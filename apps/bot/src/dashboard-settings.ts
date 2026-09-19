@@ -77,6 +77,15 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
     actionHints: ["Проверить role hierarchy", "Проверить права Manage Roles"]
   },
   {
+    key: "leveling",
+    title: "Leveling",
+    fields: [
+      { key: "xpPerMessage", label: "XP за сообщение", type: "number", min: 1, max: 1000 },
+      { key: "cooldownSeconds", label: "Cooldown, сек.", type: "number", min: 0, max: 3600 },
+      { key: "announceLevelUp", label: "Объявлять новый уровень", type: "boolean" }
+    ]
+  },
+  {
     key: "tickets",
     title: "Tickets",
     fields: [
@@ -158,6 +167,14 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       windowSeconds: "window_seconds",
       quarantineRoleId: "quarantine_role_id",
       logChannelId: "log_channel_id"
+    }
+  },
+  leveling: {
+    table: "leveling_settings",
+    columns: {
+      xpPerMessage: "xp_per_message",
+      cooldownSeconds: "cooldown_seconds",
+      announceLevelUp: "announce_level_up"
     }
   },
   tickets: {
