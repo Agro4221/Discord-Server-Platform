@@ -8,6 +8,7 @@ type VerificationConfig = {
   enabled: boolean;
   channelId: string | null;
   verifiedRoleId: string | null;
+  quarantineRoleId: string | null;
   logChannelId: string | null;
   codeTtlMinutes: number;
 };
@@ -34,7 +35,7 @@ export class Verification implements PlatformModule {
 
   private async config(guildId: string): Promise<VerificationConfig> {
     const result = await this.db.query<{ enabled: boolean; channel_id: string | null; verified_role_id: string | null; log_channel_id: string | null; code_ttl_minutes: number }>(
-      "SELECT enabled,channel_id,verified_role_id,log_channel_id,code_ttl_minutes FROM verification_settings WHERE guild_id=$1",
+      "SELECT enabled,channel_id,verified_role_id,quarantine_role_id,log_channel_id,code_ttl_minutes FROM verification_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -42,6 +43,7 @@ export class Verification implements PlatformModule {
       enabled: row?.enabled ?? false,
       channelId: row?.channel_id ?? null,
       verifiedRoleId: row?.verified_role_id ?? null,
+      quarantineRoleId: row?.quarantine_role_id ?? null,
       logChannelId: row?.log_channel_id ?? null,
       codeTtlMinutes: row?.code_ttl_minutes ?? 10
     };
@@ -51,12 +53,13 @@ export class Verification implements PlatformModule {
     const current = await this.config(guildId);
     const next = { ...current, ...patch };
     await this.db.query(
-      `INSERT INTO verification_settings(guild_id,enabled,channel_id,verified_role_id,log_channel_id,code_ttl_minutes)
-       VALUES($1,$2,$3,$4,$5,$6)
+      `INSERT INTO verification_settings(guild_id,enabled,channel_id,verified_role_id,quarantine_role_id,log_channel_id,code_ttl_minutes)
+       VALUES($1,$2,$3,$4,$5,$6,$7)
        ON CONFLICT(guild_id) DO UPDATE SET
          enabled=EXCLUDED.enabled,channel_id=EXCLUDED.channel_id,verified_role_id=EXCLUDED.verified_role_id,
-         log_channel_id=EXCLUDED.log_channel_id,code_ttl_minutes=EXCLUDED.code_ttl_minutes,updated_at=now()`,
-      [guildId,next.enabled,next.channelId,next.verifiedRoleId,next.logChannelId,Math.min(Math.max(next.codeTtlMinutes,2),60)]
+         quarantine_role_id=EXCLUDED.quarantine_role_id,log_channel_id=EXCLUDED.log_channel_id,
+         code_ttl_minutes=EXCLUDED.code_ttl_minutes,updated_at=now()`,
+      [guildId,next.enabled,next.channelId,next.verifiedRoleId,next.quarantineRoleId,next.logChannelId,Math.min(Math.max(next.codeTtlMinutes,2),60)]
     );
     await this.db.query(
       `INSERT INTO guild_modules(guild_id,module_key,enabled)
@@ -76,6 +79,7 @@ export class Verification implements PlatformModule {
     if (sub === "setup") {
       const channelOption = interaction.options.getChannel("channel");
       const role = interaction.options.getRole("verified-role");
+      const quarantineRole = interaction.options.getRole("quarantine-role");
       const logChannelOption = interaction.options.getChannel("log-channel");
       const channel = channelOption ? interaction.guild!.channels.cache.get(channelOption.id) : null;
       const logChannel = logChannelOption ? interaction.guild!.channels.cache.get(logChannelOption.id) : null;
@@ -87,10 +91,18 @@ export class Verification implements PlatformModule {
         await interaction.reply({ content: "Log channel должен быть текстовым.", ephemeral: true });
         return;
       }
+      const botPosition = interaction.guild!.members.me?.roles.highest.position ?? 0;
+      for (const candidate of [role, quarantineRole]) {
+        if (candidate && (candidate.managed || candidate.position >= botPosition)) {
+          await interaction.reply({ content: "Одна из verification-ролей недоступна из-за role hierarchy.", ephemeral: true });
+          return;
+        }
+      }
       await this.configure(interaction.guild!.id, {
         enabled: true,
         channelId: channel?.id ?? null,
         verifiedRoleId: role?.id ?? null,
+        quarantineRoleId: quarantineRole?.id ?? null,
         logChannelId: logChannel?.id ?? null,
         codeTtlMinutes: interaction.options.getInteger("ttl") ?? 10
       });
@@ -125,6 +137,22 @@ export class Verification implements PlatformModule {
     const config = await this.config(member.guild.id);
     if (!config.enabled || !config.verifiedRoleId) return;
     if (member.roles.cache.has(config.verifiedRoleId)) return;
+
+    if (config.quarantineRoleId && member.manageable) {
+      const quarantineRole = member.guild.roles.cache.get(config.quarantineRoleId);
+      const bot = member.guild.members.me;
+      if (quarantineRole && bot?.permissions.has(PermissionFlagsBits.ManageRoles) &&
+          !quarantineRole.managed && quarantineRole.position < bot.roles.highest.position) {
+        await member.roles.add(quarantineRole, "Verification quarantine").catch(() => undefined);
+      }
+    }
+
+    if (config.logChannelId) {
+      const channel = member.guild.channels.cache.get(config.logChannelId);
+      if (channel?.isTextBased() && "send" in channel) {
+        await channel.send("🛂 Verification: новый участник ожидает подтверждения — <@" + member.id + ">").catch(() => undefined);
+      }
+    }
   }
 
   private async onInteraction(interaction: import("discord.js").Interaction): Promise<void> {
@@ -184,6 +212,12 @@ export class Verification implements PlatformModule {
       return;
     }
     await member.roles.add(role, "Verification");
+    if (config.quarantineRoleId && member.roles.cache.has(config.quarantineRoleId)) {
+      const quarantineRole = interaction.guild!.roles.cache.get(config.quarantineRoleId);
+      if (quarantineRole && quarantineRole.position < (interaction.guild!.members.me?.roles.highest.position ?? 0)) {
+        await member.roles.remove(quarantineRole, "Verification passed").catch(() => undefined);
+      }
+    }
     this.codes.delete(key);
     await interaction.reply({ content: "✅ Проверка пройдена.", ephemeral: true });
     if (config.logChannelId) {
