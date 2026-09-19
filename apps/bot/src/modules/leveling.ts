@@ -36,7 +36,7 @@ export class Leveling implements PlatformModule {
          VALUES($1,true,$2,$3,$4)
          ON CONFLICT(guild_id) DO UPDATE SET enabled=true,xp_per_message=EXCLUDED.xp_per_message,cooldown_seconds=EXCLUDED.cooldown_seconds,announce_level_up=EXCLUDED.announce_level_up,updated_at=now()`,
         [
-          interaction.guild.id,
+          interaction.guild!.id,
           interaction.options.getInteger("xp") ?? 10,
           interaction.options.getInteger("cooldown") ?? 30,
           interaction.options.getBoolean("announce") ?? true
@@ -46,13 +46,13 @@ export class Leveling implements PlatformModule {
         `INSERT INTO guild_modules(guild_id,module_key,enabled)
          VALUES($1,'leveling',true)
          ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()`,
-        [interaction.guild.id]
+        [interaction.guild!.id]
       );
       await interaction.reply({ content: "Leveling настроен и включён.", ephemeral: true });
       return;
     }
 
-    if (!await moduleEnabled(this.db, interaction.guild.id, "leveling", false)) {
+    if (!await moduleEnabled(this.db, interaction.guild!.id, "leveling", false)) {
       await interaction.reply({ content: "Модуль Leveling выключен.", ephemeral: true });
       return;
     }
@@ -60,7 +60,7 @@ export class Leveling implements PlatformModule {
     const target = interaction.options.getUser("user") ?? interaction.user;
     const result = await this.db.query<{ xp: number; level: number }>(
       "SELECT xp,level FROM leveling_users WHERE guild_id=$1 AND user_id=$2",
-      [interaction.guild.id,target.id]
+      [interaction.guild!.id,target.id]
     );
 
     if (sub === "rank") {
@@ -75,7 +75,7 @@ export class Leveling implements PlatformModule {
     if (sub === "top") {
       const top = await this.db.query<{ user_id: string; xp: number; level: number }>(
         "SELECT user_id,xp,level FROM leveling_users WHERE guild_id=$1 ORDER BY xp DESC LIMIT 10",
-        [interaction.guild.id]
+        [interaction.guild!.id]
       );
       const lines = top.rows.map((row, index) => `${index + 1}. <@${row.user_id}> · lvl ${row.level} · ${row.xp} XP`);
       await interaction.reply({ content: lines.length ? `📈 **Топ Leveling**\n${lines.join("\n")}` : "Таблица лидеров пуста.", ephemeral: true });
@@ -116,9 +116,11 @@ export class Leveling implements PlatformModule {
         [nextLevel, message.guild.id, message.author.id]
       );
       if (setting.announce_level_up) {
-        await message.channel.send(
-          `🎉 <@${message.author.id}> достиг уровня **${nextLevel}**!`
-        ).catch(() => undefined);
+        if ("send" in message.channel) {
+          await message.channel.send(
+            `🎉 <@${message.author.id}> достиг уровня **${nextLevel}**!`
+          ).catch(() => undefined);
+        }
       }
     }
   }
