@@ -128,6 +128,89 @@ const migrations = [
       );
     \`
   }
+  },
+  {
+    version: 5,
+    name: "support_community",
+    sql: \`
+      CREATE TABLE IF NOT EXISTS ticket_settings (
+        guild_id text PRIMARY KEY,
+        enabled boolean NOT NULL DEFAULT false,
+        category_id text,
+        staff_role_id text,
+        transcript_channel_id text,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS tickets (
+        id bigserial PRIMARY KEY,
+        guild_id text NOT NULL,
+        channel_id text NOT NULL UNIQUE,
+        creator_id text NOT NULL,
+        claimed_by text,
+        status text NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        closed_at timestamptz
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_tickets_guild_status
+        ON tickets(guild_id,status);
+
+      CREATE TABLE IF NOT EXISTS ticket_transcripts (
+        ticket_id bigint PRIMARY KEY REFERENCES tickets(id) ON DELETE CASCADE,
+        guild_id text NOT NULL,
+        content text NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS role_panels (
+        id bigserial PRIMARY KEY,
+        guild_id text NOT NULL,
+        channel_id text NOT NULL,
+        message_id text,
+        title text NOT NULL,
+        roles jsonb NOT NULL DEFAULT '[]'::jsonb,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_role_panels_guild
+        ON role_panels(guild_id);
+
+      CREATE TABLE IF NOT EXISTS giveaways (
+        id bigserial PRIMARY KEY,
+        guild_id text NOT NULL,
+        channel_id text NOT NULL,
+        message_id text UNIQUE,
+        host_user_id text NOT NULL,
+        prize text NOT NULL,
+        winners integer NOT NULL CHECK (winners > 0 AND winners <= 100),
+        ends_at timestamptz NOT NULL,
+        status text NOT NULL,
+        selected_winners jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        finished_at timestamptz
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_giveaways_running
+        ON giveaways(status,ends_at);
+
+      CREATE TABLE IF NOT EXISTS giveaway_entries (
+        giveaway_id bigint NOT NULL REFERENCES giveaways(id) ON DELETE CASCADE,
+        user_id text NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY(giveaway_id,user_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS economy_accounts (
+        guild_id text NOT NULL,
+        user_id text NOT NULL,
+        balance bigint NOT NULL DEFAULT 0 CHECK (balance >= 0),
+        last_daily timestamptz,
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY(guild_id,user_id)
+      );
+    \`
+  }
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
