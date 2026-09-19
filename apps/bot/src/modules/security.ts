@@ -298,7 +298,12 @@ export class Security implements PlatformModule {
   }
 
   private async quarantine(member: GuildMember, config: SecurityConfig): Promise<void> {
-    if (!config.quarantineRoleId || !member.manageable) return;
+    if (
+      !config.quarantineRoleId ||
+      !member.manageable ||
+      member.id === member.guild.ownerId ||
+      member.permissions.has(PermissionFlagsBits.Administrator)
+    ) return;
     const botMember = member.guild.members.me;
     const role = member.guild.roles.cache.get(config.quarantineRoleId);
     if (!botMember || !role || role.position >= botMember.roles.highest.position) return;
