@@ -79,8 +79,9 @@ export class AutomationEngine implements PlatformModule {
     if (interaction.options.getSubcommand() !== "create") return;
 
     const event = interaction.options.getString("event", true) as AutomationEvent;
-    const responseChannel = interaction.options.getChannel("response-channel", true);
-    if (!responseChannel.isTextBased()) {
+    const responseChannelOption = interaction.options.getChannel("response-channel", true);
+    const responseChannel = interaction.guild!.channels.cache.get(responseChannelOption.id);
+    if (!responseChannel || responseChannel.type !== 0) {
       await interaction.reply({ content: "Response channel должен быть текстовым.", ephemeral: true });
       return;
     }
@@ -92,7 +93,7 @@ export class AutomationEngine implements PlatformModule {
     if (match) conditions.push({ type: "contains", left: "content", right: match });
 
     await this.createRule(
-      interaction.guild.id,
+      interaction.guild!.id,
       interaction.options.getString("name", true),
       event,
       conditions,
