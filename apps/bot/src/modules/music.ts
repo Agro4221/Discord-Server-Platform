@@ -149,6 +149,7 @@ export class Music implements PlatformModule {
 
     this.manager.on("trackStart", (player, track) => {
       void this.persistPlayer(player);
+      if (!track) return;
       void this.announce(player.textChannelId, `🎵 Сейчас играет **${track.info.title}** — ${track.info.author}`);
     });
 
@@ -218,7 +219,10 @@ export class Music implements PlatformModule {
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!interaction.inGuild() || interaction.commandName !== "music") return;
-    if (!await moduleEnabled(this.db, interaction.guild.id, "music", false)) {
+    const guild = interaction.guild;
+    if (!guild) return;
+
+    if (!await moduleEnabled(this.db, guild.id, "music", false)) {
       await interaction.reply({ content: "Модуль Music выключен.", ephemeral: true });
       return;
     }
@@ -228,7 +232,7 @@ export class Music implements PlatformModule {
       return;
     }
 
-    const member = await interaction.guild.members.fetch(interaction.user.id);
+    const member = await guild.members.fetch(interaction.user.id);
     const voice = member.voice.channel;
 
     switch (interaction.options.getSubcommand()) {
@@ -328,7 +332,8 @@ export class Music implements PlatformModule {
       await interaction.reply({ content: "Музыкальный плеер не запущен.", ephemeral: true });
       return;
     }
-    await player.pause(paused);
+    if (paused) await player.pause();
+    else await player.resume();
     await interaction.reply({ content: paused ? "⏸️ Пауза." : "▶️ Продолжаю.", ephemeral: true });
   }
 
@@ -348,7 +353,7 @@ export class Music implements PlatformModule {
       await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
       return;
     }
-    await player.stopPlaying(true, false);
+    await player.stopPlaying();
     await interaction.reply({ content: "⏹️ Остановлено.", ephemeral: true });
   }
 
@@ -428,9 +433,12 @@ export class Music implements PlatformModule {
     }
 
     const action = interaction.customId.slice("dsp:music:".length);
-    if (action === "pause") await player.pause(!player.paused);
+    if (action === "pause") {
+      if (player.paused) await player.resume();
+      else await player.pause();
+    }
     else if (action === "skip") await player.skip();
-    else if (action === "stop") await player.stopPlaying(true, false);
+    else if (action === "stop") await player.stopPlaying();
 
     await interaction.reply({
       content:
