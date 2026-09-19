@@ -248,8 +248,14 @@ export class AutomationEngine implements PlatformModule {
       `SELECT ar.id,ar.guild_id,ar.name,ar.enabled,ar.event,ar.conditions,ar.actions,ar.cooldown_seconds
        FROM automation_rules ar
        INNER JOIN guild_bot_assignments ga
-         ON ga.guild_id=ar.guild_id AND ga.bot_identity_id=$1
-       WHERE ar.enabled=true`,
+         ON ga.guild_id=ar.guild_id
+       LEFT JOIN bot_heartbeats bh
+         ON bh.bot_identity_id=ga.bot_identity_id
+       WHERE ar.enabled=true
+         AND (
+           ga.bot_identity_id=$1
+           OR ($1='primary' AND ga.bot_identity_id <> 'primary' AND bh.last_seen_at < now()-interval '90 seconds')
+         )`,
       [this.identityId]
     );
 
