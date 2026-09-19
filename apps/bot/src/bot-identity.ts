@@ -131,6 +131,14 @@ export class BotIdentityRepository {
     }));
   }
 
+  async unassignMusicVoice(guildId: string, botIdentityId: string): Promise<boolean> {
+    const result = await this.db.query(
+      "DELETE FROM guild_music_bot_assignments WHERE guild_id=$1 AND bot_identity_id=$2",
+      [guildId, botIdentityId]
+    );
+    return result.rowCount === 1;
+  }
+
   async claimUnassignedGuilds(guildIds: string[]): Promise<void> {
     if (this.identityId !== "primary" || guildIds.length === 0) return;
     for (const guildId of guildIds) {
