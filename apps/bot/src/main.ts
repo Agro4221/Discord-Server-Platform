@@ -128,6 +128,12 @@ async function main(): Promise<void> {
     settings: dashboardSettings,
     transfer,
     backups,
+    rolePanels: {
+      list: async (guildId) => rolePanels.list(guildId),
+      create: async (guildId, input) => rolePanels.createPanel(guildId, input.channelId, input.roles, input.title),
+      update: async (guildId, panelId, input, callbacks) => rolePanels.updatePanel(guildId, panelId, input.channelId, input.roles, input.title ?? "Выберите роли", callbacks),
+      delete: async (guildId, panelId, deleteMessage) => rolePanels.deletePanel(guildId, panelId, deleteMessage)
+    },
     actions: {
       "temporary-voice.reconcile": async (guildId) => { await temporaryVoice.reconcileGuild(guildId); return { guildId, ok: true }; },
       "automation.reload": async (guildId) => { await automation.reload(); return { guildId, ok: true }; },
