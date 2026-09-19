@@ -229,12 +229,21 @@ export class Notifications implements PlatformModule {
     }
 
     const channel = this.client?.channels.cache.get(feed.channelId);
-    if (channel?.isTextBased() && "send" in channel) {
+    if (!channel?.isTextBased() || !("send" in channel)) {
+      await this.markPolled(feed.id, "destination unavailable");
+      return;
+    }
+
+    try {
       await channel.send(
         `📡 **Новая запись из feed**
 **${first.title.slice(0, 250)}**
 ${first.url}`
-      ).catch((error) => logger.warn("Feed message failed", { feedId: feed.id, error: String(error) }));
+      );
+    } catch (error) {
+      logger.warn("Feed message failed", { feedId: feed.id, error: String(error) });
+      await this.markPolled(feed.id, "destination send failed");
+      return;
     }
 
     await this.db.query(
