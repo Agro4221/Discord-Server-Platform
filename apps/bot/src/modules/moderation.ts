@@ -208,6 +208,48 @@ export class Moderation implements PlatformModule {
     });
   }
 
+  async unban(interaction: ChatInputCommandInteraction, target: User, reason: string): Promise<void> {
+    if (!interaction.guild || !await this.enabled(interaction.guild.id)) {
+      await interaction.reply({ content: "Модуль Moderation выключен для этого сервера.", ephemeral: true });
+      return;
+    }
+
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.BanMembers)) {
+      await interaction.reply({ content: "Недостаточно прав: Ban Members.", ephemeral: true });
+      return;
+    }
+
+    try {
+      await interaction.guild.members.unban(target, reason);
+    } catch (error) {
+      logger.warn("Moderation unban failed", {
+        guildId: interaction.guild.id,
+        moderatorUserId: interaction.user.id,
+        targetUserId: target.id,
+        error: String(error)
+      });
+      await interaction.reply({
+        content: "Не удалось разблокировать пользователя. Проверь, что он действительно находится в бане и что у бота есть Ban Members.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    await this.audit("moderation.unban.applied", interaction.guild.id, interaction.user.id, target.id, { reason });
+    const caseId = await this.recordBestEffort(
+      interaction.guild.id,
+      target.id,
+      interaction.user.id,
+      "unban",
+      reason
+    );
+
+    await interaction.reply({
+      content: target.tag + " разблокирован." + (caseId ? " Case #" + caseId + "." : " Case не удалось записать в БД — действие применено."),
+      ephemeral: true
+    });
+  }
+
   async ban(interaction: ChatInputCommandInteraction, member: GuildMember, reason: string): Promise<void> {
     if (!interaction.guild || !await this.enabled(interaction.guild.id)) {
       await interaction.reply({ content: "Модуль Moderation выключен для этого сервера.", ephemeral: true });
