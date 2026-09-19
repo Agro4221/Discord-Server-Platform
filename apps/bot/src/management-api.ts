@@ -29,6 +29,25 @@ type ApiOptions = {
   analytics?: {
     report: (guildId: string, hours?: number) => Promise<unknown>;
   };
+  automation?: {
+    list: (guildId: string) => Promise<unknown[]>;
+    create: (guildId: string, input: {
+      name: string;
+      event: string;
+      conditions: unknown[];
+      actions: unknown[];
+      cooldownSeconds: number;
+    }) => Promise<unknown>;
+    update: (guildId: string, ruleId: string, input: {
+      name: string;
+      event: string;
+      conditions: unknown[];
+      actions: unknown[];
+      cooldownSeconds: number;
+      enabled?: boolean;
+    }) => Promise<boolean>;
+    delete: (guildId: string, ruleId: string) => Promise<boolean>;
+  };
   rolePanels?: {
     list: (guildId: string) => Promise<unknown[]>;
     create: (
@@ -309,6 +328,104 @@ export class ManagementApiServer {
               return;
             }
             this.json(res, 200, { guildId, report: await this.options.analytics.report(guildId, hours) });
+            return;
+          }
+
+          const automationMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation$/);
+          const automationItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/([^/]+)$/);
+
+          if ((automationMatch || automationItemMatch) && !this.options.automation) {
+            this.json(res, 500, { error: "automation_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && automationMatch) {
+            const guildId = automationMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, rules: await this.options.automation!.list(guildId) });
+            return;
+          }
+
+          if ((method === "POST" && automationMatch) || (method === "PUT" && automationItemMatch)) {
+            const guildId = automationMatch?.[1] ?? automationItemMatch?.[1] ?? "";
+            const ruleId = automationItemMatch?.[2] ?? null;
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || (ruleId && ruleId.length > 128)) {
+              this.json(res, 404, { error: "guild_or_rule_not_found" });
+              return;
+            }
+
+            const body = await readJson(req);
+            const name = body.name;
+            const event = body.event;
+            const conditions = body.conditions;
+            const actions = body.actions;
+            const cooldownSeconds = body.cooldownSeconds;
+
+            if (
+              typeof name !== "string" || name.trim().length < 1 || name.length > 80 ||
+              typeof event !== "string" || event.length > 64 ||
+              !Array.isArray(conditions) || conditions.length > 10 ||
+              !Array.isArray(actions) || actions.length < 1 || actions.length > 10 ||
+              typeof cooldownSeconds !== "number" || !Number.isFinite(cooldownSeconds) ||
+              cooldownSeconds < 0 || cooldownSeconds > 86400
+            ) {
+              throw new RequestInputError("invalid_automation_rule", 400);
+            }
+
+            validateAutomationPayload(this.options.client, guildId, event, conditions, actions);
+
+            const input = {
+              name: name.trim(),
+              event,
+              conditions,
+              actions,
+              cooldownSeconds,
+              ...(typeof body.enabled === "boolean" ? { enabled: body.enabled } : {})
+            };
+
+            const result = ruleId === null
+              ? await this.options.automation!.create(guildId, input)
+              : await this.options.automation!.update(guildId, ruleId, input);
+
+            if (ruleId !== null && result === false) {
+              this.json(res, 404, { error: "rule_not_found" });
+              return;
+            }
+
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: ruleId === null ? "automation.created" : "automation.updated",
+              targetType: "automation-rule",
+              targetId: ruleId ?? String((result as { id?: string })?.id ?? "unknown")
+            });
+            this.json(res, 200, { ok: true, rule: ruleId === null ? result : undefined });
+            return;
+          }
+
+          if (method === "DELETE" && automationItemMatch) {
+            const guildId = automationItemMatch[1] ?? "";
+            const ruleId = automationItemMatch[2] ?? "";
+            if (!guildId || !ruleId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_rule_not_found" });
+              return;
+            }
+            const deleted = await this.options.automation!.delete(guildId, ruleId);
+            if (!deleted) {
+              this.json(res, 404, { error: "rule_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "automation.deleted",
+              targetType: "automation-rule",
+              targetId: ruleId
+            });
+            this.json(res, 200, { ok: true });
             return;
           }
 
