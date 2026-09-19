@@ -34,7 +34,14 @@ export class Verification implements PlatformModule {
   }
 
   private async config(guildId: string): Promise<VerificationConfig> {
-    const result = await this.db.query<{ enabled: boolean; channel_id: string | null; verified_role_id: string | null; log_channel_id: string | null; code_ttl_minutes: number }>(
+    const result = await this.db.query<{
+      enabled: boolean;
+      channel_id: string | null;
+      verified_role_id: string | null;
+      quarantine_role_id: string | null;
+      log_channel_id: string | null;
+      code_ttl_minutes: number;
+    }>(
       "SELECT enabled,channel_id,verified_role_id,quarantine_role_id,log_channel_id,code_ttl_minutes FROM verification_settings WHERE guild_id=$1",
       [guildId]
     );
