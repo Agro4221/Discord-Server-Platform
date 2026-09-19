@@ -12,6 +12,7 @@ type Rule = {
   event: string;
   all: Array<{ type: string; left?: string; right?: string; channelId?: string }>;
   actions: Array<{ type: string; channelId?: string; content?: string; message?: string }>;
+  cooldownSeconds: number;
 };
 
 const EVENTS = ["member.join","member.leave","message.create","voice.join","voice.leave","voice.move"] as const;
@@ -64,8 +65,7 @@ export function AutomationPanel({
     setName(rule.name);
     setEvent(rule.event);
     setEnabled(rule.enabled);
-    const cooldown = 0;
-    setCooldownSeconds(cooldown);
+    setCooldownSeconds(rule.cooldownSeconds);
     setConditions(rule.all.map((condition) => {
       if (condition.type === "channel-is") return { type: "channel-is", value: condition.channelId ?? "" };
       if (condition.type === "equals") return { type: "equals", value: condition.right ?? "" };
