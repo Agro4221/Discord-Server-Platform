@@ -6,6 +6,7 @@ import {
 } from "discord.js";
 import type { Database } from "../database.js";
 import type { PlatformModule, ModuleContext } from "../module.js";
+import type { PlatformEventBus } from "../events.js";
 
 type ModerationAction = "warn" | "timeout" | "kick" | "ban" | "unban";
 
@@ -22,10 +23,13 @@ export type ModerationCase = {
 
 export class Moderation implements PlatformModule {
   readonly name = "moderation";
+  private events?: PlatformEventBus;
 
   constructor(private readonly db: Database) {}
 
-  async init(_context: ModuleContext): Promise<void> {}
+  async init(context: ModuleContext): Promise<void> {
+    this.events = context.events;
+  }
 
   async shutdown(): Promise<void> {}
 
@@ -44,7 +48,16 @@ export class Moderation implements PlatformModule {
        RETURNING id`,
       [guildId, targetUserId, moderatorUserId, action, reason, expiresAt]
     );
-    return Number(result.rows[0]?.id);
+    const caseId = Number(result.rows[0]?.id);
+    if (Number.isSafeInteger(caseId) && caseId > 0) {
+      await this.events?.emit("moderation.case", {
+        guildId,
+        userId: targetUserId,
+        action,
+        caseId
+      });
+    }
+    return caseId;
   }
 
   async history(guildId: string, targetUserId: string, limit = 10): Promise<ModerationCase[]> {
