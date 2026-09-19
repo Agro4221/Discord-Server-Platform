@@ -269,7 +269,16 @@ export class Tickets implements PlatformModule {
           ticketId,
           error: String(error)
         });
-        throw error;
+        await interaction.editReply({
+          content: "Не удалось закрыть тикет. Изменения откатированы."
+        }).catch((replyError) => {
+          logger.warn("Ticket close failure response failed", {
+            guildId: interaction.guild!.id,
+            ticketId,
+            error: String(replyError)
+          });
+        });
+        return;
       }
 
       if (config.transcriptChannelId) {
