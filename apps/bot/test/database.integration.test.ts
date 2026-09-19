@@ -54,6 +54,45 @@ test("database transaction rolls back failed writes", { skip: !enabled }, async 
   }
 });
 
+test("config import rejects malformed automation rules", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345679";
+  try {
+    await migrate(db);
+    await db.query("DELETE FROM automation_rules WHERE guild_id=$1", [guildId]);
+
+    const transfer = new ConfigTransferService(db);
+    await assert.rejects(
+      transfer.importGuild(guildId, {
+        schemaVersion: 1,
+        exportedAt: new Date().toISOString(),
+        guildId,
+        modules: [{
+          key: "automation",
+          enabled: true,
+          settings: {
+            automation_rules: [{
+              name: "Broken imported rule",
+              enabled: true,
+              event: "not-a-real-event",
+              conditions: [],
+              actions: [{ type: "send-message", channelId: "123456789012345678", content: "x" }],
+              cooldown_seconds: 0
+            }]
+          }
+        }]
+      }),
+      /unsupported_automation_event/
+    );
+
+    const result = await db.query("SELECT 1 FROM automation_rules WHERE guild_id=$1", [guildId]);
+    assert.equal(result.rows.length, 0);
+  } finally {
+    await db.query("DELETE FROM automation_rules WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.close();
+  }
+});
+
 test("config transfer and local backup round-trip preserve guild configuration", { skip: !enabled }, async () => {
   const db = new Database(process.env.DATABASE_URL!);
   const directory = await mkdtemp(join(tmpdir(), "dsp-backup-"));
