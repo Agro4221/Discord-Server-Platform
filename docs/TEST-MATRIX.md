@@ -85,3 +85,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-09-19 — Role Panel rollback snapshot
 - Same-channel publication rollback is regression-tested.
 - Live Discord message edit failure and DB outage injection remain release-gate validation.
+
+
+### 2026-09-19 — Security audit-window snapshot
+- Destructive-burst audit-log executor lookup now uses the configured destructive window and is covered by deterministic cutoff tests.
+- Live destructive-event/audit-log correlation remains a release-gate validation case.
