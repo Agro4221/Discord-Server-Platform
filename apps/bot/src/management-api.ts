@@ -127,10 +127,6 @@ export class ManagementApiServer {
                 typeof body.botIdentityId !== "string" || body.botIdentityId.length < 1 || body.botIdentityId.length > 100) {
               throw new RequestInputError("invalid_fleet_assignment", 400);
             }
-            if (!this.options.client.guilds.cache.has(body.guildId)) {
-              this.json(res, 404, { error: "guild_not_connected_to_this_bot" });
-              return;
-            }
             await this.options.identities.assignGuild(body.guildId, body.botIdentityId);
             await this.options.auditLog.record({
               guildId: body.guildId,
