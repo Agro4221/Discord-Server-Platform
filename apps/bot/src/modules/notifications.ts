@@ -7,6 +7,17 @@ import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 
+export type NotificationFeedRecord = {
+  id: number;
+  guildId: string;
+  channelId: string;
+  url: string;
+  enabled: boolean;
+  intervalSeconds: number;
+  lastItemKey: string | null;
+  lastPolledAt: string | null;
+};
+
 type Feed = {
   id: string;
   guildId: string;
@@ -24,6 +35,77 @@ export class Notifications implements PlatformModule {
   private running = false;
 
   constructor(private readonly db: Database) {}
+
+  async listFeeds(guildId: string): Promise<NotificationFeedRecord[]> {
+    const result = await this.db.query<{
+      id: string;
+      guild_id: string;
+      channel_id: string;
+      url: string;
+      enabled: boolean;
+      interval_seconds: number;
+      last_item_key: string | null;
+      last_polled_at: string | null;
+    }>(
+      "SELECT id,guild_id,channel_id,url,enabled,interval_seconds,last_item_key,last_polled_at FROM notification_feeds WHERE guild_id=$1 ORDER BY id DESC",
+      [guildId]
+    );
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      guildId: row.guild_id,
+      channelId: row.channel_id,
+      url: row.url,
+      enabled: row.enabled,
+      intervalSeconds: row.interval_seconds,
+      lastItemKey: row.last_item_key,
+      lastPolledAt: row.last_polled_at
+    }));
+  }
+
+  async addFeed(guildId: string, channelId: string, url: string, intervalSeconds: number): Promise<NotificationFeedRecord> {
+    await assertSafeFeedUrl(url);
+    const safeInterval = Math.min(Math.max(Math.trunc(intervalSeconds), 60), 86_400);
+    const result = await this.db.query<{ id: string }>(
+      "INSERT INTO notification_feeds(guild_id,channel_id,url,interval_seconds,enabled) VALUES($1,$2,$3,$4,true) RETURNING id",
+      [guildId, channelId, url, safeInterval]
+    );
+    const id = result.rows[0]?.id;
+    if (!id) throw new Error("feed_create_failed");
+    await this.db.query(
+      `INSERT INTO guild_modules(guild_id,module_key,enabled)
+       VALUES($1,'notifications',true)
+       ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()`,
+      [guildId]
+    );
+    const feed = (await this.listFeeds(guildId)).find((item) => item.id === Number(id));
+    if (!feed) throw new Error("feed_create_failed");
+    return feed;
+  }
+
+  async updateFeed(guildId: string, id: number, patch: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean }): Promise<boolean> {
+    if (patch.url !== undefined) await assertSafeFeedUrl(patch.url);
+    const current = (await this.listFeeds(guildId)).find((item) => item.id === id);
+    if (!current) return false;
+    await this.db.query(
+      `UPDATE notification_feeds
+       SET channel_id=$1,url=$2,interval_seconds=$3,enabled=$4,updated_at=now()
+       WHERE id=$5 AND guild_id=$6`,
+      [
+        patch.channelId ?? current.channelId,
+        patch.url ?? current.url,
+        Math.min(Math.max(Math.trunc(patch.intervalSeconds ?? current.intervalSeconds), 60), 86_400),
+        patch.enabled ?? current.enabled,
+        id,
+        guildId
+      ]
+    );
+    return true;
+  }
+
+  async deleteFeed(guildId: string, id: number): Promise<boolean> {
+    const result = await this.db.query("DELETE FROM notification_feeds WHERE id=$1 AND guild_id=$2", [id,guildId]);
+    return result.rowCount === 1;
+  }
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
@@ -64,21 +146,7 @@ export class Notifications implements PlatformModule {
         return;
       }
 
-      await assertSafeFeedUrl(url);
-
-      await this.db.query(
-        `INSERT INTO notification_feeds(guild_id,channel_id,url,interval_seconds)
-         VALUES($1,$2,$3,$4)`,
-        [interaction.guild!.id, channel.id, url, minutes * 60]
-      );
-
-      await this.db.query(
-        `INSERT INTO guild_modules(guild_id,module_key,enabled)
-         VALUES($1,'notifications',true)
-         ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()`,
-        [interaction.guild!.id]
-      );
-
+      await this.addFeed(interaction.guild!.id, channel.id, url, minutes * 60);
       await interaction.reply({ content: "Feed добавлен. Проверка начнётся автоматически.", ephemeral: true });
     }
   }
