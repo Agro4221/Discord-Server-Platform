@@ -41,7 +41,12 @@ async function main(): Promise<void> {
   const dashboardSettings = new DashboardSettingsService(database);
   const identities = new BotIdentityRepository(database, config.botIdentityId);
   const transfer = new ConfigTransferService(database);
-  const backups = new BackupService(database, config.backupDirectory);
+  const backups = new BackupService(
+    database,
+    config.backupDirectory,
+    config.backupRetentionCount,
+    config.backupS3
+  );
   await health.start(config.healthHost, config.healthPort);
 
   try {
