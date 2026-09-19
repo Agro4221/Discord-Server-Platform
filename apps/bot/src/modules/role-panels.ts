@@ -30,7 +30,7 @@ export class RolePanels implements PlatformModule {
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!interaction.inGuild() || interaction.commandName !== "roles") return;
-    if (!await moduleEnabled(this.db, interaction.guild.id, "roles", false)) {
+    if (!await moduleEnabled(this.db, interaction.guild!.id, "roles", false)) {
       await interaction.reply({ content: "Модуль Role Panels выключен.", ephemeral: true });
       return;
     }
@@ -40,26 +40,27 @@ export class RolePanels implements PlatformModule {
       return;
     }
 
-    const channel = interaction.options.getChannel("channel", true);
+    const channelOption = interaction.options.getChannel("channel", true);
     const role = interaction.options.getRole("role", true);
     const label = interaction.options.getString("label", true);
-    if (!channel.isTextBased()) {
+    const channel = interaction.guild!.channels.cache.get(channelOption.id);
+    if (!channel || channel.type !== 0) {
       await interaction.reply({ content: "Channel должен быть текстовым.", ephemeral: true });
       return;
     }
 
-    if (!interaction.guild.members.me?.permissions.has("ManageRoles")) {
+    if (!interaction.guild!.members.me?.permissions.has("ManageRoles")) {
       await interaction.reply({ content: "Боту не хватает Manage Roles.", ephemeral: true });
       return;
     }
-    if (role.position >= interaction.guild.members.me.roles.highest.position) {
+    if (role.position >= interaction.guild!.members.me.roles.highest.position) {
       await interaction.reply({ content: "Бот не может управлять этой ролью из-за role hierarchy.", ephemeral: true });
       return;
     }
 
     const created = await this.db.query<{ id: string }>(
       "INSERT INTO role_panels(guild_id,channel_id,title,roles) VALUES($1,$2,$3,$4::jsonb) RETURNING id",
-      [interaction.guild.id, channel.id, "Выберите роли", JSON.stringify([{ roleId: role.id, label }])]
+      [interaction.guild!.id, channel.id, "Выберите роли", JSON.stringify([{ roleId: role.id, label }])]
     );
     const panelId = created.rows[0]?.id;
     if (!panelId) throw new Error("role panel id missing");
@@ -100,7 +101,7 @@ export class RolePanels implements PlatformModule {
       [panelId]
     );
     const row = result.rows[0];
-    if (!row || row.guild_id !== interaction.guild.id) {
+    if (!row || row.guild_id !== interaction.guild!.id) {
       await interaction.reply({ content: "Панель не найдена.", ephemeral: true });
       return;
     }
@@ -111,9 +112,9 @@ export class RolePanels implements PlatformModule {
       return;
     }
 
-    const role = interaction.guild.roles.cache.get(roleId);
-    const member = await interaction.guild.members.fetch(interaction.user.id);
-    if (!role || role.position >= interaction.guild.members.me!.roles.highest.position) {
+    const role = interaction.guild!.roles.cache.get(roleId);
+    const member = await interaction.guild!.members.fetch(interaction.user.id);
+    if (!role || role.position >= interaction.guild!.members.me!.roles.highest.position) {
       await interaction.reply({ content: "Эта роль сейчас недоступна для управления.", ephemeral: true });
       return;
     }
