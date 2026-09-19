@@ -275,27 +275,32 @@ export class AutoMod implements PlatformModule {
       });
     });
 
-    await this.auditLog?.record({
-      guildId: message.guild.id,
-      source: "system",
-      action: "automod.violation",
-      targetType: "user",
-      targetId: message.author.id,
-      metadata: {
-        messageId: message.id,
-        rule: reason,
-        deleted,
-        timedOut
+    const auditLog = this.auditLog;
+    if (auditLog) {
+      try {
+        await auditLog.record({
+          guildId: message.guild.id,
+          source: "system",
+          action: "automod.violation",
+          targetType: "user",
+          targetId: message.author.id,
+          metadata: {
+            messageId: message.id,
+            rule: reason,
+            deleted,
+            timedOut
+          }
+        });
+      } catch (error) {
+        logger.warn("AutoMod audit write failed", {
+          guildId: message.guild!.id,
+          userId: message.author.id,
+          messageId: message.id,
+          rule: reason,
+          error: String(error)
+        });
       }
-    }).catch((error) => {
-      logger.warn("AutoMod audit write failed", {
-        guildId: message.guild!.id,
-        userId: message.author.id,
-        messageId: message.id,
-        rule: reason,
-        error: String(error)
-      });
-    });
+    }
   }
 
   private pruneRecent(now: number): void {
@@ -322,6 +327,9 @@ export class AutoMod implements PlatformModule {
 
 
 
+export function parseAutoModIdList(value: string): Set<string> {
+  return new Set(value.split(/[\s,\n]+/).map((id) => id.trim()).filter(Boolean));
+}
 
 export function detectAutoModViolation(
   content: string,
