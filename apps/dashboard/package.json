@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 -p 3000",
     "build": "next build",
-    "start": "next start --hostname 127.0.0.1 -p 3000"
+    "start": "next start --hostname 127.0.0.1 -p 3000",
+    "lint": "next lint"
   },
   "dependencies": {
     "next": "^16.3.0",
