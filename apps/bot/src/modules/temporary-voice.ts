@@ -57,6 +57,10 @@ export class TemporaryVoice implements PlatformModule {
     void this.reconcile();
   }
 
+  isReady(): boolean {
+    return this.ready;
+  }
+
   async configure(guildId: string, config: TempVoiceConfig): Promise<void> {
     await this.db.transaction(async (client) => {
       await client.query(
@@ -337,7 +341,12 @@ export class TemporaryVoice implements PlatformModule {
     const guild = [...this.getGuilds()].find((candidate) => candidate.id === guildId);
     for (const channelId of ids) {
       const channel = guild?.channels.cache.get(channelId);
-      if (channel?.type === ChannelType.GuildVoice && channel.members.size === 0) {
+      if (!channel || channel.type !== ChannelType.GuildVoice) {
+        await this.removeRoomRecord(channelId);
+        continue;
+      }
+
+      if (shouldDeleteEmptyTemporaryVoiceRoom(channel.members.size)) {
         await channel.delete("Temporary voice module disabled").catch((error) => {
           logger.warn("Temporary voice disabled cleanup failed", {
             guildId,
@@ -345,8 +354,15 @@ export class TemporaryVoice implements PlatformModule {
             error: String(error)
           });
         });
+        await this.removeRoomRecord(channelId);
+        continue;
       }
-      await this.removeRoomRecord(channelId);
+
+      logger.info("Temporary voice cleanup deferred because room is occupied", {
+        guildId,
+        channelId,
+        members: channel.members.size
+      });
     }
   }
 
@@ -396,4 +412,9 @@ export class TemporaryVoice implements PlatformModule {
       staleRemoved: staleIds.length
     });
   }
+}
+
+
+export function shouldDeleteEmptyTemporaryVoiceRoom(memberCount: number): boolean {
+  return memberCount <= 0;
 }

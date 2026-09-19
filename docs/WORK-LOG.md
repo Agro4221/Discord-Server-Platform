@@ -118,3 +118,11 @@ Never write credentials, tokens or private user data here.
 - Found a restart-only gap where resumed players had a current track but no `lastPlayedTracks` marker, so custom Autoplay could stop after that track.
 - Restored current tracks now repopulate the marker before the player state is persisted.
 - Live restart + Lavalink resume remains a live-environment validation item.
+
+
+## 2026-09-19 — Ticket and Temporary Voice lifecycle hardening
+- Found that `TemporaryVoice.markReady()` was never called anywhere, so `handleVoiceState()` could remain permanently gated.
+- Wired Temporary Voice activation to Discord ClientReady in `main.ts`.
+- Fixed module-disable cleanup so occupied temporary rooms are not orphaned by deleting their DB record before the room empties.
+- Found that `Tickets.recoverStaleClosures()` existed but was never invoked; added startup recovery plus a 60-second recurring sweep with caught errors.
+- Added regression tests for both lifecycle paths.

@@ -56,3 +56,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 
 ### 2026-09-19 — Music resume continuity
 - Resume/autoplay continuity is covered in code path review; full Lavalink restart/resume remains a live validation case.
+
+
+### 2026-09-19 — Ticket / Temporary Voice lifecycle snapshot
+- Temporary Voice ClientReady activation and occupied-room cleanup rules are regression-tested.
+- Ticket stale-closure recovery is now invoked at startup and periodically; live Discord cleanup remains a live-environment validation item.

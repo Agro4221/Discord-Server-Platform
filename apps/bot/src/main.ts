@@ -270,6 +270,7 @@ async function main(): Promise<void> {
 
   await registerCommands(config, client);
   wireDiscordEvents(client, events);
+  client.once("ready", () => temporaryVoice.markReady());
 
   await identities.claimUnassignedGuilds([...client.guilds.cache.keys()]);
   await identities.refreshAssignments();

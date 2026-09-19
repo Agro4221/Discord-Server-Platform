@@ -107,3 +107,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-09-19 — Music resume/autoplay continuity
 - Restored Lavalink players now repopulate the in-memory last-track marker from the resumed current track.
 - This preserves the project's Autoplay chain across a process restart instead of requiring a fresh `trackStart` event.
+
+
+## 2026-09-19 — Ticket and Temporary Voice lifecycle hardening
+- Temporary Voice is now activated from the actual Discord ClientReady lifecycle instead of leaving its internal readiness gate permanently false.
+- Disabling Temporary Voice now defers cleanup for occupied rooms; the durable room record remains so the normal leave handler can remove the room when it becomes empty.
+- Tickets now run stale `closing` recovery at startup and every 60 seconds with safe error logging.
+- Added regression coverage for the Temporary Voice lifecycle/cleanup rule and Ticket recovery startup path.

@@ -15,19 +15,30 @@ export class Tickets implements PlatformModule {
   readonly name = "tickets";
   private unsubscribe?: () => void;
   private events?: import("../events.js").PlatformEventBus;
+  private recoveryTimer?: NodeJS.Timeout;
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.events = context.events;
+    await this.recoverStaleClosures();
     const a = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const b = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
     this.unsubscribe = () => { a(); b(); };
+    this.recoveryTimer = setInterval(() => {
+      void this.recoverStaleClosures().catch((error) => {
+        logger.warn("Ticket stale-closure recovery failed", { error: String(error) });
+      });
+    }, 60_000);
+    this.recoveryTimer.unref();
   }
 
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    if (this.recoveryTimer) clearInterval(this.recoveryTimer);
+    this.recoveryTimer = undefined;
+    this.events = undefined;
   }
 
   private async config(guildId: string): Promise<TicketConfig> {
