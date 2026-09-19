@@ -28,11 +28,13 @@ export class Security implements PlatformModule {
   private readonly alertAt = new Map<string, number>();
   private readonly destructive = new Map<string, { timestamp: number; type: string }[]>();
   private client?: import("discord.js").Client;
+  private auditLog?: import("../audit.js").AuditLog;
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+    this.auditLog = context.auditLog;
     const a = context.events.on("member.add", (member) => this.onJoin(member));
     const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const c = context.events.on("channel.delete", (channel) => this.onDestructive(channel.guildId, "channel.delete"));
@@ -48,6 +50,7 @@ export class Security implements PlatformModule {
     this.destructiveActiveUntil.clear();
     this.alertAt.clear();
     this.destructive.clear();
+    this.auditLog = undefined;
     this.client = undefined;
   }
 
@@ -133,9 +136,15 @@ export class Security implements PlatformModule {
     if (!raidTriggered) return;
 
     this.raidActiveUntil.set(member.guild.id, now + Math.max(config.windowSeconds * 1000, 60000));
+    const raidMetadata = { joins: bucket.length, windowSeconds: config.windowSeconds };
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'raid-detected',$2::jsonb)",
-      [member.guild.id,JSON.stringify({ joins: bucket.length, windowSeconds: config.windowSeconds })]
+      [member.guild.id,JSON.stringify(raidMetadata)]
+    );
+    await this.audit(
+      member.guild.id,
+      "security.raid-detected",
+      raidMetadata
     );
     for (const entry of bucket) {
       const target = member.guild.members.cache.get(entry.userId) ?? await member.guild.members.fetch(entry.userId).catch(() => null);
@@ -160,10 +169,12 @@ export class Security implements PlatformModule {
       guildId,
       now + Math.max(config.destructiveWindowSeconds * 1000, 60000)
     );
+    const burstMetadata = { type, actions: bucket.length, windowSeconds: config.destructiveWindowSeconds };
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'destructive-burst',$2::jsonb)",
-      [guildId,JSON.stringify({ type, actions: bucket.length, windowSeconds: config.destructiveWindowSeconds })]
+      [guildId,JSON.stringify(burstMetadata)]
     );
+    await this.audit(guildId, "security.destructive-burst", burstMetadata);
     const executors = await this.findRecentExecutors(guildId, type);
     for (const executor of executors) {
       await this.respondToExecutor(guildId, executor.userId, config, type, executor.count);
@@ -222,6 +233,32 @@ export class Security implements PlatformModule {
     };
   }
 
+  private async audit(
+    guildId: string,
+    action: string,
+    metadata: Record<string, unknown>,
+    targetType?: string,
+    targetId?: string
+  ): Promise<void> {
+    await this.auditLog?.record({
+      guildId,
+      source: "system",
+      action,
+      targetType: targetType ?? null,
+      targetId: targetId ?? null,
+      metadata
+    }).catch((error) => {
+      console.warn(JSON.stringify({
+        ts: new Date().toISOString(),
+        level: "WARN",
+        message: "Security audit write failed",
+        guildId,
+        action,
+        error: String(error)
+      }));
+    });
+  }
+
   private async alert(guildId: string, config: SecurityConfig, message: string): Promise<void> {
     const now = Date.now();
     const last = this.alertAt.get(guildId) ?? 0;
@@ -278,9 +315,23 @@ export class Security implements PlatformModule {
 
     await this.quarantine(member, config);
 
+    const responseMetadata = {
+      userId,
+      trigger: type,
+      executorCount,
+      removedRoles: removable.size,
+      quarantine: Boolean(config.quarantineRoleId)
+    };
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'response-applied',$2::jsonb)",
-      [guildId,JSON.stringify({ userId, trigger: type, executorCount, removedRoles: removable.size, quarantine: Boolean(config.quarantineRoleId) })]
+      [guildId,JSON.stringify(responseMetadata)]
+    );
+    await this.audit(
+      guildId,
+      "security.response-applied",
+      responseMetadata,
+      "user",
+      userId
     );
   }
 }
