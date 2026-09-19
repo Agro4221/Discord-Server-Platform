@@ -13,7 +13,8 @@
   "dependencies": {
     "@dsp/domain": "file:../../packages/domain",
     "discord.js": "^14.27.0",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "fast-xml-parser": "^5.11.1"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
