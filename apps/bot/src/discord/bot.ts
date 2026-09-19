@@ -21,18 +21,25 @@ export function createDiscordClient(): Client {
       GatewayIntentBits.GuildMembers,
       GatewayIntentBits.GuildVoiceStates,
       GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.MessageContent
+      GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildMessageReactions
     ]
   });
 }
 
-export async function registerCommands(config: AppConfig, _client: Client): Promise<void> {
+export async function registerCommands(
+  config: AppConfig,
+  _client: Client
+): Promise<void> {
   const rest = new REST({ version: "10" }).setToken(config.discordToken);
   const commands = buildCommands().map((command) => command.toJSON());
 
   if (config.discordTestGuildId) {
     await rest.put(
-      Routes.applicationGuildCommands(config.discordClientId, config.discordTestGuildId),
+      Routes.applicationGuildCommands(
+        config.discordClientId,
+        config.discordTestGuildId
+      ),
       { body: commands }
     );
     logger.info("Registered test-guild commands", {
@@ -42,7 +49,9 @@ export async function registerCommands(config: AppConfig, _client: Client): Prom
     return;
   }
 
-  await rest.put(Routes.applicationCommands(config.discordClientId), { body: commands });
+  await rest.put(Routes.applicationCommands(config.discordClientId), {
+    body: commands
+  });
   logger.info("Registered global commands", { count: commands.length });
 }
 
@@ -51,6 +60,7 @@ export function wireDiscordEvents(
   events: PlatformEventBus
 ): void {
   client.on(Events.InteractionCreate, (interaction) => {
+    void events.emit("interaction", interaction);
     if (interaction.isChatInputCommand()) {
       void events.emit("interaction.command", interaction);
     }
@@ -65,13 +75,19 @@ export function wireDiscordEvents(
   });
 
   client.on(Events.MessageDelete, (message) => {
-    if (!message.partial) void events.emit("message.delete", message);
+    if (!message.partial) {
+      void events.emit("message.delete", message);
+    }
   });
 
   client.on(Events.MessageUpdate, (oldMessage, newMessage) => {
     if (!oldMessage.partial && !newMessage.partial) {
       void events.emit("message.update", { oldMessage, newMessage });
     }
+  });
+
+  client.on(Events.MessageReactionAdd, (reaction, user) => {
+    void events.emit("reaction.add", { reaction, user });
   });
 
   client.on(Events.GuildMemberAdd, (member) => {
@@ -104,16 +120,15 @@ export async function routeCommand(
       error: String(error)
     });
 
+    const reply = {
+      content: "Произошла внутренняя ошибка.",
+      ephemeral: true
+    };
+
     if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({
-        content: "Произошла внутренняя ошибка.",
-        ephemeral: true
-      }).catch(() => undefined);
+      await interaction.followUp(reply).catch(() => undefined);
     } else {
-      await interaction.reply({
-        content: "Произошла внутренняя ошибка.",
-        ephemeral: true
-      }).catch(() => undefined);
+      await interaction.reply(reply).catch(() => undefined);
     }
   }
 }
