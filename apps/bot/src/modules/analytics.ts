@@ -39,7 +39,7 @@ export class Analytics implements PlatformModule {
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!interaction.inGuild() || interaction.commandName !== "analytics") return;
-    if (!await moduleEnabled(this.db, interaction.guild.id, "analytics", false)) {
+    if (!await moduleEnabled(this.db, interaction.guild!.id, "analytics", false)) {
       await interaction.reply({ content: "Модуль Analytics выключен.", ephemeral: true });
       return;
     }
@@ -48,7 +48,7 @@ export class Analytics implements PlatformModule {
        FROM analytics_events
        WHERE guild_id=$1 AND bucket_start >= now()-interval '24 hours'
        GROUP BY event_type ORDER BY total DESC`,
-      [interaction.guild.id]
+      [interaction.guild!.id]
     );
     const lines = result.rows.map((row) => `• ${row.event_type}: ${row.total}`);
     await interaction.reply({
