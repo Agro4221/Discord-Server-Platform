@@ -345,6 +345,7 @@ export class AutomationEngine implements PlatformModule {
   }
 
   private async emitSchedules(): Promise<void> {
+    await this.reload();
     const now = new Date();
     for (const guildId of this.rules.keys()) {
       await this.execute({
