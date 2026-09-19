@@ -298,7 +298,9 @@ export function DashboardClient() {
           </div>
         </header>
 
-        {actionMessage && <div style={{ marginBottom: 18, padding: 13, borderRadius: 12, background: "#12271b", border: "1px solid #274f36" }}>{actionMessage}</div>}\n\n        {error && (
+        {actionMessage && <div style={{ marginBottom: 18, padding: 13, borderRadius: 12, background: "#12271b", border: "1px solid #274f36" }}>{actionMessage}</div>}
+
+        {error && (
           <div style={{ marginBottom: 18, padding: 13, borderRadius: 12, background: "#32191b", border: "1px solid #63292d" }}>
             {error}
           </div>
