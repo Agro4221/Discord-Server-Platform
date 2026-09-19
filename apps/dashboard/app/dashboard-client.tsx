@@ -414,6 +414,7 @@ export function DashboardClient() {
                 <AutomationPanel
                   guildId={guildId}
                   channels={resources.channels.filter((resource) => resource.type === 0)}
+                  roles={resources.roles.filter((resource) => resource.manageable !== false)}
                   onChanged={reloadAudit}
                 />
               ) : !schema ? (
