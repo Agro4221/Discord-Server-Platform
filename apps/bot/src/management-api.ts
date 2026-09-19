@@ -44,6 +44,7 @@ type ApiOptions = {
       name: string;
       event: string;
       conditions: unknown[];
+      anyConditions: unknown[];
       actions: unknown[];
       cooldownSeconds: number;
     }) => Promise<unknown>;
@@ -51,6 +52,7 @@ type ApiOptions = {
       name: string;
       event: string;
       conditions: unknown[];
+      anyConditions: unknown[];
       actions: unknown[];
       cooldownSeconds: number;
       enabled?: boolean;
