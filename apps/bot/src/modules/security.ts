@@ -185,6 +185,10 @@ export class Security implements PlatformModule {
     const botMember = guild.members.me;
     const quarantineRole = config.quarantineRoleId ? guild.roles.cache.get(config.quarantineRoleId) : null;
     const logChannel = config.logChannelId ? guild.channels.cache.get(config.logChannelId) : null;
+    const logPermissions =
+      botMember && logChannel && "permissionsFor" in logChannel
+        ? logChannel.permissionsFor(botMember)
+        : null;
 
     return {
       guildId,
@@ -198,7 +202,11 @@ export class Security implements PlatformModule {
         quarantineRole.position < botMember.roles.highest.position
       ),
       logChannelConfigured: Boolean(config.logChannelId),
-      logChannelSendable: Boolean(logChannel?.isTextBased() && "send" in logChannel)
+      logChannelSendable: Boolean(
+        logChannel?.isTextBased() &&
+        logPermissions?.has(PermissionFlagsBits.ViewChannel) &&
+        logPermissions.has(PermissionFlagsBits.SendMessages)
+      )
     };
   }
 
