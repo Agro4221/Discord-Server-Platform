@@ -102,7 +102,7 @@ export class BotIdentityRepository {
         [guildId, botIdentityId, voiceChannelId]
       );
     } catch (error) {
-      if (String(error).includes("guild_music_bot_assignments_guild_id_voice_channel_id_key")) {
+      if (isUniqueConstraint(error, "guild_music_bot_assignments_guild_id_voice_channel_id_key")) {
         throw new Error("music_voice_channel_already_assigned");
       }
       throw error;
@@ -188,4 +188,11 @@ export function resolveIdentityEnv(identityId: string): { token: string; clientI
 
 export function identityLabel(client: Client): string {
   return client.user?.tag ?? "unknown-bot";
+}
+
+
+function isUniqueConstraint(error: unknown, constraint: string): boolean {
+  if (!error || typeof error !== "object") return false;
+  const value = error as { code?: unknown; constraint?: unknown };
+  return value.code === "23505" && value.constraint === constraint;
 }
