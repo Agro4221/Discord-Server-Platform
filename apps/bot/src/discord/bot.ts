@@ -32,7 +32,9 @@ export async function registerCommands(
   _client: Client
 ): Promise<void> {
   const rest = new REST({ version: "10" }).setToken(config.discordToken);
-  const commands = buildCommands().map((command) => command.toJSON());
+  const commands = buildCommands()
+    .filter((command) => config.botIdentityId === "primary" || command.name === "music")
+    .map((command) => command.toJSON());
 
   if (config.discordTestGuildId) {
     await rest.put(
