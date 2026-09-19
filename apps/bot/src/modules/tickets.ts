@@ -67,18 +67,20 @@ export class Tickets implements PlatformModule {
         await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
         return;
       }
-      const category = interaction.options.getChannel("category");
+      const categoryOption = interaction.options.getChannel("category");
       const staffRole = interaction.options.getRole("staff-role");
-      const transcriptChannel = interaction.options.getChannel("transcript-channel");
-      if (category && category.type !== ChannelType.GuildCategory) {
+      const transcriptOption = interaction.options.getChannel("transcript-channel");
+      const category = categoryOption ? interaction.guild!.channels.cache.get(categoryOption.id) : null;
+      const transcriptChannel = transcriptOption ? interaction.guild!.channels.cache.get(transcriptOption.id) : null;
+      if (categoryOption && (!category || category.type !== ChannelType.GuildCategory)) {
         await interaction.reply({ content: "Category должна быть категорией.", ephemeral: true });
         return;
       }
-      if (transcriptChannel && !transcriptChannel.isTextBased()) {
+      if (transcriptOption && (!transcriptChannel || !transcriptChannel.isTextBased())) {
         await interaction.reply({ content: "Transcript channel должен быть текстовым.", ephemeral: true });
         return;
       }
-      await this.configure(interaction.guild.id, {
+      await this.configure(interaction.guild!.id, {
         enabled: true,
         categoryId: category?.id ?? null,
         staffRoleId: staffRole?.id ?? null,
@@ -89,14 +91,14 @@ export class Tickets implements PlatformModule {
     }
 
     if (sub !== "create") return;
-    if (!await moduleEnabled(this.db, interaction.guild.id, "tickets", false)) {
+    if (!await moduleEnabled(this.db, interaction.guild!.id, "tickets", false)) {
       await interaction.reply({ content: "Tickets выключены. Сначала выполни `/ticket setup`.", ephemeral: true });
       return;
     }
 
     const existing = await this.db.query<{ channel_id: string }>(
       "SELECT channel_id FROM tickets WHERE guild_id=$1 AND creator_id=$2 AND status='open' LIMIT 1",
-      [interaction.guild.id,interaction.user.id]
+      [interaction.guild!.id,interaction.user.id]
     );
     if (existing.rows[0]?.channel_id) {
       await interaction.reply({ content: `У тебя уже есть открытый тикет: <#${existing.rows[0].channel_id}>.`, ephemeral: true });
@@ -118,8 +120,8 @@ export class Tickets implements PlatformModule {
   }
 
   private async createTicket(interaction: ModalSubmitInteraction): Promise<void> {
-    const config = await this.config(interaction.guild.id);
-    const me = interaction.guild.members.me;
+    const config = await this.config(interaction.guild!.id);
+    const me = interaction.guild!.members.me;
     if (!me?.permissions.has(PermissionFlagsBits.ManageChannels)) {
       await interaction.reply({ content: "Боту не хватает Manage Channels.", ephemeral: true });
       return;
@@ -128,12 +130,12 @@ export class Tickets implements PlatformModule {
     const subject = interaction.fields.getTextInputValue("subject");
     const details = interaction.fields.getTextInputValue("details");
 
-    const channel = await interaction.guild.channels.create({
+    const channel = await interaction.guild!.channels.create({
       name: `ticket-${interaction.user.username}`.toLowerCase().slice(0, 90),
       type: ChannelType.GuildText,
       parent: config.categoryId ?? undefined,
       permissionOverwrites: [
-        { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+        { id: interaction.guild!.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
         { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
         ...(config.staffRoleId ? [{ id: config.staffRoleId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }] : [])
       ]
@@ -143,7 +145,7 @@ export class Tickets implements PlatformModule {
       const inserted = await this.db.query<{ id: string }>(
         `INSERT INTO tickets(guild_id,channel_id,creator_id,status)
          VALUES($1,$2,$3,'open') RETURNING id`,
-        [interaction.guild.id,channel.id,interaction.user.id]
+        [interaction.guild!.id,channel.id,interaction.user.id]
       );
       const ticketId = inserted.rows[0]?.id;
       if (!ticketId) throw new Error("ticket_id_missing");
@@ -170,7 +172,7 @@ export class Tickets implements PlatformModule {
 
   private async onInteraction(interaction: import("discord.js").Interaction): Promise<void> {
     if (interaction.isModalSubmit() && interaction.customId === "dsp:ticket:create" && interaction.guild) {
-      if (!await moduleEnabled(this.db, interaction.guild.id, "tickets", false)) {
+      if (!await moduleEnabled(this.db, interaction.guild!.id, "tickets", false)) {
         await interaction.reply({ content: "Tickets выключены.", ephemeral: true });
         return;
       }
@@ -188,13 +190,13 @@ export class Tickets implements PlatformModule {
 
     const result = await this.db.query<{ channel_id: string; creator_id: string; status: "open" | "closed"; claimed_by: string | null }>(
       "SELECT channel_id,creator_id,status,claimed_by FROM tickets WHERE id=$1 AND guild_id=$2",
-      [ticketId,interaction.guild.id]
+      [ticketId,interaction.guild!.id]
     );
     const row = result.rows[0];
     if (!row) { await interaction.reply({ content: "Тикет не найден.", ephemeral: true }); return; }
 
     if (action === "claim") {
-      const config = await this.config(interaction.guild.id);
+      const config = await this.config(interaction.guild!.id);
       if (!this.canStaff(interaction, config)) { await interaction.reply({ content: "Кнопка доступна только staff.", ephemeral: true }); return; }
       if (row.status !== "open") { await interaction.reply({ content: "Тикет уже закрыт.", ephemeral: true }); return; }
       await this.db.query("UPDATE tickets SET claimed_by=$1 WHERE id=$2 AND status='open'", [interaction.user.id,ticketId]);
@@ -203,18 +205,18 @@ export class Tickets implements PlatformModule {
     }
 
     if (action === "close") {
-      const config = await this.config(interaction.guild.id);
+      const config = await this.config(interaction.guild!.id);
       if (interaction.user.id !== row.creator_id && !this.canStaff(interaction, config)) { await interaction.reply({ content: "Недостаточно прав.", ephemeral: true }); return; }
-      const channel = interaction.guild.channels.cache.get(row.channel_id);
+      const channel = interaction.guild!.channels.cache.get(row.channel_id);
       await interaction.deferReply({ ephemeral: true });
       const transcript = channel?.type === ChannelType.GuildText ? await this.transcript(channel) : "Transcript unavailable.";
       await this.db.transaction(async (client) => {
-        await client.query("INSERT INTO ticket_transcripts(ticket_id,guild_id,content) VALUES($1,$2,$3) ON CONFLICT(ticket_id) DO UPDATE SET content=EXCLUDED.content", [ticketId,interaction.guild.id,transcript]);
+        await client.query("INSERT INTO ticket_transcripts(ticket_id,guild_id,content) VALUES($1,$2,$3) ON CONFLICT(ticket_id) DO UPDATE SET content=EXCLUDED.content", [ticketId,interaction.guild!.id,transcript]);
         await client.query("UPDATE tickets SET status='closed',closed_at=now() WHERE id=$1 AND status='open'", [ticketId]);
       });
 
       if (config.transcriptChannelId) {
-        const transcriptChannel = interaction.guild.channels.cache.get(config.transcriptChannelId);
+        const transcriptChannel = interaction.guild!.channels.cache.get(config.transcriptChannelId);
         if (transcriptChannel?.isTextBased() && "send" in transcriptChannel) {
           const { AttachmentBuilder } = await import("discord.js");
           await transcriptChannel.send({ content: `Transcript ticket #${ticketId}`, files: [new AttachmentBuilder(Buffer.from(transcript,"utf8"), { name: `ticket-${ticketId}.txt` })] }).catch(() => undefined);
