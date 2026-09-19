@@ -24,6 +24,7 @@ import { Music } from "./modules/music.js";
 import { createDiscordClient, registerCommands, routeCommand, wireDiscordEvents } from "./discord/bot.js";
 import { ConnectionSupervisor } from "./discord/connection-supervisor.js";
 import { ManagementApiServer } from "./management-api.js";
+import { DashboardSettingsService } from "./dashboard-settings.js";
 import { ModuleSettingsRepository } from "./module-settings.js";
 import { AuditLog } from "./audit.js";
 import { PlatformEventBus } from "./events.js";
@@ -39,7 +40,6 @@ async function main(): Promise<void> {
   const auditLog = new AuditLog(database);
   const dashboardSettings = new DashboardSettingsService(database);
   const identities = new BotIdentityRepository(database);
-  await identities.ensureIdentity(config.botIdentityId, config.discordClientId);
   const transfer = new ConfigTransferService(database);
   const backups = new BackupService(database, config.backupDirectory);
   const events = new PlatformEventBus();
@@ -49,6 +49,7 @@ async function main(): Promise<void> {
   try {
     await database.ping();
     await migrate(database);
+    await identities.ensureIdentity(config.botIdentityId, config.discordClientId);
     health.set({ database: "ready" });
   } catch (error) {
     health.set({ database: "down", status: "degraded", lastError: "database startup failed" });
