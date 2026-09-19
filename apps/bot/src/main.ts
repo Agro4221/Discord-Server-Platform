@@ -13,6 +13,9 @@ import { Tickets } from "./modules/tickets.js";
 import { RolePanels } from "./modules/role-panels.js";
 import { Giveaways } from "./modules/giveaways.js";
 import { Economy } from "./modules/economy.js";
+import { Reminders } from "./modules/reminders.js";
+import { Starboard } from "./modules/starboard.js";
+import { AutomationEngine } from "./modules/automation-engine.js";
 import { createDiscordClient, registerCommands, routeCommand, wireDiscordEvents } from "./discord/bot.js";
 import { ConnectionSupervisor } from "./discord/connection-supervisor.js";
 import { ManagementApiServer } from "./management-api.js";
@@ -52,6 +55,9 @@ async function main(): Promise<void> {
   const rolePanels = new RolePanels(database);
   const giveaways = new Giveaways(database);
   const economy = new Economy(database);
+  const reminders = new Reminders(database);
+  const starboard = new Starboard(database);
+  const automation = new AutomationEngine(database);
 
   const modules = new ModuleRegistry({
     client,
@@ -69,6 +75,9 @@ async function main(): Promise<void> {
   modules.register(rolePanels);
   modules.register(giveaways);
   modules.register(economy);
+  modules.register(reminders);
+  modules.register(starboard);
+  modules.register(automation);
 
   for (const name of modules.list()) health.setModule(name, "starting");
 
