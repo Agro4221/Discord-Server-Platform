@@ -36,6 +36,7 @@ export class Security implements PlatformModule {
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
     this.auditLog = context.auditLog;
+    await this.restoreActiveIncidents();
     const a = context.events.on("member.add", (member) => this.onJoin(member));
     const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const c = context.events.on("channel.delete", (channel) => this.onDestructive(channel.guildId, "channel.delete"));
@@ -93,6 +94,39 @@ export class Security implements PlatformModule {
        ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=now()`,
       [guildId,next.enabled]
     );
+  }
+
+
+  private async restoreActiveIncidents(): Promise<void> {
+    const result = await this.db.query<{
+      guild_id: string;
+      event_type: "raid-detected" | "destructive-burst";
+      created_at: Date | string;
+      metadata: { windowSeconds?: number };
+    }>(
+      "SELECT guild_id,event_type,created_at,metadata FROM security_events WHERE event_type IN ('raid-detected','destructive-burst') AND created_at >= now() - interval '5 minutes' ORDER BY created_at DESC"
+    );
+
+    const now = Date.now();
+    for (const row of result.rows) {
+      const createdAt = new Date(row.created_at).getTime();
+      if (!Number.isFinite(createdAt)) continue;
+
+      const configuredWindowSeconds =
+        typeof row.metadata?.windowSeconds === "number" && Number.isFinite(row.metadata.windowSeconds)
+          ? row.metadata.windowSeconds
+          : 20;
+      const cooldown = securityIncidentCooldownUntil(createdAt, configuredWindowSeconds);
+      if (cooldown <= now) continue;
+
+      if (row.event_type === "raid-detected") {
+        const current = this.raidActiveUntil.get(row.guild_id) ?? 0;
+        if (cooldown > current) this.raidActiveUntil.set(row.guild_id, cooldown);
+      } else {
+        const current = this.destructiveActiveUntil.get(row.guild_id) ?? 0;
+        if (cooldown > current) this.destructiveActiveUntil.set(row.guild_id, cooldown);
+      }
+    }
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -356,7 +390,8 @@ export class Security implements PlatformModule {
     const botMember = guild.members.me;
     if (!botMember) return;
 
-    const removable = executorCount >= Math.ceil(config.maxDestructiveActions / 2) &&
+    const responseThreshold = securityResponseThreshold(config.maxDestructiveActions);
+    const removable = executorCount >= responseThreshold &&
       !member.permissions.has(PermissionFlagsBits.Administrator)
       ? member.roles.cache.filter(
           (role) => !role.managed && role.id !== guild.id && role.position < botMember.roles.highest.position
@@ -404,4 +439,13 @@ export function shouldTriggerSecurityIncident(
   threshold: number
 ): boolean {
   return count >= threshold && now >= activeUntil;
+}
+
+
+export function securityIncidentCooldownUntil(createdAt: number, windowSeconds: number): number {
+  return createdAt + Math.max(windowSeconds * 1000, 60_000);
+}
+
+export function securityResponseThreshold(maxDestructiveActions: number): number {
+  return Math.max(2, Math.ceil(maxDestructiveActions / 2));
 }
