@@ -185,14 +185,55 @@ export class ManagementApiServer {
           }
 
           const backupsMatch = path.match(/^\/api\/guilds\/([^/]+)\/backups$/);
+          const restoreBackupMatch = path.match(/^\/api\/guilds\/([^/]+)\/backups\/([^/]+)\/restore$/);
+          const deleteBackupMatch = path.match(/^\/api\/guilds\/([^/]+)\/backups\/([^/]+)$/);
+
           if (method === "GET" && backupsMatch) {
             const guildId = backupsMatch[1];
             if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
               this.json(res, 404, { error: "guild_not_found" });
               return;
             }
-            const backups = await this.options.backups.listBackups();
+            const backups = await this.options.backups.listBackups(guildId);
             this.json(res, 200, { guildId, backups });
+            return;
+          }
+
+          if (method === "POST" && restoreBackupMatch) {
+            const guildId = restoreBackupMatch[1];
+            const file = restoreBackupMatch[2];
+            if (!guildId || !file || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_backup_not_found" });
+              return;
+            }
+            await this.options.backups.restoreGuildBackup(guildId, file);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "backup.restored",
+              targetType: "backup",
+              targetId: file
+            });
+            this.json(res, 200, { ok: true, guildId, file });
+            return;
+          }
+
+          if (method === "DELETE" && deleteBackupMatch) {
+            const guildId = deleteBackupMatch[1];
+            const file = deleteBackupMatch[2];
+            if (!guildId || !file || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_backup_not_found" });
+              return;
+            }
+            await this.options.backups.deleteBackup(file, guildId);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "backup.deleted",
+              targetType: "backup",
+              targetId: file
+            });
+            this.json(res, 200, { ok: true, guildId, file });
             return;
           }
 
