@@ -180,10 +180,11 @@ export class AutomationEngine implements PlatformModule {
       enabled: boolean;
       event: AutomationEvent;
       conditions: AutomationCondition[];
+      any_conditions: AutomationCondition[];
       actions: AutomationAction[];
       cooldown_seconds: number;
     }>(
-      "SELECT id,guild_id,name,enabled,event,conditions,actions,cooldown_seconds FROM automation_rules WHERE guild_id=$1 ORDER BY id DESC",
+      "SELECT id,guild_id,name,enabled,event,conditions,any_conditions,actions,cooldown_seconds FROM automation_rules WHERE guild_id=$1 ORDER BY id DESC",
       [guildId]
     );
 
@@ -193,7 +194,7 @@ export class AutomationEngine implements PlatformModule {
       name: row.name,
       enabled: row.enabled,
       all: row.conditions ?? [],
-      any: [],
+      any: row.any_conditions ?? [],
       event: row.event,
       actions: row.actions ?? [],
       cooldownSeconds: row.cooldown_seconds
@@ -203,17 +204,19 @@ export class AutomationEngine implements PlatformModule {
   async updateRule(
     guildId: string,
     ruleId: string,
-    input: { name: string; event: AutomationEvent; conditions: AutomationCondition[]; actions: AutomationAction[]; cooldownSeconds: number; enabled?: boolean }
+    input: { name: string; event: AutomationEvent; conditions: AutomationCondition[]; anyConditions?: AutomationCondition[]; actions: AutomationAction[]; cooldownSeconds: number; enabled?: boolean }
   ): Promise<boolean> {
-    validateAutomationRule(input.event, input.conditions, input.actions);
+    const anyConditions = input.anyConditions ?? [];
+    validateAutomationRule(input.event, [...input.conditions, ...anyConditions], input.actions);
     const result = await this.db.query(
       `UPDATE automation_rules
-       SET name=$1,event=$2,conditions=$3::jsonb,actions=$4::jsonb,cooldown_seconds=$5,enabled=$6,updated_at=now()
+       SET name=$1,event=$2,conditions=$3::jsonb,any_conditions=$4::jsonb,actions=$5::jsonb,cooldown_seconds=$6,enabled=$7,updated_at=now()
        WHERE id=$7 AND guild_id=$8`,
       [
         input.name.trim().slice(0,80) || "Automation rule",
         input.event,
         JSON.stringify(input.conditions),
+        JSON.stringify(anyConditions),
         JSON.stringify(input.actions),
         Math.min(Math.max(Math.trunc(input.cooldownSeconds),0),86400),
         input.enabled !== false,
@@ -244,10 +247,11 @@ export class AutomationEngine implements PlatformModule {
       enabled: boolean;
       event: AutomationEvent;
       conditions: AutomationCondition[];
+      any_conditions: AutomationCondition[];
       actions: AutomationAction[];
       cooldown_seconds: number;
     }>(
-      `SELECT ar.id,ar.guild_id,ar.name,ar.enabled,ar.event,ar.conditions,ar.actions,ar.cooldown_seconds
+      `SELECT ar.id,ar.guild_id,ar.name,ar.enabled,ar.event,ar.conditions,ar.any_conditions,ar.actions,ar.cooldown_seconds
        FROM automation_rules ar
        INNER JOIN guild_bot_assignments ga
          ON ga.guild_id=ar.guild_id
@@ -271,7 +275,7 @@ export class AutomationEngine implements PlatformModule {
         name: row.name,
         enabled: row.enabled,
         all: row.conditions ?? [],
-        any: [],
+        any: row.any_conditions ?? [],
         event: row.event,
         actions: row.actions ?? []
       });
@@ -285,21 +289,23 @@ export class AutomationEngine implements PlatformModule {
     event: AutomationEvent,
     conditions: AutomationCondition[],
     actions: AutomationAction[],
-    cooldownSeconds = 0
+    cooldownSeconds = 0,
+    anyConditions: AutomationCondition[] = []
   ): Promise<AutomationRuleRecord> {
-    validateAutomationRule(event, conditions, actions);
+    validateAutomationRule(event, [...conditions, ...anyConditions], actions);
 
     const created = await this.db.query<{ id: string }>(
       `INSERT INTO automation_rules(
-         guild_id,name,enabled,event,conditions,actions,cooldown_seconds
+         guild_id,name,enabled,event,conditions,any_conditions,actions,cooldown_seconds
        )
-       VALUES($1,$2,true,$3,$4::jsonb,$5::jsonb,$6)
+       VALUES($1,$2,true,$3,$4::jsonb,$5::jsonb,$6::jsonb,$7)
        RETURNING id`,
       [
         guildId,
         name.slice(0, 80),
         event,
         JSON.stringify(conditions),
+        JSON.stringify(anyConditions),
         JSON.stringify(actions),
         Math.min(Math.max(cooldownSeconds, 0), 86_400)
       ]
@@ -410,6 +416,7 @@ export class AutomationEngine implements PlatformModule {
     for (const rule of rules) {
       if (rule.event !== event.type) continue;
       if (!await this.conditionsMatch(rule.all, event)) continue;
+      if (rule.any.length > 0 && !await this.conditionsMatch(rule.any, event)) continue;
 
       const cooldownSeconds = await this.cooldownFor(rule.id);
       this.executionCounter += 1;
