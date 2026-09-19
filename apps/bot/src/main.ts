@@ -195,7 +195,6 @@ async function main(): Promise<void> {
 
   await identities.claimUnassignedGuilds([...client.guilds.cache.keys()]);
   await identities.refreshAssignments();
-  await identities.heartbeat("ready", client.guilds.cache.size).catch(() => undefined);
 
   const fleetTimer = setInterval(() => {
     void identities.refreshAssignments()
