@@ -22,7 +22,7 @@ export class ConnectionSupervisor {
       logger.warn("Discord shard reconnecting", { shardId });
       this.update("connecting", `shard ${shardId} reconnecting`);
     });
-    this.bind(Events.ShardDisconnect, (event: CloseEvent, shardId: number) => {
+    this.bind(Events.ShardDisconnect, (event: { code: number; reason: string }, shardId: number) => {
       logger.warn("Discord shard disconnected", {
         shardId,
         code: event.code,
