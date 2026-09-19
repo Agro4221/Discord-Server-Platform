@@ -103,7 +103,7 @@ export function wireDiscordEvents(
   });
 
   client.on(Events.ChannelDelete, (channel) => {
-    if (channel.guildId) {
+    if ("guildId" in channel && channel.guildId) {
       void events.emit("channel.delete", channel);
     }
   });
