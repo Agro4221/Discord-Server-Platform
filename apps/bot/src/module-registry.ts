@@ -1,6 +1,8 @@
 import type { ModuleContext, PlatformModule } from "./module.js";
 import { logger } from "./logger.js";
 
+export type ModuleInitStatus = "ready" | "degraded";
+
 export class ModuleRegistry {
   private readonly modules = new Map<string, PlatformModule>();
   private readonly controller = new AbortController();
@@ -16,22 +18,29 @@ export class ModuleRegistry {
     return [...this.modules.keys()];
   }
 
-  async initAll(): Promise<void> {
+  async initAll(): Promise<Record<string, ModuleInitStatus>> {
+    const status: Record<string, ModuleInitStatus> = {};
+
     for (const module of this.modules.values()) {
       try {
         await module.init({ signal: this.controller.signal });
+        status[module.name] = "ready";
         logger.info("Module ready", { module: module.name });
       } catch (error) {
-        logger.error("Module initialization failed", { module: module.name, error: String(error) });
-        throw error;
+        status[module.name] = "degraded";
+        logger.error("Module initialization failed; continuing", {
+          module: module.name,
+          error: String(error)
+        });
       }
     }
+
+    return status;
   }
 
   async shutdownAll(): Promise<void> {
     this.controller.abort();
-    const modules = [...this.modules.values()].reverse();
-    for (const module of modules) {
+    for (const module of [...this.modules.values()].reverse()) {
       try {
         await module.shutdown();
       } catch (error) {
