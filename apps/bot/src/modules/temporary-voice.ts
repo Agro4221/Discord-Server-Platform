@@ -61,6 +61,9 @@ export class TemporaryVoice implements PlatformModule {
         temp_voice_private=EXCLUDED.temp_voice_private,
         updated_at=now()`,
       [guildId, config.enabled, config.triggerChannelId, config.categoryId, config.defaultLimit, config.privateByDefault]
+    );    await this.db.query(
+      "INSERT INTO guild_modules(guild_id,module_key,enabled) VALUES($1,$2,$3) ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=EXCLUDED.enabled, updated_at=now()",
+      [guildId, "temporary-voice", config.enabled]
     );
   }
 
@@ -89,16 +92,17 @@ export class TemporaryVoice implements PlatformModule {
       temp_voice_category_id: string | null;
       temp_voice_default_limit: number;
       temp_voice_private: boolean;
+      module_enabled: boolean;
     }>(
-      "SELECT temp_voice_enabled,temp_voice_trigger_channel_id,temp_voice_category_id,temp_voice_default_limit,temp_voice_private FROM guild_settings WHERE guild_id=$1",
-      [guildId]
+      "SELECT gs.temp_voice_enabled,gs.temp_voice_trigger_channel_id,gs.temp_voice_category_id,gs.temp_voice_default_limit,gs.temp_voice_private,COALESCE(gm.enabled,gs.temp_voice_enabled) AS module_enabled FROM guild_settings gs LEFT JOIN guild_modules gm ON gm.guild_id=gs.guild_id AND gm.module_key=$2 WHERE gs.guild_id=$1",
+      [guildId, "temporary-voice"]
     );
 
     const row = result.rows[0];
     if (!row || !row.temp_voice_trigger_channel_id) return null;
 
     return {
-      enabled: row.temp_voice_enabled,
+      enabled: row.temp_voice_enabled && row.module_enabled,
       triggerChannelId: row.temp_voice_trigger_channel_id,
       categoryId: row.temp_voice_category_id,
       defaultLimit: row.temp_voice_default_limit,
