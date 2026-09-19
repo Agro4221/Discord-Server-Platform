@@ -7,6 +7,7 @@ import {
 } from "discord.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
+import { logger } from "../logger.js";
 import { moduleEnabled } from "../module-utils.js";
 
 type SecurityConfig = {
@@ -250,14 +251,7 @@ export class Security implements PlatformModule {
         metadata
       });
     } catch (error) {
-      console.warn(JSON.stringify({
-        ts: new Date().toISOString(),
-        level: "WARN",
-        message: "Security audit write failed",
-        guildId,
-        action,
-        error: String(error)
-      }));
+      logger.warn("Security audit write failed", { guildId, action, error: String(error) });
     }
   }
 
