@@ -278,6 +278,26 @@ const migrations = [
       ");"
     ])
   }
+  },
+  {
+    version: 11,
+    name: "bot_identities",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS bot_identities (",
+      "  id text PRIMARY KEY,",
+      "  client_id text NOT NULL,",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  presence_name text,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE TABLE IF NOT EXISTS guild_bot_assignments (",
+      "  guild_id text PRIMARY KEY,",
+      "  bot_identity_id text NOT NULL REFERENCES bot_identities(id) ON DELETE RESTRICT,",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");"
+    ])
+  }
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
