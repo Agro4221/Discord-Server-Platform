@@ -418,9 +418,11 @@ export class AutomationEngine implements PlatformModule {
         case "channel-is":
           if (event.channelId !== condition.channelId) return false;
           break;
-        case "contains":
-          if (typeof event.content !== "string" || !event.content.toLocaleLowerCase().includes(condition.right.toLocaleLowerCase())) return false;
+        case "contains": {
+          const value = resolveTextField(event, condition.left);
+          if (value === undefined || !value.toLocaleLowerCase().includes(condition.right.toLocaleLowerCase())) return false;
           break;
+        }
         case "equals":
           if (resolveTextField(event, condition.left) !== condition.right) return false;
           break;
