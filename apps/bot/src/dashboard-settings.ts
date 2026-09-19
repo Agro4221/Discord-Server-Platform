@@ -300,8 +300,15 @@ function validateValues(
     }
 
     if (field.type === "textarea") {
-      if (typeof value !== "string" || value.length > 10_000) throw new Error(`invalid_${field.key}`);
-      result[field.key] = value;
+      if (field.key === "blockedWords") {
+        if (!Array.isArray(value) || value.length > 500 || value.some((item) => typeof item !== "string" || item.length > 200)) {
+          throw new Error(`invalid_${field.key}`);
+        }
+        result[field.key] = value.map((item) => item.trim()).filter(Boolean);
+      } else {
+        if (typeof value !== "string" || value.length > 10_000) throw new Error(`invalid_${field.key}`);
+        result[field.key] = value;
+      }
       continue;
     }
 
