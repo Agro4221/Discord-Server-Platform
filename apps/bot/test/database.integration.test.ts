@@ -22,11 +22,41 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1)",
       [[
         "guild_modules","automod_settings","verification_settings","automation_rules",
-        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions"
+        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments"
       ]]
     );
     assert.equal(tables.rows.length, 8);
   } finally {
+    await db.close();
+  }
+});
+
+test("music bot assignment is unique per voice channel", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345680";
+  try {
+    await migrate(db);
+    await db.query("DELETE FROM guild_music_bot_assignments WHERE guild_id=$1", [guildId]);
+    await db.query("DELETE FROM bot_identities WHERE id IN ('music-test-a','music-test-b')");
+
+    await db.query(
+      "INSERT INTO bot_identities(id,client_id,enabled) VALUES('music-test-a','123456789012345681',true),('music-test-b','123456789012345682',true)"
+    );
+
+    await db.query(
+      "INSERT INTO guild_music_bot_assignments(guild_id,bot_identity_id,voice_channel_id) VALUES($1,'music-test-a','123456789012345683')",
+      [guildId]
+    );
+
+    await assert.rejects(
+      db.query(
+        "INSERT INTO guild_music_bot_assignments(guild_id,bot_identity_id,voice_channel_id) VALUES($1,'music-test-b','123456789012345683')",
+        [guildId]
+      )
+    );
+  } finally {
+    await db.query("DELETE FROM guild_music_bot_assignments WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.query("DELETE FROM bot_identities WHERE id IN ('music-test-a','music-test-b')").catch(() => undefined);
     await db.close();
   }
 });
