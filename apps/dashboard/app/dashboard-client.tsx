@@ -7,6 +7,7 @@ import { GiveawaysPanel } from "./giveaways-panel";
 import { AnalyticsPanel } from "./analytics-panel";
 import { AutomationPanel } from "./automation-panel";
 import { FleetPanel } from "./fleet-panel";
+import { NotificationsPanel } from "./notifications-panel";
 
 type Guild = { id: string; name: string; icon: string | null };
 type ModuleState = Record<string, boolean>;
@@ -415,6 +416,12 @@ export function DashboardClient() {
                   guildId={guildId}
                   channels={resources.channels.filter((resource) => resource.type === 0)}
                   roles={resources.roles.filter((resource) => resource.manageable !== false)}
+                  onChanged={reloadAudit}
+                />
+              ) : selectedModule === "notifications" ? (
+                <NotificationsPanel
+                  guildId={guildId}
+                  channels={resources.channels.filter((resource) => resource.type === 0)}
                   onChanged={reloadAudit}
                 />
               ) : !schema ? (
