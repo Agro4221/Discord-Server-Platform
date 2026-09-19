@@ -101,6 +101,14 @@ export function wireDiscordEvents(
   client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
     void events.emit("member.update", { oldMember, newMember });
   });
+
+  client.on(Events.ChannelDelete, (channel) => {
+    if (channel.guild) void events.emit("channel.delete", channel);
+  });
+
+  client.on(Events.RoleDelete, (role) => {
+    void events.emit("role.delete", role);
+  });
 }
 
 export async function routeCommand(
