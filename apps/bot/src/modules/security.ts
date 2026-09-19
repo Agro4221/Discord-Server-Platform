@@ -295,7 +295,13 @@ export class Security implements PlatformModule {
   private async respondToExecutor(guildId: string, userId: string, config: SecurityConfig, type: string, executorCount: number): Promise<void> {
     const guild = this.client?.guilds.cache.get(guildId);
     const member = guild ? await guild.members.fetch(userId).catch(() => null) : null;
-    if (!guild || !member || !member.manageable || member.id === guild.ownerId) return;
+    if (
+      !guild ||
+      !member ||
+      !member.manageable ||
+      member.id === guild.ownerId ||
+      member.permissions.has(PermissionFlagsBits.Administrator)
+    ) return;
     const botMember = guild.members.me;
     if (!botMember) return;
 
