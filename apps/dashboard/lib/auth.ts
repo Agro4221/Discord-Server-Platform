@@ -60,3 +60,11 @@ export function validAdminPassword(candidate: string): boolean {
 export async function requireSession(): Promise<void> {
   if (!await currentSession()) throw new Error("unauthorized");
 }
+
+export function assertSameOrigin(request: Request): void {
+  const origin = request.headers.get("origin");
+  if (!origin) return;
+  const host = request.headers.get("host");
+  const expected = host ? `http${process.env.NODE_ENV === "production" ? "s" : ""}://${host}` : null;
+  if (expected && origin !== expected) throw new Error("bad_origin");
+}
