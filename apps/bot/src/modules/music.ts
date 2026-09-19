@@ -78,7 +78,6 @@ export class Music implements PlatformModule {
   private unsubscribe?: () => void;
   private rawHandler?: (data: unknown) => void;
   private readyHandler?: () => void;
-  private directInteractionHandler?: (interaction: Interaction) => void;
   private manager?: LavalinkManager;
   private client?: Client;
   private initialized = false;
@@ -100,17 +99,6 @@ export class Music implements PlatformModule {
     this.connectedNodes.clear();
     this.lastPlayedTracks.clear();
     this.autoplayInFlight.clear();
-
-    if (this.config.botIdentityId !== "primary") {
-      this.directInteractionHandler = (interaction) => {
-        if (interaction.isChatInputCommand() && interaction.commandName === "music") {
-          void this.onCommand(interaction);
-        } else if (interaction.isButton() && interaction.customId.startsWith("dsp:music:")) {
-          void this.onInteraction(interaction);
-        }
-      };
-      this.client.on("interactionCreate", this.directInteractionHandler);
-    }
 
     const queueStore = new PostgresQueueStore(this.db, this.config.botIdentityId);
     const persistedSessions = await this.db.query<{ node_id: string; session_id: string }>(
@@ -319,10 +307,6 @@ export class Music implements PlatformModule {
       this.client.off("ready", this.readyHandler);
     }
 
-    if (this.client && this.directInteractionHandler) {
-      this.client.off("interactionCreate", this.directInteractionHandler);
-    }
-
     if (this.healthTimer) clearTimeout(this.healthTimer);
     this.healthTimer = undefined;
     this.connectedNodes.clear();
@@ -330,7 +314,6 @@ export class Music implements PlatformModule {
     this.autoplayInFlight.clear();
 
     this.rawHandler = undefined;
-    this.directInteractionHandler = undefined;
     this.readyHandler = undefined;
     this.manager = undefined;
     this.client = undefined;

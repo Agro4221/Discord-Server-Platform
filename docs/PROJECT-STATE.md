@@ -119,3 +119,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-09-19 — Ticket creation race UX
 - Concurrent Ticket creation now recognizes PostgreSQL unique-open-ticket conflicts and reports that an existing ticket is already open instead of presenting a generic internal failure.
 - The newly created Discord channel is still rolled back before returning the conflict response.
+
+
+## 2026-09-19 — Multi-bot Music duplicate-handler fix
+- Removed the secondary-identity direct `interactionCreate` Music handler.
+- Music commands and buttons now use the shared Platform Event Bus, whose guild filter already enforces bot-identity ownership.
+- This prevents duplicate Music command execution and duplicate interaction replies on secondary identities.

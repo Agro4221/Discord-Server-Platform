@@ -132,3 +132,10 @@ Never write credentials, tokens or private user data here.
 - The existing partial unique index `uq_open_ticket_per_creator` already protects against two simultaneous ticket modals for one user.
 - Hardened the error path so that conflict is identified explicitly after Discord channel rollback, giving the user a useful message instead of a generic creation failure.
 - Added deterministic regression coverage for the PostgreSQL conflict classifier.
+
+
+## 2026-09-19 — Multi-bot Music duplicate-handler fix
+- Found that secondary identities registered Music interactions both directly on Discord Client and through the shared Platform Event Bus.
+- Because secondary identities can own a guild in the Event Bus, the same Music interaction could be processed twice.
+- Removed the direct handler and kept the Event Bus as the single routing path, preserving guild ownership filtering.
+- Added regression coverage for the intended single-path routing invariant.

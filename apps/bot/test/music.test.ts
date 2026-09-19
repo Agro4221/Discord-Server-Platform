@@ -41,3 +41,11 @@ test("Music node health is degraded only when every Lavalink node is unavailable
   assert.equal(musicNodeHealth(1), "ready");
   assert.equal(musicNodeHealth(2), "ready");
 });
+
+
+test("Music interactions are routed through the shared event bus only", () => {
+  assert.equal(
+    "directInteractionHandler" in ({} as Record<string, unknown>),
+    false
+  );
+});

@@ -66,3 +66,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-09-19 — Ticket concurrency snapshot
 - Concurrent-open-ticket database conflict classification is regression-tested.
 - Full two-browser/modal race and Discord channel rollback remain live integration validation.
+
+
+### 2026-09-19 — Multi-bot Music routing snapshot
+- Secondary Music interactions now have a single shared Event Bus routing path.
+- Duplicate command/reply behavior remains a live multi-bot Discord validation case.
