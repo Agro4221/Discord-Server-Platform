@@ -60,6 +60,7 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
     fields: [
       { key: "channelId", label: "Канал verification", type: "channel" },
       { key: "verifiedRoleId", label: "Verified role", type: "role" },
+      { key: "quarantineRoleId", label: "Quarantine role", type: "role" },
       { key: "logChannelId", label: "Канал логов", type: "channel" },
       { key: "codeTtlMinutes", label: "Время действия кода, мин.", type: "number", min: 2, max: 60 }
     ]
@@ -165,6 +166,7 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
     columns: {
       channelId: "channel_id",
       verifiedRoleId: "verified_role_id",
+      quarantineRoleId: "quarantine_role_id",
       logChannelId: "log_channel_id",
       codeTtlMinutes: "code_ttl_minutes"
     }
