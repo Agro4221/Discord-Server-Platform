@@ -235,7 +235,7 @@ export class Tickets implements PlatformModule {
       const config = await this.config(interaction.guild!.id);
       if (interaction.user.id !== row.creator_id && !this.canStaff(interaction, config)) { await interaction.reply({ content: "Недостаточно прав.", ephemeral: true }); return; }
       const claimedClose = await this.db.query<{ channel_id: string }>(
-        "UPDATE tickets SET status='closing' WHERE id=$1 AND guild_id=$2 AND status='open' RETURNING channel_id",
+        "UPDATE tickets SET status='closing',closing_at=now() WHERE id=$1 AND guild_id=$2 AND status='open' RETURNING channel_id",
         [ticketId, interaction.guild!.id]
       );
       if (!claimedClose.rows[0]) {
@@ -254,12 +254,12 @@ export class Tickets implements PlatformModule {
             [ticketId,interaction.guild!.id,transcript]
           );
           await client.query(
-            "UPDATE tickets SET status='closed',closed_at=now() WHERE id=$1 AND status='closing'",
+            "UPDATE tickets SET status='closed',closed_at=now(),closing_at=NULL WHERE id=$1 AND status='closing'",
             [ticketId]
           );
         });
       } catch (error) {
-        await this.db.query("UPDATE tickets SET status='open' WHERE id=$1 AND status='closing'", [ticketId])
+        await this.db.query("UPDATE tickets SET status='open',closing_at=NULL WHERE id=$1 AND status='closing'", [ticketId])
           .catch((rollbackError) => logger.error("Ticket close rollback failed", {
             guildId: interaction.guild!.id,
             ticketId,
@@ -317,6 +317,15 @@ export class Tickets implements PlatformModule {
           });
         });
       }
+    }
+  }
+
+  private async recoverStaleClosures(): Promise<void> {
+    const result = await this.db.query(
+      "UPDATE tickets SET status='open',closing_at=NULL WHERE status='closing' AND closing_at IS NOT NULL AND closing_at < now()-interval '10 minutes'"
+    );
+    if (result.rowCount) {
+      logger.warn("Recovered stale Ticket closures", { recovered: result.rowCount });
     }
   }
 
