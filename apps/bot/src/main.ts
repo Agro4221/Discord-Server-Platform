@@ -145,6 +145,12 @@ async function main(): Promise<void> {
     analytics: {
       report: async (guildId, hours) => analytics.report(guildId, hours)
     },
+    notifications: {
+      list: async (guildId) => notifications.listFeeds(guildId),
+      create: async (guildId, channelId, url, intervalSeconds) => notifications.addFeed(guildId, channelId, url, intervalSeconds),
+      update: async (guildId, feedId, input) => notifications.updateFeed(guildId, feedId, input),
+      delete: async (guildId, feedId) => notifications.deleteFeed(guildId, feedId)
+    },
     automation: {
       list: async (guildId) => automation.listRules(guildId),
       create: async (guildId, input) => automation.createRule(
