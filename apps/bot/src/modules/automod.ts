@@ -1,6 +1,7 @@
 import { PermissionFlagsBits, type ChatInputCommandInteraction, type Message } from "discord.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
+import type { AuditLog } from "../audit.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 
@@ -45,10 +46,12 @@ export class AutoMod implements PlatformModule {
   private unsubscribe?: () => void;
   private readonly recent = new Map<string, { content: string; timestamp: number }[]>();
   private inspectedMessages = 0;
+  private auditLog?: AuditLog;
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
+    this.auditLog = context.auditLog;
     const a = context.events.on("message.create", (message) => this.inspect(message));
     const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     this.unsubscribe = () => { a(); b(); };
@@ -59,6 +62,7 @@ export class AutoMod implements PlatformModule {
     this.unsubscribe = undefined;
     this.recent.clear();
     this.inspectedMessages = 0;
+    this.auditLog = undefined;
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -194,48 +198,26 @@ export class AutoMod implements PlatformModule {
     if (message.member && [...exemptRoles].some((roleId) => message.member!.roles.cache.has(roleId))) return;
 
     const content = message.content;
-    const normalized = content.toLocaleLowerCase();
-
-    let reason: string | null = null;
-
-    if (config.blockedWords.some((word) => word && normalized.includes(word.toLocaleLowerCase()))) {
-      reason = "blocked_word";
-    }
-
     const mentions = message.mentions.users.size + message.mentions.roles.size;
-    if (!reason && mentions > config.maxMentions) reason = "mention_spam";
-
-    const links = content.match(/https?:\/\/[^\s<>]+/gi) ?? [];
-    const invites = content.match(/(?:discord(?:\.gg|(?:app)?\.com\/invite))\/[A-Za-z0-9-]+/gi) ?? [];
-    if (!reason && config.blockInvites && invites.length > 0) reason = "invite_link";
-    if (!reason && config.blockLinks && links.length > 0) reason = "link_blocked";
-    if (!reason && config.maxLinks > 0 && links.length > config.maxLinks) reason = "link_spam";
-
-    const emojiMatches = content.match(/<a?:\w+:\d+>|\p{Extended_Pictographic}/gu) ?? [];
-    if (!reason && config.maxEmojis > 0 && emojiMatches.length > config.maxEmojis) reason = "emoji_spam";
-
-    const longestLine = Math.max(0, ...content.split(/\r?\n/).map((line) => line.length));
-    if (!reason && config.maxLineLength > 0 && longestLine > config.maxLineLength) reason = "line_too_long";
-
-    const letters = content.match(/[A-Za-zА-Яа-я]/g) ?? [];
-    const upper = content.match(/[A-ZА-Я]/g) ?? [];
-    if (!reason && letters.length >= 12 && upper.length / letters.length >= config.maxCapsRatio) {
-      reason = "excessive_caps";
-    }
-
     const key = `${message.guild.id}:${message.author.id}`;
     const now = Date.now();
     const bucket = this.recent.get(key) ?? [];
-    bucket.push({ content: normalized, timestamp: now });
     const cutoff = now - config.repeatedWindowSeconds * 1000;
-    const recent = bucket.filter((item) => item.timestamp >= cutoff).slice(-20);
+    const recent = bucket
+      .filter((item) => item.timestamp >= cutoff)
+      .slice(-19);
+
+    recent.push({ content: content.toLocaleLowerCase(), timestamp: now });
     this.recent.set(key, recent);
     this.inspectedMessages += 1;
     if (this.inspectedMessages % 100 === 0) this.pruneRecent(now);
 
-    if (!reason && recent.filter((item) => item.content === normalized).length >= config.maxRepeatedMessages) {
-      reason = "repeated_message";
-    }
+    const reason = detectAutoModViolation(
+      content,
+      mentions,
+      config,
+      recent.map((item) => item.content)
+    );
 
     if (!reason) return;
 
@@ -246,8 +228,12 @@ export class AutoMod implements PlatformModule {
       messageId: message.id
     });
 
+    let deleted = false;
     if (config.deleteMessage) {
-      await message.delete().catch((error) => {
+      try {
+        await message.delete();
+        deleted = true;
+      } catch (error) {
         logger.warn("AutoMod message deletion failed", {
           guildId: message.guild!.id,
           userId: message.author.id,
@@ -255,11 +241,15 @@ export class AutoMod implements PlatformModule {
           rule: reason,
           error: String(error)
         });
-      });
+      }
     }
 
+    let timedOut = false;
     if (config.timeoutMinutes > 0 && message.member?.moderatable) {
-      await message.member.timeout(config.timeoutMinutes * 60_000, `AutoMod: ${reason}`).catch((error) => {
+      try {
+        await message.member.timeout(config.timeoutMinutes * 60_000, `AutoMod: ${reason}`);
+        timedOut = true;
+      } catch (error) {
         logger.warn("AutoMod timeout failed", {
           guildId: message.guild!.id,
           userId: message.author.id,
@@ -268,7 +258,7 @@ export class AutoMod implements PlatformModule {
           timeoutMinutes: config.timeoutMinutes,
           error: String(error)
         });
-      });
+      }
     }
 
     await this.db.query(
@@ -277,6 +267,28 @@ export class AutoMod implements PlatformModule {
       [message.guild.id, message.author.id, message.id, reason]
     ).catch((error) => {
       logger.error("AutoMod violation persistence failed", {
+        guildId: message.guild!.id,
+        userId: message.author.id,
+        messageId: message.id,
+        rule: reason,
+        error: String(error)
+      });
+    });
+
+    await this.auditLog?.record({
+      guildId: message.guild.id,
+      source: "system",
+      action: "automod.violation",
+      targetType: "user",
+      targetId: message.author.id,
+      metadata: {
+        messageId: message.id,
+        rule: reason,
+        deleted,
+        timedOut
+      }
+    }).catch((error) => {
+      logger.warn("AutoMod audit write failed", {
         guildId: message.guild!.id,
         userId: message.author.id,
         messageId: message.id,
@@ -309,3 +321,43 @@ export class AutoMod implements PlatformModule {
 }
 
 
+
+
+export function detectAutoModViolation(
+  content: string,
+  mentionCount: number,
+  config: AutoModConfig,
+  recentMessages: readonly string[] = []
+): string | null {
+  const normalized = content.toLocaleLowerCase();
+
+  if (config.blockedWords.some((word) => word && normalized.includes(word.toLocaleLowerCase()))) {
+    return "blocked_word";
+  }
+
+  if (mentionCount > config.maxMentions) return "mention_spam";
+
+  const links = content.match(/https?:\/\/[^\s<>]+/gi) ?? [];
+  const invites = content.match(/(?:discord(?:\.gg|(?:app)?\.com\/invite))\/[A-Za-z0-9-]+/gi) ?? [];
+  if (config.blockInvites && invites.length > 0) return "invite_link";
+  if (config.blockLinks && links.length > 0) return "link_blocked";
+  if (config.maxLinks > 0 && links.length > config.maxLinks) return "link_spam";
+
+  const emojiMatches = content.match(/<a?:\w+:\d+>|\p{Extended_Pictographic}/gu) ?? [];
+  if (config.maxEmojis > 0 && emojiMatches.length > config.maxEmojis) return "emoji_spam";
+
+  const longestLine = Math.max(0, ...content.split(/\r?\n/).map((line) => line.length));
+  if (config.maxLineLength > 0 && longestLine > config.maxLineLength) return "line_too_long";
+
+  const letters = content.match(/[A-Za-zА-Яа-я]/g) ?? [];
+  const upper = content.match(/[A-ZА-Я]/g) ?? [];
+  if (letters.length >= 12 && upper.length / letters.length >= config.maxCapsRatio) {
+    return "excessive_caps";
+  }
+
+  if (recentMessages.filter((item) => item === normalized).length >= config.maxRepeatedMessages) {
+    return "repeated_message";
+  }
+
+  return null;
+}
