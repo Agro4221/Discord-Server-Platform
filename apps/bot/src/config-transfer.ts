@@ -1,0 +1,295 @@
+import type { Database } from "./database.js";
+import { MODULE_CATALOG } from "./modules/catalog.js";
+import type { ServerConfigExport, ServerModuleConfig } from "@dsp/domain";
+
+type ExportTable = {
+  table: string;
+  fields: string[];
+};
+
+const CONFIG_TABLES: ExportTable[] = [
+  { table: "guild_settings", fields: [
+    "temp_voice_enabled","temp_voice_trigger_channel_id","temp_voice_category_id",
+    "temp_voice_default_limit","temp_voice_private"
+  ]},
+  { table: "guild_modules", fields: ["module_key","enabled"] },
+  { table: "automod_settings", fields: [
+    "enabled","blocked_words","max_mentions","max_caps_ratio",
+    "max_repeated_messages","repeated_window_seconds","delete_message","timeout_minutes"
+  ]},
+  { table: "welcome_settings", fields: ["enabled","channel_id","message","dm","embed"] },
+  { table: "ticket_settings", fields: ["enabled","category_id","staff_role_id","transcript_channel_id"] },
+  { table: "security_settings", fields: ["enabled","max_joins","window_seconds","quarantine_role_id","log_channel_id"] },
+  { table: "starboard_settings", fields: ["channel_id","threshold","ignore_self_reaction","ignore_bots"] },
+  { table: "music_settings", fields: ["enabled","preferred_text_channel_id","default_volume","announce_track_start"] }
+];
+
+const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
+  { table: "automation_rules", fields: ["name","enabled","event","conditions","actions","cooldown_seconds"] },
+  { table: "role_panels", fields: ["channel_id","message_id","title","roles"] }
+];
+
+export class ConfigTransferService {
+  constructor(private readonly db: Database) {}
+
+  async exportGuild(guildId: string): Promise<ServerConfigExport> {
+    const modulesResult = await this.db.query<{
+      module_key: string;
+      enabled: boolean;
+    }>(
+      "SELECT module_key,enabled FROM guild_modules WHERE guild_id=$1 ORDER BY module_key",
+      [guildId]
+    );
+
+    const moduleKeys = new Set(MODULE_CATALOG.map((module) => module.key));
+    const modules: ServerModuleConfig[] = [];
+
+    for (const row of modulesResult.rows) {
+      if (!moduleKeys.has(row.module_key as never)) continue;
+      modules.push({
+        key: row.module_key as ServerModuleConfig["key"],
+        enabled: row.enabled,
+        settings: {}
+      });
+    }
+
+    for (const table of CONFIG_TABLES) {
+      const result = await this.db.query(
+        `SELECT ${table.fields.join(",")} FROM ${quoteIdentifier(table.table)} WHERE guild_id=$1`,
+        [guildId]
+      );
+      if (result.rows[0]) {
+        const moduleKey = tableToModule(table.table);
+        if (!moduleKey) continue;
+        const target = modules.find((module) => module.key === moduleKey);
+        if (target) target.settings = sanitizeJson(result.rows[0]);
+        else modules.push({
+          key: moduleKey,
+          enabled: Boolean((result.rows[0] as Record<string, unknown>).enabled ?? false),
+          settings: sanitizeJson(result.rows[0])
+        });
+      }
+    }
+
+    for (const table of JSON_TABLES) {
+      const result = await this.db.query(
+        `SELECT ${table.fields.join(",")} FROM ${quoteIdentifier(table.table)} WHERE guild_id=$1 ORDER BY id`,
+        [guildId]
+      );
+      const moduleKey = table.table === "automation_rules" ? "automation" : "roles";
+      const target = modules.find((module) => module.key === moduleKey);
+      if (target) {
+        target.settings[table.table] = result.rows.map((row) => sanitizeJson(row));
+      }
+    }
+
+    return {
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      guildId,
+      modules
+    };
+  }
+
+  async importGuild(targetGuildId: string, payload: unknown): Promise<void> {
+    validateExport(payload);
+
+    const data = payload as ServerConfigExport;
+
+    await this.db.transaction(async (client) => {
+      for (const module of data.modules) {
+        const moduleKey = module.key;
+        const known = MODULE_CATALOG.some((candidate) => candidate.key === moduleKey);
+        if (!known) throw new Error(`unknown_module:${moduleKey}`);
+
+        await client.query(
+          `INSERT INTO guild_modules(guild_id,module_key,enabled)
+           VALUES($1,$2,$3)
+           ON CONFLICT(guild_id,module_key)
+           DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=now()`,
+          [targetGuildId, moduleKey, module.enabled]
+        );
+      }
+
+      await this.upsertSettings(client, targetGuildId, data.modules);
+
+      const automation = data.modules.find((module) => module.key === "automation");
+      const automationRules = automation?.settings.automation_rules;
+      if (Array.isArray(automationRules)) {
+        await client.query("DELETE FROM automation_rules WHERE guild_id=$1", [targetGuildId]);
+        for (const rule of automationRules) {
+          if (!rule || typeof rule !== "object") continue;
+          const object = rule as Record<string, unknown>;
+          await client.query(
+            `INSERT INTO automation_rules(
+              guild_id,name,enabled,event,conditions,actions,cooldown_seconds
+            ) VALUES($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)`,
+            [
+              targetGuildId,
+              typeof object.name === "string" ? object.name.slice(0,80) : "Imported rule",
+              object.enabled !== false,
+              typeof object.event === "string" ? object.event : "message.create",
+              JSON.stringify(Array.isArray(object.conditions) ? object.conditions : []),
+              JSON.stringify(Array.isArray(object.actions) ? object.actions : []),
+              typeof object.cooldown_seconds === "number" ? Math.min(Math.max(object.cooldown_seconds,0),86400) : 0
+            ]
+          );
+        }
+      }
+    });
+  }
+
+  private async upsertSettings(
+    client: import("pg").PoolClient,
+    guildId: string,
+    modules: ServerModuleConfig[]
+  ): Promise<void> {
+    const byKey = new Map(modules.map((module) => [module.key, module.settings]));
+
+    const execute = async (
+      table: string,
+      moduleKey: ServerModuleConfig["key"],
+      fields: string[],
+      defaults: Record<string, unknown>
+    ) => {
+      const settings = byKey.get(moduleKey);
+      if (!settings) return;
+
+      const values = fields.map((field) => settings[field] ?? defaults[field]);
+      const columns = ["guild_id", ...fields];
+      const placeholders = columns.map((_, index) => `$${index + 1}`);
+      const updates = fields.map((field) => `${field}=EXCLUDED.${field}`);
+
+      await client.query(
+        `INSERT INTO ${quoteIdentifier(table)}(${columns.map(quoteIdentifier).join(",")})
+         VALUES(${placeholders.join(",")})
+         ON CONFLICT(guild_id) DO UPDATE SET ${updates.join(",")},updated_at=now()`,
+        [guildId, ...values]
+      );
+    };
+
+    await execute("guild_settings", "temporary-voice", [
+      "temp_voice_enabled","temp_voice_trigger_channel_id","temp_voice_category_id",
+      "temp_voice_default_limit","temp_voice_private"
+    ], {
+      temp_voice_enabled: false,
+      temp_voice_trigger_channel_id: null,
+      temp_voice_category_id: null,
+      temp_voice_default_limit: 0,
+      temp_voice_private: false
+    });
+
+    await execute("automod_settings", "automod", [
+      "enabled","blocked_words","max_mentions","max_caps_ratio",
+      "max_repeated_messages","repeated_window_seconds","delete_message","timeout_minutes"
+    ], {
+      enabled: false,
+      blocked_words: [],
+      max_mentions: 6,
+      max_caps_ratio: 0.85,
+      max_repeated_messages: 5,
+      repeated_window_seconds: 10,
+      delete_message: true,
+      timeout_minutes: 0
+    });
+
+    await execute("welcome_settings", "welcome", [
+      "enabled","channel_id","message","dm","embed"
+    ], {
+      enabled: false,
+      channel_id: null,
+      message: "Добро пожаловать, {mention}, на {server}!",
+      dm: false,
+      embed: true
+    });
+
+    await execute("ticket_settings", "tickets", [
+      "enabled","category_id","staff_role_id","transcript_channel_id"
+    ], {
+      enabled: false,
+      category_id: null,
+      staff_role_id: null,
+      transcript_channel_id: null
+    });
+
+    await execute("security_settings", "security", [
+      "enabled","max_joins","window_seconds","quarantine_role_id","log_channel_id"
+    ], {
+      enabled: false,
+      max_joins: 10,
+      window_seconds: 20,
+      quarantine_role_id: null,
+      log_channel_id: null
+    });
+
+    await execute("starboard_settings", "starboard", [
+      "channel_id","threshold","ignore_self_reaction","ignore_bots"
+    ], {
+      channel_id: "",
+      threshold: 3,
+      ignore_self_reaction: true,
+      ignore_bots: true
+    });
+
+    await execute("music_settings", "music", [
+      "enabled","preferred_text_channel_id","default_volume","announce_track_start"
+    ], {
+      enabled: false,
+      preferred_text_channel_id: null,
+      default_volume: 100,
+      announce_track_start: true
+    });
+  }
+}
+
+function tableToModule(table: string): ServerModuleConfig["key"] | null {
+  switch (table) {
+    case "guild_settings": return "temporary-voice";
+    case "automod_settings": return "automod";
+    case "welcome_settings": return "welcome";
+    case "ticket_settings": return "tickets";
+    case "security_settings": return "security";
+    case "starboard_settings": return "starboard";
+    case "music_settings": return "music";
+    default: return null;
+  }
+}
+
+function quoteIdentifier(identifier: string): string {
+  if (!/^[a-z_][a-z0-9_]*$/i.test(identifier)) {
+    throw new Error("unsafe_identifier");
+  }
+  return `"${identifier}"`;
+}
+
+function sanitizeJson(value: unknown): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(value ?? {})) as Record<string, unknown>;
+}
+
+function validateExport(payload: unknown): asserts payload is ServerConfigExport {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("invalid_export");
+  }
+
+  const record = payload as Record<string, unknown>;
+  if (record.schemaVersion !== 1) throw new Error("unsupported_schema_version");
+  if (typeof record.guildId !== "string" || !/^\d{17,20}$/.test(record.guildId)) {
+    throw new Error("invalid_guild_id");
+  }
+
+  if (!Array.isArray(record.modules) || record.modules.length > MODULE_CATALOG.length) {
+    throw new Error("invalid_modules");
+  }
+
+  for (const module of record.modules) {
+    if (!module || typeof module !== "object") throw new Error("invalid_module");
+    const item = module as Record<string, unknown>;
+    if (typeof item.key !== "string" || !MODULE_CATALOG.some((known) => known.key === item.key)) {
+      throw new Error("unknown_module");
+    }
+    if (typeof item.enabled !== "boolean") throw new Error("invalid_module_enabled");
+    if (!item.settings || typeof item.settings !== "object" || Array.isArray(item.settings)) {
+      throw new Error("invalid_module_settings");
+    }
+  }
+}
