@@ -74,18 +74,20 @@ export class Verification implements PlatformModule {
       return;
     }
     if (sub === "setup") {
-      const channel = interaction.options.getChannel("channel");
+      const channelOption = interaction.options.getChannel("channel");
       const role = interaction.options.getRole("verified-role");
-      const logChannel = interaction.options.getChannel("log-channel");
-      if (channel && !channel.isTextBased()) {
+      const logChannelOption = interaction.options.getChannel("log-channel");
+      const channel = channelOption ? interaction.guild!.channels.cache.get(channelOption.id) : null;
+      const logChannel = logChannelOption ? interaction.guild!.channels.cache.get(logChannelOption.id) : null;
+      if (channelOption && (!channel || !channel.isTextBased())) {
         await interaction.reply({ content: "Verification channel должен быть текстовым.", ephemeral: true });
         return;
       }
-      if (logChannel && !logChannel.isTextBased()) {
+      if (logChannelOption && (!logChannel || !logChannel.isTextBased())) {
         await interaction.reply({ content: "Log channel должен быть текстовым.", ephemeral: true });
         return;
       }
-      await this.configure(interaction.guild.id, {
+      await this.configure(interaction.guild!.id, {
         enabled: true,
         channelId: channel?.id ?? null,
         verifiedRoleId: role?.id ?? null,
@@ -136,12 +138,12 @@ export class Verification implements PlatformModule {
   }
 
   private async issue(interaction: import("discord.js").ButtonInteraction): Promise<void> {
-    const config = await this.config(interaction.guild.id);
+    const config = await this.config(interaction.guild!.id);
     if (!config.enabled) {
       await interaction.reply({ content: "Verification выключен.", ephemeral: true });
       return;
     }
-    const key = `${interaction.guild.id}:${interaction.user.id}`;
+    const key = `${interaction.guild!.id}:${interaction.user.id}`;
     const existing = this.codes.get(key);
     if (existing && existing.expiresAt > Date.now()) {
       await interaction.reply({ content: "У тебя уже есть действующий код. Используй его с кнопкой подтверждения.", ephemeral: true });
@@ -161,7 +163,7 @@ export class Verification implements PlatformModule {
   }
 
   private async confirm(interaction: import("discord.js").ButtonInteraction, code: string): Promise<void> {
-    const key = `${interaction.guild.id}:${interaction.user.id}`;
+    const key = `${interaction.guild!.id}:${interaction.user.id}`;
     const entry = this.codes.get(key);
     if (!entry || entry.expiresAt < Date.now()) {
       this.codes.delete(key);
@@ -173,10 +175,10 @@ export class Verification implements PlatformModule {
       await interaction.reply({ content: "Неверный код.", ephemeral: true });
       return;
     }
-    const config = await this.config(interaction.guild.id);
-    const role = config.verifiedRoleId ? interaction.guild.roles.cache.get(config.verifiedRoleId) : null;
-    const member = await interaction.guild.members.fetch(interaction.user.id);
-    if (!role || role.position >= (interaction.guild.members.me?.roles.highest.position ?? 0)) {
+    const config = await this.config(interaction.guild!.id);
+    const role = config.verifiedRoleId ? interaction.guild!.roles.cache.get(config.verifiedRoleId) : null;
+    const member = await interaction.guild!.members.fetch(interaction.user.id);
+    if (!role || role.position >= (interaction.guild!.members.me?.roles.highest.position ?? 0)) {
       await interaction.reply({ content: "Verification role недоступна для бота.", ephemeral: true });
       return;
     }
@@ -184,7 +186,7 @@ export class Verification implements PlatformModule {
     this.codes.delete(key);
     await interaction.reply({ content: "✅ Проверка пройдена.", ephemeral: true });
     if (config.logChannelId) {
-      const channel = interaction.guild.channels.cache.get(config.logChannelId);
+      const channel = interaction.guild!.channels.cache.get(config.logChannelId);
       if (channel?.isTextBased() && "send" in channel) {
         await channel.send(`✅ Verification: ${interaction.user.tag} подтвердил аккаунт.`).catch(() => undefined);
       }
