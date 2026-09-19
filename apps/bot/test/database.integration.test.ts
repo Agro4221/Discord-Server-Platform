@@ -191,6 +191,63 @@ test("config transfer and local backup round-trip preserve guild configuration",
 });
 
 
+test("economy transfers lock accounts in deterministic order", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345710";
+  try {
+    await migrate(db);
+    await db.query("DELETE FROM economy_transactions WHERE guild_id=$1", [guildId]);
+    await db.query("DELETE FROM economy_accounts WHERE guild_id=$1", [guildId]);
+    await db.query(
+      "INSERT INTO economy_accounts(guild_id,user_id,balance) VALUES($1,'123456789012345711',100),($1,'123456789012345712',100)",
+      [guildId]
+    );
+
+    await Promise.all([
+      runTransferLikeTransaction(db, guildId, "123456789012345711", "123456789012345712", 10),
+      runTransferLikeTransaction(db, guildId, "123456789012345712", "123456789012345711", 15)
+    ]);
+
+    const result = await db.query<{ user_id: string; balance: string }>(
+      "SELECT user_id,balance::text AS balance FROM economy_accounts WHERE guild_id=$1 ORDER BY user_id",
+      [guildId]
+    );
+    assert.deepEqual(result.rows, [
+      { user_id: "123456789012345711", balance: "105" },
+      { user_id: "123456789012345712", balance: "95" }
+    ]);
+  } finally {
+    await db.query("DELETE FROM economy_transactions WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.query("DELETE FROM economy_accounts WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.close();
+  }
+});
+
+async function runTransferLikeTransaction(
+  db: Database,
+  guildId: string,
+  from: string,
+  to: string,
+  amount: number
+): Promise<void> {
+  await db.transaction(async (client) => {
+    for (const id of [from, to].sort()) {
+      await client.query(
+        "SELECT balance FROM economy_accounts WHERE guild_id=$1 AND user_id=$2 FOR UPDATE",
+        [guildId, id]
+      );
+    }
+    await client.query(
+      "UPDATE economy_accounts SET balance=balance-$3 WHERE guild_id=$1 AND user_id=$2",
+      [guildId, from, amount]
+    );
+    await client.query(
+      "UPDATE economy_accounts SET balance=balance+$3 WHERE guild_id=$1 AND user_id=$2",
+      [guildId, to, amount]
+    );
+  });
+}
+
 test("background jobs are isolated by guild bot assignment", { skip: !enabled }, async () => {
   const db = new Database(process.env.DATABASE_URL!);
   const primaryGuild = "123456789012345690";
