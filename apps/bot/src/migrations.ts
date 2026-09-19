@@ -245,6 +245,25 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_music_players_identity ON music_players(bot_identity_id);"
     ])
   }
+  },
+  {
+    version: 9,
+    name: "verification_analytics",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS verification_settings (",
+      "  guild_id text PRIMARY KEY, enabled boolean NOT NULL DEFAULT false,",
+      "  channel_id text, verified_role_id text, log_channel_id text,",
+      "  code_ttl_minutes integer NOT NULL DEFAULT 10 CHECK(code_ttl_minutes BETWEEN 2 AND 60),",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE TABLE IF NOT EXISTS analytics_events (",
+      "  guild_id text NOT NULL, event_type text NOT NULL,",
+      "  bucket_start timestamptz NOT NULL, count bigint NOT NULL DEFAULT 0,",
+      "  PRIMARY KEY(guild_id,event_type,bucket_start)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_analytics_events_guild_bucket ON analytics_events(guild_id,bucket_start DESC);"
+    ])
+  }
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
