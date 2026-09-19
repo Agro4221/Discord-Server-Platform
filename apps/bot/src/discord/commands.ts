@@ -338,6 +338,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .setDescription("Configure verification")
           .addChannelOption((o) => o.setName("channel").setDescription("Optional verification channel").addChannelTypes(ChannelType.GuildText))
           .addRoleOption((o) => o.setName("verified-role").setDescription("Role granted after verification"))
+          .addRoleOption((o) => o.setName("quarantine-role").setDescription("Role applied until verification"))
           .addChannelOption((o) => o.setName("log-channel").setDescription("Optional log channel").addChannelTypes(ChannelType.GuildText))
           .addIntegerOption((o) => o.setName("ttl").setDescription("Code lifetime in minutes").setMinValue(2).setMaxValue(60))
       )
