@@ -16,7 +16,6 @@ export class ConnectionSupervisor {
     this.bind(Events.ClientReady, () => this.update("ready", "gateway ready"));
     this.bind(Events.ShardReady, (shardId: number) => {
       logger.info("Discord shard ready", { shardId });
-      this.update("ready", `shard ${shardId} ready`);
     });
     this.bind(Events.ShardReconnecting, (shardId: number) => {
       logger.warn("Discord shard reconnecting", { shardId });
