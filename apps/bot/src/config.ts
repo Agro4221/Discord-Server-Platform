@@ -12,6 +12,7 @@ export type AppConfig = {
   lavalinkHost: string;
   lavalinkPort: number;
   lavalinkPassword: string;
+  backupDirectory: string;
   nodeEnv: "development" | "test" | "production";
 };
 
@@ -51,6 +52,7 @@ export function loadConfig(): AppConfig {
     lavalinkHost: process.env.LAVALINK_HOST ?? "127.0.0.1",
     lavalinkPort: port("LAVALINK_PORT", 2333),
     lavalinkPassword: required("LAVALINK_PASSWORD"),
+    backupDirectory: process.env.BACKUP_DIRECTORY ?? "./data/backups",
     nodeEnv
   };
 }
