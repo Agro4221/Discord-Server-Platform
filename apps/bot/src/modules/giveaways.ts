@@ -113,6 +113,35 @@ export class Giveaways implements PlatformModule {
     await interaction.reply({ content: "Giveaway создан.", ephemeral: true });
   }
 
+  private async finish(id: number, guildId: string): Promise<{ id: number; channelId: string; winners: string[] } | null> {
+    const claimed = await this.db.query<{ id: string; channel_id: string; winners: number }>(
+      "UPDATE giveaways SET status='finishing' WHERE id=$1 AND guild_id=$2 AND status='running' RETURNING id,channel_id,winners",
+      [id, guildId]
+    );
+    const row = claimed.rows[0];
+    if (!row) return null;
+
+    try {
+      const entries = await this.db.query<{ user_id: string }>(
+        "SELECT user_id FROM giveaway_entries WHERE giveaway_id=$1",
+        [id]
+      );
+      const pool = entries.rows.map((entry) => entry.user_id);
+      const winners: string[] = [];
+      while (pool.length && winners.length < row.winners) {
+        winners.push(pool.splice(randomInt(pool.length), 1)[0]!);
+      }
+      await this.db.query(
+        "UPDATE giveaways SET status='finished',selected_winners=$1::jsonb,finished_at=now() WHERE id=$2 AND status='finishing'",
+        [JSON.stringify(winners), id]
+      );
+      return { id, channelId: row.channel_id, winners };
+    } catch (error) {
+      await this.db.query("UPDATE giveaways SET status='running' WHERE id=$1 AND status='finishing'", [id]);
+      throw error;
+    }
+  }
+
   private async onInteraction(interaction: import("discord.js").Interaction): Promise<void> {
     if (!interaction.isButton() || !interaction.customId.startsWith("dsp:giveaway:") || !interaction.guild!) return;
     const [, , action, rawId] = interaction.customId.split(":");
