@@ -235,6 +235,9 @@ export function buildCommands(): SlashCommandBuilder[] {
         sub.setName("daily").setDescription("Claim daily coins")
       )
       .addSubcommand((sub) =>
+        sub.setName("leaderboard").setDescription("Show richest users")
+      )
+      .addSubcommand((sub) =>
         sub
           .setName("pay")
           .setDescription("Transfer coins")
@@ -249,6 +252,27 @@ export function buildCommands(): SlashCommandBuilder[] {
               .setMaxValue(1_000_000)
               .setRequired(true)
           )
+      ),
+
+    new SlashCommandBuilder()
+      .setName("shop")
+      .setDescription("Economy shop")
+      .addSubcommand((sub) => sub.setName("list").setDescription("List available items"))
+      .addSubcommand((sub) =>
+        sub
+          .setName("buy")
+          .setDescription("Buy an item")
+          .addIntegerOption((o) => o.setName("item").setDescription("Item id").setMinValue(1).setRequired(true))
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName("create")
+          .setDescription("Create shop item")
+          .addStringOption((o) => o.setName("name").setDescription("Name").setMaxLength(80).setRequired(true))
+          .addStringOption((o) => o.setName("description").setDescription("Description").setMaxLength(500).setRequired(true))
+          .addIntegerOption((o) => o.setName("price").setDescription("Price").setMinValue(1).setMaxValue(1000000000).setRequired(true))
+          .addRoleOption((o) => o.setName("role").setDescription("Optional role reward"))
+          .addIntegerOption((o) => o.setName("stock").setDescription("Optional stock").setMinValue(1).setMaxValue(100000))
       ),
 
     new SlashCommandBuilder()
