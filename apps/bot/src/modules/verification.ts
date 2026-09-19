@@ -98,8 +98,9 @@ export class Verification implements PlatformModule {
       return;
     }
     if (sub === "panel") {
-      const channel = interaction.options.getChannel("channel", true);
-      if (!channel.isTextBased() || !("send" in channel)) {
+      const channelOption = interaction.options.getChannel("channel", true);
+      const channel = interaction.guild!.channels.cache.get(channelOption.id);
+      if (!channel || channel.type !== 0) {
         await interaction.reply({ content: "Panel channel должен быть текстовым.", ephemeral: true });
         return;
       }
@@ -127,7 +128,7 @@ export class Verification implements PlatformModule {
   }
 
   private async onInteraction(interaction: import("discord.js").Interaction): Promise<void> {
-    if (!interaction.isButton() || !interaction.guild) return;
+    if (!interaction.isButton() || !interaction.guild!) return;
     if (interaction.customId === "dsp:verify:issue") {
       await this.issue(interaction);
       return;
