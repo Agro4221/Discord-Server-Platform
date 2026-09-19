@@ -16,6 +16,7 @@ export class Giveaways implements PlatformModule {
   private timer?: NodeJS.Timeout;
   private client?: import("discord.js").Client;
   private events?: import("../events.js").PlatformEventBus;
+  private identityId = "primary";
 
   constructor(private readonly db: Database) {}
 
@@ -131,6 +132,7 @@ export class Giveaways implements PlatformModule {
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+    this.identityId = context.identityId;
     this.events = context.events;
     const commandUnsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const interactionUnsubscribe = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
@@ -280,7 +282,8 @@ export class Giveaways implements PlatformModule {
 
   private async sweep(): Promise<void> {
     const expired = await this.db.query<{ id: string; guild_id: string }>(
-      "SELECT id,guild_id FROM giveaways WHERE status='running' AND ends_at <= now() ORDER BY ends_at LIMIT 20"
+      "SELECT g.id,g.guild_id FROM giveaways g INNER JOIN guild_bot_assignments ga ON ga.guild_id=g.guild_id AND ga.bot_identity_id=$1 WHERE g.status='running' AND g.ends_at <= now() ORDER BY g.ends_at LIMIT 20",
+      [this.identityId]
     );
 
     for (const giveaway of expired.rows) {
