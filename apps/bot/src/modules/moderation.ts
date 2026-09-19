@@ -116,9 +116,15 @@ export class Moderation implements PlatformModule {
     }
 
     await this.audit("moderation.warn.attempted", interaction.guild.id, interaction.user.id, target.id, { reason });
-    const caseId = await this.record(interaction.guild.id, target.id, interaction.user.id, "warn", reason);
+    const caseId = await this.recordBestEffort(
+      interaction.guild.id,
+      target.id,
+      interaction.user.id,
+      "warn",
+      reason
+    );
     await interaction.reply({
-      content: `Предупреждение выдано ${target}. Case #${caseId}.`,
+      content: `Предупреждение выдано ${target}.${caseId ? ` Case #${caseId}.` : " Case не удалось записать в БД — действие применено."}`,
       ephemeral: true
     });
 
@@ -158,7 +164,7 @@ export class Moderation implements PlatformModule {
       durationMinutes,
       reason
     });
-    const caseId = await this.record(
+    const caseId = await this.recordBestEffort(
       interaction.guild.id,
       member.id,
       interaction.user.id,
@@ -168,7 +174,7 @@ export class Moderation implements PlatformModule {
     );
 
     await interaction.reply({
-      content: `Timeout для ${member} на ${durationMinutes} мин. Case #${caseId}.`,
+      content: `Timeout для ${member} на ${durationMinutes} мин.${caseId ? ` Case #${caseId}.` : " Case не удалось записать в БД — действие применено."}`,
       ephemeral: true
     });
   }
@@ -194,10 +200,10 @@ export class Moderation implements PlatformModule {
 
     await member.kick(reason);
     await this.audit("moderation.kick.applied", interaction.guild.id, interaction.user.id, member.id, { reason });
-    const caseId = await this.record(interaction.guild.id, member.id, interaction.user.id, "kick", reason);
+    const caseId = await this.recordBestEffort(interaction.guild.id, member.id, interaction.user.id, "kick", reason);
 
     await interaction.reply({
-      content: `${member.user.tag} исключён. Case #${caseId}.`,
+      content: `${member.user.tag} исключён.${caseId ? ` Case #${caseId}.` : " Case не удалось записать в БД — действие применено."}`,
       ephemeral: true
     });
   }
@@ -223,12 +229,34 @@ export class Moderation implements PlatformModule {
 
     await member.ban({ reason });
     await this.audit("moderation.ban.applied", interaction.guild.id, interaction.user.id, member.id, { reason });
-    const caseId = await this.record(interaction.guild.id, member.id, interaction.user.id, "ban", reason);
+    const caseId = await this.recordBestEffort(interaction.guild.id, member.id, interaction.user.id, "ban", reason);
 
     await interaction.reply({
-      content: `${member.user.tag} заблокирован. Case #${caseId}.`,
+      content: `${member.user.tag} заблокирован.${caseId ? ` Case #${caseId}.` : " Case не удалось записать в БД — действие применено."}`,
       ephemeral: true
     });
+  }
+
+  private async recordBestEffort(
+    guildId: string,
+    targetUserId: string,
+    moderatorUserId: string,
+    action: ModerationAction,
+    reason: string | null,
+    expiresAt: Date | null = null
+  ): Promise<number | null> {
+    try {
+      return await this.record(guildId, targetUserId, moderatorUserId, action, reason, expiresAt);
+    } catch (error) {
+      logger.error("Moderation case persistence failed after action was applied", {
+        guildId,
+        targetUserId,
+        moderatorUserId,
+        action,
+        error: String(error)
+      });
+      return null;
+    }
   }
 
   private async safeDm(user: User, message: string): Promise<void> {
