@@ -323,6 +323,13 @@ const migrations = [
       "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS destructive_window_seconds integer NOT NULL DEFAULT 20;"
     ])
   },
+  {
+    version: 14,
+    name: "reminder_processing_lease",
+    sql: q([
+      "ALTER TABLE reminders ADD COLUMN IF NOT EXISTS processing_until timestamptz;"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
