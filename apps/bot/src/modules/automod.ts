@@ -243,17 +243,42 @@ export class AutoMod implements PlatformModule {
     });
 
     if (config.deleteMessage) {
-      await message.delete().catch(() => undefined);
+      await message.delete().catch((error) => {
+        logger.warn("AutoMod message deletion failed", {
+          guildId: message.guild!.id,
+          userId: message.author.id,
+          messageId: message.id,
+          rule: reason,
+          error: String(error)
+        });
+      });
     }
 
     if (config.timeoutMinutes > 0 && message.member?.moderatable) {
-      await message.member.timeout(config.timeoutMinutes * 60_000, `AutoMod: ${reason}`).catch(() => undefined);
+      await message.member.timeout(config.timeoutMinutes * 60_000, `AutoMod: ${reason}`).catch((error) => {
+        logger.warn("AutoMod timeout failed", {
+          guildId: message.guild!.id,
+          userId: message.author.id,
+          messageId: message.id,
+          rule: reason,
+          timeoutMinutes: config.timeoutMinutes,
+          error: String(error)
+        });
+      });
     }
 
     await this.db.query(
       `INSERT INTO automod_events(guild_id,user_id,message_id,rule,created_at)
        VALUES($1,$2,$3,$4,now())`,
       [message.guild.id, message.author.id, message.id, reason]
-    ).catch(() => undefined);
+    ).catch((error) => {
+      logger.error("AutoMod violation persistence failed", {
+        guildId: message.guild!.id,
+        userId: message.author.id,
+        messageId: message.id,
+        rule: reason,
+        error: String(error)
+      });
+    });
   }
 }
