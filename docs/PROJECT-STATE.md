@@ -7,42 +7,54 @@ Self-hosted Discord Server Platform: local-first, resilient, modular, no artific
 development
 
 ## Current phase
-Full build — foundation implementation.
+Full build — implementation + continuous verification.
 
-## Implemented
-- Monorepo workspace skeleton.
-- Environment/config validation.
-- Structured JSON logging.
-- Local health/readiness HTTP endpoint.
-- PostgreSQL pool and transaction wrapper.
-- Versioned migration runner with advisory lock.
-- Discord client with required gateway intents and command registration.
-- /ping.
-- /setup temp-voice.
-- Temporary Voice creation, owner persistence, cleanup and startup reconciliation.
-- Discord connection supervision/health reporting.
-- Moderation module with warn/timeout/kick/ban and durable case records.
-- Module catalog/settings persistence.
-- Initial local Next.js dashboard shell.
-- Worker shell.
-- Docker Compose for PostgreSQL and Lavalink 4.2.2.
-- Persistent test/quality/continuity documentation.
+## Working subsystems
+- Discord Core with typed event bus and module lifecycle.
+- PostgreSQL persistence + versioned migrations + advisory migration lock.
+- Health/readiness endpoint and Discord connection supervision.
+- Durable audit log.
+- Local protected Management API.
+- Schema-driven Next.js Control Center with session auth, module toggles, Discord channel/role selectors, settings forms, import/export and backups.
+- Moderation with case history.
+- Temporary Voice with idempotency, ownership and reconciliation.
+- AutoMod, Welcome, Verification, Leveling.
+- Tickets with modal intake, staff claim, close and transcript.
+- Role Panels with role hierarchy/tamper checks.
+- Giveaways with durable entries and scheduled finishing.
+- Economy with daily/pay/leaderboard, shop and transaction ledger.
+- Reminders with retry/lease semantics.
+- Starboard.
+- Automation engine with persisted rules and cooldowns.
+- Security/Anti-Raid and destructive burst detection.
+- Notifications with HTTPS feed validation and SSRF protections.
+- Analytics minute buckets.
+- Music/Lavalink foundation with persistent queue store and bot identity namespace.
+- Multi-bot identity persistence for separate-process fleet deployment.
+- Config transfer and compressed local backups.
+- Docker Compose / Dockerfiles for local-to-VPS topology.
 
-## Not complete
-- Full dashboard authentication/RBAC and write API.
-- Full AutoMod/security/roles/welcome/verification/leveling/tickets/giveaways/starboard/economy/reminders/notifications/automation/music/analytics.
-- Multi-bot identity/session manager.
-- Full music provider adapters and recovery.
-- Comprehensive unit/integration/e2e/chaos/soak/security tests.
-- Automated backups/restore.
-- VPS packaging and installation UX.
+## Still under development
+- Comprehensive multi-role panel editor and richer Dashboard action panels.
+- Complete Giveaway admin UI/history/reroll UX.
+- Full AutoMod rule editor beyond current core rules.
+- Full Security response workflow beyond alert/quarantine.
+- Full Automation condition/action catalog and visual builder.
+- Music provider breadth, player resume restoration and multi-node failover validation.
+- Multi-bot fleet orchestrator/health UI; current model is separate bot processes sharing DB/Lavalink.
+- Full analytics Dashboard charts/reporting.
+- Production backup retention/remote backup integration.
+- Full E2E/chaos/soak/security test suite.
+- VPS installer/reverse-proxy/upgrade tooling.
 
-## Verification status
-Static review is ongoing. Full dependency compilation and Discord E2E have not been run in this environment because the available runtime is Node.js 22.16.0 while the target stack requires Node.js 24.17+, and network package installation timed out.
+## Verification
+- GitHub Actions CI runs on Node.js 24.17.
+- Source secret hygiene check is active.
+- Unit regression tests exist for health, module registry, event bus and dashboard schema.
+- Full dependency compilation is delegated to CI because this execution environment has Node.js 22.16.
+- Discord live E2E requires user-owned Discord test credentials and has not been run here.
 
-## Immediate next work
-1. Make the local management API/dashboard security model explicit.
-2. Strengthen Temporary Voice idempotency and orphan-resource recovery.
-3. Implement the remaining full product modules using shared infrastructure.
-4. Add test harnesses and regression coverage continuously.
-5. Run live verification on Node.js 24.17+ with the user's Discord test application/guild credentials.
+## Continuity
+Read docs/WORK-LOG.md before continuing work in a new chat.
+Read docs/TEST-MATRIX.md before declaring a subsystem complete.
+Never commit credentials, bot tokens, provider secrets or private user data.
