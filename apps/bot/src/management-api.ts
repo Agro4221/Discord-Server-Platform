@@ -114,9 +114,6 @@ export class ManagementApiServer {
         });
 
         try {
-          if (requestStartedAt && Date.now() < requestStartedAt) {
-            throw new Error("clock_regressed");
-          }
           if (!this.allowedRate(ip)) {
             this.json(res, 429, { error: "rate_limited" });
             return;
