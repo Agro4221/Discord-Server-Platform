@@ -12,6 +12,7 @@ export type ModuleServices = {
   db: Database;
   auditLog: AuditLog;
   events: PlatformEventBus;
+  identityId: string;
 };
 
 export class ModuleRegistry {
