@@ -148,10 +148,27 @@ export class RolePanels implements PlatformModule {
 
     if (current.messageId && current.channelId === channelId) {
       await callbacks.editMessage(current.channelId, current.messageId, content, components);
-      await this.db.query(
-        "UPDATE role_panels SET title=$1,roles=$2::jsonb WHERE id=$3 AND guild_id=$4",
-        [nextTitle,JSON.stringify(cleaned),panelId,guildId]
-      );
+      try {
+        await this.db.query(
+          "UPDATE role_panels SET title=$1,roles=$2::jsonb WHERE id=$3 AND guild_id=$4",
+          [nextTitle,JSON.stringify(cleaned),panelId,guildId]
+        );
+      } catch (error) {
+        await callbacks.editMessage(
+          current.channelId,
+          current.messageId,
+          "🎭 **" + current.title + "**",
+          [this.row(panelId, current.roles)]
+        ).catch((rollbackError) => {
+          logger.error("Role panel message rollback failed after database update error", {
+            guildId,
+            panelId,
+            messageId: current.messageId,
+            error: String(rollbackError)
+          });
+        });
+        throw error;
+      }
     } else {
       const newMessageId = await callbacks.sendMessage(channelId, content, components);
       try {
