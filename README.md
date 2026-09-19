@@ -58,7 +58,7 @@ The dashboard never receives bot tokens or provider secrets.
 
 The same codebase supports local development, a single VPS deployment, and multiple bot identities as separate bot service instances sharing PostgreSQL/Lavalink.
 
-See docs/LOCAL-SETUP.md, docs/MULTI-BOT.md, docs/TEST-MATRIX.md, docs/PROJECT-STATE.md and docs/WORK-LOG.md.
+See docs/LOCAL-SETUP.md, docs/ADMIN-GUIDE.md, docs/MULTI-BOT.md, docs/TEST-MATRIX.md, docs/PROJECT-STATE.md and docs/WORK-LOG.md.
 
 ## Quality bar
 
