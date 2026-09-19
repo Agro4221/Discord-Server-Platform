@@ -10,12 +10,14 @@ import { createDiscordClient, registerCommands, wireDiscordEvents } from "./disc
 import { ConnectionSupervisor } from "./discord/connection-supervisor.js";
 import { ManagementApiServer } from "./management-api.js";
 import { ModuleSettingsRepository } from "./module-settings.js";
+import { AuditLog } from "./audit.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const health = new HealthServer();
   const database = new Database(config.databaseUrl);
   const moduleSettings = new ModuleSettingsRepository(database);
+  const auditLog = new AuditLog(database);
 
   await health.start(config.healthHost, config.healthPort);
 
@@ -59,7 +61,8 @@ async function main(): Promise<void> {
     port: config.managementApiPort,
     apiKey: config.managementApiKey,
     client,
-    moduleSettings
+    moduleSettings,
+    auditLog
   });
   await management.start();
 
