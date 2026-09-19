@@ -22,6 +22,10 @@ type RuntimeEvent = {
   content?: string;
 };
 
+export type AutomationRuleRecord = AutomationRule & {
+  cooldownSeconds: number;
+};
+
 export class AutomationEngine implements PlatformModule {
   readonly name = "automation";
   private unsubscribe?: () => void;
@@ -109,7 +113,7 @@ export class AutomationEngine implements PlatformModule {
     await interaction.reply({ content: "Automation rule создано.", ephemeral: true });
   }
 
-  async listRules(guildId: string): Promise<AutomationRule[]> {
+  async listRules(guildId: string): Promise<AutomationRuleRecord[]> {
     const result = await this.db.query<{
       id: string;
       guild_id: string;
@@ -132,7 +136,8 @@ export class AutomationEngine implements PlatformModule {
       all: row.conditions ?? [],
       any: [],
       event: row.event,
-      actions: row.actions ?? []
+      actions: row.actions ?? [],
+      cooldownSeconds: row.cooldown_seconds
     }));
   }
 
@@ -211,14 +216,15 @@ export class AutomationEngine implements PlatformModule {
     conditions: AutomationCondition[],
     actions: AutomationAction[],
     cooldownSeconds = 0
-  ): Promise<void> {
+  ): Promise<AutomationRuleRecord> {
     validateAutomationRule(event, conditions, actions);
 
-    await this.db.query(
+    const created = await this.db.query<{ id: string }>(
       `INSERT INTO automation_rules(
          guild_id,name,enabled,event,conditions,actions,cooldown_seconds
        )
-       VALUES($1,$2,true,$3,$4::jsonb,$5::jsonb,$6)`,
+       VALUES($1,$2,true,$3,$4::jsonb,$5::jsonb,$6)
+       RETURNING id`,
       [
         guildId,
         name.slice(0, 80),
@@ -238,6 +244,12 @@ export class AutomationEngine implements PlatformModule {
     );
 
     await this.reload();
+    const createdId = created.rows[0]?.id;
+    const rule = createdId
+      ? (await this.listRules(guildId)).find((item) => item.id === createdId)
+      : undefined;
+    if (!rule) throw new Error("automation_rule_create_failed");
+    return rule;
   }
 
   private async executeFromMessage(message: Message): Promise<void> {
