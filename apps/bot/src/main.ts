@@ -55,7 +55,9 @@ async function main(): Promise<void> {
     await identities.ensureIdentity(config.botIdentityId, config.discordClientId);
     await identities.refreshAssignments();
     health.set({ database: "ready" });
-    await identities.heartbeat("starting", 0).catch(() => undefined);
+    await identities.heartbeat("starting", 0).catch((error) => {
+      logger.warn("Initial fleet heartbeat failed", { identityId: config.botIdentityId, error: String(error) });
+    });
   } catch (error) {
     health.set({ database: "down", status: "degraded", lastError: "database startup failed" });
     logger.error("Database startup failed", { error: String(error) });
@@ -221,12 +223,20 @@ async function main(): Promise<void> {
     logger.info("Shutdown requested", { signal });
     supervisor.stop();
     clearInterval(fleetTimer);
-    await identities.heartbeat("stopped", client.guilds.cache.size).catch(() => undefined);
+    await identities.heartbeat("stopped", client.guilds.cache.size).catch((error) => {
+      logger.warn("Stopped fleet heartbeat failed", { identityId: config.botIdentityId, error: String(error) });
+    });
     await modules.shutdownAll();
     client.destroy();
-    await management.stop().catch(() => undefined);
-    await database.close().catch(() => undefined);
-    await health.stop().catch(() => undefined);
+    await management.stop().catch((error) => {
+      logger.warn("Management API shutdown failed", { error: String(error) });
+    });
+    await database.close().catch((error) => {
+      logger.error("Database shutdown failed", { error: String(error) });
+    });
+    await health.stop().catch((error) => {
+      logger.warn("Health server shutdown failed", { error: String(error) });
+    });
   };
 
   process.once("SIGINT", () => void shutdown("SIGINT"));
