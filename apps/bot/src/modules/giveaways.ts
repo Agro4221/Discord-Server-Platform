@@ -3,7 +3,8 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
-  type ChatInputCommandInteraction
+  type ChatInputCommandInteraction,
+  type Message
 } from "discord.js";
 import { randomInt } from "node:crypto";
 import type { Database } from "../database.js";
@@ -222,7 +223,7 @@ export class Giveaways implements PlatformModule {
     const id = created.rows[0]?.id;
     if (!id) throw new Error("giveaway id missing");
 
-    let message;
+    let message: Message | undefined;
     try {
       message = await interaction.channel!.send({
       embeds: [
@@ -241,7 +242,6 @@ export class Giveaways implements PlatformModule {
       });
 
       await this.db.query("UPDATE giveaways SET message_id=$1 WHERE id=$2", [message.id, id]);
-      await interaction.reply({ content: "Giveaway создан.", ephemeral: true });
     } catch (error) {
       if (message) {
         await message.delete().catch((deleteError) => {
@@ -267,6 +267,16 @@ export class Giveaways implements PlatformModule {
         error: String(error)
       });
       throw error;
+    }
+
+    try {
+      await interaction.reply({ content: "Giveaway создан.", ephemeral: true });
+    } catch (error) {
+      logger.warn("Giveaway success response failed", {
+        guildId: interaction.guild!.id,
+        giveawayId: id,
+        error: String(error)
+      });
     }
   }
 
