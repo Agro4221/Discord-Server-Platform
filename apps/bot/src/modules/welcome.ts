@@ -1,5 +1,6 @@
 import {
   EmbedBuilder,
+  PermissionFlagsBits,
   type GuildMember,
   type TextChannel
 } from "discord.js";
@@ -30,7 +31,9 @@ export class Welcome implements PlatformModule {
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
-    this.unsubscribe = context.events.on("member.add", (member) => this.onJoin(member));
+    const a = context.events.on("member.add", (member) => this.onJoin(member));
+    const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    this.unsubscribe = () => { a(); b(); };
   }
 
   async shutdown(): Promise<void> {
@@ -38,7 +41,32 @@ export class Welcome implements PlatformModule {
     this.unsubscribe = undefined;
   }
 
-  async getConfig(guildId: string): Promise<WelcomeConfig> {
+  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+    if (!interaction.inGuild() || interaction.commandName !== "welcome") return;
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+      await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
+      return;
+    }
+    if (interaction.options.getSubcommand() !== "setup") return;
+
+    const channel = interaction.options.getChannel("channel");
+    if (channel && !channel.isTextBased()) {
+      await interaction.reply({ content: "Welcome channel должен быть текстовым.", ephemeral: true });
+      return;
+    }
+
+    await this.configure(interaction.guild.id, {
+      enabled: true,
+      channelId: channel?.id ?? null,
+      message: interaction.options.getString("message") ?? defaultConfig.message,
+      dm: interaction.options.getBoolean("dm") ?? false,
+      embed: interaction.options.getBoolean("embed") ?? true
+    });
+
+    await interaction.reply({ content: "Welcome настроен и включён.", ephemeral: true });
+  }
+
+  async getConfig(guildId: string): Promise<WelcomeConfig>
     const result = await this.db.query<{
       enabled: boolean;
       channel_id: string | null;
