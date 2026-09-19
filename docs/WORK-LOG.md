@@ -164,3 +164,10 @@ Never write credentials, tokens or private user data here.
 - Added a bounded pure helper for the lookback cutoff and regression coverage for configured, clamped windows.
 - Current code commits: `eeaa0fe3fbf20bcf16a36c612530c30631084dd4` and `94aa7f594f8c64f4424ab0bfcfc257864484ba36`.
 - A fresh CI run should be treated as the verification gate for these changes; the connector does not expose push-triggered run listings for this private repository.
+
+
+## 2026-09-19 — Final CI verification
+- Current development HEAD before this log update: `506939661adc2b06038b0d2f1f0997269a52064f`.
+- GitHub Actions run **#552** (`35442074459`) passed every stage: PostgreSQL service initialization, dependency install/audit, source hygiene, deployment/observability contracts, bot typecheck, bot tests, domain build, bot build and Dashboard build.
+- Security configured audit-window hardening is therefore CI-verified on the current code state.
+- Live Discord/Lavalink E2E, chaos, soak and clean-host VPS acceptance remain the only environment-dependent validation items; they require user-owned runtime credentials/infrastructure and are not reproducible inside this execution environment.
