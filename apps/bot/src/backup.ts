@@ -1,4 +1,5 @@
 import { createReadStream, createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
 import { mkdir, readdir, readFile, unlink } from "node:fs/promises";
 import { createGzip, createGunzip } from "node:zlib";
 import { pipeline } from "node:stream/promises";
@@ -26,7 +27,7 @@ export class BackupService {
     const target = join(this.directory, filename);
 
     await pipeline(
-      ReadableFromJson(JSON.stringify(payload)),
+      Readable.from([JSON.stringify(payload)]),
       createGzip({ level: 9 }),
       createWriteStream(target, { flags: "wx", mode: 0o600 })
     );
@@ -74,6 +75,3 @@ async function readGzip(path: string): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-function ReadableFromJson(value: string) {
-  return import("node:stream").then(({ Readable }) => Readable.from([value]));
-}
