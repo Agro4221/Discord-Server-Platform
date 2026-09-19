@@ -29,9 +29,9 @@ type ApiOptions = {
       panelId: number,
       input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }> },
       callbacks: {
-        editMessage: (channelId: string, messageId: string, content: string, components: unknown[]) => Promise<void>;
+        editMessage: (channelId: string, messageId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => Promise<void>;
         deleteMessage: (channelId: string, messageId: string) => Promise<void>;
-        sendMessage: (channelId: string, content: string, components: unknown[]) => Promise<string>;
+        sendMessage: (channelId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => Promise<string>;
       }
     ) => Promise<unknown>;
     delete: (guildId: string, panelId: number, deleteMessage: (channelId: string, messageId: string) => Promise<void>) => Promise<boolean>;
