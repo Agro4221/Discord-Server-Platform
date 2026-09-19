@@ -39,18 +39,18 @@ async function main(): Promise<void> {
   const moduleSettings = new ModuleSettingsRepository(database);
   const auditLog = new AuditLog(database);
   const dashboardSettings = new DashboardSettingsService(database);
-  const identities = new BotIdentityRepository(database);
+  const identities = new BotIdentityRepository(database, config.botIdentityId);
   const transfer = new ConfigTransferService(database);
   const backups = new BackupService(database, config.backupDirectory);
-  const events = new PlatformEventBus();
-
   await health.start(config.healthHost, config.healthPort);
 
   try {
     await database.ping();
     await migrate(database);
     await identities.ensureIdentity(config.botIdentityId, config.discordClientId);
+    await identities.refreshAssignments();
     health.set({ database: "ready" });
+    await identities.heartbeat("starting", 0).catch(() => undefined);
   } catch (error) {
     health.set({ database: "down", status: "degraded", lastError: "database startup failed" });
     logger.error("Database startup failed", { error: String(error) });
@@ -60,6 +60,7 @@ async function main(): Promise<void> {
   }
 
   const client = createDiscordClient();
+  const events = new PlatformEventBus((guildId) => identities.ownsGuild(guildId));
   const temporaryVoice = new TemporaryVoice(database, () => client.guilds.cache.values());
   const moderation = new Moderation(database);
   const autoMod = new AutoMod(database);
@@ -110,6 +111,7 @@ async function main(): Promise<void> {
       discord: status,
       status: status === "ready" ? "ready" : "degraded"
     });
+    void identities.heartbeat(status === "ready" ? "ready" : "degraded", client.guilds.cache.size).catch(() => undefined);
   });
   supervisor.start();
 
@@ -123,6 +125,8 @@ async function main(): Promise<void> {
     port: config.managementApiPort,
     apiKey: config.managementApiKey,
     client,
+    guildAccess: (guildId: string) => identities.ownsGuild(guildId),
+    identities,
     moduleSettings,
     auditLog,
     settings: dashboardSettings,
@@ -178,6 +182,17 @@ async function main(): Promise<void> {
   await registerCommands(config, client);
   wireDiscordEvents(client, events);
 
+  await identities.claimUnassignedGuilds([...client.guilds.cache.keys()]);
+  await identities.refreshAssignments();
+  await identities.heartbeat("ready", client.guilds.cache.size).catch(() => undefined);
+
+  const fleetTimer = setInterval(() => {
+    void identities.refreshAssignments()
+      .then(() => identities.heartbeat("ready", client.guilds.cache.size))
+      .catch((error) => logger.warn("Fleet heartbeat failed", { error: String(error) }));
+  }, 15_000);
+  fleetTimer.unref();
+
   events.on("interaction.command", (interaction) => {
     void routeCommand(client, interaction, database, temporaryVoice, moderation);
   });
@@ -191,6 +206,8 @@ async function main(): Promise<void> {
 
     logger.info("Shutdown requested", { signal });
     supervisor.stop();
+    clearInterval(fleetTimer);
+    await identities.heartbeat("stopped", client.guilds.cache.size).catch(() => undefined);
     await modules.shutdownAll();
     client.destroy();
     await management.stop().catch(() => undefined);
