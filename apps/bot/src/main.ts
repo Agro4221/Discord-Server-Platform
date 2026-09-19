@@ -130,7 +130,8 @@ async function main(): Promise<void> {
     backups,
     rolePanels: {
       list: async (guildId) => rolePanels.list(guildId),
-      create: async (guildId, input) => rolePanels.createPanel(guildId, input.channelId, input.roles, input.title),
+      create: async (guildId, input, callbacks) =>
+        rolePanels.createPanel(guildId, input.channelId, input.roles, input.title, callbacks),
       update: async (guildId, panelId, input, callbacks) => rolePanels.updatePanel(guildId, panelId, input.channelId, input.roles, input.title ?? "Выберите роли", callbacks),
       delete: async (guildId, panelId, deleteMessage) => rolePanels.deletePanel(guildId, panelId, deleteMessage)
     },
