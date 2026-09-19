@@ -82,7 +82,7 @@ async function main(): Promise<void> {
   const notifications = new Notifications(database);
   const verification = new Verification(database);
   const analytics = new Analytics(database);
-  const music = new Music(database, config);
+  const music = new Music(database, config, identities);
 
   const modules = new ModuleRegistry({
     client,
