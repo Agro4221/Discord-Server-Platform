@@ -401,10 +401,10 @@ export class ManagementApiServer {
             }
 
             const input: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean } = {};
-            if (body.channelId !== undefined) input.channelId = body.channelId;
-            if (body.url !== undefined) input.url = body.url;
-            if (body.intervalSeconds !== undefined) input.intervalSeconds = body.intervalSeconds;
-            if (body.enabled !== undefined) input.enabled = body.enabled;
+            if (typeof body.channelId === "string") input.channelId = body.channelId;
+            if (typeof body.url === "string") input.url = body.url;
+            if (typeof body.intervalSeconds === "number") input.intervalSeconds = body.intervalSeconds;
+            if (typeof body.enabled === "boolean") input.enabled = body.enabled;
 
             if (input.channelId !== undefined) {
               const channel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(input.channelId);
