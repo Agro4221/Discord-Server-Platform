@@ -301,17 +301,52 @@ async function assertSafeFeedUrl(raw: string): Promise<void> {
 function isPrivateIp(address: string): boolean {
   if (net.isIPv4(address)) {
     const [a,b] = address.split(".").map(Number);
-    if (a === 10 || a === 127 || a === 0) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b !== undefined && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    return false;
+    if (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b !== undefined && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b !== undefined && b >= 16 && b <= 31) ||
+      (a === 192 && b === 0) ||
+      (a === 192 && b === 168) ||
+      (a === 198 && b !== undefined && b >= 18 && b <= 19)
+    ) return true;
+    return a >= 224;
   }
 
   const normalized = address.toLowerCase();
-  return normalized === "::1" ||
+  if (
+    normalized === "::1" ||
     normalized === "::" ||
     normalized.startsWith("fc") ||
     normalized.startsWith("fd") ||
-    normalized.startsWith("fe80:");
+    normalized.startsWith("fe80:") ||
+    normalized.startsWith("ff")
+  ) {
+    return true;
+  }
+
+  if (normalized.startsWith("::ffff:")) {
+    const mapped = normalized.slice("::ffff:").split(".").length === 4
+      ? normalized.slice("::ffff:")
+      : ipv4FromMappedHex(normalized.slice("::ffff:"));
+    return net.isIPv4(mapped) ? isPrivateIp(mapped) : false;
+  }
+
+  return false;
+}
+
+function ipv4FromMappedHex(value: string): string {
+  const parts = value.split(":");
+  if (parts.length !== 2) return "";
+  const first = Number.parseInt(parts[0] ?? "", 16);
+  const second = Number.parseInt(parts[1] ?? "", 16);
+  if (!Number.isInteger(first) || !Number.isInteger(second)) return "";
+  return [
+    (first >> 8) & 255,
+    first & 255,
+    (second >> 8) & 255,
+    second & 255
+  ].join(".");
 }
