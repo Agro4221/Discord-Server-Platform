@@ -51,7 +51,69 @@ jobs:
 
       - name: Shell script smoke checks
         run: |
-          grep -q 'set -euo pipefail' scripts/install-vps.sh
+          grep -Eq '^set -E?euo pipefail
+          grep -Eq '^set -E?euo pipefail
+          grep -q 'management_api_host' docs/MASTER-PLAN.md || true
+
+      - name: Check observability contract
+        run: node scripts/check-observability.mjs
+
+      - name: Check deployment contract
+        run: node scripts/check-deployment-contract.mjs
+
+      - name: Typecheck bot
+        run: npm run typecheck
+
+      - name: Test bot
+        run: npm test
+
+      - name: Build bot
+        run: npm run build:bot
+
+      - name: Build dashboard
+        run: npm run build -w apps/dashboard
+ scripts/install-vps.sh
+          grep -q 'set -euo pipefail' scripts/upgrade.sh
+          grep -q 'management_api_host' docs/MASTER-PLAN.md || true
+
+      - name: Check observability contract
+        run: node scripts/check-observability.mjs
+
+      - name: Check deployment contract
+        run: node scripts/check-deployment-contract.mjs
+
+      - name: Typecheck bot
+        run: npm run typecheck
+
+      - name: Test bot
+        run: npm test
+
+      - name: Build bot
+        run: npm run build:bot
+
+      - name: Build dashboard
+        run: npm run build -w apps/dashboard
+ scripts/upgrade.sh
+          grep -q 'management_api_host' docs/MASTER-PLAN.md || true
+
+      - name: Check observability contract
+        run: node scripts/check-observability.mjs
+
+      - name: Check deployment contract
+        run: node scripts/check-deployment-contract.mjs
+
+      - name: Typecheck bot
+        run: npm run typecheck
+
+      - name: Test bot
+        run: npm test
+
+      - name: Build bot
+        run: npm run build:bot
+
+      - name: Build dashboard
+        run: npm run build -w apps/dashboard
+ scripts/install-vps.sh
           grep -q 'set -euo pipefail' scripts/upgrade.sh
           grep -q 'management_api_host' docs/MASTER-PLAN.md || true
 
