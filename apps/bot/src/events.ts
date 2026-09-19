@@ -108,7 +108,8 @@ function extractGuildId<K extends keyof PlatformEventMap>(
   }
   if (event === "member.add" || event === "member.remove" || event === "member.update") {
     const member = payload as GuildMember | { newMember: GuildMember };
-    return "newMember" in member ? member.newMember.guild.id : member.guild.id;
+    const guild = "newMember" in member ? member.newMember.guild : member.guild;
+    return guild?.id ?? null;
   }
   if (event === "member.role.add" || event === "member.role.remove" ||
       event === "moderation.case" || event === "ticket.create" || event === "ticket.close" ||
