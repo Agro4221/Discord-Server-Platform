@@ -44,6 +44,7 @@ export function DashboardClient() {
   const [saving, setSaving] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [savedAt, setSavedAt] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
 
   const schema = useMemo(
     () => schemas.find((item) => item.key === selectedModule) ?? null,
@@ -192,6 +193,63 @@ export function DashboardClient() {
     setAudit(body.events ?? []);
   }
 
+  async function exportConfig() {
+    if (!guildId) return;
+    setActionMessage("");
+    const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/export");
+    if (!response.ok) {
+      setError("Не удалось экспортировать конфигурацию.");
+      return;
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "discord-server-platform-" + guildId + ".json";
+    link.click();
+    URL.revokeObjectURL(url);
+    setActionMessage("Конфигурация экспортирована.");
+  }
+
+  async function createBackup() {
+    if (!guildId) return;
+    setActionMessage("");
+    const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/backup", {
+      method: "POST"
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setError("Не удалось создать backup.");
+      return;
+    }
+    setActionMessage("Backup создан: " + (body.file ?? "ok"));
+  }
+
+  async function importConfig(file: File) {
+    if (!guildId) return;
+    setActionMessage("");
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error("import_failed");
+      setActionMessage("Конфигурация импортирована. Перезагружаю настройки.");
+      const settingsResponse = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/settings/" + encodeURIComponent(selectedModule), { cache: "no-store" });
+      if (settingsResponse.ok) {
+        const body = await settingsResponse.json();
+        setValues(normalizeValues(schema, body.values ?? {}));
+        setOriginalValues(normalizeValues(schema, body.values ?? {}));
+      }
+      await reloadAudit();
+    } catch {
+      setError("Файл конфигурации некорректен или импорт не удался.");
+    }
+  }
+
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
@@ -215,6 +273,21 @@ export function DashboardClient() {
             <div style={{ padding: "8px 12px", border: "1px solid #292e3a", borderRadius: 999, background: "#10131a", fontSize: 13 }}>
               ● {health?.status === "ready" ? "Healthy" : "Degraded"}
             </div>
+            <button type="button" onClick={() => void exportConfig()} style={buttonStyle("secondary")}>Экспорт</button>
+            <label style={{ ...buttonStyle("secondary"), display: "inline-flex", alignItems: "center" }}>
+              Импорт
+              <input
+                type="file"
+                accept=".json,application/json"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void importConfig(file);
+                  event.currentTarget.value = "";
+                }}
+              />
+            </label>
+            <button type="button" onClick={() => void createBackup()} style={buttonStyle("secondary")}>Backup</button>
             <button
               type="button"
               onClick={() => void logout()}
@@ -225,7 +298,7 @@ export function DashboardClient() {
           </div>
         </header>
 
-        {error && (
+        {actionMessage && <div style={{ marginBottom: 18, padding: 13, borderRadius: 12, background: "#12271b", border: "1px solid #274f36" }}>{actionMessage}</div>}\n\n        {error && (
           <div style={{ marginBottom: 18, padding: 13, borderRadius: 12, background: "#32191b", border: "1px solid #63292d" }}>
             {error}
           </div>
