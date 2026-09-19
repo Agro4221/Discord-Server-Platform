@@ -128,6 +128,7 @@ export class Security implements PlatformModule {
     const bucket = (this.joins.get(member.guild.id) ?? []).filter((entry) => entry.timestamp >= cutoff);
     bucket.push({ timestamp: now, userId: member.id });
     this.joins.set(member.guild.id, bucket);
+    this.pruneBuckets(now);
     const activeUntil = this.raidActiveUntil.get(member.guild.id) ?? 0;
     const raidTriggered = bucket.length >= config.maxJoins;
     if (now < activeUntil) {
@@ -163,6 +164,7 @@ export class Security implements PlatformModule {
     const bucket = (this.destructive.get(guildId) ?? []).filter((entry) => entry.timestamp >= cutoff);
     bucket.push({ timestamp: now, type });
     this.destructive.set(guildId, bucket);
+    this.pruneBuckets(now);
     const activeUntil = this.destructiveActiveUntil.get(guildId) ?? 0;
     if (!shouldTriggerSecurityIncident(now, activeUntil, bucket.length, config.maxDestructiveActions)) return;
 
@@ -234,6 +236,31 @@ export class Security implements PlatformModule {
     };
   }
 
+  private pruneBuckets(now: number): void {
+    const cutoff = now - 300_000;
+    for (const [guildId, entries] of this.joins) {
+      const latest = entries.at(-1)?.timestamp ?? 0;
+      if (latest < cutoff) this.joins.delete(guildId);
+    }
+    for (const [guildId, entries] of this.destructive) {
+      const latest = entries.at(-1)?.timestamp ?? 0;
+      if (latest < cutoff) this.destructive.delete(guildId);
+    }
+
+    const maxGuilds = 10_000;
+    for (const [name, bucket] of [
+      ["joins", this.joins],
+      ["destructive", this.destructive]
+    ] as const) {
+      if (bucket.size <= maxGuilds) continue;
+      const oldest = [...bucket.entries()]
+        .sort((a, b) => (a[1].at(-1)?.timestamp ?? 0) - (b[1].at(-1)?.timestamp ?? 0))
+        .slice(0, bucket.size - maxGuilds);
+      for (const [guildId] of oldest) bucket.delete(guildId);
+      logger.warn("Security event cache trimmed", { name, removed: oldest.length, remaining: bucket.size });
+    }
+  }
+
   private async audit(
     guildId: string,
     action: string,
@@ -262,7 +289,11 @@ export class Security implements PlatformModule {
     this.alertAt.set(guildId, now);
     const guild = this.client?.guilds.cache.get(guildId);
     const channel = guild?.channels.cache.get(config.logChannelId);
-    if (channel?.isTextBased() && "send" in channel) await (channel as TextChannel).send("🚨 " + message).catch(() => undefined);
+    if (channel?.isTextBased() && "send" in channel) {
+      await (channel as TextChannel).send("🚨 " + message).catch((error) => {
+        logger.warn("Security alert delivery failed", { guildId, channelId: config.logChannelId, error: String(error) });
+      });
+    }
   }
 
   private async quarantine(member: GuildMember, config: SecurityConfig): Promise<void> {
@@ -270,7 +301,14 @@ export class Security implements PlatformModule {
     const botMember = member.guild.members.me;
     const role = member.guild.roles.cache.get(config.quarantineRoleId);
     if (!botMember || !role || role.position >= botMember.roles.highest.position) return;
-    await member.roles.add(role, "Security quarantine").catch(() => undefined);
+    await member.roles.add(role, "Security quarantine").catch((error) => {
+      logger.warn("Security quarantine role assignment failed", {
+        guildId: member.guild.id,
+        userId: member.id,
+        roleId: role.id,
+        error: String(error)
+      });
+    });
   }
 
   private async findRecentExecutors(guildId: string, type: string): Promise<Array<{ userId: string; count: number }>> {
@@ -279,7 +317,10 @@ export class Security implements PlatformModule {
     await new Promise((resolve) => setTimeout(resolve, 350));
 
     const auditType = type === "channel.delete" ? AuditLogEvent.ChannelDelete : AuditLogEvent.RoleDelete;
-    const logs = await guild.fetchAuditLogs({ limit: 25, type: auditType }).catch(() => null);
+    const logs = await guild.fetchAuditLogs({ limit: 25, type: auditType }).catch((error) => {
+      logger.warn("Security audit-log fetch failed", { guildId, type, error: String(error) });
+      return null;
+    });
     if (!logs) return [];
 
     const cutoff = Date.now() - 30_000;
@@ -312,7 +353,14 @@ export class Security implements PlatformModule {
         )
       : member.roles.cache.filter(() => false);
     for (const role of removable.values()) {
-      await member.roles.remove(role, "Security destructive burst response").catch(() => undefined);
+      await member.roles.remove(role, "Security destructive burst response").catch((error) => {
+        logger.warn("Security role removal failed", {
+          guildId,
+          userId,
+          roleId: role.id,
+          error: String(error)
+        });
+      });
     }
 
     await this.quarantine(member, config);
