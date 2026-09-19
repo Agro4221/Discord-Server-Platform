@@ -37,6 +37,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
       - name: Check source hygiene
         run: node scripts/check-source-hygiene.mjs
 
@@ -45,6 +48,12 @@ jobs:
           bash -n scripts/install-vps.sh scripts/upgrade.sh
           cp .env.example .env
           docker compose config >/dev/null
+
+      - name: Shell script smoke checks
+        run: |
+          grep -q 'set -euo pipefail' scripts/install-vps.sh
+          grep -q 'set -euo pipefail' scripts/upgrade.sh
+          grep -q 'management_api_host' docs/MASTER-PLAN.md || true
 
       - name: Check observability contract
         run: node scripts/check-observability.mjs
