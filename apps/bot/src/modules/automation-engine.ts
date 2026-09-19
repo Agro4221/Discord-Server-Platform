@@ -20,6 +20,7 @@ export class AutomationEngine implements PlatformModule {
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
+    this.client = context.client;
     await this.reload();
     const unsubs = [
       context.events.on("member.add", (member) => this.execute({ type: "member.join", guildId: member.guild.id, userId: member.id })),
@@ -34,6 +35,7 @@ export class AutomationEngine implements PlatformModule {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.rules.clear();
+    this.client = undefined;
   }
 
   async reload(): Promise<void> {
@@ -132,7 +134,7 @@ export class AutomationEngine implements PlatformModule {
   }
 
   private async perform(actions: AutomationAction[], event: RuntimeEvent): Promise<void> {
-    const client = globalThis.__DSP_CLIENT;
+    const client = this.client;
     for (const action of actions) {
       if (action.type === "log") {
         console.log(JSON.stringify({ ts: new Date().toISOString(), level: "INFO", automation: true, guildId: event.guildId, message: action.message }));
@@ -176,6 +178,3 @@ export class AutomationEngine implements PlatformModule {
   }
 }
 
-declare global {
-  var __DSP_CLIENT: import("discord.js").Client | undefined;
-}
