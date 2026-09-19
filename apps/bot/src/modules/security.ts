@@ -1,4 +1,5 @@
 import {
+  AuditLogEvent,
   PermissionFlagsBits,
   type ChatInputCommandInteraction,
   type GuildMember,
@@ -21,10 +22,10 @@ type SecurityConfig = {
 export class Security implements PlatformModule {
   readonly name = "security";
   private unsubscribe?: () => void;
-  private readonly joins = new Map<string, number[]>();
+  private readonly joins = new Map<string, { timestamp: number; userId: string }[]>();
   private readonly raidActiveUntil = new Map<string, number>();
   private readonly alertAt = new Map<string, number>();
-  private readonly destructive = new Map<string, number[]>();
+  private readonly destructive = new Map<string, { timestamp: number; type: string }[]>();
   private client?: import("discord.js").Client;
 
   constructor(private readonly db: Database) {}
@@ -118,8 +119,8 @@ export class Security implements PlatformModule {
     if (!config.enabled) return;
     const now = Date.now();
     const cutoff = now - config.windowSeconds * 1000;
-    const bucket = (this.joins.get(member.guild.id) ?? []).filter((timestamp) => timestamp >= cutoff);
-    bucket.push(now);
+    const bucket = (this.joins.get(member.guild.id) ?? []).filter((entry) => entry.timestamp >= cutoff);
+    bucket.push({ timestamp: now, userId: member.id });
     this.joins.set(member.guild.id, bucket);
     const activeUntil = this.raidActiveUntil.get(member.guild.id) ?? 0;
     const raidTriggered = bucket.length >= config.maxJoins;
@@ -130,7 +131,10 @@ export class Security implements PlatformModule {
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'raid-detected',$2::jsonb)",
       [member.guild.id,JSON.stringify({ joins: bucket.length, windowSeconds: config.windowSeconds })]
     );
-    await this.quarantine(member, config);
+    for (const entry of bucket) {
+      const target = member.guild.members.cache.get(entry.userId) ?? await member.guild.members.fetch(entry.userId).catch(() => null);
+      if (target) await this.quarantine(target, config);
+    }
     await this.alert(member.guild.id, config, `Anti-Raid: ${bucket.length} входов за ${config.windowSeconds} сек.`);
   }
 
@@ -140,14 +144,18 @@ export class Security implements PlatformModule {
     if (!config.enabled) return;
     const now = Date.now();
     const cutoff = now - config.destructiveWindowSeconds * 1000;
-    const bucket = (this.destructive.get(guildId) ?? []).filter((timestamp) => timestamp >= cutoff);
-    bucket.push(now);
+    const bucket = (this.destructive.get(guildId) ?? []).filter((entry) => entry.timestamp >= cutoff);
+    bucket.push({ timestamp: now, type });
     this.destructive.set(guildId, bucket);
     if (bucket.length < config.maxDestructiveActions) return;
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'destructive-burst',$2::jsonb)",
       [guildId,JSON.stringify({ type, actions: bucket.length, windowSeconds: config.destructiveWindowSeconds })]
     );
+    const executorIds = await this.findRecentExecutors(guildId, type);
+    for (const executorId of executorIds) {
+      await this.respondToExecutor(guildId, executorId, config, type);
+    }
     await this.alert(guildId, config, `Security: обнаружено ${bucket.length} destructive actions за ${config.destructiveWindowSeconds} сек.`);
   }
 
@@ -209,6 +217,47 @@ export class Security implements PlatformModule {
     const botMember = member.guild.members.me;
     const role = member.guild.roles.cache.get(config.quarantineRoleId);
     if (!botMember || !role || role.position >= botMember.roles.highest.position) return;
-    await member.roles.add(role, "Security anti-raid quarantine").catch(() => undefined);
+    await member.roles.add(role, "Security quarantine").catch(() => undefined);
+  }
+
+  private async findRecentExecutors(guildId: string, type: string): Promise<string[]> {
+    const guild = this.client?.guilds.cache.get(guildId);
+    if (!guild) return [];
+    await new Promise((resolve) => setTimeout(resolve, 350));
+
+    const auditType = type === "channel.delete" ? AuditLogEvent.ChannelDelete : AuditLogEvent.RoleDelete;
+    const logs = await guild.fetchAuditLogs({ limit: 25, type: auditType }).catch(() => null);
+    if (!logs) return [];
+
+    const cutoff = Date.now() - 30_000;
+    const ids = new Set<string>();
+    for (const entry of logs.entries.values()) {
+      if (entry.createdTimestamp < cutoff || !entry.executorId) continue;
+      if (entry.executorId === guild.members.me?.id) continue;
+      ids.add(entry.executorId);
+    }
+    return [...ids];
+  }
+
+  private async respondToExecutor(guildId: string, userId: string, config: SecurityConfig, type: string): Promise<void> {
+    const guild = this.client?.guilds.cache.get(guildId);
+    const member = guild ? await guild.members.fetch(userId).catch(() => null) : null;
+    if (!guild || !member || !member.manageable) return;
+    const botMember = guild.members.me;
+    if (!botMember) return;
+
+    const removable = member.roles.cache.filter(
+      (role) => !role.managed && role.id !== guild.id && role.position < botMember.roles.highest.position
+    );
+    for (const role of removable.values()) {
+      await member.roles.remove(role, "Security destructive burst response").catch(() => undefined);
+    }
+
+    await this.quarantine(member, config);
+
+    await this.db.query(
+      "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'response-applied',$2::jsonb)",
+      [guildId,JSON.stringify({ userId, trigger: type, removedRoles: removable.size, quarantine: Boolean(config.quarantineRoleId) })]
+    );
   }
 }
