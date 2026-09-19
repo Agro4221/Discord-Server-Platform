@@ -1,0 +1,251 @@
+import dns from "node:dns/promises";
+import net from "node:net";
+import { XMLParser } from "fast-xml-parser";
+import {
+  type ChatInputCommandInteraction,
+  type Client
+} from "discord.js";
+import type { Database } from "../database.js";
+import type { ModuleContext, PlatformModule } from "../module.js";
+import { moduleEnabled } from "../module-utils.js";
+import { logger } from "../logger.js";
+
+type Feed = {
+  id: string;
+  guildId: string;
+  channelId: string;
+  url: string;
+  intervalSeconds: number;
+  lastItemKey: string | null;
+};
+
+export class Notifications implements PlatformModule {
+  readonly name = "notifications";
+  private unsubscribe?: () => void;
+  private timer?: NodeJS.Timeout;
+  private client?: Client;
+  private running = false;
+
+  constructor(private readonly db: Database) {}
+
+  async init(context: ModuleContext): Promise<void> {
+    this.client = context.client;
+    this.unsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    this.timer = setInterval(() => void this.pollAll(), 30_000);
+    this.timer.unref();
+  }
+
+  async shutdown(): Promise<void> {
+    this.unsubscribe?.();
+    this.unsubscribe = undefined;
+    if (this.timer) clearInterval(this.timer);
+    this.timer = undefined;
+    this.client = undefined;
+  }
+
+  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+    if (!interaction.inGuild() || interaction.commandName !== "feed") return;
+    if (!await moduleEnabled(this.db, interaction.guild.id, "notifications", false)) {
+      await interaction.reply({ content: "Модуль Notifications выключен.", ephemeral: true });
+      return;
+    }
+
+    if (!interaction.memberPermissions?.has("ManageGuild")) {
+      await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
+      return;
+    }
+
+    const sub = interaction.options.getSubcommand();
+    if (sub === "add") {
+      const url = interaction.options.getString("url", true);
+      const channel = interaction.options.getChannel("channel", true);
+      const minutes = interaction.options.getInteger("minutes") ?? 5;
+
+      if (!channel.isTextBased()) {
+        await interaction.reply({ content: "Channel должен быть текстовым.", ephemeral: true });
+        return;
+      }
+
+      await assertSafeFeedUrl(url);
+
+      await this.db.query(
+        `INSERT INTO notification_feeds(guild_id,channel_id,url,interval_seconds)
+         VALUES($1,$2,$3,$4)`,
+        [interaction.guild.id, channel.id, url, minutes * 60]
+      );
+
+      await this.db.query(
+        `INSERT INTO guild_modules(guild_id,module_key,enabled)
+         VALUES($1,'notifications',true)
+         ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()`,
+        [interaction.guild.id]
+      );
+
+      await interaction.reply({ content: "Feed добавлен. Проверка начнётся автоматически.", ephemeral: true });
+    }
+  }
+
+  private async pollAll(): Promise<void> {
+    if (this.running || !this.client) return;
+    this.running = true;
+
+    try {
+      const feeds = await this.db.query<Feed>(
+        `SELECT id,guild_id AS "guildId",channel_id AS "channelId",url,
+                interval_seconds AS "intervalSeconds",last_item_key AS "lastItemKey"
+         FROM notification_feeds
+         WHERE enabled=true AND (last_polled_at IS NULL OR last_polled_at <= now() - make_interval(secs => interval_seconds))
+         ORDER BY last_polled_at NULLS FIRST
+         LIMIT 20`
+      );
+
+      for (const feed of feeds.rows) {
+        await this.poll(feed);
+      }
+    } finally {
+      this.running = false;
+    }
+  }
+
+  private async poll(feed: Feed): Promise<void> {
+    await assertSafeFeedUrl(feed.url);
+
+    const response = await fetch(feed.url, {
+      headers: {
+        "user-agent": "DiscordServerPlatform/0.1 (+self-hosted feed poller)"
+      },
+      redirect: "error",
+      signal: AbortSignal.timeout(10_000)
+    });
+
+    if (!response.ok) {
+      await this.markPolled(feed.id, `HTTP ${response.status}`);
+      return;
+    }
+
+    const size = Number(response.headers.get("content-length") ?? 0);
+    if (size > 2_000_000) {
+      await this.markPolled(feed.id, "response too large");
+      return;
+    }
+
+    const xml = await response.text();
+    if (xml.length > 2_000_000) {
+      await this.markPolled(feed.id, "response too large");
+      return;
+    }
+
+    const parser = new XMLParser({
+      ignoreAttributes: true,
+      processEntities: false,
+      removeNSPrefix: true,
+      parseTagValue: true,
+      trimValues: true
+    });
+
+    const document = parser.parse(xml) as Record<string, any>;
+    const entries = normalizeFeedEntries(document);
+    const first = entries[0];
+    if (!first) {
+      await this.markPolled(feed.id, null);
+      return;
+    }
+
+    if (feed.lastItemKey === first.key) {
+      await this.markPolled(feed.id, null);
+      return;
+    }
+
+    const channel = this.client?.channels.cache.get(feed.channelId);
+    if (channel?.isTextBased() && "send" in channel) {
+      await channel.send(
+        `📡 **Новая запись из feed**
+**${first.title.slice(0, 250)}**
+${first.url}`
+      ).catch((error) => logger.warn("Feed message failed", { feedId: feed.id, error: String(error) }));
+    }
+
+    await this.db.query(
+      "UPDATE notification_feeds SET last_item_key=$1,last_polled_at=now() WHERE id=$2",
+      [first.key, feed.id]
+    );
+  }
+
+  private async markPolled(id: string, _error: string | null): Promise<void> {
+    await this.db.query("UPDATE notification_feeds SET last_polled_at=now() WHERE id=$1", [id]);
+  }
+}
+
+function normalizeFeedEntries(document: Record<string, any>): { key: string; title: string; url: string }[] {
+  const rss = document.rss?.channel?.item;
+  const atom = document.feed?.entry;
+
+  const raw = Array.isArray(rss) ? rss : rss ? [rss] : Array.isArray(atom) ? atom : atom ? [atom] : [];
+
+  return raw.map((item: any, index: number) => {
+    const title = String(item.title ?? item.name ?? "Без названия");
+    const url =
+      typeof item.link === "string"
+        ? item.link
+        : typeof item.link?.href === "string"
+          ? item.link.href
+          : String(item.guid ?? item.id ?? index);
+
+    return {
+      key: String(item.guid ?? item.id ?? url),
+      title,
+      url
+    };
+  });
+}
+
+async function assertSafeFeedUrl(raw: string): Promise<void> {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("invalid_feed_url");
+  }
+
+  if (url.protocol !== "https:") throw new Error("feed_must_use_https");
+  if (url.username || url.password) throw new Error("feed_credentials_not_allowed");
+
+  const hostname = url.hostname.toLowerCase();
+  if (
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".internal") ||
+    hostname === "metadata.google.internal"
+  ) {
+    throw new Error("private_hostname_not_allowed");
+  }
+
+  if (net.isIP(hostname)) {
+    if (isPrivateIp(hostname)) throw new Error("private_ip_not_allowed");
+    throw new Error("literal_ip_not_allowed");
+  }
+
+  const addresses = await dns.lookup(hostname, { all: true });
+  if (addresses.some(({ address }) => isPrivateIp(address))) {
+    throw new Error("hostname_resolves_to_private_ip");
+  }
+}
+
+function isPrivateIp(address: string): boolean {
+  if (net.isIPv4(address)) {
+    const [a,b] = address.split(".").map(Number);
+    if (a === 10 || a === 127 || a === 0) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b !== undefined && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    return false;
+  }
+
+  const normalized = address.toLowerCase();
+  return normalized === "::1" ||
+    normalized === "::" ||
+    normalized.startsWith("fc") ||
+    normalized.startsWith("fd") ||
+    normalized.startsWith("fe80:");
+}
