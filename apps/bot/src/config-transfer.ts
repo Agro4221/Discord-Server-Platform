@@ -34,7 +34,7 @@ const CONFIG_TABLES: ExportTable[] = [
 ];
 
 const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
-  { table: "automation_rules", fields: ["name","enabled","event","conditions","actions","cooldown_seconds"] },
+  { table: "automation_rules", fields: ["name","enabled","event","conditions","any_conditions","actions","cooldown_seconds"] },
   { table: "role_panels", fields: ["channel_id","message_id","title","roles"] }
 ];
 
@@ -138,14 +138,15 @@ export class ConfigTransferService {
         for (const rule of normalizedRules) {
           await client.query(
             `INSERT INTO automation_rules(
-              guild_id,name,enabled,event,conditions,actions,cooldown_seconds
-            ) VALUES($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)`,
+              guild_id,name,enabled,event,conditions,any_conditions,actions,cooldown_seconds
+            ) VALUES($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,$8)`,
             [
               targetGuildId,
               rule.name,
               rule.enabled,
               rule.event,
               JSON.stringify(rule.conditions),
+              JSON.stringify(rule.anyConditions),
               JSON.stringify(rule.actions),
               rule.cooldownSeconds
             ]
@@ -378,6 +379,7 @@ type NormalizedAutomationRule = {
   enabled: boolean;
   event: AutomationEvent;
   conditions: AutomationCondition[];
+  anyConditions: AutomationCondition[];
   actions: AutomationAction[];
   cooldownSeconds: number;
 };
@@ -395,6 +397,7 @@ function normalizeImportedAutomationRule(value: unknown): NormalizedAutomationRu
     typeof object.enabled !== "boolean" ||
     typeof object.event !== "string" ||
     !Array.isArray(object.conditions) ||
+    (object.any_conditions !== undefined && !Array.isArray(object.any_conditions)) ||
     !Array.isArray(object.actions) ||
     typeof object.cooldown_seconds !== "number" ||
     !Number.isInteger(object.cooldown_seconds) ||
@@ -406,7 +409,10 @@ function normalizeImportedAutomationRule(value: unknown): NormalizedAutomationRu
 
   validateAutomationRule(
     object.event as AutomationEvent,
-    object.conditions as AutomationCondition[],
+    [
+      ...(object.conditions as AutomationCondition[]),
+      ...((object.any_conditions as AutomationCondition[] | undefined) ?? [])
+    ],
     object.actions as AutomationAction[]
   );
 
@@ -415,6 +421,7 @@ function normalizeImportedAutomationRule(value: unknown): NormalizedAutomationRu
     enabled: object.enabled,
     event: object.event as AutomationEvent,
     conditions: object.conditions as AutomationCondition[],
+    anyConditions: (object.any_conditions as AutomationCondition[] | undefined) ?? [],
     actions: object.actions as AutomationAction[],
     cooldownSeconds: object.cooldown_seconds
   };
