@@ -344,6 +344,19 @@ const migrations = [
       "  guild_count integer NOT NULL DEFAULT 0 CHECK(guild_count >= 0)",
       ");"
     ])
+  },
+  {
+    version: 16,
+    name: "music_node_sessions",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS music_node_sessions (",
+      "  bot_identity_id text NOT NULL REFERENCES bot_identities(id) ON DELETE CASCADE,",
+      "  node_id text NOT NULL,",
+      "  session_id text NOT NULL,",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(bot_identity_id,node_id)",
+      ");"
+    ])
   }
 ] as const;
 
