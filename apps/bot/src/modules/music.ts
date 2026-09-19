@@ -10,6 +10,8 @@ import {
 } from "discord.js";
 import {
   LavalinkManager,
+  type Player,
+  type Track,
   type QueueStoreManager,
   type StoredQueue
 } from "lavalink-client";
@@ -19,6 +21,8 @@ import type { BotIdentityRepository } from "../bot-identity.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
+
+type MusicRepeatMode = "off" | "track" | "queue";
 
 class PostgresQueueStore implements QueueStoreManager {
   constructor(
@@ -121,6 +125,7 @@ export class Music implements PlatformModule {
         this.client?.guilds.cache.get(guildId)?.shard?.send(payload),
       autoSkip: true,
       autoMove: true,
+      emitNewSongsOnly: true,
       client: {
         id: this.config.discordClientId,
         username: this.client.user?.username ?? "DSP"
@@ -309,6 +314,12 @@ export class Music implements PlatformModule {
       case "shuffle":
         await this.shuffle(interaction);
         break;
+      case "repeat":
+        await this.repeat(interaction);
+        break;
+      case "autoplay":
+        await this.autoplay(interaction);
+        break;
       case "seek":
         await this.seek(interaction);
         break;
@@ -436,6 +447,42 @@ export class Music implements PlatformModule {
     await interaction.reply({ content: "🔀 Очередь перемешана.", ephemeral: true });
   }
 
+  private async repeat(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
+
+    const mode = normalizeMusicRepeatMode(interaction.options.getString("mode", true));
+    if (!mode) {
+      await interaction.reply({ content: "Неизвестный repeat mode.", ephemeral: true });
+      return;
+    }
+
+    await player.setRepeatMode(mode);
+    await this.persistPlayer(player);
+    await interaction.reply({ content: `🔁 Repeat: **${mode}**`, ephemeral: true });
+  }
+
+  private async autoplay(interaction: ChatInputCommandInteraction): Promise<void> {
+    if (!interaction.memberPermissions?.has("ManageGuild")) {
+      await interaction.reply({ content: "Autoplay настраивается пользователями с Manage Server.", ephemeral: true });
+      return;
+    }
+
+    const enabled = interaction.options.getBoolean("enabled");
+    const current = await this.autoplayEnabled(interaction.guildId!);
+    if (enabled === null) {
+      await interaction.reply({ content: `Autoplay: **${current ? "включён" : "выключен"}**`, ephemeral: true });
+      return;
+    }
+
+    await this.setAutoplay(interaction.guildId!, enabled);
+    await interaction.reply({ content: `Autoplay ${enabled ? "включён" : "выключен"}.`, ephemeral: true });
+  }
+
   private async seek(interaction: ChatInputCommandInteraction): Promise<void> {
     const player = this.manager?.players.get(interaction.guildId!);
     const track = player?.queue.current;
@@ -550,14 +597,27 @@ export class Music implements PlatformModule {
       new ButtonBuilder().setCustomId("dsp:music:stop").setLabel("Стоп").setStyle(ButtonStyle.Danger)
     );
 
+    const autoplay = await this.autoplayEnabled(interaction.guildId!);
     const embed = new EmbedBuilder()
       .setTitle("🎵 Сейчас играет")
       .setDescription(`**${track.info.title}**\n${track.info.author}`)
-      .addFields({
-        name: "Состояние",
-        value: player.paused ? "⏸️ Пауза" : "▶️ Играет",
-        inline: true
-      });
+      .addFields(
+        {
+          name: "Состояние",
+          value: player.paused ? "⏸️ Пауза" : "▶️ Играет",
+          inline: true
+        },
+        {
+          name: "Repeat",
+          value: player.repeatMode,
+          inline: true
+        },
+        {
+          name: "Autoplay",
+          value: autoplay ? "включён" : "выключен",
+          inline: true
+        }
+      );
 
     await interaction.reply({ embeds: [embed], components: [row] });
   }
@@ -606,6 +666,7 @@ export class Music implements PlatformModule {
         volume?: unknown;
         paused?: unknown;
         track?: unknown;
+        repeatMode?: unknown;
         filters?: unknown;
         state?: {
           connected?: unknown;
@@ -657,6 +718,10 @@ export class Music implements PlatformModule {
         }
 
         await player.queue.utils.sync(true, false);
+        if (typeof data.repeatMode === "string") {
+          const repeatMode = normalizeMusicRepeatMode(data.repeatMode);
+          if (repeatMode) await player.setRepeatMode(repeatMode);
+        }
 
         if (data.track && typeof data.track === "object") {
           player.queue.current = this.manager!.utils.buildTrack(
@@ -684,6 +749,41 @@ export class Music implements PlatformModule {
         });
       }
     }
+  }
+
+  private async autoplayEnabled(guildId: string): Promise<boolean> {
+    const result = await this.db.query<{ autoplay: boolean }>(
+      "SELECT autoplay FROM music_settings WHERE guild_id=$1",
+      [guildId]
+    );
+    return result.rows[0]?.autoplay ?? false;
+  }
+
+  private async setAutoplay(guildId: string, enabled: boolean): Promise<void> {
+    await this.db.query(
+      "INSERT INTO music_settings(guild_id,autoplay) VALUES($1,$2) ON CONFLICT(guild_id) DO UPDATE SET autoplay=EXCLUDED.autoplay,updated_at=now()",
+      [guildId, enabled]
+    );
+  }
+
+  private async autoplayNext(player: Player, lastPlayedTrack: Track): Promise<void> {
+    if (!await this.autoplayEnabled(player.guildId)) return;
+
+    const seed = `${lastPlayedTrack.info.author ?? ""} ${lastPlayedTrack.info.title ?? ""}`.trim();
+    if (!seed) return;
+
+    const result = await player.search(
+      { query: seed, source: "ytsearch" },
+      this.client?.user
+    );
+
+    const candidate = result.tracks.find(
+      (track) => track.info.identifier !== lastPlayedTrack.info.identifier
+    );
+    if (!candidate) return;
+
+    player.queue.add(candidate);
+    await this.persistPlayer(player);
   }
 
   private async persistPlayer(player: {
@@ -733,4 +833,9 @@ export function canControlMusic(
     Boolean(playerVoiceChannelId) &&
     memberVoiceChannelId === playerVoiceChannelId
   );
+}
+
+
+export function normalizeMusicRepeatMode(value: string): MusicRepeatMode | null {
+  return value === "off" || value === "track" || value === "queue" ? value : null;
 }
