@@ -151,6 +151,49 @@ export class Security implements PlatformModule {
     await this.alert(guildId, config, `Security: обнаружено ${bucket.length} destructive actions за ${config.destructiveWindowSeconds} сек.`);
   }
 
+  async checkHierarchy(guildId: string): Promise<{
+    guildId: string;
+    botPresent: boolean;
+    manageRoles: boolean;
+    quarantineRoleConfigured: boolean;
+    quarantineRoleManageable: boolean;
+    logChannelConfigured: boolean;
+    logChannelSendable: boolean;
+  }> {
+    const config = await this.config(guildId);
+    const guild = this.client?.guilds.cache.get(guildId);
+    if (!guild) {
+      return {
+        guildId,
+        botPresent: false,
+        manageRoles: false,
+        quarantineRoleConfigured: Boolean(config.quarantineRoleId),
+        quarantineRoleManageable: false,
+        logChannelConfigured: Boolean(config.logChannelId),
+        logChannelSendable: false
+      };
+    }
+
+    const botMember = guild.members.me;
+    const quarantineRole = config.quarantineRoleId ? guild.roles.cache.get(config.quarantineRoleId) : null;
+    const logChannel = config.logChannelId ? guild.channels.cache.get(config.logChannelId) : null;
+
+    return {
+      guildId,
+      botPresent: Boolean(botMember),
+      manageRoles: Boolean(botMember?.permissions.has(PermissionFlagsBits.ManageRoles)),
+      quarantineRoleConfigured: Boolean(config.quarantineRoleId),
+      quarantineRoleManageable: Boolean(
+        botMember &&
+        quarantineRole &&
+        botMember.permissions.has(PermissionFlagsBits.ManageRoles) &&
+        quarantineRole.position < botMember.roles.highest.position
+      ),
+      logChannelConfigured: Boolean(config.logChannelId),
+      logChannelSendable: Boolean(logChannel?.isTextBased() && "send" in logChannel)
+    };
+  }
+
   private async alert(guildId: string, config: SecurityConfig, message: string): Promise<void> {
     const now = Date.now();
     const last = this.alertAt.get(guildId) ?? 0;
