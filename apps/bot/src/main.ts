@@ -6,6 +6,9 @@ import { logger } from "./logger.js";
 import { ModuleRegistry } from "./module-registry.js";
 import { TemporaryVoice } from "./modules/temporary-voice.js";
 import { Moderation } from "./modules/moderation.js";
+import { AutoMod } from "./modules/automod.js";
+import { Welcome } from "./modules/welcome.js";
+import { Leveling } from "./modules/leveling.js";
 import { createDiscordClient, registerCommands, routeCommand, wireDiscordEvents } from "./discord/bot.js";
 import { ConnectionSupervisor } from "./discord/connection-supervisor.js";
 import { ManagementApiServer } from "./management-api.js";
@@ -38,6 +41,9 @@ async function main(): Promise<void> {
   const client = createDiscordClient();
   const temporaryVoice = new TemporaryVoice(database, () => client.guilds.cache.values());
   const moderation = new Moderation(database);
+  const autoMod = new AutoMod(database);
+  const welcome = new Welcome(database);
+  const leveling = new Leveling(database);
 
   const modules = new ModuleRegistry({
     client,
@@ -48,6 +54,9 @@ async function main(): Promise<void> {
 
   modules.register(temporaryVoice);
   modules.register(moderation);
+  modules.register(autoMod);
+  modules.register(welcome);
+  modules.register(leveling);
 
   for (const name of modules.list()) health.setModule(name, "starting");
 
