@@ -194,7 +194,8 @@ export class Verification implements PlatformModule {
       await interaction.reply({ content: "Verification выключен.", ephemeral: true });
       return;
     }
-    const key = `${interaction.guild!.id}:${interaction.user.id}`;
+    const key = interaction.guild!.id + ":" + interaction.user.id;
+    this.pruneCodes(Date.now());
     const existing = this.codes.get(key);
     if (existing && existing.expiresAt > Date.now()) {
       await interaction.reply({ content: "У тебя уже есть действующий код. Используй его с кнопкой подтверждения.", ephemeral: true });
@@ -221,6 +222,25 @@ export class Verification implements PlatformModule {
       });
       throw error;
     }
+  }
+
+  private pruneCodes(now: number): void {
+    for (const [key, value] of this.codes) {
+      if (value.expiresAt <= now) this.codes.delete(key);
+    }
+
+    const maxCodes = 10_000;
+    if (this.codes.size <= maxCodes) return;
+
+    const oldest = [...this.codes.entries()]
+      .sort((a, b) => a[1].expiresAt - b[1].expiresAt)
+      .slice(0, this.codes.size - maxCodes);
+    for (const [key] of oldest) this.codes.delete(key);
+
+    logger.warn("Verification code cache trimmed", {
+      removed: oldest.length,
+      remaining: this.codes.size
+    });
   }
 
   private async confirm(interaction: import("discord.js").ButtonInteraction, code: string): Promise<void> {
