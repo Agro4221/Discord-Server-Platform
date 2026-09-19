@@ -294,6 +294,27 @@ export function buildCommands(): SlashCommandBuilder[] {
       ),
 
     new SlashCommandBuilder()
+      .setName("verify")
+      .setDescription("Member verification")
+      .addSubcommand((sub) =>
+        sub
+          .setName("setup")
+          .setDescription("Configure verification")
+          .addChannelOption((o) => o.setName("channel").setDescription("Optional verification channel").addChannelTypes(ChannelType.GuildText))
+          .addRoleOption((o) => o.setName("verified-role").setDescription("Role granted after verification"))
+          .addChannelOption((o) => o.setName("log-channel").setDescription("Optional log channel").addChannelTypes(ChannelType.GuildText))
+          .addIntegerOption((o) => o.setName("ttl").setDescription("Code lifetime in minutes").setMinValue(2).setMaxValue(60))
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName("panel")
+          .setDescription("Publish verification panel")
+          .addChannelOption((o) => o.setName("channel").setDescription("Panel channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
+      ),
+    new SlashCommandBuilder()
+      .setName("analytics")
+      .setDescription("Server analytics"),
+    new SlashCommandBuilder()
       .setName("security")
       .setDescription("Security / anti-raid")
       .addSubcommand((sub) =>
