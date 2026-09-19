@@ -152,7 +152,8 @@ export class BackupService {
         Bucket: this.remote.bucket,
         Key: this.remoteKey(filename),
         Body: body,
-        ContentType: "application/gzip"
+        ContentType: "application/gzip",
+        ServerSideEncryption: "AES256"
       }));
     } catch (error) {
       logger.warn("Remote backup upload failed; local backup retained", { filename, error: String(error) });
@@ -265,18 +266,33 @@ export class BackupService {
 }
 
 async function readGzip(path: string): Promise<string> {
+  const stat = await import("node:fs/promises").then((fs) => fs.stat(path));
+  if (stat.size > 10485760) throw new Error("backup_compressed_too_large");
+
   const chunks: Buffer[] = [];
+  let total = 0;
   const source = createReadStream(path);
   const gunzip = createGunzip();
-  gunzip.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+  gunzip.on("data", (chunk) => {
+    total += chunk.length;
+    if (total > 33554432) throw new Error("backup_decompressed_too_large");
+    chunks.push(Buffer.from(chunk));
+  });
   await pipeline(source, gunzip);
   return Buffer.concat(chunks).toString("utf8");
 }
 
 async function gunzipBuffer(input: Buffer): Promise<Buffer> {
+  if (input.length > 10485760) throw new Error("backup_compressed_too_large");
+
   const chunks: Buffer[] = [];
+  let total = 0;
   const gunzip = createGunzip();
-  gunzip.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+  gunzip.on("data", (chunk) => {
+    total += chunk.length;
+    if (total > 33554432) throw new Error("backup_decompressed_too_large");
+    chunks.push(Buffer.from(chunk));
+  });
   await pipeline(Readable.from([input]), gunzip);
   return Buffer.concat(chunks);
 }
