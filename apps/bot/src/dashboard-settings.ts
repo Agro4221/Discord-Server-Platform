@@ -13,11 +13,13 @@ export type SettingField = {
   step?: number;
 };
 
+export type ModuleAction = { id: string; label: string; kind?: "safe" | "danger"; confirmation?: string };
+
 export type ModuleSettingsSchema = {
   key: ModuleKey;
   title: string;
   fields: SettingField[];
-  actionHints?: string[];
+  actions?: ModuleAction[];
 };
 
 export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
@@ -30,7 +32,7 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "defaultLimit", label: "Лимит участников", type: "number", min: 0, max: 99 },
       { key: "privateByDefault", label: "Приватные комнаты", type: "boolean" }
     ],
-    actionHints: ["Проверить права бота", "Очистить осиротевшие комнаты"]
+    actions: [{ id: "reconcile", label: "Синхронизировать Temporary Voice", kind: "safe" }]
   },
   {
     key: "automod",
@@ -43,7 +45,8 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "repeatedWindowSeconds", label: "Окно повторов, сек.", type: "number", min: 2, max: 120 },
       { key: "deleteMessage", label: "Удалять нарушающее сообщение", type: "boolean" },
       { key: "timeoutMinutes", label: "Timeout, минут", type: "number", min: 0, max: 40320 }
-    ]
+    ],
+    actions: [{ id: "reload", label: "Перезагрузить правила", kind: "safe" }]
   },
   {
     key: "verification",
@@ -76,7 +79,7 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "quarantineRoleId", label: "Quarantine role", type: "role" },
       { key: "logChannelId", label: "Security log channel", type: "channel" }
     ],
-    actionHints: ["Проверить role hierarchy", "Проверить права Manage Roles"]
+    actions: [{ id: "check-hierarchy", label: "Проверить role hierarchy", kind: "safe" }]
   },
   {
     key: "leveling",
