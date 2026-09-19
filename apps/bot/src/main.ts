@@ -129,7 +129,7 @@ async function main(): Promise<void> {
     transfer,
     backups,
     actions: {
-      "temporary-voice.reconcile": async (guildId) => { await temporaryVoice.reconcile(); return { guildId, ok: true }; },
+      "temporary-voice.reconcile": async (guildId) => { await temporaryVoice.reconcileGuild(guildId); return { guildId, ok: true }; },
       "automation.reload": async (guildId) => { await automation.reload(); return { guildId, ok: true }; },
       "security.check-hierarchy": async (guildId) => ({ guildId, checked: true })
     }
