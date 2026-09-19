@@ -58,7 +58,7 @@ export class Leveling implements PlatformModule {
     }
 
     const target = interaction.options.getUser("user") ?? interaction.user;
-    const result = await this.db.query<{ xp: number; level: number }>(
+    const result = await this.db.query<{ xp: string | number; level: number }>(
       "SELECT xp,level FROM leveling_users WHERE guild_id=$1 AND user_id=$2",
       [interaction.guild!.id,target.id]
     );
@@ -66,7 +66,7 @@ export class Leveling implements PlatformModule {
     if (sub === "rank") {
       const row = result.rows[0];
       await interaction.reply({
-        content: row ? `🏆 ${target}: уровень **${row.level}**, XP **${row.xp}**` : `${target} пока не имеет XP.`,
+        content: row ? `🏆 ${target}: уровень **${row.level}**, XP **${Number(row.xp)}**` : `${target} пока не имеет XP.`,
         ephemeral: true
       });
       return;
@@ -77,7 +77,7 @@ export class Leveling implements PlatformModule {
         "SELECT user_id,xp,level FROM leveling_users WHERE guild_id=$1 ORDER BY xp DESC LIMIT 10",
         [interaction.guild!.id]
       );
-      const lines = top.rows.map((row, index) => `${index + 1}. <@${row.user_id}> · lvl ${row.level} · ${row.xp} XP`);
+      const lines = top.rows.map((row, index) => `${index + 1}. <@${row.user_id}> · lvl ${row.level} · ${Number(row.xp)} XP`);
       await interaction.reply({ content: lines.length ? `📈 **Топ Leveling**\n${lines.join("\n")}` : "Таблица лидеров пуста.", ephemeral: true });
     }
   }
@@ -98,7 +98,7 @@ export class Leveling implements PlatformModule {
     this.cooldowns.set(key, now);
 
     const xp = setting.xp_per_message;
-    const result = await this.db.query<{ xp: number; level: number }>(
+    const result = await this.db.query<{ xp: string | number; level: number }>(
       `INSERT INTO leveling_users(guild_id,user_id,xp,level)
        VALUES($1,$2,$3,0)
        ON CONFLICT(guild_id,user_id) DO UPDATE SET xp=leveling_users.xp+EXCLUDED.xp
@@ -109,7 +109,9 @@ export class Leveling implements PlatformModule {
     const row = result.rows[0];
     if (!row) return;
 
-    const nextLevel = Math.floor(Math.sqrt(row.xp / 100));
+    const currentXp = Number(row.xp);
+    if (!Number.isSafeInteger(currentXp) || currentXp < 0) return;
+    const nextLevel = Math.floor(Math.sqrt(currentXp / 100));
     if (nextLevel > row.level) {
       await this.db.query(
         "UPDATE leveling_users SET level=$1,updated_at=now() WHERE guild_id=$2 AND user_id=$3",
