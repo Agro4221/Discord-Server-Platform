@@ -24,6 +24,7 @@ export class Security implements PlatformModule {
   private unsubscribe?: () => void;
   private readonly joins = new Map<string, { timestamp: number; userId: string }[]>();
   private readonly raidActiveUntil = new Map<string, number>();
+  private readonly destructiveActiveUntil = new Map<string, number>();
   private readonly alertAt = new Map<string, number>();
   private readonly destructive = new Map<string, { timestamp: number; type: string }[]>();
   private client?: import("discord.js").Client;
@@ -44,6 +45,7 @@ export class Security implements PlatformModule {
     this.unsubscribe = undefined;
     this.joins.clear();
     this.raidActiveUntil.clear();
+    this.destructiveActiveUntil.clear();
     this.alertAt.clear();
     this.destructive.clear();
     this.client = undefined;
@@ -124,8 +126,12 @@ export class Security implements PlatformModule {
     this.joins.set(member.guild.id, bucket);
     const activeUntil = this.raidActiveUntil.get(member.guild.id) ?? 0;
     const raidTriggered = bucket.length >= config.maxJoins;
-    if (!raidTriggered && now < activeUntil) { await this.quarantine(member, config); return; }
+    if (now < activeUntil) {
+      await this.quarantine(member, config);
+      return;
+    }
     if (!raidTriggered) return;
+
     this.raidActiveUntil.set(member.guild.id, now + Math.max(config.windowSeconds * 1000, 60000));
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'raid-detected',$2::jsonb)",
@@ -147,7 +153,13 @@ export class Security implements PlatformModule {
     const bucket = (this.destructive.get(guildId) ?? []).filter((entry) => entry.timestamp >= cutoff);
     bucket.push({ timestamp: now, type });
     this.destructive.set(guildId, bucket);
-    if (bucket.length < config.maxDestructiveActions) return;
+    const activeUntil = this.destructiveActiveUntil.get(guildId) ?? 0;
+    if (!shouldTriggerSecurityIncident(now, activeUntil, bucket.length, config.maxDestructiveActions)) return;
+
+    this.destructiveActiveUntil.set(
+      guildId,
+      now + Math.max(config.destructiveWindowSeconds * 1000, 60000)
+    );
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'destructive-burst',$2::jsonb)",
       [guildId,JSON.stringify({ type, actions: bucket.length, windowSeconds: config.destructiveWindowSeconds })]
@@ -271,4 +283,14 @@ export class Security implements PlatformModule {
       [guildId,JSON.stringify({ userId, trigger: type, executorCount, removedRoles: removable.size, quarantine: Boolean(config.quarantineRoleId) })]
     );
   }
+}
+
+
+export function shouldTriggerSecurityIncident(
+  now: number,
+  activeUntil: number,
+  count: number,
+  threshold: number
+): boolean {
+  return count >= threshold && now >= activeUntil;
 }
