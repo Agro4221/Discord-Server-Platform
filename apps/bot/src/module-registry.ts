@@ -1,11 +1,24 @@
-import type { ModuleContext, PlatformModule } from "./module.js";
+import type { Client } from "discord.js";
+import type { AuditLog } from "./audit.js";
+import type { Database } from "./database.js";
+import type { PlatformEventBus } from "./events.js";
+import type { PlatformModule } from "./module.js";
 import { logger } from "./logger.js";
 
 export type ModuleInitStatus = "ready" | "degraded";
 
+export type ModuleServices = {
+  client: Client;
+  db: Database;
+  auditLog: AuditLog;
+  events: PlatformEventBus;
+};
+
 export class ModuleRegistry {
   private readonly modules = new Map<string, PlatformModule>();
   private readonly controller = new AbortController();
+
+  constructor(private readonly services: ModuleServices) {}
 
   register(module: PlatformModule): void {
     if (this.modules.has(module.name)) {
@@ -23,7 +36,7 @@ export class ModuleRegistry {
 
     for (const module of this.modules.values()) {
       try {
-        await module.init({ signal: this.controller.signal });
+        await module.init({ signal: this.controller.signal, ...this.services });
         status[module.name] = "ready";
         logger.info("Module ready", { module: module.name });
       } catch (error) {
@@ -40,11 +53,15 @@ export class ModuleRegistry {
 
   async shutdownAll(): Promise<void> {
     this.controller.abort();
+
     for (const module of [...this.modules.values()].reverse()) {
       try {
         await module.shutdown();
       } catch (error) {
-        logger.error("Module shutdown failed", { module: module.name, error: String(error) });
+        logger.error("Module shutdown failed", {
+          module: module.name,
+          error: String(error)
+        });
       }
     }
   }
