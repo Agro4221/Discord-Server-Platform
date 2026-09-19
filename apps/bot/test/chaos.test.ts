@@ -87,3 +87,31 @@ test("logger sanitization survives cyclic-like hostile values without exposing s
   assert.deepEqual((safe.nested as Record<string, unknown>).secret, "[REDACTED]");
   assert.match(String(safe.huge), /truncated/);
 });
+
+
+test("Automation ANY condition group matches when at least one condition matches", async () => {
+  const { AutomationEngine } = await import("../src/modules/automation-engine.js");
+  const db = {} as import("../src/database.js").Database;
+  const engine = new AutomationEngine(db);
+  const conditions = [
+    { type: "equals", left: "content", right: "needle-a" },
+    { type: "equals", left: "content", right: "needle-b" }
+  ] as const;
+
+  const match = async (event: { content: string }) => {
+    const result = await (engine as unknown as {
+      conditionsAnyMatch: (
+        conditions: typeof conditions,
+        event: { guildId: string; type: "message.create"; content: string }
+      ) => Promise<boolean>;
+    }).conditionsAnyMatch(
+      conditions,
+      { guildId: "123456789012345901", type: "message.create", content: event.content }
+    );
+    return result;
+  };
+
+  assert.equal(await match({ content: "needle-b" }), true);
+  assert.equal(await match({ content: "needle-a" }), true);
+  assert.equal(await match({ content: "other" }), false);
+});
