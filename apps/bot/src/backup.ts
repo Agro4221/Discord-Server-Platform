@@ -91,7 +91,7 @@ export class BackupService {
     const local = await readdir(this.directory);
     const result = new Set(
       local
-        .filter((entry) => /^guild-\d{17,20}-\d+\.json\.gz$/.test(entry))
+        .filter((entry) => this.isBackupName(entry))
         .filter((entry) => !guildId || entry.startsWith("guild-" + guildId + "-"))
     );
 
@@ -196,11 +196,57 @@ export class BackupService {
         })).catch((error) => logger.warn("Remote backup retention cleanup failed", { filename, error: String(error) }));
       }
     }
+
+    if (this.s3 && this.remote) {
+      await this.pruneRemoteGuildBackups(guildId);
+    }
+  }
+
+  private async pruneRemoteGuildBackups(guildId: string): Promise<void> {
+    if (!this.s3 || !this.remote) return;
+
+    const remoteBackups: string[] = [];
+    let token: string | undefined;
+
+    do {
+      const response = await this.s3.send(new ListObjectsV2Command({
+        Bucket: this.remote.bucket,
+        Prefix: this.remotePrefix(guildId),
+        ContinuationToken: token
+      }));
+
+      const prefixLength = this.remote.prefix ? this.remote.prefix.length + 1 : 0;
+      for (const object of response.Contents ?? []) {
+        if (!object.Key) continue;
+        const name = object.Key.slice(prefixLength);
+        if (this.isBackupName(name) && this.belongsToGuild(name, guildId)) {
+          remoteBackups.push(name);
+        }
+      }
+
+      token = response.IsTruncated ? response.NextContinuationToken : undefined;
+    } while (token);
+
+    remoteBackups.sort().reverse();
+
+    for (const filename of remoteBackups.slice(this.retentionCount)) {
+      await this.s3.send(new DeleteObjectCommand({
+        Bucket: this.remote.bucket,
+        Key: this.remoteKey(filename)
+      })).catch((error) => logger.warn("Remote backup retention cleanup failed", {
+        filename,
+        error: String(error)
+      }));
+    }
+  }
+
+  private isBackupName(file: string): boolean {
+    return /^guild-\d{17,20}-\d+\.json\.gz$/.test(file);
   }
 
   private safeBackupName(file: string): string {
     const safe = basename(file);
-    if (!/^guild-\d{17,20}-\d+\.json\.gz$/.test(safe)) throw new Error("invalid_backup_name");
+    if (!this.isBackupName(safe)) throw new Error("invalid_backup_name");
     return safe;
   }
 
