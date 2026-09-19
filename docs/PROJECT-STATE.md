@@ -7,7 +7,7 @@ Self-hosted Discord Server Platform: local-first, resilient, modular, no artific
 development
 
 ## Current phase
-Full build — implementation + continuous verification.
+Release candidate — code/CI verified, ready for live Discord validation.
 
 ## Working subsystems
 - Discord Core with typed event bus and module lifecycle.
@@ -147,3 +147,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-09-19 — Security audit-window consistency
 - Destructive-burst executor lookup now uses the configured `destructiveWindowSeconds` (clamped to the same 5–300 second range as configuration) instead of a fixed 30-second window.
 - Added deterministic regression coverage for the lookback calculation.
+
+
+## 2026-09-19 — Release-candidate clarification
+- Added the administrator guide at docs/ADMIN-GUIDE.md.
+- Added /moderate unban as a fully wired Discord command and regression-covered Moderation operation.
+- Final automated CI run #553 was green before this command/documentation pass; a fresh CI run is required after these new changes.
+- The project is ready for live server testing within the implemented feature set, but it is not a claim of total feature parity with every mature Discord multipurpose bot.
