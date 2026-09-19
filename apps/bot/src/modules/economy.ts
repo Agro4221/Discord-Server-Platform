@@ -35,7 +35,7 @@ export class Economy implements PlatformModule {
     if (!interaction.inGuild()) return;
     if (!["economy", "shop"].includes(interaction.commandName)) return;
 
-    if (!await moduleEnabled(this.db, interaction.guild.id, "economy", false)) {
+    if (!await moduleEnabled(this.db, interaction.guild!.id, "economy", false)) {
       await interaction.reply({ content: "Модуль Economy выключен.", ephemeral: true });
       return;
     }
@@ -52,7 +52,7 @@ export class Economy implements PlatformModule {
 
     if (sub === "balance") {
       const user = interaction.options.getUser("user") ?? interaction.user;
-      const balance = await this.balance(interaction.guild.id, user.id);
+      const balance = await this.balance(interaction.guild!.id, user.id);
       await interaction.reply({ content: `💰 ${user}: **${balance}** coins.`, ephemeral: true });
       return;
     }
@@ -68,7 +68,7 @@ export class Economy implements PlatformModule {
          WHERE economy_accounts.last_daily IS NULL
             OR economy_accounts.last_daily < now()-interval '23 hours'
          RETURNING balance`,
-        [interaction.guild.id, interaction.user.id]
+        [interaction.guild!.id, interaction.user.id]
       );
 
       if (!result.rows[0]) {
@@ -76,7 +76,7 @@ export class Economy implements PlatformModule {
         return;
       }
 
-      await this.recordTransaction(interaction.guild.id, interaction.user.id, "daily", 100);
+      await this.recordTransaction(interaction.guild!.id, interaction.user.id, "daily", 100);
       await interaction.reply({ content: `🎁 Получено **100** coins. Баланс: **${result.rows[0].balance}**.`, ephemeral: true });
       return;
     }
@@ -89,7 +89,7 @@ export class Economy implements PlatformModule {
         return;
       }
 
-      const moved = await this.transfer(interaction.guild.id, interaction.user.id, target.id, amount);
+      const moved = await this.transfer(interaction.guild!.id, interaction.user.id, target.id, amount);
       await interaction.reply({
         content: moved ? `💸 Переведено **${amount}** coins пользователю ${target}.` : "Недостаточно средств.",
         ephemeral: true
@@ -100,7 +100,7 @@ export class Economy implements PlatformModule {
     if (sub === "leaderboard") {
       const result = await this.db.query<{ user_id: string; balance: number }>(
         "SELECT user_id,balance FROM economy_accounts WHERE guild_id=$1 ORDER BY balance DESC LIMIT 10",
-        [interaction.guild.id]
+        [interaction.guild!.id]
       );
       const lines = result.rows.map((row, index) => `${index + 1}. <@${row.user_id}> · ${row.balance} coins`);
       await interaction.reply({ content: lines.length ? `🏦 **Экономика**\n${lines.join("\n")}` : "Балансов пока нет.", ephemeral: true });
@@ -111,7 +111,7 @@ export class Economy implements PlatformModule {
     const sub = interaction.options.getSubcommand();
 
     if (sub === "list") {
-      const items = await this.items(interaction.guild.id);
+      const items = await this.items(interaction.guild!.id);
       if (!items.length) {
         await interaction.reply({ content: "Магазин пуст.", ephemeral: true });
         return;
@@ -138,7 +138,7 @@ export class Economy implements PlatformModule {
 
       const role = interaction.options.getRole("role");
       const price = interaction.options.getInteger("price", true);
-      if (role && role.position >= (interaction.guild.members.me?.roles.highest.position ?? 0)) {
+      if (role && role.position >= (interaction.guild!.members.me?.roles.highest.position ?? 0)) {
         await interaction.reply({ content: "Бот не может управлять этой ролью из-за role hierarchy.", ephemeral: true });
         return;
       }
@@ -147,7 +147,7 @@ export class Economy implements PlatformModule {
         `INSERT INTO economy_shop_items(guild_id,name,description,price,role_id,stock)
          VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,
         [
-          interaction.guild.id,
+          interaction.guild!.id,
           interaction.options.getString("name", true),
           interaction.options.getString("description", true),
           price,
@@ -162,22 +162,22 @@ export class Economy implements PlatformModule {
 
     if (sub === "buy") {
       const itemId = interaction.options.getInteger("item", true);
-      const item = (await this.items(interaction.guild.id)).find((candidate) => candidate.id === itemId);
+      const item = (await this.items(interaction.guild!.id)).find((candidate) => candidate.id === itemId);
       if (!item) {
         await interaction.reply({ content: "Товар не найден.", ephemeral: true });
         return;
       }
 
-      const bought = await this.purchase(interaction.guild.id, interaction.user.id, item);
+      const bought = await this.purchase(interaction.guild!.id, interaction.user.id, item);
       if (!bought) {
         await interaction.reply({ content: "Не хватает coins или товар закончился.", ephemeral: true });
         return;
       }
 
       if (item.roleId) {
-        const role = interaction.guild.roles.cache.get(item.roleId);
-        const member = await interaction.guild.members.fetch(interaction.user.id);
-        if (role && member.manageable && role.position < (interaction.guild.members.me?.roles.highest.position ?? 0)) {
+        const role = interaction.guild!.roles.cache.get(item.roleId);
+        const member = await interaction.guild!.members.fetch(interaction.user.id);
+        if (role && member.manageable && role.position < (interaction.guild!.members.me?.roles.highest.position ?? 0)) {
           await member.roles.add(role, "Economy shop purchase").catch(() => undefined);
         }
       }
