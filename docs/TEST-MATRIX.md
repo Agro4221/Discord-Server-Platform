@@ -35,3 +35,10 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - **Giveaways:** CI regression coverage now verifies the participation button is actually wired to the platform event bus and that entry is rejected after the Giveaway is no longer running.
 - **CI run #277:** passed on branch `development`; source hygiene, bot typecheck, bot tests, bot build and Dashboard build were successful.
 - The matrix below intentionally remains unchecked for live Discord behavior until the full release-gate suite is executed with real Discord/PostgreSQL/Lavalink dependencies.
+
+
+### 2026-09-19 — AutoMod hardening snapshot
+- Added deterministic detector tests covering the implemented AutoMod rules.
+- Added audit-event coverage for handled violations.
+- Fixed channel/role exemption ID parsing.
+- Live Discord matrix remains intentionally unchecked until the release-gate environment is exercised.
