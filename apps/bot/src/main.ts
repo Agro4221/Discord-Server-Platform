@@ -53,6 +53,7 @@ async function main(): Promise<void> {
   let supervisor: ConnectionSupervisor | undefined;
   let management: ManagementApiServer | undefined;
   let fleetTimer: NodeJS.Timeout | undefined;
+  let cleanupStarted = false;
   await health.start(config.healthHost, config.healthPort);
 
   try {
@@ -67,8 +68,12 @@ async function main(): Promise<void> {
   } catch (error) {
     health.set({ database: "down", status: "degraded", lastError: "database startup failed" });
     logger.error("Database startup failed", { error: String(error) });
-    await health.stop().catch(() => undefined);
-    await database.close().catch(() => undefined);
+    await health.stop().catch((cleanupError) => {
+      logger.warn("Health server cleanup after database startup failure failed", { error: String(cleanupError) });
+    });
+    await database.close().catch((cleanupError) => {
+      logger.error("Database cleanup after startup failure failed", { error: String(cleanupError) });
+    });
     throw error;
   }
 
@@ -100,6 +105,36 @@ async function main(): Promise<void> {
     identityId: config.botIdentityId
   });
 
+  fatalCleanup = async () => {
+    if (cleanupStarted) return;
+    cleanupStarted = true;
+
+    supervisor?.stop();
+    if (fleetTimer) clearInterval(fleetTimer);
+
+    await identities.heartbeat("stopped", client.guilds.cache.size).catch((error) => {
+      logger.warn("Stopped fleet heartbeat failed", {
+        identityId: config.botIdentityId,
+        error: String(error)
+      });
+    });
+
+    await modules.shutdownAll();
+    client.destroy();
+
+    await management?.stop().catch((error) => {
+      logger.warn("Management API shutdown failed", { error: String(error) });
+    });
+    await database.close().catch((error) => {
+      logger.error("Database shutdown failed", { error: String(error) });
+    });
+    await health.stop().catch((error) => {
+      logger.warn("Health server shutdown failed", { error: String(error) });
+    });
+
+    fatalCleanup = undefined;
+  };
+
   modules.register(temporaryVoice);
   modules.register(moderation);
   modules.register(autoMod);
@@ -125,7 +160,14 @@ async function main(): Promise<void> {
       discord: status,
       status: status === "ready" ? "ready" : "degraded"
     });
-    void identities.heartbeat(status === "ready" ? "ready" : "degraded", client.guilds.cache.size).catch(() => undefined);
+    void identities.heartbeat(status === "ready" ? "ready" : "degraded", client.guilds.cache.size).catch((error) => {
+      logger.warn("Fleet heartbeat update failed", {
+        identityId: config.botIdentityId,
+        status,
+        guildCount: client.guilds.cache.size,
+        error: String(error)
+      });
+    });
   });
   supervisor.start();
 
@@ -221,26 +263,6 @@ async function main(): Promise<void> {
 
   await client.login(config.discordToken);
 
-  fatalCleanup = async () => {
-    supervisor?.stop();
-    if (fleetTimer) clearInterval(fleetTimer);
-    await identities.heartbeat("stopped", client.guilds.cache.size).catch((error) => {
-      logger.warn("Stopped fleet heartbeat failed", { identityId: config.botIdentityId, error: String(error) });
-    });
-    await modules.shutdownAll();
-    client.destroy();
-    await management?.stop().catch((error) => {
-      logger.warn("Management API shutdown failed", { error: String(error) });
-    });
-    await database.close().catch((error) => {
-      logger.error("Database shutdown failed", { error: String(error) });
-    });
-    await health.stop().catch((error) => {
-      logger.warn("Health server shutdown failed", { error: String(error) });
-    });
-    fatalCleanup = undefined;
-  };
-
   let shuttingDown = false;
   const shutdown = async (signal: string) => {
     if (shuttingDown) return;
@@ -254,12 +276,18 @@ async function main(): Promise<void> {
   process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
   process.on("unhandledRejection", (reason) => {
-    logger.error("Unhandled rejection", { reason: String(reason) });
+    logger.error("Unhandled rejection; restarting process through controlled shutdown", {
+      reason: String(reason)
+    });
+    void fatalCleanup?.().finally(() => process.exit(1));
   });
 
   process.on("uncaughtException", (error) => {
-    logger.error("Uncaught exception", { error: error.message });
-    process.exitCode = 1;
+    logger.error("Uncaught exception; restarting process through controlled shutdown", {
+      error: error.message,
+      stack: error.stack
+    });
+    void fatalCleanup?.().finally(() => process.exit(1));
   });
 }
 
