@@ -2,6 +2,7 @@ import type { ChatInputCommandInteraction, Client } from "discord.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
+import { logger } from "../logger.js";
 
 export class Reminders implements PlatformModule {
   readonly name = "reminders";
@@ -95,8 +96,16 @@ export class Reminders implements PlatformModule {
             "UPDATE reminders SET processing_until=NULL,last_error=$1 WHERE id=$2",
             [String(error).slice(0, 1000),reminder.id]
           );
+          logger.warn("Reminder delivery failed", {
+            reminderId: reminder.id,
+            guildId: reminder.guild_id,
+            userId: reminder.user_id,
+            error: String(error)
+          });
         }
       }
+    } catch (error) {
+      logger.error("Reminder worker cycle failed", { identityId: this.identityId, error: String(error) });
     } finally {
       this.running = false;
     }
