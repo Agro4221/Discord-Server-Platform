@@ -11,8 +11,9 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const health = new HealthServer();
   const database = new Database(config.databaseUrl);
+  const moduleSettings = new ModuleSettingsRepository(database);
 
-  await health.start(config.dashboardHost, config.dashboardPort);
+  await health.start(config.healthHost, config.healthPort);
 
   try {
     await database.ping();
@@ -48,6 +49,7 @@ async function main(): Promise<void> {
     logger.info("Shutdown requested", { signal });
     await modules.shutdownAll();
     client.destroy();
+    await management.stop();
     await database.close();
     await health.stop();
   };
