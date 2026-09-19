@@ -145,7 +145,7 @@ async function main(): Promise<void> {
         input.conditions as import("@dsp/domain").AutomationCondition[],
         input.actions as import("@dsp/domain").AutomationAction[],
         input.cooldownSeconds
-      ).then(async () => (await automation.listRules(guildId))[0]),
+      ),
       update: async (guildId, ruleId, input) => automation.updateRule(
         guildId,
         ruleId,
