@@ -254,32 +254,36 @@ test("primary failover selects only stale secondary assignments", { skip: !enabl
   const staleGuild = "123456789012345721";
   try {
     await migrate(db);
-    await db.query("DELETE FROM bot_heartbeats WHERE bot_identity_id IN ('failover-primary','failover-secondary')");
-    await db.query("DELETE FROM bot_identities WHERE id IN ('failover-primary','failover-secondary')");
-    await db.query("DELETE FROM guild_bot_assignments WHERE guild_id IN ($1,$2)", [activeGuild, staleGuild]);
-
     await db.query(
-      "INSERT INTO bot_identities(id,client_id,enabled) VALUES('failover-primary','123456789012345722',true),('failover-secondary','123456789012345723',true)"
+      "DELETE FROM bot_heartbeats WHERE bot_identity_id IN ('failover-primary','failover-active','failover-stale')"
     );
     await db.query(
-      "INSERT INTO guild_bot_assignments(guild_id,bot_identity_id) VALUES($1,'failover-secondary'),($2,'failover-secondary')",
+      "DELETE FROM bot_identities WHERE id IN ('failover-primary','failover-active','failover-stale')"
+    );
+    await db.query(
+      "DELETE FROM guild_bot_assignments WHERE guild_id IN ($1,$2)",
+      [activeGuild, staleGuild]
+    );
+
+    await db.query(
+      "INSERT INTO bot_identities(id,client_id,enabled) VALUES('failover-primary','123456789012345722',true),('failover-active','123456789012345723',true),('failover-stale','123456789012345724',true)"
+    );
+    await db.query(
+      "INSERT INTO guild_bot_assignments(guild_id,bot_identity_id) VALUES($1,'failover-active'),($2,'failover-stale')",
       [activeGuild, staleGuild]
     );
     await db.query(
-      "INSERT INTO bot_heartbeats(bot_identity_id,status,last_seen_at,guild_count) VALUES('failover-secondary','ready',now(),2),('failover-primary','ready',now(),0)"
-    );
-    await db.query(
-      "UPDATE bot_heartbeats SET last_seen_at=now()-interval '2 minutes' WHERE bot_identity_id='failover-secondary'"
+      "INSERT INTO bot_heartbeats(bot_identity_id,status,last_seen_at,guild_count) VALUES('failover-primary','ready',now(),0),('failover-active','ready',now(),1),('failover-stale','ready',now()-interval '2 minutes',1)"
     );
 
     const result = await db.query<{ guild_id: string }>(
-      "SELECT ga.guild_id FROM guild_bot_assignments ga LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id WHERE ga.bot_identity_id='failover-primary' OR (ga.bot_identity_id <> 'primary' AND bh.last_seen_at < now()-interval '90 seconds') ORDER BY ga.guild_id"
+      "SELECT ga.guild_id FROM guild_bot_assignments ga LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id WHERE ga.bot_identity_id='primary' OR (ga.bot_identity_id <> 'primary' AND bh.last_seen_at < now()-interval '90 seconds') ORDER BY ga.guild_id"
     );
-    assert.deepEqual(result.rows.map((row) => row.guild_id), [activeGuild, staleGuild]);
+    assert.deepEqual(result.rows.map((row) => row.guild_id), [staleGuild]);
   } finally {
     await db.query("DELETE FROM guild_bot_assignments WHERE guild_id IN ($1,$2)", [activeGuild, staleGuild]).catch(() => undefined);
-    await db.query("DELETE FROM bot_heartbeats WHERE bot_identity_id IN ('failover-primary','failover-secondary')").catch(() => undefined);
-    await db.query("DELETE FROM bot_identities WHERE id IN ('failover-primary','failover-secondary')").catch(() => undefined);
+    await db.query("DELETE FROM bot_heartbeats WHERE bot_identity_id IN ('failover-primary','failover-active','failover-stale')").catch(() => undefined);
+    await db.query("DELETE FROM bot_identities WHERE id IN ('failover-primary','failover-active','failover-stale')").catch(() => undefined);
     await db.close();
   }
 });
