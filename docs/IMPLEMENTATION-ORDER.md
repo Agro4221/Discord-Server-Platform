@@ -33,7 +33,7 @@ Implement the complete planned feature set and shared architecture before enteri
 - Backup/restore tooling
 - VPS/Docker deployment path
 
-During development, only **cheap engineering checks** are performed as needed to prevent completely broken dependencies: type checking, linting, build checks, migration sanity, static validation and immediate debugging of blockers. This is not the formal QA phase.
+Verification is continuous and aggressive throughout development. Every subsystem gets static checks, unit tests, integration tests where applicable, negative-path tests, permission tests, persistence/restart checks, and regression coverage as soon as its behavior exists. We still keep a later feature-freeze stabilization phase, but defects are fixed immediately rather than deliberately accumulated. The final QA phase is for exhaustive cross-module, adversarial, chaos, soak, security and recovery verification across the complete product.
 
 ## Stabilization phase — test everything
 
