@@ -103,3 +103,12 @@ Never write credentials, tokens or private user data here.
 - Launcher bootstraps `.env`, generates management/database/Lavalink/session secrets, waits for bot and Dashboard health and auto-opens the Control Center.
 - Added static deployment-contract checks for the launcher.
 - Windows execution itself is not available in this Linux environment; this remains an explicit validation limitation.
+
+
+## 2026-09-19 — Music autoplay and Lavalink health hardening
+- Branch: `development`.
+- Found a real functional gap: `autoplayNext()` existed but was never invoked by the playback lifecycle.
+- Wired autoplay to queue-end, guarded against repeat modes and duplicate concurrent autoplay searches, and retained durable player persistence.
+- Added dynamic Music module health based on connected Lavalink nodes plus reconnect/disconnect/destroy diagnostics.
+- Added deterministic regression tests for autoplay eligibility and node health.
+- Current validation limitation: live Discord/Lavalink playback and failover still require user-owned local infrastructure/credentials.

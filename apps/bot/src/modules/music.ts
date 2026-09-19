@@ -82,6 +82,11 @@ export class Music implements PlatformModule {
   private manager?: LavalinkManager;
   private client?: Client;
   private initialized = false;
+  private setModuleHealth?: ModuleContext["setModuleHealth"];
+  private healthTimer?: NodeJS.Timeout;
+  private readonly connectedNodes = new Set<string>();
+  private readonly lastPlayedTracks = new Map<string, Track>();
+  private readonly autoplayInFlight = new Set<string>();
 
   constructor(
     private readonly db: Database,
@@ -91,6 +96,10 @@ export class Music implements PlatformModule {
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+    this.setModuleHealth = context.setModuleHealth;
+    this.connectedNodes.clear();
+    this.lastPlayedTracks.clear();
+    this.autoplayInFlight.clear();
 
     if (this.config.botIdentityId !== "primary") {
       this.directInteractionHandler = (interaction) => {
@@ -182,6 +191,7 @@ export class Music implements PlatformModule {
     this.manager.on("trackStart", (player, track) => {
       void this.persistPlayer(player);
       if (!track) return;
+      this.lastPlayedTracks.set(player.guildId, track);
       void this.announce(player.textChannelId, `🎵 Сейчас играет **${track.info.title}** — ${track.info.author}`);
     });
 
@@ -190,7 +200,27 @@ export class Music implements PlatformModule {
     });
 
     this.manager.on("queueEnd", (player) => {
-      void this.persistPlayer(player);
+      const lastTrack = this.lastPlayedTracks.get(player.guildId);
+      void (async () => {
+        try {
+          const autoplay = await this.autoplayEnabled(player.guildId);
+          if (lastTrack && shouldAutoplayAfterQueueEnd(
+            autoplay,
+            player.repeatMode,
+            player.queue.tracks.length
+          )) {
+            await this.autoplayNext(player, lastTrack);
+          }
+        } catch (error) {
+          logger.warn("Music autoplay cycle failed", {
+            guildId: player.guildId,
+            identity: this.config.botIdentityId,
+            error: String(error)
+          });
+        } finally {
+          await this.persistPlayer(player);
+        }
+      })();
     });
 
     this.manager.on("playerUpdate", (_oldPlayer, newPlayer) => {
@@ -198,6 +228,8 @@ export class Music implements PlatformModule {
     });
 
     this.manager.on("playerDestroy", (player) => {
+      this.lastPlayedTracks.delete(player.guildId);
+      this.autoplayInFlight.delete(player.guildId);
       void this.db.query(
         "DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
         [player.guildId, this.config.botIdentityId]
@@ -205,6 +237,8 @@ export class Music implements PlatformModule {
     });
 
     this.manager.nodeManager.on("connect", (node) => {
+      this.connectedNodes.add(node.id);
+      this.publishNodeHealth();
       void this.db.query(
         `INSERT INTO music_node_sessions(bot_identity_id,node_id,session_id)
          VALUES($1,$2,$3)
@@ -223,18 +257,39 @@ export class Music implements PlatformModule {
     });
 
     this.manager.nodeManager.on("resumed", (node, _payload, fetchedPlayers) => {
+      this.connectedNodes.add(node.id);
+      this.publishNodeHealth();
       if (!Array.isArray(fetchedPlayers)) return;
       void this.restoreResumedPlayers(node.id, fetchedPlayers as unknown[]);
     });
 
+    this.manager.nodeManager.on("reconnecting", (node) => {
+      this.connectedNodes.delete(node.id);
+      this.publishNodeHealth();
+      logger.warn("Lavalink node reconnecting", {
+        node: node.id
+      });
+    });
+
     this.manager.nodeManager.on("disconnect", (node, reason) => {
+      this.connectedNodes.delete(node.id);
+      this.publishNodeHealth();
       logger.warn("Lavalink node disconnected", {
         node: node.id,
         reason: String(reason)
       });
     });
 
+    this.manager.nodeManager.on("destroy", (node) => {
+      this.connectedNodes.delete(node.id);
+      this.publishNodeHealth();
+      logger.warn("Lavalink node destroyed", {
+        node: node.id
+      });
+    });
+
     this.manager.nodeManager.on("error", (node, error) => {
+      if (!this.connectedNodes.has(node.id)) this.publishNodeHealth();
       logger.error("Lavalink node error", {
         node: node.id,
         error: String(error)
@@ -247,6 +302,9 @@ export class Music implements PlatformModule {
       a();
       b();
     };
+
+    this.healthTimer = setTimeout(() => this.publishNodeHealth(), 0);
+    this.healthTimer.unref();
   }
 
   async shutdown(): Promise<void> {
@@ -265,12 +323,23 @@ export class Music implements PlatformModule {
       this.client.off("interactionCreate", this.directInteractionHandler);
     }
 
+    if (this.healthTimer) clearTimeout(this.healthTimer);
+    this.healthTimer = undefined;
+    this.connectedNodes.clear();
+    this.lastPlayedTracks.clear();
+    this.autoplayInFlight.clear();
+
     this.rawHandler = undefined;
     this.directInteractionHandler = undefined;
     this.readyHandler = undefined;
     this.manager = undefined;
     this.client = undefined;
+    this.setModuleHealth = undefined;
     this.initialized = false;
+  }
+
+  private publishNodeHealth(): void {
+    this.setModuleHealth?.(this.name, musicNodeHealth(this.connectedNodes.size));
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -785,22 +854,28 @@ export class Music implements PlatformModule {
 
   private async autoplayNext(player: Player, lastPlayedTrack: Track): Promise<void> {
     if (!await this.autoplayEnabled(player.guildId)) return;
+    if (this.autoplayInFlight.has(player.guildId)) return;
 
-    const seed = `${lastPlayedTrack.info.author ?? ""} ${lastPlayedTrack.info.title ?? ""}`.trim();
-    if (!seed) return;
+    this.autoplayInFlight.add(player.guildId);
+    try {
+      const seed = `${lastPlayedTrack.info.author ?? ""} ${lastPlayedTrack.info.title ?? ""}`.trim();
+      if (!seed) return;
 
-    const result = await player.search(
-      { query: seed, source: "ytsearch" },
-      this.client?.user
-    );
+      const result = await player.search(
+        { query: seed, source: "ytsearch" },
+        this.client?.user
+      );
 
-    const candidate = result.tracks.find(
-      (track) => track.info.identifier !== lastPlayedTrack.info.identifier
-    );
-    if (!candidate) return;
+      const candidate = result.tracks.find(
+        (track) => track.info.identifier !== lastPlayedTrack.info.identifier
+      );
+      if (!candidate) return;
 
-    player.queue.add(candidate);
-    await this.persistPlayer(player);
+      player.queue.add(candidate);
+      await this.persistPlayer(player);
+    } finally {
+      this.autoplayInFlight.delete(player.guildId);
+    }
   }
 
   private async persistPlayer(player: {
@@ -855,4 +930,16 @@ export function canControlMusic(
 
 export function normalizeMusicRepeatMode(value: string): MusicRepeatMode | null {
   return value === "off" || value === "track" || value === "queue" ? value : null;
+}
+
+export function shouldAutoplayAfterQueueEnd(
+  autoplayEnabled: boolean,
+  repeatMode: MusicRepeatMode,
+  queuedTrackCount: number
+): boolean {
+  return autoplayEnabled && repeatMode === "off" && queuedTrackCount === 0;
+}
+
+export function musicNodeHealth(connectedNodeCount: number): "ready" | "degraded" {
+  return connectedNodeCount > 0 ? "ready" : "degraded";
 }

@@ -98,12 +98,20 @@ async function main(): Promise<void> {
   const analytics = new Analytics(database);
   const music = new Music(database, config, identities);
 
+  const setModuleHealth = (
+    name: string,
+    status: import("./module.js").ModuleHealthStatus
+  ): void => {
+    health.setModule(name, status);
+  };
+
   const modules = new ModuleRegistry({
     client,
     db: database,
     auditLog,
     events,
-    identityId: config.botIdentityId
+    identityId: config.botIdentityId,
+    setModuleHealth
   });
 
   fatalCleanup = async () => {

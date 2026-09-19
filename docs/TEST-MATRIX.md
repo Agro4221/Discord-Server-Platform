@@ -47,3 +47,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-09-19 — Local deployment UX
 - Windows local launcher contract added and checked statically.
 - Actual Windows/Docker Desktop runtime execution remains a user-side/live validation task.
+
+
+### 2026-09-19 — Music reliability snapshot
+- Autoplay eligibility and Lavalink node-health helpers are covered by deterministic tests.
+- Live playback, node failover and session-resume behavior remain live-environment checks.

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canControlMusic, normalizeMusicRepeatMode } from "../src/modules/music.js";
+import { canControlMusic, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
 
 test("music controls require the same voice channel unless Manage Server is granted", () => {
   assert.equal(canControlMusic("voice-1", "voice-1", false), true);
@@ -25,4 +25,19 @@ test("Automation schedule is emitted once per minute", () => {
   assert.equal(shouldEmitSchedule(100, null), true);
   assert.equal(shouldEmitSchedule(100, 99), true);
   assert.equal(shouldEmitSchedule(100, 100), false);
+});
+
+
+test("Music autoplay activates only when the queue really ended and repeat is off", () => {
+  assert.equal(shouldAutoplayAfterQueueEnd(true, "off", 0), true);
+  assert.equal(shouldAutoplayAfterQueueEnd(false, "off", 0), false);
+  assert.equal(shouldAutoplayAfterQueueEnd(true, "track", 0), false);
+  assert.equal(shouldAutoplayAfterQueueEnd(true, "queue", 0), false);
+  assert.equal(shouldAutoplayAfterQueueEnd(true, "off", 1), false);
+});
+
+test("Music node health is degraded only when every Lavalink node is unavailable", () => {
+  assert.equal(musicNodeHealth(0), "degraded");
+  assert.equal(musicNodeHealth(1), "ready");
+  assert.equal(musicNodeHealth(2), "ready");
 });

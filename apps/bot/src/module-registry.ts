@@ -13,6 +13,7 @@ export type ModuleServices = {
   auditLog: AuditLog;
   events: PlatformEventBus;
   identityId: string;
+  setModuleHealth?: (name: string, status: import("./module.js").ModuleHealthStatus) => void;
 };
 
 export class ModuleRegistry {

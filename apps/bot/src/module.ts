@@ -3,6 +3,8 @@ import type { AuditLog } from "./audit.js";
 import type { Database } from "./database.js";
 import type { PlatformEventBus } from "./events.js";
 
+export type ModuleHealthStatus = "starting" | "ready" | "degraded" | "down";
+
 export type ModuleContext = {
   signal: AbortSignal;
   client: Client;
@@ -10,6 +12,7 @@ export type ModuleContext = {
   auditLog: AuditLog;
   events: PlatformEventBus;
   identityId: string;
+  setModuleHealth?: (name: string, status: ModuleHealthStatus) => void;
 };
 
 export interface PlatformModule {

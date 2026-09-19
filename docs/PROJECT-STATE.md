@@ -95,3 +95,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - `-Rebuild`, `-NoOpen` and `-Down` cover the common local lifecycle without requiring manual Docker commands.
 - Local ports remain loopback-only by default.
 - Windows runtime validation is not available in this execution environment; CI validates the surrounding deployment contract and the launcher is intentionally dependency-light.
+
+
+## 2026-09-19 — Music autoplay and Lavalink health hardening
+- Wired the existing persisted Autoplay setting into the actual queue lifecycle; queue-end now searches for and appends a follow-up track when repeat is off.
+- Added an in-flight guard so concurrent queue-end events cannot launch duplicate autoplay searches for one guild.
+- Music now reports dynamic module health from Lavalink node connectivity: one connected node keeps Music ready, while loss of every node degrades only the Music module.
+- Added reconnect/disconnect/destroy node lifecycle logging and regression helpers for autoplay eligibility and node health.
