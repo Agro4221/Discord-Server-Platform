@@ -73,6 +73,11 @@ export function DashboardClient() {
     }
   }
 
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  }
+
   return (
     <main style={{ minHeight: "100vh", background: "#0b0d12", color: "#f4f5f7", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
       <div style={{ maxWidth: 1180, margin: "0 auto", padding: "34px 24px 60px" }}>
@@ -82,8 +87,17 @@ export function DashboardClient() {
             <h1 style={{ fontSize: 42, margin: "7px 0 8px", letterSpacing: -1.5 }}>Control Center</h1>
             <div style={{ opacity: 0.62 }}>Локальная админка. Настройки применяются к твоему self-hosted экземпляру.</div>
           </div>
-          <div style={{ padding: "9px 13px", border: "1px solid #292e3a", borderRadius: 999, background: "#10131a" }}>
-            ● {health?.status === "ready" ? "Platform healthy" : "Degraded / offline"}
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <div style={{ padding: "9px 13px", border: "1px solid #292e3a", borderRadius: 999, background: "#10131a" }}>
+              ● {health?.status === "ready" ? "Platform healthy" : "Degraded / offline"}
+            </div>
+            <button
+              type="button"
+              onClick={() => void logout()}
+              style={{ border: "1px solid #292e3a", background: "#10131a", color: "#fff", borderRadius: 10, padding: "9px 13px", cursor: "pointer" }}
+            >
+              Выйти
+            </button>
           </div>
         </header>
 
