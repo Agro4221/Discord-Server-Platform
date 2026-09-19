@@ -9,6 +9,7 @@ import { DashboardSettingsService, moduleExists } from "./dashboard-settings.js"
 import { guildResources } from "./discord/resources.js";
 import { ConfigTransferService } from "./config-transfer.js";
 import { BackupService } from "./backup.js";
+import { BotIdentityRepository } from "./bot-identity.js";
 
 type ApiOptions = {
   host: string;
@@ -20,6 +21,8 @@ type ApiOptions = {
   settings: DashboardSettingsService;
   transfer: ConfigTransferService;
   backups: BackupService;
+  identities?: BotIdentityRepository;
+  guildAccess?: (guildId: string) => boolean;
   actions: Record<string, (guildId: string) => Promise<unknown>>;
   giveaways?: {
     list: (guildId: string) => Promise<unknown[]>;
@@ -99,8 +102,51 @@ export class ManagementApiServer {
           const url = new URL(req.url ?? "/", `http://${this.options.host}:${this.options.port}`);
           const path = url.pathname;
 
+          const scopedGuild = path.match(/^\/api\/guilds\/([^/]+)/);
+          if (scopedGuild && this.options.guildAccess && !this.options.guildAccess(scopedGuild[1] ?? "")) {
+            this.json(res, 404, { error: "guild_not_found" });
+            return;
+          }
+
+          if (method === "GET" && path === "/api/fleet") {
+            if (!this.options.identities) {
+              this.json(res, 500, { error: "fleet_unavailable" });
+              return;
+            }
+            this.json(res, 200, { identities: await this.options.identities.listFleet() });
+            return;
+          }
+
+          if (method === "POST" && path === "/api/fleet/assign") {
+            if (!this.options.identities) {
+              this.json(res, 500, { error: "fleet_unavailable" });
+              return;
+            }
+            const body = await readJson(req);
+            if (typeof body.guildId !== "string" || !/^\d{17,20}$/.test(body.guildId) ||
+                typeof body.botIdentityId !== "string" || body.botIdentityId.length < 1 || body.botIdentityId.length > 100) {
+              throw new RequestInputError("invalid_fleet_assignment", 400);
+            }
+            if (!this.options.client.guilds.cache.has(body.guildId)) {
+              this.json(res, 404, { error: "guild_not_connected_to_this_bot" });
+              return;
+            }
+            await this.options.identities.assignGuild(body.guildId, body.botIdentityId);
+            await this.options.auditLog.record({
+              guildId: body.guildId,
+              source: "dashboard",
+              action: "fleet.guild.assigned",
+              targetType: "bot-identity",
+              targetId: body.botIdentityId
+            });
+            this.json(res, 200, { ok: true, guildId: body.guildId, botIdentityId: body.botIdentityId });
+            return;
+          }
+
           if (method === "GET" && path === "/api/guilds") {
-            const guilds = [...this.options.client.guilds.cache.values()].map((guild) => ({
+            const guilds = [...this.options.client.guilds.cache.values()]
+              .filter((guild) => !this.options.guildAccess || this.options.guildAccess(guild.id))
+              .map((guild) => ({
               id: guild.id,
               name: guild.name,
               icon: guild.iconURL({ size: 64 })
