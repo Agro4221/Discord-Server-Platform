@@ -60,6 +60,12 @@ services:
       LAVALINK_NODES: '[{"id":"local","host":"lavalink","port":2333,"password":"${LAVALINK_PASSWORD:-change-me-local}"},{"id":"local-2","host":"lavalink2","port":2334,"password":"${LAVALINK_PASSWORD:-change-me-local}"}]'
       HEALTH_HOST: 0.0.0.0
       MANAGEMENT_API_HOST: 0.0.0.0
+      DSP_CONTAINERIZED: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3001/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,8 +87,14 @@ services:
       BOT_HEALTH_URL: http://bot:3001/health
       MANAGEMENT_API_URL: http://bot:3002
       MANAGEMENT_API_KEY: ${MANAGEMENT_API_KEY}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
     depends_on:
-      - bot
+      bot:
+        condition: service_healthy
     ports:
       - "127.0.0.1:${DASHBOARD_PORT:-3000}:3000"
     networks: [dsp]
