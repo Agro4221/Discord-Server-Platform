@@ -227,7 +227,8 @@ async function main(): Promise<void> {
         input.event as import("@dsp/domain").AutomationEvent,
         input.conditions as import("@dsp/domain").AutomationCondition[],
         input.actions as import("@dsp/domain").AutomationAction[],
-        input.cooldownSeconds
+        input.cooldownSeconds,
+        input.anyConditions as import("@dsp/domain").AutomationCondition[]
       ),
       update: async (guildId, ruleId, input) => automation.updateRule(
         guildId,
@@ -236,6 +237,7 @@ async function main(): Promise<void> {
           name: input.name,
           event: input.event as import("@dsp/domain").AutomationEvent,
           conditions: input.conditions as import("@dsp/domain").AutomationCondition[],
+          anyConditions: input.anyConditions as import("@dsp/domain").AutomationCondition[],
           actions: input.actions as import("@dsp/domain").AutomationAction[],
           cooldownSeconds: input.cooldownSeconds,
           enabled: input.enabled
