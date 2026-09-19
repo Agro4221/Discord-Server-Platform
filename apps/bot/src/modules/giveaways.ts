@@ -241,6 +241,7 @@ export class Giveaways implements PlatformModule {
       ]
       });
 
+      if (!message) throw new Error("giveaway_message_missing");
       await this.db.query("UPDATE giveaways SET message_id=$1 WHERE id=$2", [message.id, id]);
     } catch (error) {
       if (message) {
