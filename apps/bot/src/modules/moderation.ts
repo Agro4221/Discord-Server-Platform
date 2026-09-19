@@ -6,6 +6,8 @@ import {
 } from "discord.js";
 import type { Database } from "../database.js";
 import type { PlatformModule, ModuleContext } from "../module.js";
+import { logger } from "../logger.js";
+import type { AuditLog } from "../audit.js";
 import type { PlatformEventBus } from "../events.js";
 
 type ModerationAction = "warn" | "timeout" | "kick" | "ban" | "unban";
@@ -24,11 +26,13 @@ export type ModerationCase = {
 export class Moderation implements PlatformModule {
   readonly name = "moderation";
   private events?: PlatformEventBus;
+  private auditLog?: AuditLog;
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.events = context.events;
+    this.auditLog = context.auditLog;
   }
 
   async shutdown(): Promise<void> {}
@@ -111,6 +115,7 @@ export class Moderation implements PlatformModule {
       return;
     }
 
+    await this.audit("moderation.warn.attempted", interaction.guild.id, interaction.user.id, target.id, { reason });
     const caseId = await this.record(interaction.guild.id, target.id, interaction.user.id, "warn", reason);
     await interaction.reply({
       content: `Предупреждение выдано ${target}. Case #${caseId}.`,
@@ -149,6 +154,10 @@ export class Moderation implements PlatformModule {
 
     const expires = new Date(Date.now() + durationMinutes * 60_000);
     await member.timeout(durationMinutes * 60_000, reason);
+    await this.audit("moderation.timeout.applied", interaction.guild.id, interaction.user.id, member.id, {
+      durationMinutes,
+      reason
+    });
     const caseId = await this.record(
       interaction.guild.id,
       member.id,
@@ -184,6 +193,7 @@ export class Moderation implements PlatformModule {
     }
 
     await member.kick(reason);
+    await this.audit("moderation.kick.applied", interaction.guild.id, interaction.user.id, member.id, { reason });
     const caseId = await this.record(interaction.guild.id, member.id, interaction.user.id, "kick", reason);
 
     await interaction.reply({
@@ -212,6 +222,7 @@ export class Moderation implements PlatformModule {
     }
 
     await member.ban({ reason });
+    await this.audit("moderation.ban.applied", interaction.guild.id, interaction.user.id, member.id, { reason });
     const caseId = await this.record(interaction.guild.id, member.id, interaction.user.id, "ban", reason);
 
     await interaction.reply({
@@ -221,6 +232,39 @@ export class Moderation implements PlatformModule {
   }
 
   private async safeDm(user: User, message: string): Promise<void> {
-    await user.send(message).catch(() => undefined);
+    await user.send(message).catch((error) => {
+      logger.info("Moderation user DM could not be delivered", {
+        userId: user.id,
+        error: String(error)
+      });
+    });
+  }
+
+  private async audit(
+    action: string,
+    guildId: string,
+    actorUserId: string,
+    targetId: string,
+    metadata: Record<string, unknown>
+  ): Promise<void> {
+    try {
+      await this.auditLog?.record({
+        guildId,
+        actorUserId,
+        source: "discord",
+        action,
+        targetType: "user",
+        targetId,
+        metadata
+      });
+    } catch (error) {
+      logger.error("Moderation audit write failed", {
+        guildId,
+        actorUserId,
+        targetId,
+        action,
+        error: String(error)
+      });
+    }
   }
 }
