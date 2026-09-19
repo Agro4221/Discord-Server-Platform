@@ -1,4 +1,4 @@
-import type { ChatInputCommandInteraction } from "discord.js";
+import type { ChatInputCommandInteraction, Client } from "discord.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
@@ -7,10 +7,12 @@ export class Reminders implements PlatformModule {
   readonly name = "reminders";
   private unsubscribe?: () => void;
   private timer?: NodeJS.Timeout;
+  private client?: Client;
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
+    this.client = context.client;
     this.unsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     this.timer = setInterval(() => void this.deliver(), 5_000);
     this.timer.unref();
@@ -21,6 +23,7 @@ export class Reminders implements PlatformModule {
     this.unsubscribe = undefined;
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
+    this.client = undefined;
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -47,6 +50,8 @@ export class Reminders implements PlatformModule {
   }
 
   private async deliver(): Promise<void> {
+    if (!this.client) return;
+
     const due = await this.db.query<{
       id: string;
       guild_id: string;
@@ -67,10 +72,8 @@ export class Reminders implements PlatformModule {
       );
       if (marked.rows.length === 0) continue;
 
-      const guild = globalThis.__DSP_CLIENT?.guilds.cache.get(reminder.guild_id);
-      const user = await globalThis.__DSP_CLIENT?.users.fetch(reminder.user_id).catch(() => null);
+      const user = await this.client.users.fetch(reminder.user_id).catch(() => null);
       await user?.send(`⏰ Напоминание: ${reminder.content}`).catch(() => undefined);
-      void guild;
     }
   }
 }
