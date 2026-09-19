@@ -123,44 +123,57 @@ export class RolePanels implements PlatformModule {
     if (!current) return null;
 
     const nextTitle = title.trim().slice(0,100) || "Выберите роли";
-    await this.db.query(
-      "UPDATE role_panels SET channel_id=$1,title=$2,roles=$3::jsonb WHERE id=$4 AND guild_id=$5",
-      [channelId,nextTitle,JSON.stringify(cleaned),panelId,guildId]
-    );
+    const content = "🎭 **" + nextTitle + "**";
+    const components = [this.row(panelId, cleaned)];
 
-    let next = (await this.list(guildId)).find((panel) => panel.id === panelId);
-    if (!next) return null;
+    let newMessageId: string | null = current.messageId;
+    let oldMessageDeleted = false;
 
-    const content = "🎭 **" + next.title + "**";
-    const components = [this.row(next.id,next.roles)];
-
-    if (current.messageId) {
-      if (current.channelId === next.channelId) {
-        await callbacks.editMessage(current.channelId,current.messageId,content,components);
+    try {
+      if (current.messageId && current.channelId === channelId) {
+        await callbacks.editMessage(current.channelId, current.messageId, content, components);
       } else {
-        await callbacks.deleteMessage(current.channelId,current.messageId);
-        const messageId = await callbacks.sendMessage(next.channelId,content,components);
-        await this.db.query("UPDATE role_panels SET message_id=$1 WHERE id=$2 AND guild_id=$3",[messageId,panelId,guildId]);
-        next = { ...next, messageId };
+        const newMessageId = await callbacks.sendMessage(channelId, content, components);
+        newMessageId = newMessageId;
+
+        if (current.messageId) {
+          await callbacks.deleteMessage(current.channelId, current.messageId).catch(() => undefined);
+          oldMessageDeleted = true;
+        }
       }
-    } else {
-      const messageId = await callbacks.sendMessage(next.channelId,content,components);
-      await this.db.query("UPDATE role_panels SET message_id=$1 WHERE id=$2 AND guild_id=$3",[messageId,panelId,guildId]);
-      next = { ...next, messageId };
+
+      await this.db.query(
+        "UPDATE role_panels SET channel_id=$1,title=$2,roles=$3::jsonb,message_id=$4 WHERE id=$5 AND guild_id=$6",
+        [channelId,nextTitle,JSON.stringify(cleaned),newMessageId,panelId,guildId]
+      );
+    } catch (error) {
+      if (newMessageId && newMessageId !== current.messageId) {
+        await callbacks.deleteMessage(channelId,newMessageId).catch(() => undefined);
+      }
+      if (oldMessageDeleted) {
+        await callbacks.sendMessage(current.channelId,"🎭 **" + current.title + "**",[this.row(current.id,current.roles)]).catch(() => undefined);
+      }
+      throw error;
     }
 
-    return next;
+    const next = (await this.list(guildId)).find((panel) => panel.id === panelId);
+    return next ?? null;
   }
 
   async deletePanel(guildId: string, panelId: number, deleteMessage: (channelId: string, messageId: string) => Promise<void>): Promise<boolean> {
     const result = await this.db.query<{ channel_id: string; message_id: string | null }>(
-      "DELETE FROM role_panels WHERE id=$1 AND guild_id=$2 RETURNING channel_id,message_id",
+      "SELECT channel_id,message_id FROM role_panels WHERE id=$1 AND guild_id=$2",
       [panelId,guildId]
     );
     const row = result.rows[0];
     if (!row) return false;
-    if (row.message_id) await deleteMessage(row.channel_id,row.message_id);
-    return true;
+
+    if (row.message_id) await deleteMessage(row.channel_id,row.message_id).catch(() => undefined);
+    const deleted = await this.db.query(
+      "DELETE FROM role_panels WHERE id=$1 AND guild_id=$2",
+      [panelId,guildId]
+    );
+    return deleted.rowCount === 1;
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
