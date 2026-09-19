@@ -72,25 +72,29 @@ export class RolePanels implements PlatformModule {
     const id = Number(result.rows[0]?.id);
     if (!Number.isSafeInteger(id) || id < 1) throw new Error("role_panel_id_missing");
 
+    let publishedMessageId: string | null = null;
     try {
       let panel = (await this.list(guildId)).find((entry) => entry.id === id);
       if (!panel) throw new Error("role_panel_not_found_after_create");
 
       if (callbacks) {
-        const messageId = await callbacks.sendMessage(
+        publishedMessageId = await callbacks.sendMessage(
           channelId,
           "🎭 **" + panel.title + "**",
           [this.row(panel.id, panel.roles)]
         );
         await this.db.query(
           "UPDATE role_panels SET message_id=$1 WHERE id=$2 AND guild_id=$3",
-          [messageId,id,guildId]
+          [publishedMessageId,id,guildId]
         );
-        panel = { ...panel, messageId };
+        panel = { ...panel, messageId: publishedMessageId };
       }
 
       return panel;
     } catch (error) {
+      if (publishedMessageId && callbacks) {
+        await callbacks.deleteMessage(channelId,publishedMessageId).catch(() => undefined);
+      }
       await this.db.query("DELETE FROM role_panels WHERE id=$1 AND guild_id=$2", [id,guildId]);
       throw error;
     }
