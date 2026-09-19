@@ -54,6 +54,7 @@ async function main(): Promise<void> {
   let management: ManagementApiServer | undefined;
   let fleetTimer: NodeJS.Timeout | undefined;
   let cleanupStarted = false;
+  let modulesHealthy = true;
   await health.start(config.healthHost, config.healthPort);
 
   try {
@@ -158,7 +159,7 @@ async function main(): Promise<void> {
   supervisor = new ConnectionSupervisor(client, (status) => {
     health.set({
       discord: status,
-      status: status === "ready" ? "ready" : "degraded"
+      status: status === "ready" && modulesHealthy ? "ready" : "degraded"
     });
     void identities.heartbeat(status === "ready" ? "ready" : "degraded", client.guilds.cache.size).catch((error) => {
       logger.warn("Fleet heartbeat update failed", {
@@ -172,8 +173,21 @@ async function main(): Promise<void> {
   supervisor.start();
 
   const moduleStatus = await modules.initAll();
+  modulesHealthy = Object.values(moduleStatus).every((status) => status === "ready");
   for (const [name, status] of Object.entries(moduleStatus)) {
     health.setModule(name, status);
+  }
+
+  if (!modulesHealthy) {
+    health.set({
+      status: "degraded",
+      lastError: "one or more modules failed initialization"
+    });
+    logger.warn("Platform started with degraded modules", {
+      modules: Object.entries(moduleStatus)
+        .filter(([, status]) => status !== "ready")
+        .map(([name]) => name)
+    });
   }
 
   management = new ManagementApiServer({
@@ -252,8 +266,11 @@ async function main(): Promise<void> {
 
   fleetTimer = setInterval(() => {
     void identities.refreshAssignments()
-      .then(() => identities.heartbeat("ready", client.guilds.cache.size))
-      .catch((error) => logger.warn("Fleet heartbeat failed", { error: String(error) }));
+      .then(() => identities.heartbeat(modulesHealthy ? "ready" : "degraded", client.guilds.cache.size))
+      .catch((error) => logger.warn("Fleet heartbeat failed", {
+        identityId: config.botIdentityId,
+        error: String(error)
+      }));
   }, 15_000);
   fleetTimer.unref();
 
