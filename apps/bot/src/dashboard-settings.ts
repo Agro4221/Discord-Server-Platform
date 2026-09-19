@@ -122,7 +122,8 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
     fields: [
       { key: "preferredTextChannelId", label: "Канал объявлений", type: "channel" },
       { key: "defaultVolume", label: "Громкость по умолчанию", type: "number", min: 0, max: 200 },
-      { key: "announceTrackStart", label: "Объявлять начало трека", type: "boolean" }
+      { key: "announceTrackStart", label: "Объявлять начало трека", type: "boolean" },
+      { key: "autoplay", label: "Autoplay", type: "boolean", description: "После окончания очереди искать следующий трек автоматически." }
     ]
   }
 ];
@@ -221,7 +222,8 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
     columns: {
       preferredTextChannelId: "preferred_text_channel_id",
       defaultVolume: "default_volume",
-      announceTrackStart: "announce_track_start"
+      announceTrackStart: "announce_track_start",
+      autoplay: "autoplay"
     }
   }
 };
