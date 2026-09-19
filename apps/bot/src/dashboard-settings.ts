@@ -167,6 +167,8 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
     columns: {
       maxJoins: "max_joins",
       windowSeconds: "window_seconds",
+      maxDestructiveActions: "max_destructive_actions",
+      destructiveWindowSeconds: "destructive_window_seconds",
       quarantineRoleId: "quarantine_role_id",
       logChannelId: "log_channel_id"
     }
