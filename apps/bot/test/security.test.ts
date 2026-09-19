@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { shouldTriggerSecurityIncident, securityIncidentCooldownUntil, securityResponseThreshold } from "../src/modules/security.js";
+import {
+  securityAuditLookbackCutoff,
+  shouldTriggerSecurityIncident,
+  securityIncidentCooldownUntil,
+  securityResponseThreshold
+} from "../src/modules/security.js";
 
 test("Security burst incident is opened only at threshold and outside active window", () => {
   assert.equal(shouldTriggerSecurityIncident(100, 0, 5, 5), true);
@@ -21,4 +26,11 @@ test("Security incident cooldown survives a process restart", () => {
   const createdAt = 1_000;
   assert.equal(securityIncidentCooldownUntil(createdAt, 20), 61_000);
   assert.equal(securityIncidentCooldownUntil(createdAt, 120), 121_000);
+});
+
+test("Security executor audit lookback honors configured destructive window", () => {
+  assert.equal(securityAuditLookbackCutoff(100_000, 5), 95_000);
+  assert.equal(securityAuditLookbackCutoff(100_000, 120), -20_000);
+  assert.equal(securityAuditLookbackCutoff(100_000, 1), 95_000);
+  assert.equal(securityAuditLookbackCutoff(100_000, 999), -200_000);
 });
