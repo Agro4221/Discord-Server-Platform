@@ -308,6 +308,42 @@ const migrations = [
         ON notification_feeds(guild_id, url);
     `
   }
+  },
+  {
+    version: 8,
+    name: "music",
+    sql: \`
+      CREATE TABLE IF NOT EXISTS music_settings (
+        guild_id text PRIMARY KEY,
+        enabled boolean NOT NULL DEFAULT false,
+        preferred_text_channel_id text,
+        default_volume integer NOT NULL DEFAULT 100 CHECK (default_volume BETWEEN 0 AND 200),
+        announce_track_start boolean NOT NULL DEFAULT true,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS music_players (
+        guild_id text NOT NULL,
+        bot_identity_id text NOT NULL,
+        voice_channel_id text,
+        text_channel_id text,
+        state jsonb NOT NULL DEFAULT '{}'::jsonb,
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (guild_id,bot_identity_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS music_queue_store (
+        guild_id text NOT NULL,
+        bot_identity_id text NOT NULL,
+        data jsonb NOT NULL,
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (guild_id,bot_identity_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_music_players_identity
+        ON music_players(bot_identity_id);
+    \`
+  }
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
