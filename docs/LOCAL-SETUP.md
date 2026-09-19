@@ -1,61 +1,25 @@
-# Local Setup
+# VPS Installation
 
-## Requirements
+The production Compose topology contains PostgreSQL, two Lavalink nodes, the bot, and the Dashboard.
 
-- Node.js 24.17+
-- Docker Desktop / Docker Engine
-- A Discord Application with a Bot user
-- A private Discord test server
+## Fresh install
 
-## 1. Create local environment
+The installer expects Git access to this private repository.
 
-Copy `.env.example` to `.env`.
+    sudo INSTALL_DIR=/opt/discord-server-platform REPO_URL=git@github.com:Agro4221/Discord-Server-Platform.git BRANCH=development bash scripts/install-vps.sh
 
-Generate a management key:
+It installs Docker when needed, prepares .env, prompts for the Discord credentials and dashboard password, generates server secrets, validates Compose, starts the stack, and waits for the bot health endpoint.
 
-~~~bash
-node scripts/generate-secret.mjs
-~~~
+## Upgrade
 
-Fill in:
-- `DISCORD_CLIENT_ID`
-- `DISCORD_TOKEN`
-- `DISCORD_TEST_GUILD_ID`
-- `DATABASE_URL`
-- `MANAGEMENT_API_KEY`
+    sudo INSTALL_DIR=/opt/discord-server-platform BRANCH=development bash scripts/upgrade.sh
 
-Do not commit `.env`.
+The upgrade is fast-forward-only and stops with a non-zero exit code if the post-upgrade health check fails.
 
-## 2. Start local infrastructure
+## Reverse proxy
 
-~~~bash
-docker compose up -d postgres lavalink
-~~~
+Use infrastructure/caddy/Caddyfile.example with a real DOMAIN. Only the Dashboard is public. Keep ports 3001 and 3002 private.
 
-## 3. Install dependencies
+## Remote backups
 
-~~~bash
-npm install
-~~~
-
-## 4. Start bot
-
-~~~bash
-node --env-file=.env --import=tsx apps/bot/src/main.ts
-~~~
-
-## 5. Start dashboard
-
-The dashboard runs locally on `http://127.0.0.1:3000`. Its server-side proxy talks to the local management API.
-
-## Discord permissions
-
-Do not grant Administrator by default. Temporary Voice needs View Channel, Connect, Manage Channels and Move Members; role hierarchy must also permit the bot to manage target members/resources.
-
-## Test environment
-
-Use a disposable private guild. Keep production servers out of the initial failure-injection cycle.
-
-## Current limitation
-
-The dashboard UI has working module toggles, but full authentication/RBAC, audit UI, setup wizard and complete module settings are still under development.
+Set BACKUP_S3_ENDPOINT, BACKUP_S3_REGION, BACKUP_S3_BUCKET, BACKUP_S3_PREFIX, BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY and BACKUP_S3_FORCE_PATH_STYLE to enable optional S3-compatible backup storage. BACKUP_RETENTION_COUNT controls local retention.
