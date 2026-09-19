@@ -209,7 +209,8 @@ export class DashboardSettingsService {
     const spec = STORAGE[moduleKey];
     if (!schema || !spec) throw new Error("settings_not_supported");
 
-    const validated = validateValues(schema.fields, values);
+    const current = await this.get(guildId, moduleKey);
+    const validated = validateValues(schema.fields, { ...current, ...values });
     const entries = Object.entries(spec.columns);
 
     const columns = entries.map(([, column]) => quoteIdentifier(column));
