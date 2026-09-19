@@ -423,6 +423,13 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .addSubcommand((sub) => sub.setName("resume").setDescription("Resume playback"))
       .addSubcommand((sub) => sub.setName("skip").setDescription("Skip current track"))
       .addSubcommand((sub) => sub.setName("stop").setDescription("Stop and clear queue"))
+      .addSubcommand((sub) => sub.setName("shuffle").setDescription("Shuffle the queue"))
+      .addSubcommand((sub) =>
+        sub
+          .setName("seek")
+          .setDescription("Seek within the current track")
+          .addIntegerOption((o) => o.setName("seconds").setDescription("Position in seconds").setMinValue(0).setMaxValue(86400).setRequired(true))
+      )
       .addSubcommand((sub) => sub.setName("queue").setDescription("Show queue"))
       .addSubcommand((sub) => sub.setName("nowplaying").setDescription("Show current track"))
       .addSubcommand((sub) =>
