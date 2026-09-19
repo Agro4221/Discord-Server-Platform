@@ -18,3 +18,11 @@ test("Music repeat mode validator accepts only supported modes", () => {
   assert.equal(normalizeMusicRepeatMode("loop"), null);
   assert.equal(normalizeMusicRepeatMode(""), null);
 });
+
+import { shouldEmitSchedule } from "../src/modules/automation-engine.js";
+
+test("Automation schedule is emitted once per minute", () => {
+  assert.equal(shouldEmitSchedule(100, null), true);
+  assert.equal(shouldEmitSchedule(100, 99), true);
+  assert.equal(shouldEmitSchedule(100, 100), false);
+});
