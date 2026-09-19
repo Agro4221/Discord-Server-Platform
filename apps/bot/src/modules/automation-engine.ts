@@ -45,6 +45,7 @@ export class AutomationEngine implements PlatformModule {
   private readonly keyedCooldowns = new Map<string, number>();
   private scheduleTimer?: NodeJS.Timeout;
   private identityId = "primary";
+  private executionCounter = 0;
 
   constructor(private readonly db: Database) {}
 
@@ -122,6 +123,7 @@ export class AutomationEngine implements PlatformModule {
     this.rules.clear();
     this.cooldowns.clear();
     this.keyedCooldowns.clear();
+    this.executionCounter = 0;
     if (this.scheduleTimer) clearInterval(this.scheduleTimer);
     this.scheduleTimer = undefined;
     this.client = undefined;
@@ -398,6 +400,8 @@ export class AutomationEngine implements PlatformModule {
       if (!await this.conditionsMatch(rule.all, event)) continue;
 
       const cooldownSeconds = await this.cooldownFor(rule.id);
+      this.executionCounter += 1;
+      if (this.executionCounter % 100 === 0) this.pruneCooldowns(Date.now());
       const cooldownKey = `${event.guildId}:${rule.id}:${event.userId ?? "global"}`;
       const previous = this.cooldowns.get(cooldownKey) ?? 0;
       if (cooldownSeconds > 0 && Date.now() - previous < cooldownSeconds * 1000) continue;
@@ -409,6 +413,39 @@ export class AutomationEngine implements PlatformModule {
         }
       }
       await this.perform(rule.actions, event);
+    }
+  }
+
+  private pruneCooldowns(now: number): void {
+    const cutoff = now - 86_400_000;
+    for (const [key, timestamp] of this.cooldowns) {
+      if (timestamp < cutoff) this.cooldowns.delete(key);
+    }
+    for (const [key, timestamp] of this.keyedCooldowns) {
+      if (timestamp < now) this.keyedCooldowns.delete(key);
+    }
+
+    const maxKeys = 10_000;
+    if (this.cooldowns.size > maxKeys) {
+      const oldest = [...this.cooldowns.entries()]
+        .sort((a, b) => a[1] - b[1])
+        .slice(0, this.cooldowns.size - maxKeys);
+      for (const [key] of oldest) this.cooldowns.delete(key);
+      logger.warn("Automation cooldown cache trimmed", {
+        removed: oldest.length,
+        remaining: this.cooldowns.size
+      });
+    }
+
+    if (this.keyedCooldowns.size > maxKeys) {
+      const oldest = [...this.keyedCooldowns.entries()]
+        .sort((a, b) => a[1] - b[1])
+        .slice(0, this.keyedCooldowns.size - maxKeys);
+      for (const [key] of oldest) this.keyedCooldowns.delete(key);
+      logger.warn("Automation keyed cooldown cache trimmed", {
+        removed: oldest.length,
+        remaining: this.keyedCooldowns.size
+      });
     }
   }
 
