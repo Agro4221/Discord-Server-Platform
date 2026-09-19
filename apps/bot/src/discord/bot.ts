@@ -87,28 +87,86 @@ export function wireDiscordEvents(
   });
 
   client.on(Events.MessageReactionAdd, (reaction, user) => {
-    void events.emit("reaction.add", { reaction, user });
+    void emitReaction(events, reaction, user);
   });
 
   client.on(Events.GuildMemberAdd, (member) => {
-    void events.emit("member.add", member);
+    void emitMemberAdd(events, member);
   });
 
   client.on(Events.GuildMemberRemove, (member) => {
-    void events.emit("member.remove", member);
+    void emitMemberRemove(events, member);
   });
 
   client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
-    void events.emit("member.update", { oldMember, newMember });
+    void emitMemberUpdate(events, oldMember, newMember);
   });
 
   client.on(Events.ChannelDelete, (channel) => {
-    if (channel.guild) void events.emit("channel.delete", channel);
+    if (channel.guildId) {
+      void events.emit("channel.delete", channel);
+    }
   });
 
-  client.on(Events.RoleDelete, (role) => {
+  client.on("roleDelete", (role) => {
     void events.emit("role.delete", role);
   });
+}
+
+async function emitReaction(
+  events: PlatformEventBus,
+  reaction: import("discord.js").MessageReaction | import("discord.js").PartialMessageReaction,
+  user: import("discord.js").User | import("discord.js").PartialUser
+): Promise<void> {
+  const resolvedReaction = reaction.partial
+    ? await reaction.fetch().catch(() => null)
+    : reaction;
+  const resolvedUser = user.partial
+    ? await user.fetch().catch(() => null)
+    : user;
+
+  if (!resolvedReaction || !resolvedUser) return;
+
+  await events.emit("reaction.add", {
+    reaction: resolvedReaction,
+    user: resolvedUser
+  });
+}
+
+async function emitMemberAdd(
+  events: PlatformEventBus,
+  member: import("discord.js").GuildMember | import("discord.js").PartialGuildMember
+): Promise<void> {
+  const resolved = member.partial
+    ? await member.fetch().catch(() => null)
+    : member;
+  if (resolved) await events.emit("member.add", resolved);
+}
+
+async function emitMemberRemove(
+  events: PlatformEventBus,
+  member: import("discord.js").GuildMember | import("discord.js").PartialGuildMember
+): Promise<void> {
+  const resolved = member.partial
+    ? await member.fetch().catch(() => null)
+    : member;
+  if (resolved) await events.emit("member.remove", resolved);
+}
+
+async function emitMemberUpdate(
+  events: PlatformEventBus,
+  oldMember: import("discord.js").GuildMember | import("discord.js").PartialGuildMember,
+  newMember: import("discord.js").GuildMember
+): Promise<void> {
+  const oldResolved = oldMember.partial
+    ? await oldMember.fetch().catch(() => null)
+    : oldMember;
+  if (oldResolved) {
+    await events.emit("member.update", {
+      oldMember: oldResolved,
+      newMember
+    });
+  }
 }
 
 export async function routeCommand(
@@ -119,7 +177,13 @@ export async function routeCommand(
   moderation: Moderation
 ): Promise<void> {
   try {
-    await handleCommand(client, interaction, db, temporaryVoice, moderation);
+    await handleCommand(
+      client,
+      interaction,
+      db,
+      temporaryVoice,
+      moderation
+    );
   } catch (error) {
     logger.error("Command failed", {
       command: interaction.commandName,
