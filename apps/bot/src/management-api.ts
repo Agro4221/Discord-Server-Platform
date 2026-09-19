@@ -20,6 +20,7 @@ type ApiOptions = {
   settings: DashboardSettingsService;
   transfer: ConfigTransferService;
   backups: BackupService;
+  actions: Record<string, (guildId: string) => Promise<unknown>>;
 };
 
 type RateWindow = { startedAt: number; count: number };
@@ -69,6 +70,33 @@ export class ManagementApiServer {
 
             const modules = await this.options.moduleSettings.list(guildId);
             this.json(res, 200, { guildId, catalog: MODULE_CATALOG, modules });
+            return;
+          }
+
+          const actionMatch = path.match(/^\/api\/guilds\/([^/]+)\/actions\/([^/]+)\/([^/]+)$/);
+          if (method === "POST" && actionMatch) {
+            const guildId = actionMatch[1];
+            const actionKey = (actionMatch[2] ?? "") + "." + (actionMatch[3] ?? "");
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+
+            const handler = this.options.actions[actionKey];
+            if (!handler) {
+              this.json(res, 400, { error: "unknown_action" });
+              return;
+            }
+
+            const result = await handler(guildId);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "module.action",
+              targetType: "action",
+              targetId: actionKey
+            });
+            this.json(res, 200, { ok: true, result });
             return;
           }
 
