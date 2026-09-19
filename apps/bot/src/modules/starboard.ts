@@ -14,7 +14,9 @@ export class Starboard implements PlatformModule {
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
-    this.unsubscribe = context.events.on("reaction.add", ({ reaction, user }) => this.onReaction(reaction, user));
+    const a = context.events.on("reaction.add", ({ reaction, user }) => this.onReaction(reaction, user));
+    const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    this.unsubscribe = () => { a(); b(); };
   }
 
   async shutdown(): Promise<void> {
@@ -22,7 +24,29 @@ export class Starboard implements PlatformModule {
     this.unsubscribe = undefined;
   }
 
-  private async onReaction(reaction: MessageReaction, user: User): Promise<void> {
+  private async onCommand(interaction: import("discord.js").ChatInputCommandInteraction): Promise<void> {
+    if (!interaction.inGuild() || interaction.commandName !== "starboard") return;
+    if (!interaction.memberPermissions?.has("ManageGuild")) {
+      await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
+      return;
+    }
+    if (interaction.options.getSubcommand() !== "setup") return;
+
+    const channel = interaction.options.getChannel("channel", true);
+    if (!channel.isTextBased()) {
+      await interaction.reply({ content: "Starboard channel должен быть текстовым.", ephemeral: true });
+      return;
+    }
+
+    await this.configure(
+      interaction.guild.id,
+      channel.id,
+      interaction.options.getInteger("threshold") ?? 3
+    );
+    await interaction.reply({ content: "Starboard настроен и включён.", ephemeral: true });
+  }
+
+  private async onReaction(reaction: MessageReaction, user: User): Promise<void>
     if (!reaction.message.guild || user.bot) return;
     if (reaction.emoji.name !== "⭐") return;
     if (!await moduleEnabled(this.db, reaction.message.guild.id, "starboard", false)) return;
