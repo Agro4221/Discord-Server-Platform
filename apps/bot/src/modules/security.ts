@@ -96,7 +96,6 @@ export class Security implements PlatformModule {
     );
   }
 
-
   private async restoreActiveIncidents(): Promise<void> {
     const result = await this.db.query<{
       guild_id: string;
@@ -213,7 +212,7 @@ export class Security implements PlatformModule {
       [guildId,JSON.stringify(burstMetadata)]
     );
     await this.audit(guildId, "security.destructive-burst", burstMetadata);
-    const executors = await this.findRecentExecutors(guildId, type, targetUserId);
+    const executors = await this.findRecentExecutors(guildId, type, targetUserId, config.destructiveWindowSeconds);
     for (const executor of executors) {
       await this.respondToExecutor(guildId, executor.userId, config, type, executor.count);
     }
@@ -361,7 +360,12 @@ export class Security implements PlatformModule {
     });
   }
 
-  private async findRecentExecutors(guildId: string, type: string, targetUserId?: string): Promise<Array<{ userId: string; count: number }>> {
+  private async findRecentExecutors(
+    guildId: string,
+    type: string,
+    targetUserId?: string,
+    windowSeconds = 20
+  ): Promise<Array<{ userId: string; count: number }>> {
     const guild = this.client?.guilds.cache.get(guildId);
     if (!guild) return [];
     await new Promise((resolve) => setTimeout(resolve, 350));
@@ -376,7 +380,7 @@ export class Security implements PlatformModule {
     });
     if (!logs) return [];
 
-    const cutoff = Date.now() - 30_000;
+    const cutoff = securityAuditLookbackCutoff(Date.now(), windowSeconds);
     const counts = new Map<string, number>();
     for (const entry of logs.entries.values()) {
       if (entry.createdTimestamp < cutoff || !entry.executorId) continue;
@@ -441,7 +445,6 @@ export class Security implements PlatformModule {
   }
 }
 
-
 export function shouldTriggerSecurityIncident(
   now: number,
   activeUntil: number,
@@ -451,11 +454,14 @@ export function shouldTriggerSecurityIncident(
   return count >= threshold && now >= activeUntil;
 }
 
-
 export function securityIncidentCooldownUntil(createdAt: number, windowSeconds: number): number {
   return createdAt + Math.max(windowSeconds * 1000, 60_000);
 }
 
 export function securityResponseThreshold(maxDestructiveActions: number): number {
   return Math.max(2, Math.ceil(maxDestructiveActions / 2));
+}
+
+export function securityAuditLookbackCutoff(now: number, windowSeconds: number): number {
+  return now - Math.min(Math.max(windowSeconds, 5), 300) * 1000;
 }
