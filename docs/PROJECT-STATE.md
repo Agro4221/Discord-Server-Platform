@@ -30,19 +30,18 @@ Full build — implementation + continuous verification.
 - Notifications with HTTPS feed validation and SSRF protections.
 - Analytics minute buckets with Dashboard reporting.
 - Music/Lavalink foundation with persistent queue store and bot identity namespace.
-- Multi-bot identity persistence for separate-process fleet deployment.
-- Config transfer and compressed local backups with guild-scoped restore/delete controls.
+- Multi-bot identity persistence for separate-process fleet deployment, per-voice Music routing and identity-scoped background workers.
+- Config transfer and compressed local backups with guild-scoped restore/delete controls, including local/remote retention enforcement.
 - Docker Compose / Dockerfiles for local-to-VPS topology.
 
 ## Still under development
-- Full AutoMod rule editor beyond current core rules.
-- Full Security response workflow beyond alert/quarantine.
+- Full AutoMod rule editor and richer response policies beyond the current persisted rule set.
+- Full Security response workflow beyond the current anti-raid/quarantine/destructive-burst response.
 - Full Automation condition/action catalog beyond the currently supported safe builder.
-- Music provider breadth and multi-node failover validation.
-- Multi-bot fleet orchestrator/health UI; current model is separate bot processes sharing DB/Lavalink.
-- Production backup retention/remote backup integration.
-- Full E2E/chaos/soak/security test suite.
-- VPS installer/reverse-proxy/upgrade tooling.
+- Music provider breadth and multi-node failover validation beyond the current Lavalink foundation.
+- Full multi-bot fleet orchestration/failover automation beyond persisted assignments and health UI.
+- Full E2E/chaos/soak/security test suite and live Discord validation.
+- VPS installer/reverse-proxy production drill and clean-host acceptance.
 
 ## Verification
 - GitHub Actions CI runs on Node.js 24.17.
@@ -73,3 +72,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Secondary bot identities register only Music commands and handle only Music interactions for assigned voice channels; the shared Platform Event Bus remains scoped by general guild ownership.
 - Removed premature fleet `ready` heartbeat before Discord Gateway login.
 - Added Music `shuffle` and `seek` controls with voice-channel / Manage Server authorization.
+
+
+## 2026-09-19 — Verified fleet/Music hardening
+- CI run 35436484093 passed on HEAD 670231a88e88d954ac44a01ca36c969c301a19e2.
+- 23 bot tests passed, including AutoMod persistence, Security burst latch, Notifications SSRF filtering, Music repeat/control helpers, config-import validation, migration 20, backup retention and background worker guild isolation.
+- Multi-bot Music routing now has persistent voice-channel assignments, Management API, Dashboard controls and secondary-identity Music-only command handling.
+- Background workers are identity-scoped through guild_bot_assignments so only the assigned bot process processes reminders, feeds, giveaways and Automation schedule rules.
+- Music repeat/autoplay is persisted and restored through player state / guild settings.
