@@ -36,7 +36,7 @@ test("event bus extracts guild id from member ban events", async () => {
   const bus = new PlatformEventBus();
   const received: string[] = [];
   bus.on("member.ban", (member) => {
-    received.push(member.guild.id);
+    received.push(member.guildId);
   });
 
   const payload = { guildId: "123456789012345777", userId: "123456789012345778" };
