@@ -40,7 +40,8 @@ export class Security implements PlatformModule {
     const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const c = context.events.on("channel.delete", (channel) => this.onDestructive(channel.guildId, "channel.delete"));
     const d = context.events.on("role.delete", (role) => this.onDestructive(role.guild.id, "role.delete"));
-    this.unsubscribe = () => { a(); b(); c(); d(); };
+    const e = context.events.on("member.ban", (member) => this.onDestructive(member.guild.id, "member.ban"));
+    this.unsubscribe = () => { a(); b(); c(); d(); e(); };
   }
 
   async shutdown(): Promise<void> {
@@ -316,7 +317,10 @@ export class Security implements PlatformModule {
     if (!guild) return [];
     await new Promise((resolve) => setTimeout(resolve, 350));
 
-    const auditType = type === "channel.delete" ? AuditLogEvent.ChannelDelete : AuditLogEvent.RoleDelete;
+    const auditType =
+      type === "channel.delete" ? AuditLogEvent.ChannelDelete :
+      type === "role.delete" ? AuditLogEvent.RoleDelete :
+      AuditLogEvent.MemberBanAdd;
     const logs = await guild.fetchAuditLogs({ limit: 25, type: auditType }).catch((error) => {
       logger.warn("Security audit-log fetch failed", { guildId, type, error: String(error) });
       return null;
