@@ -86,25 +86,27 @@ export class Music implements PlatformModule {
     this.client = context.client;
 
     const queueStore = new PostgresQueueStore(this.db, this.config.botIdentityId);
-    const persistedSession = await this.db.query<{ node_session_id: string | null }>(
-      "SELECT state->>'nodeSessionId' AS node_session_id FROM music_players WHERE bot_identity_id=$1 AND state->>'nodeSessionId' IS NOT NULL ORDER BY updated_at DESC LIMIT 1",
+    const persistedSessions = await this.db.query<{ node_id: string; session_id: string }>(
+      "SELECT node_id,session_id FROM music_node_sessions WHERE bot_identity_id=$1",
       [this.config.botIdentityId]
     );
-    const resumeSessionId = persistedSession.rows[0]?.node_session_id ?? undefined;
+    const resumeSessions = new Map(persistedSessions.rows.map((row) => [row.node_id, row.session_id]));
 
     this.manager = new LavalinkManager({
-      nodes: [{
-        id: "local",
-        authorization: this.config.lavalinkPassword,
-        host: this.config.lavalinkHost,
-        port: this.config.lavalinkPort,
+      nodes: this.config.lavalinkNodes.map((node) => ({
+        id: node.id,
+        authorization: node.password,
+        host: node.host,
+        port: node.port,
+        ...(node.secure ? { secure: true } : {}),
         retryAmount: 10,
         retryDelay: 10_000,
-        ...(resumeSessionId ? { sessionId: resumeSessionId } : {})
-      }],
+        ...(resumeSessions.get(node.id) ? { sessionId: resumeSessions.get(node.id) } : {})
+      })),
       sendToShard: (guildId, payload) =>
         this.client?.guilds.cache.get(guildId)?.shard?.send(payload),
       autoSkip: true,
+      autoMove: true,
       client: {
         id: this.config.discordClientId,
         username: this.client.user?.username ?? "DSP"
@@ -126,6 +128,11 @@ export class Music implements PlatformModule {
       },
       linksAllowed: true,
       advancedOptions: {
+        playerMigration: {
+          concurrency: 5,
+          perTargetConcurrency: 2,
+          backpressureDelayMs: 50
+        },
         debugOptions: {
           noAudio: false,
           playerDestroy: {
@@ -179,6 +186,14 @@ export class Music implements PlatformModule {
     });
 
     this.manager.nodeManager.on("connect", (node) => {
+      void this.db.query(
+        `INSERT INTO music_node_sessions(bot_identity_id,node_id,session_id)
+         VALUES($1,$2,$3)
+         ON CONFLICT(bot_identity_id,node_id)
+         DO UPDATE SET session_id=EXCLUDED.session_id,updated_at=now()`,
+        [this.config.botIdentityId, node.id, node.sessionId]
+      ).catch((error) => logger.warn("Failed to persist Lavalink node session", { node: node.id, error: String(error) }));
+
       void node.updateSession(true, 300_000).catch((error) => {
         logger.warn("Failed to enable Lavalink session resuming", {
           node: node.id,
@@ -337,7 +352,6 @@ export class Music implements PlatformModule {
       guildId: interaction.guildId!,
       voiceChannelId,
       textChannelId: interaction.channelId,
-      node: "local",
       volume: 100,
       selfDeaf: true
     });
