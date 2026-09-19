@@ -3,7 +3,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY apps/bot/package*.json apps/bot/
 COPY packages/domain/package*.json packages/domain/
-RUN npm install
+RUN npm ci
 COPY tsconfig.base.json package.json ./
 COPY packages/domain packages/domain
 COPY apps/bot apps/bot
