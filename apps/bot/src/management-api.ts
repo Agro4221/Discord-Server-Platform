@@ -26,6 +26,9 @@ type ApiOptions = {
     end: (guildId: string, giveawayId: number) => Promise<unknown>;
     reroll: (guildId: string, giveawayId: number) => Promise<unknown>;
   };
+  analytics?: {
+    report: (guildId: string, hours?: number) => Promise<unknown>;
+  };
   rolePanels?: {
     list: (guildId: string) => Promise<unknown[]>;
     create: (
@@ -286,6 +289,26 @@ export class ManagementApiServer {
               targetId: String(giveawayId)
             });
             this.json(res, 200, { ok: true, result });
+            return;
+          }
+
+          const analyticsMatch = path.match(/^\/api\/guilds\/([^/]+)\/analytics$/);
+          if (method === "GET" && analyticsMatch) {
+            if (!this.options.analytics) {
+              this.json(res, 500, { error: "analytics_unavailable" });
+              return;
+            }
+            const guildId = analyticsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const hours = Number.parseInt(url.searchParams.get("hours") ?? "24", 10);
+            if (!Number.isInteger(hours) || hours < 1 || hours > 168) {
+              this.json(res, 400, { error: "invalid_hours" });
+              return;
+            }
+            this.json(res, 200, { guildId, report: await this.options.analytics.report(guildId, hours) });
             return;
           }
 
