@@ -25,3 +25,15 @@ DISCORD_CLIENT_ID=...
 ```
 
 Both processes use the same `DATABASE_URL`. The persistent music state already carries `bot_identity_id`, so queues and players stay identity-safe.
+
+
+## Music voice-channel routing
+
+The general guild assignment remains the ownership boundary for the shared Platform Event Bus. Music has a separate routing table so one guild can use multiple bot identities in different voice channels without duplicating every non-Music module.
+
+- `guild_music_bot_assignments` maps `guild_id + voice_channel_id` to one bot identity.
+- A bot identity can own at most one Music voice channel in the same guild because one Discord bot cannot occupy multiple voice channels simultaneously.
+- Primary identity remains the fallback for unassigned Music voice channels.
+- A secondary identity registers only the `/music` command and Music button interactions, then serves only voice channels assigned to that identity.
+- Dashboard Control Center exposes these assignments under Bot Fleet.
+- Assignment changes are audited and persisted in PostgreSQL.
