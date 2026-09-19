@@ -6,6 +6,7 @@ import { BackupPanel } from "./backup-panel";
 import { GiveawaysPanel } from "./giveaways-panel";
 import { AnalyticsPanel } from "./analytics-panel";
 import { AutomationPanel } from "./automation-panel";
+import { FleetPanel } from "./fleet-panel";
 
 type Guild = { id: string; name: string; icon: string | null };
 type ModuleState = Record<string, boolean>;
@@ -315,6 +316,8 @@ export function DashboardClient() {
         </header>
 
         {actionMessage && <div style={{ marginBottom: 18, padding: 13, borderRadius: 12, background: "#12271b", border: "1px solid #274f36" }}>{actionMessage}</div>}
+
+        {guildId && <FleetPanel guildId={guildId} onChanged={reloadAudit} />}
 
         {error && (
           <div style={{ marginBottom: 18, padding: 13, borderRadius: 12, background: "#32191b", border: "1px solid #63292d" }}>
