@@ -86,6 +86,11 @@ export class Music implements PlatformModule {
     this.client = context.client;
 
     const queueStore = new PostgresQueueStore(this.db, this.config.botIdentityId);
+    const persistedSession = await this.db.query<{ node_session_id: string | null }>(
+      "SELECT state->>'nodeSessionId' AS node_session_id FROM music_players WHERE bot_identity_id=$1 AND state->>'nodeSessionId' IS NOT NULL ORDER BY updated_at DESC LIMIT 1",
+      [this.config.botIdentityId]
+    );
+    const resumeSessionId = persistedSession.rows[0]?.node_session_id ?? undefined;
 
     this.manager = new LavalinkManager({
       nodes: [{
@@ -94,7 +99,8 @@ export class Music implements PlatformModule {
         host: this.config.lavalinkHost,
         port: this.config.lavalinkPort,
         retryAmount: 10,
-        retryDelay: 10_000
+        retryDelay: 10_000,
+        ...(resumeSessionId ? { sessionId: resumeSessionId } : {})
       }],
       sendToShard: (guildId, payload) =>
         this.client?.guilds.cache.get(guildId)?.shard?.send(payload),
@@ -173,7 +179,18 @@ export class Music implements PlatformModule {
     });
 
     this.manager.nodeManager.on("connect", (node) => {
+      void node.updateSession(true, 300_000).catch((error) => {
+        logger.warn("Failed to enable Lavalink session resuming", {
+          node: node.id,
+          error: String(error)
+        });
+      });
       logger.info("Lavalink node connected", { node: node.id });
+    });
+
+    this.manager.nodeManager.on("resumed", (node, _payload, fetchedPlayers) => {
+      if (!Array.isArray(fetchedPlayers)) return;
+      void this.restoreResumedPlayers(node.id, fetchedPlayers as unknown[]);
     });
 
     this.manager.nodeManager.on("disconnect", (node, reason) => {
@@ -447,6 +464,94 @@ export class Music implements PlatformModule {
         "⏹️ Стоп.",
       ephemeral: true
     });
+  }
+
+  private async restoreResumedPlayers(nodeId: string, fetchedPlayers: unknown[]): Promise<void> {
+    for (const item of fetchedPlayers) {
+      if (!item || typeof item !== "object") continue;
+      const data = item as {
+        guildId?: unknown;
+        volume?: unknown;
+        paused?: unknown;
+        track?: unknown;
+        filters?: unknown;
+        state?: {
+          connected?: unknown;
+          position?: unknown;
+          ping?: unknown;
+        };
+      };
+
+      const guildId = typeof data.guildId === "string" ? data.guildId : null;
+      if (!guildId || data.state?.connected !== true) {
+        if (guildId) {
+          await this.db.query(
+            "DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
+            [guildId, this.config.botIdentityId]
+          );
+        }
+        continue;
+      }
+
+      const saved = await this.db.query<{
+        voice_channel_id: string | null;
+        text_channel_id: string | null;
+        state: unknown;
+      }>(
+        "SELECT voice_channel_id,text_channel_id,state FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
+        [guildId, this.config.botIdentityId]
+      );
+      const savedRow = saved.rows[0];
+      if (!savedRow?.voice_channel_id) continue;
+
+      const existing = this.manager?.players.get(guildId);
+      const player = existing ?? this.manager?.createPlayer({
+        guildId,
+        voiceChannelId: savedRow.voice_channel_id,
+        textChannelId: savedRow.text_channel_id ?? undefined,
+        node: nodeId,
+        volume: typeof data.volume === "number" ? data.volume : 100,
+        selfDeaf: true
+      });
+
+      if (!player) continue;
+
+      try {
+        if (!player.connected) await player.connect();
+        if (typeof data.volume === "number") await player.setVolume(data.volume);
+
+        if (data.filters && typeof data.filters === "object") {
+          player.filterManager.data = data.filters as typeof player.filterManager.data;
+        }
+
+        await player.queue.utils.sync(true, false);
+
+        if (data.track && typeof data.track === "object") {
+          player.queue.current = this.manager!.utils.buildTrack(
+            data.track,
+            player.queue.current?.requester ?? this.client?.user
+          );
+        }
+
+        const position = typeof data.state?.position === "number" ? data.state.position : 0;
+        player.lastPosition = Number.isFinite(position) && position >= 0 ? position : 0;
+        player.lastPositionChange = Date.now();
+
+        if (typeof data.state?.ping === "number") {
+          player.ping.lavalink = data.state.ping;
+        }
+
+        player.paused = data.paused === true;
+        player.playing = !player.paused && Boolean(data.track);
+        await this.persistPlayer(player);
+      } catch (error) {
+        logger.warn("Failed to restore Lavalink player", {
+          node: nodeId,
+          guildId,
+          error: String(error)
+        });
+      }
+    }
   }
 
   private async persistPlayer(player: {
