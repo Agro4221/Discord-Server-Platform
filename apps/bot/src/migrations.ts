@@ -264,6 +264,20 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_analytics_events_guild_bucket ON analytics_events(guild_id,bucket_start DESC);"
     ])
   }
+  },
+  {
+    version: 10,
+    name: "leveling_settings",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS leveling_settings (",
+      "  guild_id text PRIMARY KEY, enabled boolean NOT NULL DEFAULT false,",
+      "  xp_per_message integer NOT NULL DEFAULT 10 CHECK(xp_per_message BETWEEN 1 AND 1000),",
+      "  cooldown_seconds integer NOT NULL DEFAULT 30 CHECK(cooldown_seconds BETWEEN 0 AND 3600),",
+      "  announce_level_up boolean NOT NULL DEFAULT true,",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");"
+    ])
+  }
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
