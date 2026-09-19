@@ -96,8 +96,27 @@ export class ManagementApiServer {
       this.rateCleanupTimer.unref();
 
       this.server = createServer(async (req, res) => {
+        const requestStartedAt = Date.now();
+        const requestMethod = req.method ?? "GET";
+        const requestPath = req.url ?? "/";
+        const ip = req.socket.remoteAddress ?? "unknown";
+
+        req.setTimeout(15_000, () => {
+          if (res.writableEnded) return;
+          logger.warn("Management API request timed out", {
+            method: requestMethod,
+            path: requestPath,
+            ip
+          });
+          res.writeHead(408, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+          res.end(JSON.stringify({ error: "request_timeout" }));
+          req.destroy();
+        });
+
         try {
-          const ip = req.socket.remoteAddress ?? "unknown";
+          if (requestStartedAt && Date.now() < requestStartedAt) {
+            throw new Error("clock_regressed");
+          }
           if (!this.allowedRate(ip)) {
             this.json(res, 429, { error: "rate_limited" });
             return;
@@ -108,8 +127,8 @@ export class ManagementApiServer {
             return;
           }
 
-          const method = req.method ?? "GET";
-          const url = new URL(req.url ?? "/", `http://${this.options.host}:${this.options.port}`);
+          const method = requestMethod;
+          const url = new URL(requestPath, `http://${this.options.host}:${this.options.port}`);
           const path = url.pathname;
 
           const scopedGuild = path.match(/^\/api\/guilds\/([^/]+)/);
@@ -945,7 +964,13 @@ export class ManagementApiServer {
             return;
           }
 
-          logger.error("Management API request failed", { error: String(error) });
+          logger.error("Management API request failed", {
+            method: requestMethod,
+            path: requestPath,
+            ip,
+            durationMs: Date.now() - requestStartedAt,
+            error: String(error)
+          });
           this.json(res, 500, { error: "internal_error" });
         }
       });
