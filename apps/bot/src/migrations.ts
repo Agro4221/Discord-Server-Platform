@@ -392,6 +392,13 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_guild_music_bot_assignments_guild ON guild_music_bot_assignments(guild_id);"
     ])
+  },
+  {
+    version: 20,
+    name: "music_autoplay",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS autoplay boolean NOT NULL DEFAULT false;"
+    ])
   }
 ] as const;
 
