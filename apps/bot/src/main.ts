@@ -6,11 +6,12 @@ import { logger } from "./logger.js";
 import { ModuleRegistry } from "./module-registry.js";
 import { TemporaryVoice } from "./modules/temporary-voice.js";
 import { Moderation } from "./modules/moderation.js";
-import { createDiscordClient, registerCommands, wireDiscordEvents } from "./discord/bot.js";
+import { createDiscordClient, registerCommands, routeCommand, wireDiscordEvents } from "./discord/bot.js";
 import { ConnectionSupervisor } from "./discord/connection-supervisor.js";
 import { ManagementApiServer } from "./management-api.js";
 import { ModuleSettingsRepository } from "./module-settings.js";
 import { AuditLog } from "./audit.js";
+import { PlatformEventBus } from "./events.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -18,6 +19,7 @@ async function main(): Promise<void> {
   const database = new Database(config.databaseUrl);
   const moduleSettings = new ModuleSettingsRepository(database);
   const auditLog = new AuditLog(database);
+  const events = new PlatformEventBus();
 
   await health.start(config.healthHost, config.healthPort);
 
@@ -37,7 +39,13 @@ async function main(): Promise<void> {
   const temporaryVoice = new TemporaryVoice(database, () => client.guilds.cache.values());
   const moderation = new Moderation(database);
 
-  const modules = new ModuleRegistry();
+  const modules = new ModuleRegistry({
+    client,
+    db: database,
+    auditLog,
+    events
+  });
+
   modules.register(temporaryVoice);
   modules.register(moderation);
 
@@ -66,8 +74,13 @@ async function main(): Promise<void> {
   });
   await management.start();
 
-  wireDiscordEvents(client, database, temporaryVoice, moderation);
   await registerCommands(config, client);
+  wireDiscordEvents(client, events);
+
+  events.on("interaction.command", (interaction) => {
+    void routeCommand(client, interaction, database, temporaryVoice, moderation);
+  });
+
   await client.login(config.discordToken);
 
   let shuttingDown = false;
