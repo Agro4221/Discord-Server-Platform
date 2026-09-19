@@ -167,7 +167,7 @@ export class BackupService {
     }));
     if (!response.Body) throw new Error("remote_backup_empty");
     const bytes = await response.Body.transformToByteArray();
-    return gunzipBuffer(Buffer.from(bytes)).toString("utf8");
+    return gunzipBuffer(Buffer.from(bytes)).toString();
   }
 
   private async deleteRemote(filename: string): Promise<void> {
