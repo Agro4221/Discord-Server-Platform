@@ -111,7 +111,7 @@ export class BotIdentityRepository {
 
   async musicVoiceOwner(guildId: string, voiceChannelId: string): Promise<string | null> {
     const result = await this.db.query<{ bot_identity_id: string }>(
-      "SELECT a.bot_identity_id FROM guild_music_bot_assignments a LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=a.bot_identity_id WHERE a.guild_id=$1 AND a.voice_channel_id=$2 AND (a.bot_identity_id='primary' OR bh.last_seen_at >= now()-interval '90 seconds')",
+      "SELECT a.bot_identity_id FROM guild_music_bot_assignments a LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=a.bot_identity_id WHERE a.guild_id=$1 AND a.voice_channel_id=$2 AND (a.bot_identity_id='primary' OR (bh.last_seen_at IS NOT NULL AND bh.last_seen_at >= now()-interval '90 seconds'))",
       [guildId, voiceChannelId]
     );
     return result.rows[0]?.bot_identity_id ?? null;
@@ -155,7 +155,7 @@ export class BotIdentityRepository {
   async refreshAssignments(): Promise<void> {
     const result = this.identityId === "primary"
       ? await this.db.query<{ guild_id: string }>(
-          "SELECT ga.guild_id FROM guild_bot_assignments ga LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id WHERE ga.bot_identity_id='primary' OR (ga.bot_identity_id <> 'primary' AND bh.last_seen_at < now()-interval '90 seconds')",
+          "SELECT ga.guild_id FROM guild_bot_assignments ga LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id WHERE ga.bot_identity_id='primary' OR (ga.bot_identity_id <> 'primary' AND (bh.last_seen_at IS NULL OR bh.last_seen_at < now()-interval '90 seconds'))",
           []
         )
       : await this.db.query<{ guild_id: string }>(
