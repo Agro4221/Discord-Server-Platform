@@ -25,10 +25,12 @@ export class Security implements PlatformModule {
   private readonly raidActiveUntil = new Map<string, number>();
   private readonly alertAt = new Map<string, number>();
   private readonly destructive = new Map<string, number[]>();
+  private client?: import("discord.js").Client;
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
+    this.client = context.client;
     const a = context.events.on("member.add", (member) => this.onJoin(member));
     const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const c = context.events.on("channel.delete", (channel) => this.onDestructive(channel.guildId, "channel.delete"));
@@ -43,6 +45,7 @@ export class Security implements PlatformModule {
     this.raidActiveUntil.clear();
     this.alertAt.clear();
     this.destructive.clear();
+    this.client = undefined;
   }
 
   private async config(guildId: string): Promise<SecurityConfig> {
@@ -152,7 +155,7 @@ export class Security implements PlatformModule {
     const last = this.alertAt.get(guildId) ?? 0;
     if (!config.logChannelId || now - last < 60000) return;
     this.alertAt.set(guildId, now);
-    const guild = [...(globalThis.__DSP_GUILDS ?? [])].find((item) => item.id === guildId);
+    const guild = this.client?.guilds.cache.get(guildId);
     const channel = guild?.channels.cache.get(config.logChannelId);
     if (channel?.isTextBased() && "send" in channel) await (channel as TextChannel).send("🚨 " + message).catch(() => undefined);
   }
@@ -164,8 +167,4 @@ export class Security implements PlatformModule {
     if (!botMember || !role || role.position >= botMember.roles.highest.position) return;
     await member.roles.add(role, "Security anti-raid quarantine").catch(() => undefined);
   }
-}
-
-declare global {
-  var __DSP_GUILDS: Iterable<import("discord.js").Guild> | undefined;
 }
