@@ -12,6 +12,12 @@ export class PermissionChecker {
     return member.permissions.has(permission);
   }
 
+  botMissing(permissions: PermissionResolvable[]): PermissionResolvable[] {
+    const me = this.guild.members.me;
+    if (!me) return permissions;
+    return permissions.filter((permission) => !me.permissions.has(permission));
+  }
+
   botCan(permission: PermissionResolvable): boolean {
     const me = this.guild.members.me;
     if (!me) return false;
