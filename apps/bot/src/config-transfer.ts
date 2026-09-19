@@ -1,5 +1,7 @@
 import type { Database } from "./database.js";
 import { MODULE_CATALOG } from "./modules/catalog.js";
+import { validateAutomationRule } from "./modules/automation-engine.js";
+import type { AutomationAction, AutomationCondition, AutomationEvent } from "@dsp/domain";
 import type { ServerConfigExport, ServerModuleConfig } from "@dsp/domain";
 
 type ExportTable = {
@@ -125,23 +127,27 @@ export class ConfigTransferService {
 
       const automation = data.modules.find((module) => module.key === "automation");
       const automationRules = automation?.settings.automation_rules;
+      if (automationRules !== undefined && !Array.isArray(automationRules)) {
+        throw new Error("invalid_automation_rules");
+      }
+
       if (Array.isArray(automationRules)) {
+        const normalizedRules = automationRules.map((rule) => normalizeImportedAutomationRule(rule));
+
         await client.query("DELETE FROM automation_rules WHERE guild_id=$1", [targetGuildId]);
-        for (const rule of automationRules) {
-          if (!rule || typeof rule !== "object") continue;
-          const object = rule as Record<string, unknown>;
+        for (const rule of normalizedRules) {
           await client.query(
             `INSERT INTO automation_rules(
               guild_id,name,enabled,event,conditions,actions,cooldown_seconds
             ) VALUES($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)`,
             [
               targetGuildId,
-              typeof object.name === "string" ? object.name.slice(0,80) : "Imported rule",
-              object.enabled !== false,
-              typeof object.event === "string" ? object.event : "message.create",
-              JSON.stringify(Array.isArray(object.conditions) ? object.conditions : []),
-              JSON.stringify(Array.isArray(object.actions) ? object.actions : []),
-              typeof object.cooldown_seconds === "number" ? Math.min(Math.max(object.cooldown_seconds,0),86400) : 0
+              rule.name,
+              rule.enabled,
+              rule.event,
+              JSON.stringify(rule.conditions),
+              JSON.stringify(rule.actions),
+              rule.cooldownSeconds
             ]
           );
         }
@@ -336,4 +342,52 @@ function validateExport(payload: unknown): asserts payload is ServerConfigExport
       throw new Error("invalid_module_settings");
     }
   }
+}
+
+
+type NormalizedAutomationRule = {
+  name: string;
+  enabled: boolean;
+  event: AutomationEvent;
+  conditions: AutomationCondition[];
+  actions: AutomationAction[];
+  cooldownSeconds: number;
+};
+
+function normalizeImportedAutomationRule(value: unknown): NormalizedAutomationRule {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("invalid_automation_rule");
+  }
+
+  const object = value as Record<string, unknown>;
+  if (
+    typeof object.name !== "string" ||
+    !object.name.trim() ||
+    object.name.length > 80 ||
+    typeof object.enabled !== "boolean" ||
+    typeof object.event !== "string" ||
+    !Array.isArray(object.conditions) ||
+    !Array.isArray(object.actions) ||
+    typeof object.cooldown_seconds !== "number" ||
+    !Number.isInteger(object.cooldown_seconds) ||
+    object.cooldown_seconds < 0 ||
+    object.cooldown_seconds > 86400
+  ) {
+    throw new Error("invalid_automation_rule");
+  }
+
+  validateAutomationRule(
+    object.event as AutomationEvent,
+    object.conditions as AutomationCondition[],
+    object.actions as AutomationAction[]
+  );
+
+  return {
+    name: object.name.trim(),
+    enabled: object.enabled,
+    event: object.event as AutomationEvent,
+    conditions: object.conditions as AutomationCondition[],
+    actions: object.actions as AutomationAction[],
+    cooldownSeconds: object.cooldown_seconds
+  };
 }
