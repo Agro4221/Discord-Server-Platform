@@ -81,6 +81,57 @@ export function buildCommands(): SlashCommandBuilder[] {
           .setDescription("Show recent moderation cases")
           .addUserOption((option) => option.setName("user").setDescription("User").setRequired(true))
           .addIntegerOption((option) => option.setName("limit").setDescription("Number of cases").setMinValue(1).setMaxValue(50))
+      ),
+    new SlashCommandBuilder()
+      .setName("ticket")
+      .setDescription("Ticket system")
+      .addSubcommand((sub) => sub.setName("create").setDescription("Create a support ticket"))
+      .addSubcommand((sub) =>
+        sub
+          .setName("setup")
+          .setDescription("Configure tickets")
+          .addChannelOption((o) => o.setName("category").setDescription("Ticket category").addChannelTypes(ChannelType.GuildCategory))
+          .addRoleOption((o) => o.setName("staff-role").setDescription("Staff role"))
+          .addChannelOption((o) => o.setName("transcript-channel").setDescription("Transcript channel").addChannelTypes(ChannelType.GuildText))
+      ),
+    new SlashCommandBuilder()
+      .setName("roles")
+      .setDescription("Role panels")
+      .addSubcommand((sub) =>
+        sub
+          .setName("panel")
+          .setDescription("Create a role panel")
+          .addChannelOption((o) => o.setName("channel").setDescription("Text channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
+          .addRoleOption((o) => o.setName("role").setDescription("Role to toggle").setRequired(true))
+          .addStringOption((o) => o.setName("label").setDescription("Button label").setMaxLength(80).setRequired(true))
+      ),
+    new SlashCommandBuilder()
+      .setName("giveaway")
+      .setDescription("Giveaways")
+      .addSubcommand((sub) =>
+        sub
+          .setName("create")
+          .setDescription("Create a giveaway")
+          .addIntegerOption((o) => o.setName("minutes").setDescription("Duration").setMinValue(1).setMaxValue(10080).setRequired(true))
+          .addIntegerOption((o) => o.setName("winners").setDescription("Winner count").setMinValue(1).setMaxValue(100))
+          .addStringOption((o) => o.setName("prize").setDescription("Prize").setMaxLength(200).setRequired(true))
+      ),
+    new SlashCommandBuilder()
+      .setName("economy")
+      .setDescription("Economy")
+      .addSubcommand((sub) =>
+        sub
+          .setName("balance")
+          .setDescription("Show balance")
+          .addUserOption((o) => o.setName("user").setDescription("User"))
+      )
+      .addSubcommand((sub) => sub.setName("daily").setDescription("Claim daily coins"))
+      .addSubcommand((sub) =>
+        sub
+          .setName("pay")
+          .setDescription("Transfer coins")
+          .addUserOption((o) => o.setName("user").setDescription("Recipient").setRequired(true))
+          .addIntegerOption((o) => o.setName("amount").setDescription("Amount").setMinValue(1).setMaxValue(1_000_000).setRequired(true))
       )
   ];
 }
