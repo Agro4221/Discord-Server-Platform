@@ -131,7 +131,7 @@ async function main(): Promise<void> {
     actions: {
       "temporary-voice.reconcile": async (guildId) => { await temporaryVoice.reconcileGuild(guildId); return { guildId, ok: true }; },
       "automation.reload": async (guildId) => { await automation.reload(); return { guildId, ok: true }; },
-      "security.check-hierarchy": async (guildId) => ({ guildId, checked: true })
+      "security.check-hierarchy": async (guildId) => security.checkHierarchy(guildId)
     }
   });
   await management.start();
