@@ -40,7 +40,7 @@ export class Security implements PlatformModule {
     const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const c = context.events.on("channel.delete", (channel) => this.onDestructive(channel.guildId, "channel.delete"));
     const d = context.events.on("role.delete", (role) => this.onDestructive(role.guild.id, "role.delete"));
-    const e = context.events.on("member.ban", (member) => this.onDestructive(member.guild.id, "member.ban"));
+    const e = context.events.on("member.ban", ({ guildId }) => this.onDestructive(guildId, "member.ban"));
     this.unsubscribe = () => { a(); b(); c(); d(); e(); };
   }
 
