@@ -417,7 +417,7 @@ export class AutomationEngine implements PlatformModule {
             event.content.toLocaleLowerCase().includes(condition.right.toLocaleLowerCase())
           );
         case "equals":
-          return event.content === condition.right;
+          return resolveTextField(event, condition.left) === condition.right;
         case "matches": {
           const value = resolveTextField(event, condition.left);
           if (value === undefined) return false;
@@ -457,7 +457,7 @@ export class AutomationEngine implements PlatformModule {
         if (action.type === "log") {
           await this.db.query(
             "INSERT INTO audit_events(guild_id,source,action,target_type,target_id,metadata) VALUES($1,'system','automation.log','automation',NULL,$2::jsonb)",
-            [event.guildId, JSON.stringify({ message: action.message })]
+            [event.guildId, JSON.stringify({ message: renderTemplate(action.message, event) })]
           );
           continue;
         }
@@ -479,8 +479,9 @@ export class AutomationEngine implements PlatformModule {
 
         if (action.type === "add-role" || action.type === "remove-role") {
           const guild = client?.guilds.cache.get(event.guildId);
-          const member = event.userId
-            ? await guild?.members.fetch(event.userId).catch(() => null)
+          const userId = resolveUserReference(action.userId, event.userId);
+          const member = userId
+            ? await guild?.members.fetch(userId).catch(() => null)
             : null;
           const role = guild?.roles.cache.get(action.roleId);
 
