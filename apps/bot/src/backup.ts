@@ -1,5 +1,5 @@
 import { createReadStream, createWriteStream } from "node:fs";
-import { Readable } from "node:stream";
+import { Readable, Transform } from "node:stream";
 import { mkdir, readdir, unlink } from "node:fs/promises";
 import { createGzip, createGunzip } from "node:zlib";
 import { pipeline } from "node:stream/promises";
@@ -267,33 +267,45 @@ export class BackupService {
 
 async function readGzip(path: string): Promise<string> {
   const stat = await import("node:fs/promises").then((fs) => fs.stat(path));
-  if (stat.size > 10485760) throw new Error("backup_compressed_too_large");
-
-  const chunks: Buffer[] = [];
-  let total = 0;
+  if (stat.size > 10 * 1024 * 1024) throw new Error("backup_compressed_too_large");
   const source = createReadStream(path);
-  const gunzip = createGunzip();
-  gunzip.on("data", (chunk) => {
-    total += chunk.length;
-    if (total > 33554432) throw new Error("backup_decompressed_too_large");
-    chunks.push(Buffer.from(chunk));
+  return gunzipReadable(source);
+}
+
+async function gunzipReadable(source: NodeJS.ReadableStream): Promise<string> {
+  const chunks: Buffer[] = [];
+  const limiter = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      if (this.readableLength + chunk.length > 32 * 1024 * 1024) {
+        callback(new Error("backup_decompressed_too_large"));
+        return;
+      }
+      chunks.push(Buffer.from(chunk));
+      callback(null, chunk);
+    }
   });
-  await pipeline(source, gunzip);
+
+  await pipeline(source, createGunzip(), limiter);
   return Buffer.concat(chunks).toString("utf8");
 }
 
 async function gunzipBuffer(input: Buffer): Promise<Buffer> {
-  if (input.length > 10485760) throw new Error("backup_compressed_too_large");
+  if (input.length > 10 * 1024 * 1024) throw new Error("backup_compressed_too_large");
 
   const chunks: Buffer[] = [];
-  let total = 0;
-  const gunzip = createGunzip();
-  gunzip.on("data", (chunk) => {
-    total += chunk.length;
-    if (total > 33554432) throw new Error("backup_decompressed_too_large");
-    chunks.push(Buffer.from(chunk));
+  const limiter = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      const size = chunks.reduce((total, item) => total + item.length, 0) + chunk.length;
+      if (size > 32 * 1024 * 1024) {
+        callback(new Error("backup_decompressed_too_large"));
+        return;
+      }
+      chunks.push(Buffer.from(chunk));
+      callback(null, chunk);
+    }
   });
-  await pipeline(Readable.from([input]), gunzip);
+
+  await pipeline(Readable.from([input]), createGunzip(), limiter);
   return Buffer.concat(chunks);
 }
 
