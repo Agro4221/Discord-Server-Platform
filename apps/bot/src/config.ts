@@ -138,6 +138,18 @@ export function loadConfig(): AppConfig {
     throw new Error("NODE_ENV must be development, test, or production");
   }
 
+  const managementApiHost = process.env.MANAGEMENT_API_HOST ?? "127.0.0.1";
+  if (
+    nodeEnv === "production" &&
+    !["127.0.0.1", "::1", "localhost"].includes(managementApiHost)
+  ) {
+    throw new Error("MANAGEMENT_API_HOST must be loopback in production");
+  }
+
+  if (nodeEnv === "production" && backupS3 && !backupS3.endpoint.startsWith("https://")) {
+    throw new Error("BACKUP_S3_ENDPOINT must use HTTPS in production");
+  }
+
   return {
     discordToken: discordCredentials.token,
     discordClientId: discordCredentials.clientId,
@@ -145,7 +157,7 @@ export function loadConfig(): AppConfig {
     ...(process.env.DISCORD_TEST_GUILD_ID ? { discordTestGuildId: process.env.DISCORD_TEST_GUILD_ID } : {}),
     healthHost: process.env.HEALTH_HOST ?? "127.0.0.1",
     healthPort: port("HEALTH_PORT", 3001),
-    managementApiHost: process.env.MANAGEMENT_API_HOST ?? "127.0.0.1",
+    managementApiHost,
     managementApiPort: port("MANAGEMENT_API_PORT", 3002),
     managementApiKey: required("MANAGEMENT_API_KEY"),
     databaseUrl: required("DATABASE_URL"),
