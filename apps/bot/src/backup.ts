@@ -183,7 +183,7 @@ export class BackupService {
   private async pruneGuildBackups(guildId: string): Promise<void> {
     const entries = await readdir(this.directory);
     const backups = entries
-      .filter((entry) => /^guild-\\d{17,20}-\\d+\\.json\\.gz$/.test(entry))
+      .filter((entry) => this.isBackupName(entry))
       .filter((entry) => entry.startsWith("guild-" + guildId + "-"))
       .sort()
       .reverse();
