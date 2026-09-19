@@ -11,6 +11,13 @@ type AutoModConfig = {
   maxCapsRatio: number;
   maxRepeatedMessages: number;
   repeatedWindowSeconds: number;
+  blockLinks: boolean;
+  blockInvites: boolean;
+  maxLinks: number;
+  maxEmojis: number;
+  maxLineLength: number;
+  exemptChannelIds: string;
+  exemptRoleIds: string;
   deleteMessage: boolean;
   timeoutMinutes: number;
 };
@@ -22,6 +29,13 @@ const defaultConfig: AutoModConfig = {
   maxCapsRatio: 0.85,
   maxRepeatedMessages: 5,
   repeatedWindowSeconds: 10,
+  blockLinks: false,
+  blockInvites: false,
+  maxLinks: 3,
+  maxEmojis: 20,
+  maxLineLength: 1000,
+  exemptChannelIds: "",
+  exemptRoleIds: "",
   deleteMessage: true,
   timeoutMinutes: 0
 };
@@ -80,6 +94,13 @@ export class AutoMod implements PlatformModule {
        max_mentions=EXCLUDED.max_mentions,max_caps_ratio=EXCLUDED.max_caps_ratio,
        max_repeated_messages=EXCLUDED.max_repeated_messages,
        repeated_window_seconds=EXCLUDED.repeated_window_seconds,
+       block_links=EXCLUDED.block_links,
+       block_invites=EXCLUDED.block_invites,
+       max_links=EXCLUDED.max_links,
+       max_emojis=EXCLUDED.max_emojis,
+       max_line_length=EXCLUDED.max_line_length,
+       exempt_channel_ids=EXCLUDED.exempt_channel_ids,
+       exempt_role_ids=EXCLUDED.exempt_role_ids,
        delete_message=EXCLUDED.delete_message,timeout_minutes=EXCLUDED.timeout_minutes,
        updated_at=now()`,
       [
@@ -90,6 +111,13 @@ export class AutoMod implements PlatformModule {
         next.maxCapsRatio,
         next.maxRepeatedMessages,
         next.repeatedWindowSeconds,
+        next.blockLinks,
+        next.blockInvites,
+        next.maxLinks,
+        next.maxEmojis,
+        next.maxLineLength,
+        next.exemptChannelIds,
+        next.exemptRoleIds,
         next.deleteMessage,
         next.timeoutMinutes
       ]
@@ -110,6 +138,13 @@ export class AutoMod implements PlatformModule {
       max_caps_ratio: number;
       max_repeated_messages: number;
       repeated_window_seconds: number;
+      block_links: boolean;
+      block_invites: boolean;
+      max_links: number;
+      max_emojis: number;
+      max_line_length: number;
+      exempt_channel_ids: string;
+      exempt_role_ids: string;
       delete_message: boolean;
       timeout_minutes: number;
     }>(
@@ -128,6 +163,13 @@ export class AutoMod implements PlatformModule {
       maxCapsRatio: row.max_caps_ratio,
       maxRepeatedMessages: row.max_repeated_messages,
       repeatedWindowSeconds: row.repeated_window_seconds,
+      blockLinks: row.block_links,
+      blockInvites: row.block_invites,
+      maxLinks: row.max_links,
+      maxEmojis: row.max_emojis,
+      maxLineLength: row.max_line_length,
+      exemptChannelIds: row.exempt_channel_ids ?? "",
+      exemptRoleIds: row.exempt_role_ids ?? "",
       deleteMessage: row.delete_message,
       timeoutMinutes: row.timeout_minutes
     };
@@ -139,6 +181,13 @@ export class AutoMod implements PlatformModule {
 
     const config = await this.getConfig(message.guild.id);
     if (!config.enabled) return;
+
+    const exemptChannels = new Set(config.exemptChannelIds.split(/[\\s,\\n]+/).map((id) => id.trim()).filter(Boolean));
+    if (exemptChannels.has(message.channelId)) return;
+
+    const exemptRoles = new Set(config.exemptRoleIds.split(/[\\s,\\n]+/).map((id) => id.trim()).filter(Boolean));
+    if (message.member && [...exemptRoles].some((roleId) => message.member!.roles.cache.has(roleId))) return;
+
     const content = message.content;
     const normalized = content.toLocaleLowerCase();
 
@@ -150,6 +199,18 @@ export class AutoMod implements PlatformModule {
 
     const mentions = message.mentions.users.size + message.mentions.roles.size;
     if (!reason && mentions > config.maxMentions) reason = "mention_spam";
+
+    const links = content.match(/https?:\\/\\/[^\\s<>]+/gi) ?? [];
+    const invites = content.match(/(?:discord(?:\\.gg|(?:app)?\\.com\\/invite))\\/[A-Za-z0-9-]+/gi) ?? [];
+    if (!reason && config.blockInvites && invites.length > 0) reason = "invite_link";
+    if (!reason && config.blockLinks && links.length > 0) reason = "link_blocked";
+    if (!reason && config.maxLinks > 0 && links.length > config.maxLinks) reason = "link_spam";
+
+    const emojiMatches = content.match(/<a?:\\w+:\\d+>|\\p{Extended_Pictographic}/gu) ?? [];
+    if (!reason && config.maxEmojis > 0 && emojiMatches.length > config.maxEmojis) reason = "emoji_spam";
+
+    const longestLine = Math.max(0, ...content.split(/\\r?\\n/).map((line) => line.length));
+    if (!reason && config.maxLineLength > 0 && longestLine > config.maxLineLength) reason = "line_too_long";
 
     const letters = content.match(/[A-Za-zА-Яа-я]/g) ?? [];
     const upper = content.match(/[A-ZА-Я]/g) ?? [];
