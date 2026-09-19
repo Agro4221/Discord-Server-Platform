@@ -211,7 +211,7 @@ export class AutomationEngine implements PlatformModule {
     const result = await this.db.query(
       `UPDATE automation_rules
        SET name=$1,event=$2,conditions=$3::jsonb,any_conditions=$4::jsonb,actions=$5::jsonb,cooldown_seconds=$6,enabled=$7,updated_at=now()
-       WHERE id=$7 AND guild_id=$8`,
+       WHERE id=$8 AND guild_id=$9`,
       [
         input.name.trim().slice(0,80) || "Automation rule",
         input.event,
@@ -416,7 +416,7 @@ export class AutomationEngine implements PlatformModule {
     for (const rule of rules) {
       if (rule.event !== event.type) continue;
       if (!await this.conditionsMatch(rule.all, event)) continue;
-      if (rule.any.length > 0 && !await this.conditionsMatch(rule.any, event)) continue;
+      if (rule.any.length > 0 && !await this.conditionsAnyMatch(rule.any, event)) continue;
 
       const cooldownSeconds = await this.cooldownFor(rule.id);
       this.executionCounter += 1;
@@ -474,6 +474,13 @@ export class AutomationEngine implements PlatformModule {
       [ruleId]
     );
     return result.rows[0]?.cooldown_seconds ?? 0;
+  }
+
+  private async conditionsAnyMatch(conditions: AutomationCondition[], event: RuntimeEvent): Promise<boolean> {
+    for (const condition of conditions) {
+      if (await this.conditionsMatch([condition], event)) return true;
+    }
+    return false;
   }
 
   private async conditionsMatch(conditions: AutomationCondition[], event: RuntimeEvent): Promise<boolean> {
