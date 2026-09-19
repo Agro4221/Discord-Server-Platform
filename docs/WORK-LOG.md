@@ -139,3 +139,9 @@ Never write credentials, tokens or private user data here.
 - Because secondary identities can own a guild in the Event Bus, the same Music interaction could be processed twice.
 - Removed the direct handler and kept the Event Bus as the single routing path, preserving guild ownership filtering.
 - Added regression coverage for the intended single-path routing invariant.
+
+
+## 2026-09-19 — Ticket publication rollback consistency
+- Found a consistency gap: channel creation succeeds, the ticket row is inserted, then the initial channel message can fail; the previous rollback deleted the channel but left the DB ticket row open.
+- Added DB-row rollback keyed by ticket ID after Discord publication failure.
+- Added a regression fixture covering channel deletion, user error response and persisted-row cleanup.

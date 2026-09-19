@@ -191,6 +191,21 @@ export class Tickets implements PlatformModule {
           error: String(deleteError)
         });
       });
+
+      if (ticketId) {
+        await this.db.query(
+          "DELETE FROM tickets WHERE id=$1 AND guild_id=$2",
+          [ticketId, interaction.guild!.id]
+        ).catch((deleteError) => {
+          logger.error("Ticket creation rollback database delete failed", {
+            guildId: interaction.guild!.id,
+            ticketId,
+            channelId: channel.id,
+            error: String(deleteError)
+          });
+        });
+      }
+
       logger.error("Ticket creation failed and was rolled back", {
         guildId: interaction.guild!.id,
         userId: interaction.user.id,

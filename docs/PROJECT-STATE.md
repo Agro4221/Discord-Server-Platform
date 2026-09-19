@@ -125,3 +125,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Removed the secondary-identity direct `interactionCreate` Music handler.
 - Music commands and buttons now use the shared Platform Event Bus, whose guild filter already enforces bot-identity ownership.
 - This prevents duplicate Music command execution and duplicate interaction replies on secondary identities.
+
+
+## 2026-09-19 — Ticket publication rollback consistency
+- Ticket creation rollback now deletes the persisted `tickets` row when Discord channel publication fails after the row was inserted.
+- This prevents a deleted Discord channel from leaving an `open` ticket that blocks future creation through the unique open-ticket index.
+- Regression coverage exercises the failure path with a Discord publication error.

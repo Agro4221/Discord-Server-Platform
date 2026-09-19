@@ -71,3 +71,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-09-19 — Multi-bot Music routing snapshot
 - Secondary Music interactions now have a single shared Event Bus routing path.
 - Duplicate command/reply behavior remains a live multi-bot Discord validation case.
+
+
+### 2026-09-19 — Ticket rollback snapshot
+- Discord publication failure now has regression coverage for channel + database rollback.
