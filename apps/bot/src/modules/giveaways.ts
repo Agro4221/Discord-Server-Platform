@@ -124,7 +124,7 @@ export class Giveaways implements PlatformModule {
 
   async rerollGiveaway(id: number, guildId: string): Promise<string[] | null> {
     const claimed = await this.db.query<{ winners: number }>(
-      "UPDATE giveaways SET status='rerolling' WHERE id=$1 AND guild_id=$2 AND status='finished' RETURNING winners",
+      "UPDATE giveaways SET status='rerolling',updated_at=now() WHERE id=$1 AND guild_id=$2 AND status='finished' RETURNING winners",
       [id, guildId]
     );
     const row = claimed.rows[0];
@@ -142,13 +142,13 @@ export class Giveaways implements PlatformModule {
       }
 
       await this.db.query(
-        "UPDATE giveaways SET status='finished',selected_winners=$1::jsonb,finished_at=now() WHERE id=$2 AND status='rerolling'",
+        "UPDATE giveaways SET status='finished',selected_winners=$1::jsonb,finished_at=now(),updated_at=now() WHERE id=$2 AND status='rerolling'",
         [JSON.stringify(winners), id]
       );
 
       return winners;
     } catch (error) {
-      await this.db.query("UPDATE giveaways SET status='finished' WHERE id=$1 AND status='rerolling'", [id]);
+      await this.db.query("UPDATE giveaways SET status='finished',updated_at=now() WHERE id=$1 AND status='rerolling'", [id]);
       logger.error("Giveaway reroll failed", { guildId, giveawayId: id, error: String(error) });
       throw error;
     }
@@ -156,6 +156,7 @@ export class Giveaways implements PlatformModule {
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+    await this.recoverStaleStates();
     this.identityId = context.identityId;
     this.events = context.events;
     const commandUnsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
@@ -271,7 +272,7 @@ export class Giveaways implements PlatformModule {
 
   private async finish(id: number, guildId: string): Promise<{ id: number; channelId: string; messageId: string | null; winners: string[] } | null> {
     const claimed = await this.db.query<{ id: string; channel_id: string; message_id: string | null; winners: number }>(
-      "UPDATE giveaways SET status='finishing' WHERE id=$1 AND guild_id=$2 AND status='running' RETURNING id,channel_id,message_id,winners",
+      "UPDATE giveaways SET status='finishing',updated_at=now() WHERE id=$1 AND guild_id=$2 AND status='running' RETURNING id,channel_id,message_id,winners",
       [id, guildId]
     );
     const row = claimed.rows[0];
@@ -288,7 +289,7 @@ export class Giveaways implements PlatformModule {
         winners.push(pool.splice(randomInt(pool.length), 1)[0]!);
       }
       await this.db.query(
-        "UPDATE giveaways SET status='finished',selected_winners=$1::jsonb,finished_at=now() WHERE id=$2 AND status='finishing'",
+        "UPDATE giveaways SET status='finished',selected_winners=$1::jsonb,finished_at=now(),updated_at=now() WHERE id=$2 AND status='finishing'",
         [JSON.stringify(winners), id]
       );
       await this.events?.emit("giveaway.end", {
@@ -298,7 +299,7 @@ export class Giveaways implements PlatformModule {
       });
       return { id, channelId: row.channel_id, messageId: row.message_id, winners };
     } catch (error) {
-      await this.db.query("UPDATE giveaways SET status='running' WHERE id=$1 AND status='finishing'", [id]);
+      await this.db.query("UPDATE giveaways SET status='running',updated_at=now() WHERE id=$1 AND status='finishing'", [id]);
       logger.error("Giveaway finishing failed and was reverted to running", {
         guildId,
         giveawayId: id,
@@ -328,6 +329,21 @@ export class Giveaways implements PlatformModule {
     }
 
     await interaction.reply({ content: "Ты участвуешь! 🎉", ephemeral: true });
+  }
+
+  private async recoverStaleStates(): Promise<void> {
+    const finishing = await this.db.query(
+      "UPDATE giveaways SET status='running',updated_at=now() WHERE status='finishing' AND updated_at < now()-interval '10 minutes'"
+    );
+    const rerolling = await this.db.query(
+      "UPDATE giveaways SET status='finished',updated_at=now() WHERE status='rerolling' AND updated_at < now()-interval '10 minutes'"
+    );
+    if (finishing.rowCount || rerolling.rowCount) {
+      logger.warn("Recovered stale Giveaway states", {
+        finishing: finishing.rowCount,
+        rerolling: rerolling.rowCount
+      });
+    }
   }
 
   private async sweep(): Promise<void> {
