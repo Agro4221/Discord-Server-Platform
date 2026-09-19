@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   cleanup();
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const key = forwarded || "local";
-  if (!allowed(GLOBAL_KEY) || !allowed(key)) {
+  if (!allowed(GLOBAL_KEY, 100) || !allowed(key, 10)) {
     return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   }
 
