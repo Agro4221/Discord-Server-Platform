@@ -126,38 +126,29 @@ export class RolePanels implements PlatformModule {
     const content = "🎭 **" + nextTitle + "**";
     const components = [this.row(panelId, cleaned)];
 
-    let newMessageId: string | null = current.messageId;
-    let oldMessageDeleted = false;
-
-    try {
-      if (current.messageId && current.channelId === channelId) {
-        await callbacks.editMessage(current.channelId, current.messageId, content, components);
-      } else {
-        const newMessageId = await callbacks.sendMessage(channelId, content, components);
-        newMessageId = newMessageId;
-
-        if (current.messageId) {
-          await callbacks.deleteMessage(current.channelId, current.messageId).catch(() => undefined);
-          oldMessageDeleted = true;
-        }
-      }
-
+    if (current.messageId && current.channelId === channelId) {
+      await callbacks.editMessage(current.channelId, current.messageId, content, components);
       await this.db.query(
-        "UPDATE role_panels SET channel_id=$1,title=$2,roles=$3::jsonb,message_id=$4 WHERE id=$5 AND guild_id=$6",
-        [channelId,nextTitle,JSON.stringify(cleaned),newMessageId,panelId,guildId]
+        "UPDATE role_panels SET title=$1,roles=$2::jsonb WHERE id=$3 AND guild_id=$4",
+        [nextTitle,JSON.stringify(cleaned),panelId,guildId]
       );
-    } catch (error) {
-      if (newMessageId && newMessageId !== current.messageId) {
+    } else {
+      const newMessageId = await callbacks.sendMessage(channelId, content, components);
+      try {
+        await this.db.query(
+          "UPDATE role_panels SET channel_id=$1,title=$2,roles=$3::jsonb,message_id=$4 WHERE id=$5 AND guild_id=$6",
+          [channelId,nextTitle,JSON.stringify(cleaned),newMessageId,panelId,guildId]
+        );
+      } catch (error) {
         await callbacks.deleteMessage(channelId,newMessageId).catch(() => undefined);
+        throw error;
       }
-      if (oldMessageDeleted) {
-        await callbacks.sendMessage(current.channelId,"🎭 **" + current.title + "**",[this.row(current.id,current.roles)]).catch(() => undefined);
+      if (current.messageId) {
+        await callbacks.deleteMessage(current.channelId,current.messageId).catch(() => undefined);
       }
-      throw error;
     }
 
-    const next = (await this.list(guildId)).find((panel) => panel.id === panelId);
-    return next ?? null;
+    return (await this.list(guildId)).find((panel) => panel.id === panelId) ?? null;
   }
 
   async deletePanel(guildId: string, panelId: number, deleteMessage: (channelId: string, messageId: string) => Promise<void>): Promise<boolean> {
