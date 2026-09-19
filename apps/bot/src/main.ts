@@ -27,6 +27,7 @@ import { ManagementApiServer } from "./management-api.js";
 import { ModuleSettingsRepository } from "./module-settings.js";
 import { AuditLog } from "./audit.js";
 import { PlatformEventBus } from "./events.js";
+import { BotIdentityRepository } from "./bot-identity.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -35,6 +36,8 @@ async function main(): Promise<void> {
   const moduleSettings = new ModuleSettingsRepository(database);
   const auditLog = new AuditLog(database);
   const dashboardSettings = new DashboardSettingsService(database);
+  const identities = new BotIdentityRepository(database);
+  await identities.ensureIdentity(config.botIdentityId, config.discordClientId);
   const events = new PlatformEventBus();
 
   await health.start(config.healthHost, config.healthPort);
