@@ -100,6 +100,9 @@ export class ConfigTransferService {
     validateExport(payload);
 
     const data = payload as ServerConfigExport;
+    if (data.guildId !== targetGuildId) {
+      throw new Error("cross_guild_import_requires_resource_remapping");
+    }
 
     await this.db.transaction(async (client) => {
       for (const module of data.modules) {
