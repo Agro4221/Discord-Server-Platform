@@ -244,7 +244,6 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_music_players_identity ON music_players(bot_identity_id);"
     ])
-  }
   },
   {
     version: 9,
@@ -263,7 +262,6 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_analytics_events_guild_bucket ON analytics_events(guild_id,bucket_start DESC);"
     ])
-  }
   },
   {
     version: 10,
@@ -277,7 +275,6 @@ const migrations = [
       "  updated_at timestamptz NOT NULL DEFAULT now()",
       ");"
     ])
-  }
   },
   {
     version: 11,
@@ -297,7 +294,6 @@ const migrations = [
       "  updated_at timestamptz NOT NULL DEFAULT now()",
       ");"
     ])
-  }
   },
   {
     version: 12,
