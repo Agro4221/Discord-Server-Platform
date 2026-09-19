@@ -80,3 +80,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-09-19 — Starboard rollback snapshot
 - Publication rollback decision is regression-tested.
 - Live Discord + PostgreSQL failure injection remains a release-gate test.
+
+
+### 2026-09-19 — Role Panel rollback snapshot
+- Same-channel publication rollback is regression-tested.
+- Live Discord message edit failure and DB outage injection remain release-gate validation.

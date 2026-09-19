@@ -151,3 +151,9 @@ Never write credentials, tokens or private user data here.
 - Found a transaction-boundary gap: Starboard published the Discord message before persisting `starboard_entries`; a DB failure could leave an orphaned message.
 - Added explicit rollback deletion for newly published messages when the transaction fails.
 - Added deterministic coverage for the rollback decision.
+
+
+## 2026-09-19 — Role Panel update rollback
+- Found a transaction-boundary gap in same-channel Role Panel updates: Discord message edit happened before DB persistence, with no message rollback on SQL failure.
+- Added explicit restoration of the previous panel content/components when the database update fails.
+- Added regression coverage for the edit -> DB failure -> Discord rollback sequence.

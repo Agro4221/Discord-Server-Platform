@@ -136,3 +136,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-09-19 — Starboard publication rollback
 - Newly published Starboard messages are now deleted if the following database transaction fails before the `starboard_entries` row is committed.
 - This prevents Discord messages from becoming orphaned when SQL persistence fails.
+
+
+## 2026-09-19 — Role Panel update rollback
+- Same-channel Role Panel edits now restore the previous Discord message when the following PostgreSQL update fails.
+- This prevents the Dashboard/Discord state from diverging after an SQL failure.
+- Added a regression fixture for the rollback sequence.
