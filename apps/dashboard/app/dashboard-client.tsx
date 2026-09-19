@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { RolePanelsEditor } from "./role-panels-editor";
 
 type Guild = { id: string; name: string; icon: string | null };
 type ModuleState = Record<string, boolean>;
@@ -405,7 +406,14 @@ export function DashboardClient() {
             </div>
 
             <div style={{ ...panelStyle, padding: 22 }}>
-              {!schema ? (
+              {selectedModule === "roles" ? (
+                <RolePanelsEditor
+                  guildId={guildId}
+                  channels={resources.channels.filter((resource) => resource.type === 0)}
+                  roles={resources.roles}
+                  onChanged={reloadAudit}
+                />
+              ) : !schema ? (
                 <div style={{ opacity: 0.58, padding: "24px 0" }}>
                   Для этого модуля пока нет dashboard schema. Его operational UI будет добавлен отдельно.
                 </div>
