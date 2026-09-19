@@ -25,7 +25,8 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
         "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments"
       ]]
     );
-    assert.equal(tables.rows.length, 10);
+    assert.equal(tables.rows.length, 9);
+    assert.equal(first.rows[0]?.count, "20");
   } finally {
     await db.close();
   }
