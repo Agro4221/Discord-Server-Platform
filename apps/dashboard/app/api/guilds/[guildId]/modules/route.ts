@@ -1,22 +1,31 @@
 import { NextResponse } from "next/server";
+import { assertSameOrigin, currentSession } from "../../../../../lib/auth";
 
 function upstream(path: string): string {
   return new URL(path, process.env.MANAGEMENT_API_URL ?? "http://127.0.0.1:3002").toString();
 }
 
-function authHeaders() {
-  return { Authorization: `Bearer ${process.env.MANAGEMENT_API_KEY ?? ""}` };
+function headers() {
+  return {
+    Authorization: `Bearer ${process.env.MANAGEMENT_API_KEY ?? ""}`,
+    "content-type": "application/json"
+  };
 }
 
 export async function GET(
   _request: Request,
   context: { params: Promise<{ guildId: string }> }
 ) {
+  if (!await currentSession()) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const { guildId } = await context.params;
   const response = await fetch(
     upstream(`/api/guilds/${encodeURIComponent(guildId)}/modules`),
-    { cache: "no-store", headers: authHeaders() }
+    { cache: "no-store", headers: headers() }
   );
+
   return new NextResponse(await response.text(), {
     status: response.status,
     headers: { "content-type": "application/json; charset=utf-8" }
@@ -27,21 +36,42 @@ export async function PUT(
   request: Request,
   context: { params: Promise<{ guildId: string }> }
 ) {
-  const { guildId } = await context.params;
-  const body = await request.json() as { moduleKey?: unknown; enabled?: unknown };
+  if (!await currentSession()) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
 
-  if (typeof body.moduleKey !== "string" || typeof body.enabled !== "boolean") {
+  try {
+    assertSameOrigin(request);
+  } catch {
+    return NextResponse.json({ error: "bad_origin" }, { status: 403 });
+  }
+
+  const { guildId } = await context.params;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+  }
+
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
+
+  const input = body as Record<string, unknown>;
+  if (typeof input.moduleKey !== "string" || typeof input.enabled !== "boolean") {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
   const response = await fetch(
     upstream(
-      `/api/guilds/${encodeURIComponent(guildId)}/modules/${encodeURIComponent(body.moduleKey)}`
+      `/api/guilds/${encodeURIComponent(guildId)}/modules/${encodeURIComponent(input.moduleKey)}`
     ),
     {
       method: "PUT",
-      headers: { ...authHeaders(), "content-type": "application/json" },
-      body: JSON.stringify({ enabled: body.enabled })
+      headers: headers(),
+      body: JSON.stringify({ enabled: input.enabled })
     }
   );
 
