@@ -131,3 +131,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Ticket creation rollback now deletes the persisted `tickets` row when Discord channel publication fails after the row was inserted.
 - This prevents a deleted Discord channel from leaving an `open` ticket that blocks future creation through the unique open-ticket index.
 - Regression coverage exercises the failure path with a Discord publication error.
+
+
+## 2026-09-19 — Starboard publication rollback
+- Newly published Starboard messages are now deleted if the following database transaction fails before the `starboard_entries` row is committed.
+- This prevents Discord messages from becoming orphaned when SQL persistence fails.

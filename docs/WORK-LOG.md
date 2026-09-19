@@ -145,3 +145,9 @@ Never write credentials, tokens or private user data here.
 - Found a consistency gap: channel creation succeeds, the ticket row is inserted, then the initial channel message can fail; the previous rollback deleted the channel but left the DB ticket row open.
 - Added DB-row rollback keyed by ticket ID after Discord publication failure.
 - Added a regression fixture covering channel deletion, user error response and persisted-row cleanup.
+
+
+## 2026-09-19 — Starboard publication rollback
+- Found a transaction-boundary gap: Starboard published the Discord message before persisting `starboard_entries`; a DB failure could leave an orphaned message.
+- Added explicit rollback deletion for newly published messages when the transaction fails.
+- Added deterministic coverage for the rollback decision.

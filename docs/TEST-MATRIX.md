@@ -75,3 +75,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 
 ### 2026-09-19 — Ticket rollback snapshot
 - Discord publication failure now has regression coverage for channel + database rollback.
+
+
+### 2026-09-19 — Starboard rollback snapshot
+- Publication rollback decision is regression-tested.
+- Live Discord + PostgreSQL failure injection remains a release-gate test.

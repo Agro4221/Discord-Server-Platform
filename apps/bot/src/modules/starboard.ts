@@ -16,6 +16,10 @@ type StarboardConfig = {
   ignoreBots: boolean;
 };
 
+export function shouldRollbackStarboardPublication(messageId: string | null): boolean {
+  return Boolean(messageId);
+}
+
 export class Starboard implements PlatformModule {
   readonly name = "starboard";
   private unsubscribe?: () => void;
@@ -93,6 +97,7 @@ export class Starboard implements PlatformModule {
   }
 
   private async onReaction(reaction: MessageReaction, user: User): Promise<void> {
+    let publishedMessageId: string | null = null;
     const guild = reaction.message.guild;
     if (!guild) return;
     const guildId = guild.id;
@@ -175,6 +180,7 @@ export class Starboard implements PlatformModule {
         });
         throw error;
       });
+      publishedMessageId = sent.id;
 
       await client.query(
         `INSERT INTO starboard_entries(
@@ -185,7 +191,17 @@ export class Starboard implements PlatformModule {
          DO UPDATE SET starboard_message_id=EXCLUDED.starboard_message_id`,
         [guildId, reaction.message.id, sent.id]
       );
-    }).catch((error) => {
+    }).catch(async (error) => {
+      if (shouldRollbackStarboardPublication(publishedMessageId)) {
+        await channel.messages.delete(publishedMessageId!).catch((deleteError) => {
+          logger.warn("Starboard publication rollback message delete failed", {
+            guildId: guildId,
+            sourceMessageId: reaction.message.id,
+            starboardMessageId: publishedMessageId,
+            error: String(deleteError)
+          });
+        });
+      }
       logger.error("Starboard transaction failed", {
         guildId: guildId,
         sourceMessageId: reaction.message.id,
