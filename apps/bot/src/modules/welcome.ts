@@ -1,6 +1,7 @@
 import {
   EmbedBuilder,
   PermissionFlagsBits,
+  type ChatInputCommandInteraction,
   type GuildMember,
   type TextChannel
 } from "discord.js";
@@ -49,13 +50,14 @@ export class Welcome implements PlatformModule {
     }
     if (interaction.options.getSubcommand() !== "setup") return;
 
-    const channel = interaction.options.getChannel("channel");
-    if (channel && !channel.isTextBased()) {
+    const channelOption = interaction.options.getChannel("channel");
+    const channel = channelOption ? interaction.guild!.channels.cache.get(channelOption.id) : null;
+    if (channelOption && (!channel || channel.type !== 0)) {
       await interaction.reply({ content: "Welcome channel должен быть текстовым.", ephemeral: true });
       return;
     }
 
-    await this.configure(interaction.guild.id, {
+    await this.configure(interaction.guild!.id, {
       enabled: true,
       channelId: channel?.id ?? null,
       message: interaction.options.getString("message") ?? defaultConfig.message,
