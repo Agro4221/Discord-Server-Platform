@@ -157,3 +157,10 @@ Never write credentials, tokens or private user data here.
 - Found a transaction-boundary gap in same-channel Role Panel updates: Discord message edit happened before DB persistence, with no message rollback on SQL failure.
 - Added explicit restoration of the previous panel content/components when the database update fails.
 - Added regression coverage for the edit -> DB failure -> Discord rollback sequence.
+
+
+## 2026-09-19 — Security configured audit-window consistency
+- Fixed destructive-burst executor lookup to honor the guild's configured `destructiveWindowSeconds` instead of a hard-coded 30-second audit-log window.
+- Added a bounded pure helper for the lookback cutoff and regression coverage for configured, clamped windows.
+- Current code commits: `eeaa0fe3fbf20bcf16a36c612530c30631084dd4` and `94aa7f594f8c64f4424ab0bfcfc257864484ba36`.
+- A fresh CI run should be treated as the verification gate for these changes; the connector does not expose push-triggered run listings for this private repository.
