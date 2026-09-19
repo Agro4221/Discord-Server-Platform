@@ -8,6 +8,7 @@ import {
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
+import { logger } from "../logger.js";
 
 export type PanelRole = { roleId: string; label: string };
 export type RolePanelRecord = { id: number; guildId: string; channelId: string; messageId: string | null; title: string; roles: PanelRole[] };
@@ -93,9 +94,28 @@ export class RolePanels implements PlatformModule {
       return panel;
     } catch (error) {
       if (publishedMessageId && callbacks) {
-        await callbacks.deleteMessage(channelId,publishedMessageId).catch(() => undefined);
+        await callbacks.deleteMessage(channelId,publishedMessageId).catch((deleteError) => {
+          logger.warn("Role panel publication rollback message delete failed", {
+            guildId,
+            panelId: id,
+            messageId: publishedMessageId,
+            error: String(deleteError)
+          });
+        });
       }
-      await this.db.query("DELETE FROM role_panels WHERE id=$1 AND guild_id=$2", [id,guildId]);
+      await this.db.query("DELETE FROM role_panels WHERE id=$1 AND guild_id=$2", [id,guildId])
+        .catch((cleanupError) => {
+          logger.error("Role panel publication rollback database cleanup failed", {
+            guildId,
+            panelId: id,
+            error: String(cleanupError)
+          });
+        });
+      logger.error("Role panel publication failed and was rolled back", {
+        guildId,
+        panelId: id,
+        error: String(error)
+      });
       throw error;
     }
   }
@@ -140,11 +160,31 @@ export class RolePanels implements PlatformModule {
           [channelId,nextTitle,JSON.stringify(cleaned),newMessageId,panelId,guildId]
         );
       } catch (error) {
-        await callbacks.deleteMessage(channelId,newMessageId).catch(() => undefined);
+        await callbacks.deleteMessage(channelId,newMessageId).catch((deleteError) => {
+          logger.warn("Role panel update rollback message delete failed", {
+            guildId,
+            panelId,
+            messageId: newMessageId,
+            error: String(deleteError)
+          });
+        });
+        logger.error("Role panel database update failed after publication", {
+          guildId,
+          panelId,
+          messageId: newMessageId,
+          error: String(error)
+        });
         throw error;
       }
       if (current.messageId) {
-        await callbacks.deleteMessage(current.channelId,current.messageId).catch(() => undefined);
+        await callbacks.deleteMessage(current.channelId,current.messageId).catch((error) => {
+          logger.warn("Role panel old message cleanup failed", {
+            guildId,
+            panelId,
+            messageId: current.messageId,
+            error: String(error)
+          });
+        });
       }
     }
 
@@ -159,7 +199,16 @@ export class RolePanels implements PlatformModule {
     const row = result.rows[0];
     if (!row) return false;
 
-    if (row.message_id) await deleteMessage(row.channel_id,row.message_id).catch(() => undefined);
+    if (row.message_id) {
+      await deleteMessage(row.channel_id,row.message_id).catch((error) => {
+        logger.warn("Role panel Discord message delete failed", {
+          guildId,
+          panelId,
+          messageId: row.message_id,
+          error: String(error)
+        });
+      });
+    }
     const deleted = await this.db.query(
       "DELETE FROM role_panels WHERE id=$1 AND guild_id=$2",
       [panelId,guildId]
@@ -213,7 +262,13 @@ export class RolePanels implements PlatformModule {
       deleteMessage: async (channelId, messageId) => {
         const target = interaction.guild!.channels.cache.get(channelId);
         if (!target || target.type !== 0) return;
-        await target.messages.delete(messageId).catch(() => undefined);
+        await target.messages.delete(messageId).catch((error) => {
+          logger.warn("Role panel command cleanup message delete failed", {
+            guildId,
+            messageId,
+            error: String(error)
+          });
+        });
       },
       sendMessage: async (channelId, content, components) => {
         const target = interaction.guild!.channels.cache.get(channelId);
