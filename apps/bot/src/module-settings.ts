@@ -9,6 +9,7 @@ const ENABLE_COLUMNS: Partial<Record<ModuleKey, [string, string]>> = {
   verification: ["verification_settings", "enabled"],
   tickets: ["ticket_settings", "enabled"],
   leveling: ["leveling_settings", "enabled"],
+  leveling: ["leveling_settings", "enabled"],
   music: ["music_settings", "enabled"]
 };
 
