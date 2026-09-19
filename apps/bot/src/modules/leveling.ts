@@ -2,11 +2,13 @@ import { type ChatInputCommandInteraction, PermissionFlagsBits, type Message } f
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
+import { logger } from "../logger.js";
 
 export class Leveling implements PlatformModule {
   readonly name = "leveling";
   private unsubscribe?: () => void;
   private readonly cooldowns = new Map<string, number>();
+  private messageCounter = 0;
 
   constructor(private readonly db: Database) {}
 
@@ -20,6 +22,7 @@ export class Leveling implements PlatformModule {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.cooldowns.clear();
+    this.messageCounter = 0;
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -96,6 +99,8 @@ export class Leveling implements PlatformModule {
     const previous = this.cooldowns.get(key) ?? 0;
     if (now - previous < setting.cooldown_seconds * 1000) return;
     this.cooldowns.set(key, now);
+    this.messageCounter += 1;
+    if (this.messageCounter % 100 === 0) this.pruneCooldowns(now);
 
     const xp = setting.xp_per_message;
     const result = await this.db.query<{ xp: string | number; level: number }>(
@@ -121,9 +126,34 @@ export class Leveling implements PlatformModule {
         if ("send" in message.channel) {
           await message.channel.send(
             `🎉 <@${message.author.id}> достиг уровня **${nextLevel}**!`
-          ).catch(() => undefined);
+          ).catch((error) => {
+            logger.warn("Leveling announcement failed", {
+              guildId: message.guild!.id,
+              userId: message.author.id,
+              level: nextLevel,
+              error: String(error)
+            });
+          });
         }
       }
     }
+  }
+
+  private pruneCooldowns(now: number): void {
+    const cutoff = now - 3_600_000;
+    for (const [key, timestamp] of this.cooldowns) {
+      if (timestamp < cutoff) this.cooldowns.delete(key);
+    }
+
+    const maxKeys = 10_000;
+    if (this.cooldowns.size <= maxKeys) return;
+    const oldest = [...this.cooldowns.entries()]
+      .sort((a, b) => a[1] - b[1])
+      .slice(0, this.cooldowns.size - maxKeys);
+    for (const [key] of oldest) this.cooldowns.delete(key);
+    logger.warn("Leveling cooldown cache trimmed", {
+      removed: oldest.length,
+      remaining: this.cooldowns.size
+    });
   }
 }
