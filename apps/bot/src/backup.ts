@@ -274,9 +274,11 @@ async function readGzip(path: string): Promise<string> {
 
 async function gunzipReadable(source: NodeJS.ReadableStream): Promise<string> {
   const chunks: Buffer[] = [];
+  let total = 0;
   const limiter = new Transform({
     transform(chunk: Buffer, _encoding, callback) {
-      if (this.readableLength + chunk.length > 32 * 1024 * 1024) {
+      total += chunk.length;
+      if (total > 32 * 1024 * 1024) {
         callback(new Error("backup_decompressed_too_large"));
         return;
       }
@@ -293,10 +295,11 @@ async function gunzipBuffer(input: Buffer): Promise<Buffer> {
   if (input.length > 10 * 1024 * 1024) throw new Error("backup_compressed_too_large");
 
   const chunks: Buffer[] = [];
+  let total = 0;
   const limiter = new Transform({
     transform(chunk: Buffer, _encoding, callback) {
-      const size = chunks.reduce((total, item) => total + item.length, 0) + chunk.length;
-      if (size > 32 * 1024 * 1024) {
+      total += chunk.length;
+      if (total > 32 * 1024 * 1024) {
         callback(new Error("backup_decompressed_too_large"));
         return;
       }
