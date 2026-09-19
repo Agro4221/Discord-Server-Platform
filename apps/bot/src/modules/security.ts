@@ -40,7 +40,7 @@ export class Security implements PlatformModule {
     const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const c = context.events.on("channel.delete", (channel) => this.onDestructive(channel.guildId, "channel.delete"));
     const d = context.events.on("role.delete", (role) => this.onDestructive(role.guild.id, "role.delete"));
-    const e = context.events.on("member.ban", ({ guildId }) => this.onDestructive(guildId, "member.ban"));
+    const e = context.events.on("member.ban", ({ guildId, userId }) => this.onDestructive(guildId, "member.ban", userId));
     this.unsubscribe = () => { a(); b(); c(); d(); e(); };
   }
 
@@ -156,7 +156,7 @@ export class Security implements PlatformModule {
     await this.alert(member.guild.id, config, `Anti-Raid: ${bucket.length} входов за ${config.windowSeconds} сек.`);
   }
 
-  private async onDestructive(guildId: string | null, type: string): Promise<void> {
+  private async onDestructive(guildId: string | null, type: string, targetUserId?: string): Promise<void> {
     if (!guildId || !await moduleEnabled(this.db, guildId, "security", false)) return;
     const config = await this.config(guildId);
     if (!config.enabled) return;
@@ -179,7 +179,7 @@ export class Security implements PlatformModule {
       [guildId,JSON.stringify(burstMetadata)]
     );
     await this.audit(guildId, "security.destructive-burst", burstMetadata);
-    const executors = await this.findRecentExecutors(guildId, type);
+    const executors = await this.findRecentExecutors(guildId, type, targetUserId);
     for (const executor of executors) {
       await this.respondToExecutor(guildId, executor.userId, config, type, executor.count);
     }
@@ -317,7 +317,7 @@ export class Security implements PlatformModule {
     });
   }
 
-  private async findRecentExecutors(guildId: string, type: string): Promise<Array<{ userId: string; count: number }>> {
+  private async findRecentExecutors(guildId: string, type: string, targetUserId?: string): Promise<Array<{ userId: string; count: number }>> {
     const guild = this.client?.guilds.cache.get(guildId);
     if (!guild) return [];
     await new Promise((resolve) => setTimeout(resolve, 350));
@@ -337,6 +337,7 @@ export class Security implements PlatformModule {
     for (const entry of logs.entries.values()) {
       if (entry.createdTimestamp < cutoff || !entry.executorId) continue;
       if (entry.executorId === guild.members.me?.id) continue;
+      if (type === "member.ban" && targetUserId && entry.targetId !== targetUserId) continue;
       counts.set(entry.executorId, (counts.get(entry.executorId) ?? 0) + 1);
     }
     return [...counts.entries()].map(([userId, count]) => ({ userId, count }));
