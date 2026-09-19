@@ -333,7 +333,7 @@ export class Giveaways implements PlatformModule {
   private async sweep(): Promise<void> {
     try {
       const expired = await this.db.query<{ id: string; guild_id: string }>(
-      "SELECT g.id,g.guild_id FROM giveaways g INNER JOIN guild_bot_assignments ga ON ga.guild_id=g.guild_id AND ga.bot_identity_id=$1 WHERE g.status='running' AND g.ends_at <= now() ORDER BY g.ends_at LIMIT 20",
+      "SELECT g.id,g.guild_id FROM giveaways g INNER JOIN guild_bot_assignments ga ON ga.guild_id=g.guild_id LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id WHERE (ga.bot_identity_id=$1 OR ($1='primary' AND ga.bot_identity_id <> 'primary' AND bh.last_seen_at < now()-interval '90 seconds')) AND g.status='running' AND g.ends_at <= now() ORDER BY g.ends_at LIMIT 20",
       [this.identityId]
     );
 
