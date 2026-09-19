@@ -57,6 +57,60 @@ export class RolePanels implements PlatformModule {
     return (await this.list(guildId)).find((panel) => panel.id === id)!;
   }
 
+  async updatePanel(
+    guildId: string,
+    panelId: number,
+    channelId: string,
+    roles: PanelRole[],
+    title: string,
+    callbacks: {
+      editMessage: (channelId: string, messageId: string, content: string, components: ActionRowBuilder<ButtonBuilder>[]) => Promise<void>;
+      deleteMessage: (channelId: string, messageId: string) => Promise<void>;
+      sendMessage: (channelId: string, content: string, components: ActionRowBuilder<ButtonBuilder>[]) => Promise<string>;
+    }
+  ): Promise<RolePanelRecord | null> {
+    if (!roles.length || roles.length > 5) throw new Error("panel_requires_1_to_5_roles");
+    const cleaned = [...new Map(
+      roles
+        .map((role) => ({ roleId: role.roleId, label: role.label.trim().slice(0,80) }))
+        .filter((role) => role.roleId && role.label)
+        .map((role) => [role.roleId, role])
+    ).values()];
+    if (!cleaned.length) throw new Error("panel_roles_empty");
+
+    const current = (await this.list(guildId)).find((panel) => panel.id === panelId);
+    if (!current) return null;
+
+    const nextTitle = title.trim().slice(0,100) || "Выберите роли";
+    await this.db.query(
+      "UPDATE role_panels SET channel_id=$1,title=$2,roles=$3::jsonb WHERE id=$4 AND guild_id=$5",
+      [channelId,nextTitle,JSON.stringify(cleaned),panelId,guildId]
+    );
+
+    let next = (await this.list(guildId)).find((panel) => panel.id === panelId);
+    if (!next) return null;
+
+    const content = "🎭 **" + next.title + "**";
+    const components = [this.row(next.id,next.roles)];
+
+    if (current.messageId) {
+      if (current.channelId === next.channelId) {
+        await callbacks.editMessage(current.channelId,current.messageId,content,components);
+      } else {
+        await callbacks.deleteMessage(current.channelId,current.messageId);
+        const messageId = await callbacks.sendMessage(next.channelId,content,components);
+        await this.db.query("UPDATE role_panels SET message_id=$1 WHERE id=$2 AND guild_id=$3",[messageId,panelId,guildId]);
+        next = { ...next, messageId };
+      }
+    } else {
+      const messageId = await callbacks.sendMessage(next.channelId,content,components);
+      await this.db.query("UPDATE role_panels SET message_id=$1 WHERE id=$2 AND guild_id=$3",[messageId,panelId,guildId]);
+      next = { ...next, messageId };
+    }
+
+    return next;
+  }
+
   async deletePanel(guildId: string, panelId: number, deleteMessage: (channelId: string, messageId: string) => Promise<void>): Promise<boolean> {
     const result = await this.db.query<{ channel_id: string; message_id: string | null }>(
       "DELETE FROM role_panels WHERE id=$1 AND guild_id=$2 RETURNING channel_id,message_id",
