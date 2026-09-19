@@ -95,13 +95,19 @@ export class RolePanels implements PlatformModule {
     const panelId = Number(panelRaw);
     if (!Number.isSafeInteger(panelId) || !roleId) return;
 
-    const result = await this.db.query<{ role_id: string; guild_id: string }>(
-      "SELECT guild_id, $2::text AS role_id FROM role_panels WHERE id=$1",
-      [panelId, roleId]
+    const result = await this.db.query<{ guild_id: string; roles: { roleId: string; label: string }[] | null }>(
+      "SELECT guild_id,roles FROM role_panels WHERE id=$1",
+      [panelId]
     );
     const row = result.rows[0];
     if (!row || row.guild_id !== interaction.guild.id) {
       await interaction.reply({ content: "Панель не найдена.", ephemeral: true });
+      return;
+    }
+
+    const allowed = Array.isArray(row.roles) && row.roles.some((entry) => entry?.roleId === roleId);
+    if (!allowed) {
+      await interaction.reply({ content: "Эта роль не входит в выбранную панель.", ephemeral: true });
       return;
     }
 
