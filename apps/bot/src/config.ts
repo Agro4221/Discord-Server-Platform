@@ -14,6 +14,16 @@ export type AppConfig = {
   lavalinkPassword: string;
   lavalinkNodes: Array<{ id: string; host: string; port: number; password: string; secure?: boolean }>;
   backupDirectory: string;
+  backupRetentionCount: number;
+  backupS3?: {
+    endpoint: string;
+    region: string;
+    bucket: string;
+    prefix: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+    forcePathStyle: boolean;
+  };
   nodeEnv: "development" | "test" | "production";
 };
 
@@ -33,32 +43,41 @@ function port(name: string, fallback: number): number {
   return parsed;
 }
 
-export function loadConfig(): AppConfig {
-  const nodeEnv = (process.env.NODE_ENV ?? "development") as AppConfig["nodeEnv"];
-  if (!["development", "test", "production"].includes(nodeEnv)) {
-    throw new Error("NODE_ENV must be development, test, or production");
+function integer(name: string, fallback: number, min: number, max: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const value = Number.parseInt(raw, 10);
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new Error(`Invalid integer environment variable: ${name}`);
   }
-
-  return {
-    discordToken: required("DISCORD_TOKEN"),
-    discordClientId: required("DISCORD_CLIENT_ID"),
-    botIdentityId: process.env.BOT_IDENTITY_ID ?? "primary",
-    ...(process.env.DISCORD_TEST_GUILD_ID ? { discordTestGuildId: process.env.DISCORD_TEST_GUILD_ID } : {}),
-    healthHost: process.env.HEALTH_HOST ?? "127.0.0.1",
-    healthPort: port("HEALTH_PORT", 3001),
-    managementApiHost: process.env.MANAGEMENT_API_HOST ?? "127.0.0.1",
-    managementApiPort: port("MANAGEMENT_API_PORT", 3002),
-    managementApiKey: required("MANAGEMENT_API_KEY"),
-    databaseUrl: required("DATABASE_URL"),
-    lavalinkHost: process.env.LAVALINK_HOST ?? "127.0.0.1",
-    lavalinkPort: port("LAVALINK_PORT", 2333),
-    lavalinkPassword: required("LAVALINK_PASSWORD"),
-    lavalinkNodes: parseLavalinkNodes(),
-    backupDirectory: process.env.BACKUP_DIRECTORY ?? "./data/backups",
-    nodeEnv
-  };
+  return value;
 }
 
+function parseBackupS3(): AppConfig["backupS3"] | null {
+  const endpoint = process.env.BACKUP_S3_ENDPOINT?.trim();
+  const bucket = process.env.BACKUP_S3_BUCKET?.trim();
+  const accessKeyId = process.env.BACKUP_S3_ACCESS_KEY_ID?.trim();
+  const secretAccessKey = process.env.BACKUP_S3_SECRET_ACCESS_KEY;
+  const anyConfigured = Boolean(endpoint || bucket || accessKeyId || secretAccessKey);
+  if (!anyConfigured) return null;
+  if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
+    throw new Error("BACKUP_S3_ENDPOINT, BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY_ID and BACKUP_S3_SECRET_ACCESS_KEY must be provided together");
+  }
+  let url: URL;
+  try { url = new URL(endpoint); } catch { throw new Error("BACKUP_S3_ENDPOINT must be a valid URL"); }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error("BACKUP_S3_ENDPOINT must use http or https");
+  }
+  return {
+    endpoint: url.toString().replace(/\/$/, ""),
+    region: process.env.BACKUP_S3_REGION?.trim() || "us-east-1",
+    prefix: process.env.BACKUP_S3_PREFIX?.trim().replace(/^\/+|\/+$/g, "") ?? "",
+    bucket,
+    accessKeyId,
+    secretAccessKey,
+    forcePathStyle: process.env.BACKUP_S3_FORCE_PATH_STYLE !== "false"
+  };
+}
 
 function parseLavalinkNodes(): AppConfig["lavalinkNodes"] {
   const raw = process.env.LAVALINK_NODES;
@@ -106,4 +125,32 @@ function parseLavalinkNodes(): AppConfig["lavalinkNodes"] {
       ...(node.secure === true ? { secure: true } : {})
     };
   });
+}
+
+export function loadConfig(): AppConfig {
+  const nodeEnv = (process.env.NODE_ENV ?? "development") as AppConfig["nodeEnv"];
+  if (!["development", "test", "production"].includes(nodeEnv)) {
+    throw new Error("NODE_ENV must be development, test, or production");
+  }
+
+  return {
+    discordToken: required("DISCORD_TOKEN"),
+    discordClientId: required("DISCORD_CLIENT_ID"),
+    botIdentityId: process.env.BOT_IDENTITY_ID ?? "primary",
+    ...(process.env.DISCORD_TEST_GUILD_ID ? { discordTestGuildId: process.env.DISCORD_TEST_GUILD_ID } : {}),
+    healthHost: process.env.HEALTH_HOST ?? "127.0.0.1",
+    healthPort: port("HEALTH_PORT", 3001),
+    managementApiHost: process.env.MANAGEMENT_API_HOST ?? "127.0.0.1",
+    managementApiPort: port("MANAGEMENT_API_PORT", 3002),
+    managementApiKey: required("MANAGEMENT_API_KEY"),
+    databaseUrl: required("DATABASE_URL"),
+    lavalinkHost: process.env.LAVALINK_HOST ?? "127.0.0.1",
+    lavalinkPort: port("LAVALINK_PORT", 2333),
+    lavalinkPassword: required("LAVALINK_PASSWORD"),
+    lavalinkNodes: parseLavalinkNodes(),
+    backupDirectory: process.env.BACKUP_DIRECTORY ?? "./data/backups",
+    backupRetentionCount: integer("BACKUP_RETENTION_COUNT", 30, 1, 10_000),
+    ...(parseBackupS3() ? { backupS3: parseBackupS3()! } : {}),
+    nodeEnv
+  };
 }
