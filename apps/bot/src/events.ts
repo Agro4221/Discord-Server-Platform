@@ -1,6 +1,5 @@
 import type {
   ChatInputCommandInteraction,
-  Client,
   GuildMember,
   Message,
   VoiceState
@@ -24,16 +23,19 @@ export class PlatformEventBus {
 
   on<K extends keyof PlatformEventMap>(event: K, listener: Listener<K>): () => void {
     const set = this.listeners.get(event) ?? new Set<Listener<any>>();
-    set.add(listener);
+    set.add(listener as Listener<any>);
     this.listeners.set(event, set);
-
-    return () => set.delete(listener as Listener<any>);
+    return () => {
+      set.delete(listener as Listener<any>);
+      if (set.size === 0) this.listeners.delete(event);
+    };
   }
 
   async emit<K extends keyof PlatformEventMap>(event: K, payload: PlatformEventMap[K]): Promise<void> {
     const listeners = [...(this.listeners.get(event) ?? [])] as Listener<K>[];
-    const results = listeners.map((listener) => Promise.resolve(listener(payload)));
-    const settled = await Promise.allSettled(results);
+    const settled = await Promise.allSettled(
+      listeners.map((listener) => Promise.resolve(listener(payload)))
+    );
 
     for (let i = 0; i < settled.length; i += 1) {
       const result = settled[i];
