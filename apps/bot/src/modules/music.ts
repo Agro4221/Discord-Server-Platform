@@ -1,0 +1,471 @@
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+  type ChatInputCommandInteraction,
+  type Client,
+  type Interaction,
+  type Message
+} from "discord.js";
+import {
+  LavalinkManager,
+  type QueueStoreManager,
+  type StoredQueue
+} from "lavalink-client";
+import type { Database } from "../database.js";
+import type { AppConfig } from "../config.js";
+import type { ModuleContext, PlatformModule } from "../module.js";
+import { moduleEnabled } from "../module-utils.js";
+import { logger } from "../logger.js";
+
+class PostgresQueueStore implements QueueStoreManager {
+  constructor(
+    private readonly db: Database,
+    private readonly botIdentityId: string
+  ) {}
+
+  private keyGuild(guildId: string): [string, string] {
+    return [guildId, this.botIdentityId];
+  }
+
+  async get(guildId: string): Promise<string | null> {
+    const [storedGuild, identity] = this.keyGuild(guildId);
+    const result = await this.db.query<{ data: unknown }>(
+      "SELECT data FROM music_queue_store WHERE guild_id=$1 AND bot_identity_id=$2",
+      [storedGuild, identity]
+    );
+    return result.rows[0] ? JSON.stringify(result.rows[0].data) : null;
+  }
+
+  async set(guildId: string, data: string): Promise<void> {
+    const [storedGuild, identity] = this.keyGuild(guildId);
+    await this.db.query(
+      `INSERT INTO music_queue_store(guild_id,bot_identity_id,data)
+       VALUES($1,$2,$3::jsonb)
+       ON CONFLICT(guild_id,bot_identity_id)
+       DO UPDATE SET data=EXCLUDED.data,updated_at=now()`,
+      [storedGuild, identity, data]
+    );
+  }
+
+  async delete(guildId: string): Promise<void> {
+    const [storedGuild, identity] = this.keyGuild(guildId);
+    await this.db.query(
+      "DELETE FROM music_queue_store WHERE guild_id=$1 AND bot_identity_id=$2",
+      [storedGuild, identity]
+    );
+  }
+
+  async parse(data: string): Promise<Partial<StoredQueue>> {
+    return JSON.parse(data) as Partial<StoredQueue>;
+  }
+
+  stringify(data: Partial<StoredQueue>): string {
+    return JSON.stringify(data);
+  }
+}
+
+export class Music implements PlatformModule {
+  readonly name = "music";
+  private unsubscribe?: () => void;
+  private rawHandler?: (data: unknown) => void;
+  private readyHandler?: () => void;
+  private manager?: LavalinkManager;
+  private client?: Client;
+  private initialized = false;
+
+  constructor(
+    private readonly db: Database,
+    private readonly config: AppConfig
+  ) {}
+
+  async init(context: ModuleContext): Promise<void> {
+    this.client = context.client;
+
+    const queueStore = new PostgresQueueStore(this.db, this.config.botIdentityId);
+
+    this.manager = new LavalinkManager({
+      nodes: [{
+        id: "local",
+        authorization: this.config.lavalinkPassword,
+        host: this.config.lavalinkHost,
+        port: this.config.lavalinkPort,
+        retryAmount: 10,
+        retryDelay: 10_000
+      }],
+      sendToShard: (guildId, payload) =>
+        this.client?.guilds.cache.get(guildId)?.shard?.send(payload),
+      autoSkip: true,
+      client: {
+        id: this.config.discordClientId,
+        username: this.client.user?.username ?? "DSP"
+      },
+      playerOptions: {
+        defaultSearchPlatform: "ytsearch",
+        useUnresolvedData: true,
+        onDisconnect: {
+          autoReconnect: true,
+          destroyPlayer: false
+        },
+        onEmptyQueue: {
+          destroyAfterMs: 30_000
+        }
+      },
+      queueOptions: {
+        maxPreviousTracks: 10,
+        queueStore
+      },
+      linksAllowed: true,
+      advancedOptions: {
+        debugOptions: {
+          noAudio: false,
+          playerDestroy: {
+            dontThrowError: true,
+            debugLog: false
+          }
+        }
+      }
+    });
+
+    this.rawHandler = (data) => {
+      void this.manager?.sendRawData(data);
+    };
+    this.client.on("raw", this.rawHandler);
+
+    this.readyHandler = () => {
+      if (!this.manager || !this.client?.user) return;
+      this.manager.init({ ...this.client.user });
+      this.initialized = true;
+      logger.info("Lavalink manager initialized", {
+        identity: this.config.botIdentityId,
+        node: this.config.lavalinkHost
+      });
+    };
+    this.client.once("ready", this.readyHandler);
+
+    this.manager.on("trackStart", (player, track) => {
+      void this.persistPlayer(player);
+      void this.announce(player.textChannelId, `🎵 Сейчас играет **${track.info.title}** — ${track.info.author}`);
+    });
+
+    this.manager.on("trackEnd", (player) => {
+      void this.persistPlayer(player);
+    });
+
+    this.manager.on("queueEnd", (player) => {
+      void this.persistPlayer(player);
+    });
+
+    this.manager.on("playerUpdate", (_oldPlayer, newPlayer) => {
+      void this.persistPlayer(newPlayer);
+    });
+
+    this.manager.on("playerDestroy", (player) => {
+      void this.db.query(
+        "DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
+        [player.guildId, this.config.botIdentityId]
+      );
+    });
+
+    this.manager.nodeManager.on("connect", (node) => {
+      logger.info("Lavalink node connected", { node: node.id });
+    });
+
+    this.manager.nodeManager.on("disconnect", (node, reason) => {
+      logger.warn("Lavalink node disconnected", {
+        node: node.id,
+        reason: String(reason)
+      });
+    });
+
+    this.manager.nodeManager.on("error", (node, error) => {
+      logger.error("Lavalink node error", {
+        node: node.id,
+        error: String(error)
+      });
+    });
+
+    const a = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const b = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
+    this.unsubscribe = () => {
+      a();
+      b();
+    };
+  }
+
+  async shutdown(): Promise<void> {
+    this.unsubscribe?.();
+    this.unsubscribe = undefined;
+
+    if (this.client && this.rawHandler) {
+      this.client.off("raw", this.rawHandler);
+    }
+
+    if (this.client && this.readyHandler) {
+      this.client.off("ready", this.readyHandler);
+    }
+
+    this.rawHandler = undefined;
+    this.readyHandler = undefined;
+    this.manager = undefined;
+    this.client = undefined;
+    this.initialized = false;
+  }
+
+  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+    if (!interaction.inGuild() || interaction.commandName !== "music") return;
+    if (!await moduleEnabled(this.db, interaction.guild.id, "music", false)) {
+      await interaction.reply({ content: "Модуль Music выключен.", ephemeral: true });
+      return;
+    }
+
+    if (!this.manager || !this.initialized) {
+      await interaction.reply({ content: "Музыкальный движок ещё запускается.", ephemeral: true });
+      return;
+    }
+
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    const voice = member.voice.channel;
+
+    switch (interaction.options.getSubcommand()) {
+      case "play":
+        await this.play(interaction, voice?.id ?? null);
+        break;
+      case "pause":
+        await this.pause(interaction, true);
+        break;
+      case "resume":
+        await this.pause(interaction, false);
+        break;
+      case "skip":
+        await this.skip(interaction);
+        break;
+      case "stop":
+        await this.stop(interaction);
+        break;
+      case "queue":
+        await this.queue(interaction);
+        break;
+      case "volume":
+        await this.volume(interaction);
+        break;
+      case "nowplaying":
+        await this.nowPlaying(interaction);
+        break;
+    }
+  }
+
+  private async play(interaction: ChatInputCommandInteraction, voiceChannelId: string | null): Promise<void> {
+    if (!voiceChannelId) {
+      await interaction.reply({ content: "Сначала зайди в голосовой канал.", ephemeral: true });
+      return;
+    }
+
+    const query = interaction.options.getString("query", true).trim();
+    if (!query) {
+      await interaction.reply({ content: "Поисковый запрос пуст.", ephemeral: true });
+      return;
+    }
+
+    const player = this.getOrCreatePlayer(interaction, voiceChannelId);
+    if (player.voiceChannelId !== voiceChannelId) {
+      await interaction.reply({ content: "Музыкальный бот уже находится в другом голосовом канале этого сервера.", ephemeral: true });
+      return;
+    }
+
+    if (!player.connected) {
+      await player.connect();
+    }
+
+    const source = /^https?:\/\//i.test(query) ? undefined : "ytsearch";
+    const result = await player.search(
+      source ? { query, source } : { query },
+      interaction.user
+    );
+
+    if (!result.tracks.length) {
+      await interaction.reply({ content: "Ничего не найдено.", ephemeral: true });
+      return;
+    }
+
+    player.queue.add(result.tracks[0]!);
+    if (!player.playing) await player.play();
+
+    await interaction.reply({
+      content: `Добавлено в очередь: **${result.tracks[0]!.info.title}** — ${result.tracks[0]!.info.author}`,
+      ephemeral: true
+    });
+  }
+
+  private getOrCreatePlayer(
+    interaction: ChatInputCommandInteraction,
+    voiceChannelId: string
+  ) {
+    if (!this.manager) throw new Error("music_manager_unavailable");
+
+    const existing = this.manager.players.get(interaction.guildId!);
+    if (existing) {
+      return existing;
+    }
+
+    return this.manager.createPlayer({
+      guildId: interaction.guildId!,
+      voiceChannelId,
+      textChannelId: interaction.channelId,
+      node: "local",
+      volume: 100,
+      selfDeaf: true
+    });
+  }
+
+  private async pause(interaction: ChatInputCommandInteraction, paused: boolean): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Музыкальный плеер не запущен.", ephemeral: true });
+      return;
+    }
+    await player.pause(paused);
+    await interaction.reply({ content: paused ? "⏸️ Пауза." : "▶️ Продолжаю.", ephemeral: true });
+  }
+
+  private async skip(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Очередь пуста.", ephemeral: true });
+      return;
+    }
+    await player.skip();
+    await interaction.reply({ content: "⏭️ Пропущено.", ephemeral: true });
+  }
+
+  private async stop(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+    player.queue.clear();
+    await player.destroy();
+    await interaction.reply({ content: "⏹️ Остановлено.", ephemeral: true });
+  }
+
+  private async queue(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Очередь пуста.", ephemeral: true });
+      return;
+    }
+
+    const tracks = player.queue.tracks.slice(0, 15);
+    const lines = tracks.map((track, index) =>
+      `${index + 1}. **${track.info.title}** — ${track.info.author}`
+    );
+
+    await interaction.reply({
+      content: lines.length ? `📋 **Очередь**\n${lines.join("\n")}` : "Очередь пуста.",
+      ephemeral: true
+    });
+  }
+
+  private async volume(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+
+    const value = interaction.options.getInteger("value");
+    if (value === null) {
+      await interaction.reply({ content: `🔊 Громкость: **${player.volume}**`, ephemeral: true });
+      return;
+    }
+
+    if (!interaction.memberPermissions?.has("ManageGuild")) {
+      await interaction.reply({ content: "Менять громкость сервера могут пользователи с Manage Server.", ephemeral: true });
+      return;
+    }
+
+    await player.setVolume(value);
+    await interaction.reply({ content: `🔊 Громкость: **${value}**`, ephemeral: true });
+  }
+
+  private async nowPlaying(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    const track = player?.queue.current;
+    if (!player || !track) {
+      await interaction.reply({ content: "Сейчас ничего не играет.", ephemeral: true });
+      return;
+    }
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId("dsp:music:pause").setLabel("Пауза").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("dsp:music:skip").setLabel("Следующий").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("dsp:music:stop").setLabel("Стоп").setStyle(ButtonStyle.Danger)
+    );
+
+    const embed = new EmbedBuilder()
+      .setTitle("🎵 Сейчас играет")
+      .setDescription(`**${track.info.title}**\n${track.info.author}`)
+      .addFields({
+        name: "Состояние",
+        value: player.paused ? "⏸️ Пауза" : "▶️ Играет",
+        inline: true
+      });
+
+    await interaction.reply({ embeds: [embed], components: [row] });
+  }
+
+  private async onInteraction(interaction: Interaction): Promise<void> {
+    if (!interaction.isButton() || !interaction.customId.startsWith("dsp:music:") || !interaction.guild) return;
+
+    const player = this.manager?.players.get(interaction.guild.id);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+
+    const action = interaction.customId.slice("dsp:music:".length);
+    if (action === "pause") await player.pause(!player.paused);
+    else if (action === "skip") await player.skip();
+    else if (action === "stop") await player.destroy();
+
+    await interaction.reply({
+      content:
+        action === "pause" ? (player.paused ? "⏸️ Пауза." : "▶️ Продолжаю.") :
+        action === "skip" ? "⏭️ Следующий трек." :
+        "⏹️ Стоп.",
+      ephemeral: true
+    });
+  }
+
+  private async persistPlayer(player: any): Promise<void> {
+    await this.db.query(
+      `INSERT INTO music_players(
+        guild_id,bot_identity_id,voice_channel_id,text_channel_id,state
+      )
+      VALUES($1,$2,$3,$4,$5::jsonb)
+      ON CONFLICT(guild_id,bot_identity_id)
+      DO UPDATE SET
+        voice_channel_id=EXCLUDED.voice_channel_id,
+        text_channel_id=EXCLUDED.text_channel_id,
+        state=EXCLUDED.state,
+        updated_at=now()`,
+      [
+        player.guildId,
+        this.config.botIdentityId,
+        player.voiceChannelId ?? null,
+        player.textChannelId ?? null,
+        JSON.stringify(player.toJSON())
+      ]
+    ).catch((error) => logger.warn("Failed to persist music player", { error: String(error) }));
+  }
+
+  private async announce(channelId: string | null | undefined, text: string): Promise<void> {
+    if (!channelId || !this.client) return;
+    const channel = this.client.channels.cache.get(channelId);
+    if (channel?.isTextBased() && "send" in channel) {
+      await channel.send(text).catch(() => undefined);
+    }
+  }
+}
