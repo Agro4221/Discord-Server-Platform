@@ -8,6 +8,7 @@ import {
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled, renderTemplate } from "../module-utils.js";
+import { logger } from "../logger.js";
 
 type WelcomeConfig = {
   enabled: boolean;
@@ -131,15 +132,35 @@ export class Welcome implements PlatformModule {
                 .setDescription(content)
                 .setThumbnail(member.displayAvatarURL({ size: 128 }))
             ]
-          }).catch(() => undefined);
+          }).catch((error) => {
+            logger.warn("Welcome embed delivery failed", {
+              guildId: member.guild.id,
+              channelId: channel.id,
+              userId: member.id,
+              error: String(error)
+            });
+          });
         } else {
-          await (channel as TextChannel).send(content).catch(() => undefined);
+          await (channel as TextChannel).send(content).catch((error) => {
+            logger.warn("Welcome message delivery failed", {
+              guildId: member.guild.id,
+              channelId: channel.id,
+              userId: member.id,
+              error: String(error)
+            });
+          });
         }
       }
     }
 
     if (config.dm) {
-      await member.send(content).catch(() => undefined);
+      await member.send(content).catch((error) => {
+        logger.warn("Welcome DM delivery failed", {
+          guildId: member.guild.id,
+          userId: member.id,
+          error: String(error)
+        });
+      });
     }
   }
 }
