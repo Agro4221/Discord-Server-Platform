@@ -200,16 +200,16 @@ export class AutoMod implements PlatformModule {
     const mentions = message.mentions.users.size + message.mentions.roles.size;
     if (!reason && mentions > config.maxMentions) reason = "mention_spam";
 
-    const links = content.match(/https?:\\/\\/[^\\s<>]+/gi) ?? [];
-    const invites = content.match(/(?:discord(?:\\.gg|(?:app)?\\.com\\/invite))\\/[A-Za-z0-9-]+/gi) ?? [];
+    const links = content.match(/https?:\/\/[^\s<>]+/gi) ?? [];
+    const invites = content.match(/(?:discord(?:\.gg|(?:app)?\.com\/invite))\/[A-Za-z0-9-]+/gi) ?? [];
     if (!reason && config.blockInvites && invites.length > 0) reason = "invite_link";
     if (!reason && config.blockLinks && links.length > 0) reason = "link_blocked";
     if (!reason && config.maxLinks > 0 && links.length > config.maxLinks) reason = "link_spam";
 
-    const emojiMatches = content.match(/<a?:\\w+:\\d+>|\\p{Extended_Pictographic}/gu) ?? [];
+    const emojiMatches = content.match(/<a?:\w+:\d+>|\p{Extended_Pictographic}/gu) ?? [];
     if (!reason && config.maxEmojis > 0 && emojiMatches.length > config.maxEmojis) reason = "emoji_spam";
 
-    const longestLine = Math.max(0, ...content.split(/\\r?\\n/).map((line) => line.length));
+    const longestLine = Math.max(0, ...content.split(/\r?\n/).map((line) => line.length));
     if (!reason && config.maxLineLength > 0 && longestLine > config.maxLineLength) reason = "line_too_long";
 
     const letters = content.match(/[A-Za-zА-Яа-я]/g) ?? [];
