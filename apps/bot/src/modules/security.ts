@@ -16,17 +16,21 @@ export class Security implements PlatformModule {
   readonly name = "security";
   private unsubscribe?: () => void;
   private readonly joins = new Map<string, number[]>();
+  private readonly raidActiveUntil = new Map<string, number>();
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
-    this.unsubscribe = context.events.on("member.add", (member) => this.onJoin(member));
+    const a = context.events.on("member.add", (member) => this.onJoin(member));
+    const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    this.unsubscribe = () => { a(); b(); };
   }
 
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.joins.clear();
+    this.raidActiveUntil.clear();
   }
 
   private async config(guildId: string): Promise<SecurityConfig> {
@@ -72,7 +76,36 @@ export class Security implements PlatformModule {
     );
   }
 
-  private async onJoin(member: GuildMember): Promise<void> {
+  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+    if (!interaction.inGuild() || interaction.commandName !== "security") return;
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+      await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
+      return;
+    }
+
+    if (interaction.options.getSubcommand() !== "setup") return;
+
+    const logChannel = interaction.options.getChannel("log-channel");
+    if (logChannel && !logChannel.isTextBased()) {
+      await interaction.reply({ content: "Security log channel должен быть текстовым.", ephemeral: true });
+      return;
+    }
+
+    await this.configure(interaction.guild.id, {
+      enabled: true,
+      maxJoins: interaction.options.getInteger("max-joins", true),
+      windowSeconds: interaction.options.getInteger("window", true),
+      quarantineRoleId: interaction.options.getRole("quarantine-role")?.id ?? null,
+      logChannelId: logChannel?.id ?? null
+    });
+
+    await interaction.reply({
+      content: "Anti-Raid настроен и включён.",
+      ephemeral: true
+    });
+  }
+
+  private async onJoin(member: GuildMember): Promise<void>
     if (!await moduleEnabled(this.db, member.guild.id, "security", false)) return;
     const config = await this.config(member.guild.id);
     if (!config.enabled) return;
@@ -83,19 +116,22 @@ export class Security implements PlatformModule {
     bucket.push(now);
     this.joins.set(member.guild.id, bucket);
 
-    if (bucket.length < config.maxJoins) return;
+    const activeUntil = this.raidActiveUntil.get(member.guild.id) ?? 0;
+    const raidTriggered = bucket.length >= config.maxJoins;
+    if (!raidTriggered && now < activeUntil) {
+      await this.quarantine(member, config);
+      return;
+    }
+    if (!raidTriggered) return;
+
+    this.raidActiveUntil.set(member.guild.id, now + Math.max(config.windowSeconds * 1000, 60_000));
 
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'raid-detected',$2::jsonb)",
       [member.guild.id, JSON.stringify({ joins: bucket.length, windowSeconds: config.windowSeconds })]
     );
 
-    if (config.quarantineRoleId && member.manageable) {
-      const role = member.guild.roles.cache.get(config.quarantineRoleId);
-      if (role && role.position < member.guild.members.me!.roles.highest.position) {
-        await member.roles.add(role, "Security anti-raid quarantine").catch(() => undefined);
-      }
-    }
+    await this.quarantine(member, config);
 
     if (config.logChannelId) {
       const channel = member.guild.channels.cache.get(config.logChannelId);
@@ -105,5 +141,13 @@ export class Security implements PlatformModule {
         ).catch(() => undefined);
       }
     }
+  }
+
+  private async quarantine(member: GuildMember, config: SecurityConfig): Promise<void> {
+    if (!config.quarantineRoleId || !member.manageable) return;
+    const botMember = member.guild.members.me;
+    const role = member.guild.roles.cache.get(config.quarantineRoleId);
+    if (!botMember || !role || role.position >= botMember.roles.highest.position) return;
+    await member.roles.add(role, "Security anti-raid quarantine").catch(() => undefined);
   }
 }
