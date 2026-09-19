@@ -24,10 +24,14 @@ export class TemporaryVoice implements PlatformModule {
   private readonly rooms = new Map<string, Room>();
   private readonly creationInFlight = new Set<string>();
   private ready = false;
+  private unsubscribeFromVoice?: () => void;
 
   constructor(private readonly db: Database, private readonly getGuilds: () => Iterable<Guild>) {}
 
-  async init(_context: ModuleContext): Promise<void> {
+  async init(context: ModuleContext): Promise<void> {
+    this.unsubscribeFromVoice = context.events.on("voice.state", ({ oldState, newState }) => {
+      return this.handleVoiceState(oldState, newState);
+    });
     const result = await this.db.query<{
       guild_id: string;
       channel_id: string;
@@ -44,6 +48,8 @@ export class TemporaryVoice implements PlatformModule {
   async shutdown(): Promise<void> {
     this.ready = false;
     this.creationInFlight.clear();
+    this.unsubscribeFromVoice?.();
+    this.unsubscribeFromVoice = undefined;
   }
 
   markReady(): void {
