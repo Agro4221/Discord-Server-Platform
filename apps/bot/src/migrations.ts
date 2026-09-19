@@ -357,6 +357,19 @@ const migrations = [
       "  PRIMARY KEY(bot_identity_id,node_id)",
       ");"
     ])
+  },
+  {
+    version: 17,
+    name: "automod_extended_rules",
+    sql: q([
+      "ALTER TABLE automod_settings ADD COLUMN IF NOT EXISTS block_links boolean NOT NULL DEFAULT false;",
+      "ALTER TABLE automod_settings ADD COLUMN IF NOT EXISTS block_invites boolean NOT NULL DEFAULT false;",
+      "ALTER TABLE automod_settings ADD COLUMN IF NOT EXISTS max_links integer NOT NULL DEFAULT 3;",
+      "ALTER TABLE automod_settings ADD COLUMN IF NOT EXISTS max_emojis integer NOT NULL DEFAULT 20;",
+      "ALTER TABLE automod_settings ADD COLUMN IF NOT EXISTS max_line_length integer NOT NULL DEFAULT 1000;",
+      "ALTER TABLE automod_settings ADD COLUMN IF NOT EXISTS exempt_channel_ids text NOT NULL DEFAULT '';",
+      "ALTER TABLE automod_settings ADD COLUMN IF NOT EXISTS exempt_role_ids text NOT NULL DEFAULT '';"
+    ])
   }
 ] as const;
 
