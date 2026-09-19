@@ -6,7 +6,7 @@ const attempts = new Map<string, { start: number; count: number }>();
 const GLOBAL_KEY = "__global__";
 const MAX_KEYS = 10_000;
 
-function allowed(key: string): boolean {
+function allowed(key: string, limit: number): boolean {
   const now = Date.now();
   const window = attempts.get(key);
   if (!window || now - window.start >= 15 * 60_000) {
@@ -14,7 +14,7 @@ function allowed(key: string): boolean {
     return true;
   }
   window.count += 1;
-  return window.count <= 10;
+  return window.count <= limit;
 }
 
 function cleanup(): void {
