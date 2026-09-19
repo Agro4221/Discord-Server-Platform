@@ -171,7 +171,6 @@ export class Tickets implements PlatformModule {
         ticketId: Number(ticketId),
         channelId: channel.id
       });
-      await interaction.reply({ content: `Тикет создан: <#${channel.id}>.`, ephemeral: true });
     } catch (error) {
       await channel.delete("Ticket creation rollback").catch((deleteError) => {
         logger.error("Ticket creation rollback channel delete failed", {
@@ -187,6 +186,18 @@ export class Tickets implements PlatformModule {
         error: String(error)
       });
       await interaction.reply({ content: "Не удалось создать тикет.", ephemeral: true });
+      return;
+    }
+
+    try {
+      await interaction.reply({ content: `Тикет создан: <#${channel.id}>.`, ephemeral: true });
+    } catch (error) {
+      logger.warn("Ticket creation success response failed", {
+        guildId: interaction.guild!.id,
+        ticketId,
+        channelId: channel.id,
+        error: String(error)
+      });
     }
   }
 
