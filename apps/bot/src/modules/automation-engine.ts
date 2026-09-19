@@ -23,6 +23,7 @@ export class AutomationEngine implements PlatformModule {
     this.client = context.client;
     await this.reload();
     const unsubs = [
+      context.events.on("interaction.command", (interaction) => this.onCommand(interaction)),
       context.events.on("member.add", (member) => this.execute({ type: "member.join", guildId: member.guild.id, userId: member.id })),
       context.events.on("member.remove", (member) => this.execute({ type: "member.leave", guildId: member.guild.id, userId: member.id })),
       context.events.on("message.create", (message) => this.executeFromMessage(message)),
@@ -38,7 +39,40 @@ export class AutomationEngine implements PlatformModule {
     this.client = undefined;
   }
 
-  async reload(): Promise<void> {
+  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+    if (!interaction.inGuild() || interaction.commandName !== "automation") return;
+    if (!interaction.memberPermissions?.has("ManageGuild")) {
+      await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
+      return;
+    }
+
+    if (interaction.options.getSubcommand() !== "create") return;
+
+    const event = interaction.options.getString("event", true) as AutomationEvent;
+    const responseChannel = interaction.options.getChannel("response-channel", true);
+    if (!responseChannel.isTextBased()) {
+      await interaction.reply({ content: "Response channel должен быть текстовым.", ephemeral: true });
+      return;
+    }
+
+    const conditions: AutomationCondition[] = [];
+    const eventChannel = interaction.options.getChannel("channel");
+    const match = interaction.options.getString("match");
+    if (eventChannel) conditions.push({ type: "channel-is", channelId: eventChannel.id });
+    if (match) conditions.push({ type: "contains", left: "content", right: match });
+
+    await this.createRule(
+      interaction.guild.id,
+      interaction.options.getString("name", true),
+      event,
+      conditions,
+      [{ type: "send-message", channelId: responseChannel.id, content: interaction.options.getString("response", true) }]
+    );
+
+    await interaction.reply({ content: "Automation rule создано.", ephemeral: true });
+  }
+
+  async reload(): Promise<void>
     const result = await this.db.query<{
       id: string;
       guild_id: string;
