@@ -20,9 +20,11 @@ Example second identity:
 
 ```env
 BOT_IDENTITY_ID=music2
-DISCORD_TOKEN=...
-DISCORD_CLIENT_ID=...
+DISCORD_TOKEN_MUSIC2=...
+DISCORD_CLIENT_ID_MUSIC2=...
 ```
+
+Secondary identities must use identity-specific credentials. They do not fall back to `DISCORD_TOKEN` / `DISCORD_CLIENT_ID`, preventing an accidental second process from logging in as the primary bot.
 
 Both processes use the same `DATABASE_URL`. The persistent music state already carries `bot_identity_id`, so queues and players stay identity-safe.
 
