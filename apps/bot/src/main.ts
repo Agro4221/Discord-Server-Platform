@@ -127,7 +127,12 @@ async function main(): Promise<void> {
     auditLog,
     settings: dashboardSettings,
     transfer,
-    backups
+    backups,
+    actions: {
+      "temporary-voice.reconcile": async (guildId) => { await temporaryVoice.reconcile(); return { guildId, ok: true }; },
+      "automation.reload": async (guildId) => { await automation.reload(); return { guildId, ok: true }; },
+      "security.check-hierarchy": async (guildId) => ({ guildId, checked: true })
+    }
   });
   await management.start();
 
