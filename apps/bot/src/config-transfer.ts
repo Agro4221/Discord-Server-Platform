@@ -15,7 +15,9 @@ const CONFIG_TABLES: ExportTable[] = [
   { table: "guild_modules", fields: ["module_key","enabled"] },
   { table: "automod_settings", fields: [
     "enabled","blocked_words","max_mentions","max_caps_ratio",
-    "max_repeated_messages","repeated_window_seconds","delete_message","timeout_minutes"
+    "max_repeated_messages","repeated_window_seconds","block_links","block_invites",
+    "max_links","max_emojis","max_line_length","exempt_channel_ids","exempt_role_ids",
+    "delete_message","timeout_minutes"
   ]},
   { table: "welcome_settings", fields: ["enabled","channel_id","message","dm","embed"] },
   { table: "ticket_settings", fields: ["enabled","category_id","staff_role_id","transcript_channel_id"] },
@@ -189,7 +191,9 @@ export class ConfigTransferService {
 
     await execute("automod_settings", "automod", [
       "enabled","blocked_words","max_mentions","max_caps_ratio",
-      "max_repeated_messages","repeated_window_seconds","delete_message","timeout_minutes"
+      "max_repeated_messages","repeated_window_seconds","block_links","block_invites",
+      "max_links","max_emojis","max_line_length","exempt_channel_ids","exempt_role_ids",
+      "delete_message","timeout_minutes"
     ], {
       enabled: false,
       blocked_words: [],
@@ -197,6 +201,13 @@ export class ConfigTransferService {
       max_caps_ratio: 0.85,
       max_repeated_messages: 5,
       repeated_window_seconds: 10,
+      block_links: false,
+      block_invites: false,
+      max_links: 3,
+      max_emojis: 20,
+      max_line_length: 1000,
+      exempt_channel_ids: "",
+      exempt_role_ids: "",
       delete_message: true,
       timeout_minutes: 0
     });
