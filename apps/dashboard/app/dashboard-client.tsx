@@ -14,11 +14,12 @@ type Field = {
   max?: number;
   step?: number;
 };
+type ModuleAction = { id: string; label: string; kind?: "safe" | "danger"; confirmation?: string };
 type Schema = {
   key: string;
   title: string;
   fields: Field[];
-  actionHints?: string[];
+  actions?: ModuleAction[];
 };
 type Resource = { id: string; name: string; type?: number; position?: number; manageable?: boolean };
 
