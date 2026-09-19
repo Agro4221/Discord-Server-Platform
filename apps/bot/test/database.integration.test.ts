@@ -104,6 +104,14 @@ test("config transfer and local backup round-trip preserve guild configuration",
       [guildId]
     );
     assert.equal(restoredAgain.rows[0]?.max_joins, 4);
+
+    const retainedBackups = new BackupService(db, directory, 2);
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    await retainedBackups.createGuildBackup(guildId);
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    await retainedBackups.createGuildBackup(guildId);
+    const listed = await retainedBackups.listBackups(guildId);
+    assert.equal(listed.length, 2);
   } finally {
     await db.query("DELETE FROM guild_modules WHERE guild_id=$1", [guildId]).catch(() => undefined);
     await db.query("DELETE FROM security_settings WHERE guild_id=$1", [guildId]).catch(() => undefined);
