@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { issueSession, sessionCookie, validAdminPassword } from "../../lib/auth";
+import { issueSession, sessionCookie, validAdminPassword } from "../../../../lib/auth";
 
 const attempts = new Map<string, { start: number; count: number }>();
 
