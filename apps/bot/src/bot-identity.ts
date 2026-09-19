@@ -89,6 +89,48 @@ export class BotIdentityRepository {
     return result.rows[0]?.bot_identity_id ?? null;
   }
 
+  async assignMusicVoice(guildId: string, botIdentityId: string, voiceChannelId: string): Promise<void> {
+    const identity = await this.db.query<{ id: string }>(
+      "SELECT id FROM bot_identities WHERE id=$1 AND enabled=true",
+      [botIdentityId]
+    );
+    if (!identity.rows[0]) throw new Error("bot_identity_not_available");
+
+    try {
+      await this.db.query(
+        "INSERT INTO guild_music_bot_assignments(guild_id,bot_identity_id,voice_channel_id) VALUES($1,$2,$3) ON CONFLICT(guild_id,bot_identity_id) DO UPDATE SET voice_channel_id=EXCLUDED.voice_channel_id,updated_at=now()",
+        [guildId, botIdentityId, voiceChannelId]
+      );
+    } catch (error) {
+      if (String(error).includes("guild_music_bot_assignments_guild_id_voice_channel_id_key")) {
+        throw new Error("music_voice_channel_already_assigned");
+      }
+      throw error;
+    }
+  }
+
+  async musicVoiceOwner(guildId: string, voiceChannelId: string): Promise<string | null> {
+    const result = await this.db.query<{ bot_identity_id: string }>(
+      "SELECT bot_identity_id FROM guild_music_bot_assignments WHERE guild_id=$1 AND voice_channel_id=$2",
+      [guildId, voiceChannelId]
+    );
+    return result.rows[0]?.bot_identity_id ?? null;
+  }
+
+  async listMusicAssignments(guildId: string): Promise<Array<{
+    botIdentityId: string;
+    voiceChannelId: string;
+  }>> {
+    const result = await this.db.query<{ bot_identity_id: string; voice_channel_id: string }>(
+      "SELECT bot_identity_id,voice_channel_id FROM guild_music_bot_assignments WHERE guild_id=$1 ORDER BY voice_channel_id",
+      [guildId]
+    );
+    return result.rows.map((row) => ({
+      botIdentityId: row.bot_identity_id,
+      voiceChannelId: row.voice_channel_id
+    }));
+  }
+
   async claimUnassignedGuilds(guildIds: string[]): Promise<void> {
     if (this.identityId !== "primary" || guildIds.length === 0) return;
     for (const guildId of guildIds) {
