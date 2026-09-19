@@ -248,6 +248,30 @@ async function runTransferLikeTransaction(
   });
 }
 
+test("level-up state transition has a single winner", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345730";
+  const userId = "123456789012345731";
+  try {
+    await migrate(db);
+    await db.query("DELETE FROM leveling_users WHERE guild_id=$1 AND user_id=$2", [guildId, userId]);
+    await db.query(
+      "INSERT INTO leveling_users(guild_id,user_id,xp,level) VALUES($1,$2,400,1)",
+      [guildId, userId]
+    );
+
+    const [a,b] = await Promise.all([
+      db.query("UPDATE leveling_users SET level=2 WHERE guild_id=$1 AND user_id=$2 AND level < 2 RETURNING level", [guildId, userId]),
+      db.query("UPDATE leveling_users SET level=2 WHERE guild_id=$1 AND user_id=$2 AND level < 2 RETURNING level", [guildId, userId])
+    ]);
+
+    assert.equal(Number(Boolean(a.rows[0])) + Number(Boolean(b.rows[0])), 1);
+  } finally {
+    await db.query("DELETE FROM leveling_users WHERE guild_id=$1 AND user_id=$2", [guildId, userId]).catch(() => undefined);
+    await db.close();
+  }
+});
+
 test("primary failover selects only stale secondary assignments", { skip: !enabled }, async () => {
   const db = new Database(process.env.DATABASE_URL!);
   const activeGuild = "123456789012345720";
