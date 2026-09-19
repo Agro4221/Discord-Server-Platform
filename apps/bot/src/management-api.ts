@@ -133,6 +133,20 @@ export class ManagementApiServer {
                 typeof body.botIdentityId !== "string" || body.botIdentityId.length < 1 || body.botIdentityId.length > 100) {
               throw new RequestInputError("invalid_fleet_assignment", 400);
             }
+            const identities = await this.options.identities.list();
+            const identity = identities.find((item) => item.id === body.botIdentityId);
+            if (!identity || !identity.enabled) {
+              throw new RequestInputError("bot_identity_not_available", 400);
+            }
+
+            const guild = this.options.client.guilds.cache.get(body.guildId);
+            const botMember = guild
+              ? await guild.members.fetch(identity.clientId).catch(() => null)
+              : null;
+            if (!botMember?.user.bot) {
+              throw new RequestInputError("bot_identity_not_in_guild", 400);
+            }
+
             await this.options.identities.assignGuild(body.guildId, body.botIdentityId);
             await this.options.auditLog.record({
               guildId: body.guildId,
