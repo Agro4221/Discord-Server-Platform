@@ -84,11 +84,6 @@ export class Tickets implements PlatformModule {
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!interaction.inGuild() || interaction.commandName !== "ticket") return;
-    if (!await moduleEnabled(this.db, interaction.guild.id, "tickets", false)) {
-      await interaction.reply({ content: "Модуль Tickets выключен.", ephemeral: true });
-      return;
-    }
-
     const sub = interaction.options.getSubcommand();
     if (sub === "setup") {
       if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
@@ -116,6 +111,11 @@ export class Tickets implements PlatformModule {
         transcriptChannelId: transcriptChannel?.id ?? null
       });
       await interaction.reply({ content: "Tickets настроены и включены.", ephemeral: true });
+      return;
+    }
+
+    if (!await moduleEnabled(this.db, interaction.guild.id, "tickets", false)) {
+      await interaction.reply({ content: "Модуль Tickets выключен. Сначала настрой Tickets.", ephemeral: true });
       return;
     }
 
