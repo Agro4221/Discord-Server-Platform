@@ -33,6 +33,7 @@ export class Notifications implements PlatformModule {
   private timer?: NodeJS.Timeout;
   private client?: Client;
   private running = false;
+  private identityId = "primary";
 
   constructor(private readonly db: Database) {}
 
@@ -109,6 +110,7 @@ export class Notifications implements PlatformModule {
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+    this.identityId = context.identityId;
     this.unsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     this.timer = setInterval(() => void this.pollAll(), 30_000);
     this.timer.unref();
@@ -157,12 +159,16 @@ export class Notifications implements PlatformModule {
 
     try {
       const feeds = await this.db.query<Feed>(
-        `SELECT id,guild_id AS "guildId",channel_id AS "channelId",url,
-                interval_seconds AS "intervalSeconds",last_item_key AS "lastItemKey"
-         FROM notification_feeds
-         WHERE enabled=true AND (last_polled_at IS NULL OR last_polled_at <= now() - make_interval(secs => interval_seconds))
-         ORDER BY last_polled_at NULLS FIRST
-         LIMIT 20`
+        `SELECT nf.id,nf.guild_id AS "guildId",nf.channel_id AS "channelId",nf.url,
+                nf.interval_seconds AS "intervalSeconds",nf.last_item_key AS "lastItemKey"
+         FROM notification_feeds nf
+         INNER JOIN guild_bot_assignments ga
+           ON ga.guild_id=nf.guild_id AND ga.bot_identity_id=$1
+         WHERE nf.enabled=true
+           AND (nf.last_polled_at IS NULL OR nf.last_polled_at <= now() - make_interval(secs => nf.interval_seconds))
+         ORDER BY nf.last_polled_at NULLS FIRST
+         LIMIT 20`,
+        [this.identityId]
       );
 
       for (const feed of feeds.rows) {
