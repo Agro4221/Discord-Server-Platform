@@ -211,6 +211,56 @@ const migrations = [
       );
     \`
   }
+  },
+  {
+    version: 6,
+    name: "automation_and_utilities",
+    sql: \`
+      CREATE TABLE IF NOT EXISTS reminders (
+        id bigserial PRIMARY KEY,
+        guild_id text NOT NULL,
+        user_id text NOT NULL,
+        channel_id text,
+        content text NOT NULL,
+        due_at timestamptz NOT NULL,
+        delivered_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_reminders_due
+        ON reminders(delivered_at,due_at);
+
+      CREATE TABLE IF NOT EXISTS starboard_settings (
+        guild_id text PRIMARY KEY,
+        channel_id text NOT NULL,
+        threshold integer NOT NULL DEFAULT 3 CHECK (threshold > 0 AND threshold <= 100),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS starboard_entries (
+        guild_id text NOT NULL,
+        source_message_id text NOT NULL,
+        starboard_message_id text NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY(guild_id,source_message_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS automation_rules (
+        id bigserial PRIMARY KEY,
+        guild_id text NOT NULL,
+        name text NOT NULL,
+        enabled boolean NOT NULL DEFAULT true,
+        event text NOT NULL,
+        conditions jsonb NOT NULL DEFAULT '[]'::jsonb,
+        actions jsonb NOT NULL DEFAULT '[]'::jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_automation_rules_guild_enabled
+        ON automation_rules(guild_id,enabled);
+    \`
+  }
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
