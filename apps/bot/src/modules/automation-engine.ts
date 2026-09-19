@@ -44,11 +44,13 @@ export class AutomationEngine implements PlatformModule {
   private readonly cooldowns = new Map<string, number>();
   private readonly keyedCooldowns = new Map<string, number>();
   private scheduleTimer?: NodeJS.Timeout;
+  private identityId = "primary";
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+    this.identityId = context.identityId;
     await this.reload();
 
     const unsubs = [
@@ -241,7 +243,12 @@ export class AutomationEngine implements PlatformModule {
       actions: AutomationAction[];
       cooldown_seconds: number;
     }>(
-      "SELECT id,guild_id,name,enabled,event,conditions,actions,cooldown_seconds FROM automation_rules WHERE enabled=true"
+      `SELECT ar.id,ar.guild_id,ar.name,ar.enabled,ar.event,ar.conditions,ar.actions,ar.cooldown_seconds
+       FROM automation_rules ar
+       INNER JOIN guild_bot_assignments ga
+         ON ga.guild_id=ar.guild_id AND ga.bot_identity_id=$1
+       WHERE ar.enabled=true`,
+      [this.identityId]
     );
 
     this.rules.clear();
