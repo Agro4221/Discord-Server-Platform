@@ -121,10 +121,22 @@ async function emitReaction(
   user: import("discord.js").User | import("discord.js").PartialUser
 ): Promise<void> {
   const resolvedReaction = reaction.partial
-    ? await reaction.fetch().catch(() => null)
+    ? await reaction.fetch().catch((error) => {
+      logger.warn("Discord reaction partial fetch failed", {
+        messageId: reaction.message.id,
+        error: String(error)
+      });
+      return null;
+    })
     : reaction;
   const resolvedUser = user.partial
-    ? await user.fetch().catch(() => null)
+    ? await user.fetch().catch((error) => {
+      logger.warn("Discord reaction user partial fetch failed", {
+        userId: user.id,
+        error: String(error)
+      });
+      return null;
+    })
     : user;
 
   if (!resolvedReaction || !resolvedUser) return;
@@ -140,7 +152,15 @@ async function emitMemberAdd(
   member: import("discord.js").GuildMember | import("discord.js").PartialGuildMember
 ): Promise<void> {
   const resolved = member.partial
-    ? await member.fetch().catch(() => null)
+    ? await member.fetch().catch((error) => {
+      logger.warn("Discord member partial fetch failed", {
+        guildId: member.guild?.id,
+        userId: member.id,
+        event: "member"
+        ,error: String(error)
+      });
+      return null;
+    })
     : member;
   if (resolved) await events.emit("member.add", resolved);
 }
@@ -161,7 +181,15 @@ async function emitMemberUpdate(
   newMember: import("discord.js").GuildMember
 ): Promise<void> {
   const oldResolved = oldMember.partial
-    ? await oldMember.fetch().catch(() => null)
+    ? await oldMember.fetch().catch((error) => {
+      logger.warn("Discord old member partial fetch failed", {
+        guildId: oldMember.guild?.id,
+        userId: oldMember.id,
+        event: "member.update",
+        error: String(error)
+      });
+      return null;
+    })
     : oldMember;
   if (oldResolved) {
     await events.emit("member.update", {
@@ -200,9 +228,23 @@ export async function routeCommand(
     };
 
     if (interaction.replied || interaction.deferred) {
-      await interaction.followUp(reply).catch(() => undefined);
+      await interaction.followUp(reply).catch((replyError) => {
+        logger.error("Discord command error reply failed", {
+          command: interaction.commandName,
+          guildId: interaction.guildId,
+          userId: interaction.user.id,
+          error: String(replyError)
+        });
+      });
     } else {
-      await interaction.reply(reply).catch(() => undefined);
+      await interaction.reply(reply).catch((replyError) => {
+        logger.error("Discord command error response failed", {
+          command: interaction.commandName,
+          guildId: interaction.guildId,
+          userId: interaction.user.id,
+          error: String(replyError)
+        });
+      });
     }
   }
 }
