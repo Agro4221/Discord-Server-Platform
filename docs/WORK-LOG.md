@@ -112,3 +112,9 @@ Never write credentials, tokens or private user data here.
 - Added dynamic Music module health based on connected Lavalink nodes plus reconnect/disconnect/destroy diagnostics.
 - Added deterministic regression tests for autoplay eligibility and node health.
 - Current validation limitation: live Discord/Lavalink playback and failover still require user-owned local infrastructure/credentials.
+
+
+## 2026-09-19 — Music resume/autoplay continuity
+- Found a restart-only gap where resumed players had a current track but no `lastPlayedTracks` marker, so custom Autoplay could stop after that track.
+- Restored current tracks now repopulate the marker before the player state is persisted.
+- Live restart + Lavalink resume remains a live-environment validation item.

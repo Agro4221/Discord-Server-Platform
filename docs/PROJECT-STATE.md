@@ -102,3 +102,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Added an in-flight guard so concurrent queue-end events cannot launch duplicate autoplay searches for one guild.
 - Music now reports dynamic module health from Lavalink node connectivity: one connected node keeps Music ready, while loss of every node degrades only the Music module.
 - Added reconnect/disconnect/destroy node lifecycle logging and regression helpers for autoplay eligibility and node health.
+
+
+## 2026-09-19 — Music resume/autoplay continuity
+- Restored Lavalink players now repopulate the in-memory last-track marker from the resumed current track.
+- This preserves the project's Autoplay chain across a process restart instead of requiring a fresh `trackStart` event.

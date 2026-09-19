@@ -814,6 +814,9 @@ export class Music implements PlatformModule {
             data.track as Parameters<LavalinkManager["utils"]["buildTrack"]>[0],
             player.queue.current?.requester ?? this.client?.user
           );
+          if (player.queue.current) {
+            this.lastPlayedTracks.set(guildId, player.queue.current);
+          }
         }
 
         const position = typeof data.state?.position === "number" ? data.state.position : 0;

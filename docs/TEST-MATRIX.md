@@ -52,3 +52,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-09-19 — Music reliability snapshot
 - Autoplay eligibility and Lavalink node-health helpers are covered by deterministic tests.
 - Live playback, node failover and session-resume behavior remain live-environment checks.
+
+
+### 2026-09-19 — Music resume continuity
+- Resume/autoplay continuity is covered in code path review; full Lavalink restart/resume remains a live validation case.
