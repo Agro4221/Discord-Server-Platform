@@ -9,6 +9,18 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
+for command in git curl docker; do
+  command -v "${command}" >/dev/null 2>&1 || {
+    echo "Missing command: ${command}" >&2
+    exit 1
+  }
+done
+
+if [[ ! -d "${INSTALL_DIR}/.git" ]]; then
+  echo "Install directory is not a git checkout: ${INSTALL_DIR}" >&2
+  exit 1
+fi
+
 cd "${INSTALL_DIR}"
 git fetch origin "${BRANCH}"
 git checkout "${BRANCH}"
