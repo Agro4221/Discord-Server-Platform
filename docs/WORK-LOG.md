@@ -84,3 +84,13 @@ Never write credentials, tokens or private user data here.
 - GitHub Actions workflow now uses current Node 24-based `checkout@v7` / `setup-node@v7` majors.
 - Known limitation remains live Discord E2E/chaos/soak validation because it requires user-owned Discord/Lavalink infrastructure and credentials.
 - Next engineering focus: deepen Security/AutoMod response workflows, expand Music provider/failover validation, strengthen full fleet orchestration and complete the release-gate E2E/chaos/security matrix.
+
+
+## 2026-09-19 — AutoMod detection/audit hardening
+- Branch remains `development`.
+- Implemented deterministic `detectAutoModViolation` coverage for all currently implemented AutoMod rule families.
+- Added durable audit logging for handled AutoMod violations without storing message content.
+- Fixed the exemption parser to split IDs on real whitespace/newline/comma separators; the previous expression treated the escaped characters incorrectly.
+- Added regression coverage for exemption parsing and audit-event emission.
+- Live Discord behavior remains unverified here; CI must provide the Node 24.17 dependency/build/test environment.
+- Next concrete focus remains richer AutoMod/Security response workflows, then Music provider/failover depth and broader fleet/release-gate validation.
