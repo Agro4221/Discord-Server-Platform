@@ -114,3 +114,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Disabling Temporary Voice now defers cleanup for occupied rooms; the durable room record remains so the normal leave handler can remove the room when it becomes empty.
 - Tickets now run stale `closing` recovery at startup and every 60 seconds with safe error logging.
 - Added regression coverage for the Temporary Voice lifecycle/cleanup rule and Ticket recovery startup path.
+
+
+## 2026-09-19 — Ticket creation race UX
+- Concurrent Ticket creation now recognizes PostgreSQL unique-open-ticket conflicts and reports that an existing ticket is already open instead of presenting a generic internal failure.
+- The newly created Discord channel is still rolled back before returning the conflict response.

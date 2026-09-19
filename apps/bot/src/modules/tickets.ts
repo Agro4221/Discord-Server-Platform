@@ -197,7 +197,12 @@ export class Tickets implements PlatformModule {
         channelId: channel.id,
         error: String(error)
       });
-      await interaction.reply({ content: "Не удалось создать тикет.", ephemeral: true });
+      await interaction.reply({
+        content: isOpenTicketConflict(error)
+          ? "У тебя уже есть открытый тикет. Обнови список каналов и используй существующий."
+          : "Не удалось создать тикет.",
+        ephemeral: true
+      });
       return;
     }
 
@@ -371,4 +376,11 @@ export class Tickets implements PlatformModule {
     if (!messages) return "Transcript unavailable.";
     return [...messages.values()].sort((a,b) => a.createdTimestamp-b.createdTimestamp).map((message) => `[${new Date(message.createdTimestamp).toISOString()}] ${message.author.tag}: ${message.content}`).join("\n");
   }
+}
+
+
+export function isOpenTicketConflict(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const value = error as { code?: unknown; constraint?: unknown };
+  return value.code === "23505" && value.constraint === "uq_open_ticket_per_creator";
 }

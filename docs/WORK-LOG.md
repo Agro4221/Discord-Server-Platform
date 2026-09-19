@@ -126,3 +126,9 @@ Never write credentials, tokens or private user data here.
 - Fixed module-disable cleanup so occupied temporary rooms are not orphaned by deleting their DB record before the room empties.
 - Found that `Tickets.recoverStaleClosures()` existed but was never invoked; added startup recovery plus a 60-second recurring sweep with caught errors.
 - Added regression tests for both lifecycle paths.
+
+
+## 2026-09-19 — Ticket creation race UX
+- The existing partial unique index `uq_open_ticket_per_creator` already protects against two simultaneous ticket modals for one user.
+- Hardened the error path so that conflict is identified explicitly after Discord channel rollback, giving the user a useful message instead of a generic creation failure.
+- Added deterministic regression coverage for the PostgreSQL conflict classifier.

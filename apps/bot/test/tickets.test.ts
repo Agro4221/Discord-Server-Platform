@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Tickets } from "../src/modules/tickets.js";
+import { Tickets, isOpenTicketConflict } from "../src/modules/tickets.js";
 import { PlatformEventBus } from "../src/events.js";
 
 test("Tickets performs stale closure recovery during initialization", async () => {
@@ -28,3 +28,22 @@ test("Tickets performs stale closure recovery during initialization", async () =
   );
 });
 
+
+
+test("Tickets identifies the concurrent-open-ticket database conflict", () => {
+  assert.equal(
+    isOpenTicketConflict({
+      code: "23505",
+      constraint: "uq_open_ticket_per_creator"
+    }),
+    true
+  );
+  assert.equal(
+    isOpenTicketConflict({
+      code: "23505",
+      constraint: "tickets_channel_id_key"
+    }),
+    false
+  );
+  assert.equal(isOpenTicketConflict(new Error("database unavailable")), false);
+});

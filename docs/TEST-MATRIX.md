@@ -61,3 +61,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-09-19 — Ticket / Temporary Voice lifecycle snapshot
 - Temporary Voice ClientReady activation and occupied-room cleanup rules are regression-tested.
 - Ticket stale-closure recovery is now invoked at startup and periodically; live Discord cleanup remains a live-environment validation item.
+
+
+### 2026-09-19 — Ticket concurrency snapshot
+- Concurrent-open-ticket database conflict classification is regression-tested.
+- Full two-browser/modal race and Discord channel rollback remain live integration validation.
