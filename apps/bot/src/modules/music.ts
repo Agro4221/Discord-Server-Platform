@@ -506,7 +506,9 @@ export class Music implements PlatformModule {
     voiceChannelId: string | null
   ): Promise<boolean> {
     if (!voiceChannelId) {
-      return this.config.botIdentityId === "primary";
+      if (this.config.botIdentityId === "primary") return true;
+      const assignments = await this.identities.listMusicAssignments(interaction.guildId!);
+      return assignments.some((assignment) => assignment.botIdentityId === this.config.botIdentityId);
     }
 
     const owner = await this.identities.musicVoiceOwner(interaction.guildId!, voiceChannelId);
@@ -697,6 +699,15 @@ export class Music implements PlatformModule {
       const savedRow = saved.rows[0];
       if (!savedRow?.voice_channel_id) continue;
 
+      let savedState: { repeatMode?: unknown } = {};
+      try {
+        if (savedRow.state && typeof savedRow.state === "object") {
+          savedState = savedRow.state as { repeatMode?: unknown };
+        }
+      } catch {
+        savedState = {};
+      }
+
       const existing = this.manager?.players.get(guildId);
       const player = existing ?? this.manager?.createPlayer({
         guildId,
@@ -718,8 +729,14 @@ export class Music implements PlatformModule {
         }
 
         await player.queue.utils.sync(true, false);
-        if (typeof data.repeatMode === "string") {
-          const repeatMode = normalizeMusicRepeatMode(data.repeatMode);
+        const repeatValue =
+          typeof data.repeatMode === "string"
+            ? data.repeatMode
+            : typeof savedState.repeatMode === "string"
+              ? savedState.repeatMode
+              : null;
+        if (repeatValue) {
+          const repeatMode = normalizeMusicRepeatMode(repeatValue);
           if (repeatMode) await player.setRepeatMode(repeatMode);
         }
 
