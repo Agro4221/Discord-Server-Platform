@@ -9,6 +9,10 @@ import { Moderation } from "./modules/moderation.js";
 import { AutoMod } from "./modules/automod.js";
 import { Welcome } from "./modules/welcome.js";
 import { Leveling } from "./modules/leveling.js";
+import { Tickets } from "./modules/tickets.js";
+import { RolePanels } from "./modules/role-panels.js";
+import { Giveaways } from "./modules/giveaways.js";
+import { Economy } from "./modules/economy.js";
 import { createDiscordClient, registerCommands, routeCommand, wireDiscordEvents } from "./discord/bot.js";
 import { ConnectionSupervisor } from "./discord/connection-supervisor.js";
 import { ManagementApiServer } from "./management-api.js";
@@ -44,6 +48,10 @@ async function main(): Promise<void> {
   const autoMod = new AutoMod(database);
   const welcome = new Welcome(database);
   const leveling = new Leveling(database);
+  const tickets = new Tickets(database);
+  const rolePanels = new RolePanels(database);
+  const giveaways = new Giveaways(database);
+  const economy = new Economy(database);
 
   const modules = new ModuleRegistry({
     client,
@@ -57,6 +65,10 @@ async function main(): Promise<void> {
   modules.register(autoMod);
   modules.register(welcome);
   modules.register(leveling);
+  modules.register(tickets);
+  modules.register(rolePanels);
+  modules.register(giveaways);
+  modules.register(economy);
 
   for (const name of modules.list()) health.setModule(name, "starting");
 
