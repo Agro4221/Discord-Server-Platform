@@ -621,6 +621,7 @@ export class ManagementApiServer {
             const name = body.name;
             const event = body.event;
             const conditions = body.conditions;
+            const anyConditions = body.anyConditions ?? [];
             const actions = body.actions;
             const cooldownSeconds = body.cooldownSeconds;
 
@@ -628,6 +629,8 @@ export class ManagementApiServer {
               typeof name !== "string" || name.trim().length < 1 || name.length > 80 ||
               typeof event !== "string" || event.length > 64 ||
               !Array.isArray(conditions) || conditions.length > 10 ||
+              !Array.isArray(anyConditions) || anyConditions.length > 10 ||
+              conditions.length + anyConditions.length > 10 ||
               !Array.isArray(actions) || actions.length < 1 || actions.length > 10 ||
               typeof cooldownSeconds !== "number" || !Number.isFinite(cooldownSeconds) ||
               cooldownSeconds < 0 || cooldownSeconds > 86400
@@ -635,12 +638,13 @@ export class ManagementApiServer {
               throw new RequestInputError("invalid_automation_rule", 400);
             }
 
-            validateAutomationPayload(this.options.client, guildId, event, conditions, actions);
+            validateAutomationPayload(this.options.client, guildId, event, [...conditions, ...anyConditions], actions);
 
             const input = {
               name: name.trim(),
               event,
               conditions,
+              anyConditions,
               actions,
               cooldownSeconds,
               ...(typeof body.enabled === "boolean" ? { enabled: body.enabled } : {})
