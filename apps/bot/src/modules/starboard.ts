@@ -11,7 +11,7 @@ export class Starboard implements PlatformModule {
   readonly name = "starboard";
   private unsubscribe?: () => void;
 
-  constructor(private readonly db: Database, private readonly getClient?: () => import("discord.js").Client) {}
+  constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.unsubscribe = context.events.on("reaction.add", ({ reaction, user }) => this.onReaction(reaction, user));
@@ -64,7 +64,7 @@ export class Starboard implements PlatformModule {
        DO UPDATE SET starboard_message_id=EXCLUDED.starboard_message_id`,
       [reaction.message.guild.id, reaction.message.id, sent.id]
     );
-    void this.getClient;
+
   }
 
   async configure(guildId: string, channelId: string, threshold: number): Promise<void> {
