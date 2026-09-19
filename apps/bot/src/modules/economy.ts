@@ -243,13 +243,27 @@ export class Economy implements PlatformModule {
       for (const id of ids) {
         await client.query("INSERT INTO economy_accounts(guild_id,user_id,balance) VALUES($1,$2,0) ON CONFLICT(guild_id,user_id) DO NOTHING", [guildId,id]);
       }
+      for (const id of ids) {
+        await client.query(
+          "SELECT balance FROM economy_accounts WHERE guild_id=$1 AND user_id=$2 FOR UPDATE",
+          [guildId,id]
+        );
+      }
+
       const sender = await client.query<{ balance: string }>(
-        "SELECT balance::text AS balance FROM economy_accounts WHERE guild_id=$1 AND user_id=$2 FOR UPDATE",
+        "SELECT balance::text AS balance FROM economy_accounts WHERE guild_id=$1 AND user_id=$2",
         [guildId,from]
       );
       if (!sender.rows[0] || BigInt(sender.rows[0].balance) < amount) return false;
-      await client.query("UPDATE economy_accounts SET balance=balance-$3::bigint,updated_at=now() WHERE guild_id=$1 AND user_id=$2", [guildId,from,amount.toString()]);
-      await client.query("UPDATE economy_accounts SET balance=balance+$3::bigint,updated_at=now() WHERE guild_id=$1 AND user_id=$2", [guildId,to,amount.toString()]);
+
+      await client.query(
+        "UPDATE economy_accounts SET balance=balance-$3::bigint,updated_at=now() WHERE guild_id=$1 AND user_id=$2",
+        [guildId,from,amount.toString()]
+      );
+      await client.query(
+        "UPDATE economy_accounts SET balance=balance+$3::bigint,updated_at=now() WHERE guild_id=$1 AND user_id=$2",
+        [guildId,to,amount.toString()]
+      );
       await client.query("INSERT INTO economy_transactions(guild_id,user_id,type,amount,metadata) VALUES($1,$2,'transfer-out',$3,$4::jsonb)", [guildId,from,"-" + amount.toString(),JSON.stringify({to})]);
       await client.query("INSERT INTO economy_transactions(guild_id,user_id,type,amount,metadata) VALUES($1,$2,'transfer-in',$3,$4::jsonb)", [guildId,to,amount.toString(),JSON.stringify({from})]);
       return true;
