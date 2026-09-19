@@ -94,12 +94,13 @@ export class Security implements PlatformModule {
       return;
     }
     if (interaction.options.getSubcommand() !== "setup") return;
-    const logChannel = interaction.options.getChannel("log-channel");
-    if (logChannel && !logChannel.isTextBased()) {
+    const logChannelOption = interaction.options.getChannel("log-channel");
+    const logChannel = logChannelOption ? interaction.guild!.channels.cache.get(logChannelOption.id) : null;
+    if (logChannelOption && (!logChannel || logChannel.type !== 0)) {
       await interaction.reply({ content: "Security log channel должен быть текстовым.", ephemeral: true });
       return;
     }
-    await this.configure(interaction.guild.id, {
+    await this.configure(interaction.guild!.id, {
       enabled: true,
       maxJoins: interaction.options.getInteger("max-joins", true),
       windowSeconds: interaction.options.getInteger("window", true),
