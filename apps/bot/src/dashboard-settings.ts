@@ -43,6 +43,13 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "maxCapsRatio", label: "Доля CAPS", type: "number", min: 0, max: 1, step: 0.05 },
       { key: "maxRepeatedMessages", label: "Повторов до срабатывания", type: "number", min: 2, max: 20 },
       { key: "repeatedWindowSeconds", label: "Окно повторов, сек.", type: "number", min: 2, max: 120 },
+      { key: "blockLinks", label: "Блокировать ссылки", type: "boolean" },
+      { key: "blockInvites", label: "Блокировать Discord invites", type: "boolean" },
+      { key: "maxLinks", label: "Макс. ссылок в сообщении", type: "number", min: 0, max: 20 },
+      { key: "maxEmojis", label: "Макс. emoji", type: "number", min: 0, max: 200 },
+      { key: "maxLineLength", label: "Макс. длина строки", type: "number", min: 0, max: 4000 },
+      { key: "exemptChannelIds", label: "Исключённые каналы", type: "textarea", description: "ID через пробел или новую строку." },
+      { key: "exemptRoleIds", label: "Исключённые роли", type: "textarea", description: "ID через пробел или новую строку." },
       { key: "deleteMessage", label: "Удалять нарушающее сообщение", type: "boolean" },
       { key: "timeoutMinutes", label: "Timeout, минут", type: "number", min: 0, max: 40320 }
     ],
@@ -142,6 +149,13 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       maxCapsRatio: "max_caps_ratio",
       maxRepeatedMessages: "max_repeated_messages",
       repeatedWindowSeconds: "repeated_window_seconds",
+      blockLinks: "block_links",
+      blockInvites: "block_invites",
+      maxLinks: "max_links",
+      maxEmojis: "max_emojis",
+      maxLineLength: "max_line_length",
+      exemptChannelIds: "exempt_channel_ids",
+      exemptRoleIds: "exempt_role_ids",
       deleteMessage: "delete_message",
       timeoutMinutes: "timeout_minutes"
     }
