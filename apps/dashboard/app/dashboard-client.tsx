@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { RolePanelsEditor } from "./role-panels-editor";
+import { BackupPanel } from "./backup-panel";
 
 type Guild = { id: string; name: string; icon: string | null };
 type ModuleState = Record<string, boolean>;
@@ -238,20 +239,6 @@ export function DashboardClient() {
     setActionMessage("Конфигурация экспортирована.");
   }
 
-  async function createBackup() {
-    if (!guildId) return;
-    setActionMessage("");
-    const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/backup", {
-      method: "POST"
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError("Не удалось создать backup.");
-      return;
-    }
-    setActionMessage("Backup создан: " + (body.file ?? "ok"));
-  }
-
   async function importConfig(file: File) {
     if (!guildId) return;
     setActionMessage("");
@@ -314,7 +301,6 @@ export function DashboardClient() {
                 }}
               />
             </label>
-            <button type="button" onClick={() => void createBackup()} style={buttonStyle("secondary")}>Backup</button>
             <button
               type="button"
               onClick={() => void logout()}
@@ -470,6 +456,10 @@ export function DashboardClient() {
                   </div>
                 </>
               )}
+            </div>
+
+            <div style={{ ...panelStyle, padding: 22 }}>
+              <BackupPanel guildId={guildId} onChanged={reloadAudit} />
             </div>
 
             <div style={{ ...panelStyle, padding: 22 }}>
