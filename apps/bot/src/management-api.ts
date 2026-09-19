@@ -762,7 +762,62 @@ class RequestInputError extends Error {
   }
 }
 
-async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function validateAutomationPayload(
+  client: Client,
+  guildId: string,
+  event: string,
+  conditions: unknown[],
+  actions: unknown[]
+): void {
+  const supportedEvents = new Set([
+    "member.join","member.leave","message.create","voice.join","voice.leave","voice.move"
+  ]);
+  if (!supportedEvents.has(event)) throw new RequestInputError("unsupported_automation_event", 400);
+
+  for (const condition of conditions) {
+    if (!condition || typeof condition !== "object" || Array.isArray(condition)) {
+      throw new RequestInputError("invalid_automation_condition", 400);
+    }
+    const item = condition as Record<string, unknown>;
+    if (item.type === "channel-is") {
+      if (typeof item.channelId !== "string") throw new RequestInputError("invalid_condition_channel", 400);
+      const channel = client.guilds.cache.get(guildId)?.channels.cache.get(item.channelId);
+      if (!channel || channel.type !== 0) throw new RequestInputError("invalid_condition_channel", 400);
+      continue;
+    }
+    if (item.type === "contains" || item.type === "equals") {
+      if (item.left !== "content" || typeof item.right !== "string" || item.right.length > 200) {
+        throw new RequestInputError("invalid_content_condition", 400);
+      }
+      continue;
+    }
+    throw new RequestInputError("unsupported_automation_condition", 400);
+  }
+
+  for (const action of actions) {
+    if (!action || typeof action !== "object" || Array.isArray(action)) {
+      throw new RequestInputError("invalid_automation_action", 400);
+    }
+    const item = action as Record<string, unknown>;
+    if (item.type === "log") {
+      if (typeof item.message !== "string" || item.message.length > 1000) {
+        throw new RequestInputError("invalid_log_action", 400);
+      }
+      continue;
+    }
+    if (item.type === "send-message") {
+      if (typeof item.channelId !== "string" || typeof item.content !== "string" || item.content.length > 2000) {
+        throw new RequestInputError("invalid_send_message_action", 400);
+      }
+      const channel = client.guilds.cache.get(guildId)?.channels.cache.get(item.channelId);
+      if (!channel || channel.type !== 0) throw new RequestInputError("invalid_send_message_channel", 400);
+      continue;
+    }
+    throw new RequestInputError("unsupported_automation_action", 400);
+  }
+}
+
+function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
   let size = 0;
   const chunks: Buffer[] = [];
 
