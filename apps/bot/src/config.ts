@@ -139,11 +139,13 @@ export function loadConfig(): AppConfig {
   }
 
   const managementApiHost = process.env.MANAGEMENT_API_HOST ?? "127.0.0.1";
+  const containerized = process.env.DSP_CONTAINERIZED === "true";
   if (
     nodeEnv === "production" &&
-    !["127.0.0.1", "::1", "localhost"].includes(managementApiHost)
+    !["127.0.0.1", "::1", "localhost"].includes(managementApiHost) &&
+    !(containerized && managementApiHost === "0.0.0.0")
   ) {
-    throw new Error("MANAGEMENT_API_HOST must be loopback in production");
+    throw new Error("MANAGEMENT_API_HOST must be loopback in production unless the container network is explicitly enabled");
   }
 
   if (nodeEnv === "production" && backupS3 && !backupS3.endpoint.startsWith("https://")) {
