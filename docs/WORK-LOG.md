@@ -70,3 +70,17 @@ Never write credentials, tokens or private user data here.
 - Latest full CI baseline before the newest fleet commit passed all checks on commit `9838005dd3b0d8d6b37c5b616b06c148636a567c`.
 - Current fleet change still requires a complete CI run before being considered verified.
 - Next concrete work: finish Music repeat/autoplay/provider breadth, deepen Security/AutoMod response workflows, then expand fleet health/failover and full E2E/chaos/soak validation.
+
+
+## 2026-09-19 — Verified fleet/Music/security hardening
+- Verified HEAD: `670231a88e88d954ac44a01ca36c969c301a19e2`
+- GitHub Actions run `35436484093` passed every CI stage: Actions checkout/setup, source hygiene, deployment config, bot typecheck, 23 bot tests, bot build and Dashboard production build.
+- Music now has persistent repeat modes (`off`, `track`, `queue`) and guild-scoped autoplay, including resume-state restoration and same-voice/Manage Server control checks.
+- Multi-bot Music routing is persistent per guild + voice channel; secondary identities register only Music interactions; primary Dashboard access remains available across its visible guilds.
+- Background reminders, giveaways, notifications and Automation schedule rules are scoped through `guild_bot_assignments`, preventing duplicate processing across bot processes.
+- Security burst detection now latches incidents for the configured window instead of repeatedly applying destructive responses to every subsequent event.
+- Notifications advance feed cursors only after successful Discord delivery; SSRF network filtering covers special/private/mapped address classes.
+- AutoMod extended settings persistence is regression-covered.
+- GitHub Actions workflow now uses current Node 24-based `checkout@v7` / `setup-node@v7` majors.
+- Known limitation remains live Discord E2E/chaos/soak validation because it requires user-owned Discord/Lavalink infrastructure and credentials.
+- Next engineering focus: deepen Security/AutoMod response workflows, expand Music provider/failover validation, strengthen full fleet orchestration and complete the release-gate E2E/chaos/security matrix.
