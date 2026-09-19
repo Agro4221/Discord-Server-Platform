@@ -145,6 +145,102 @@ export class ManagementApiServer {
             return;
           }
 
+          const musicBotsMatch = path.match(/^\/api\/guilds\/([^/]+)\/music-bots$/);
+          const musicBotAssignMatch = path.match(/^\/api\/guilds\/([^/]+)\/music-bots\/assign$/);
+          const musicBotItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/music-bots\/([^/]+)$/);
+
+          if ((musicBotsMatch || musicBotAssignMatch || musicBotItemMatch) && !this.options.identities) {
+            this.json(res, 500, { error: "fleet_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && musicBotsMatch) {
+            const guildId = musicBotsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+
+            this.json(res, 200, {
+              guildId,
+              assignments: await this.options.identities!.listMusicAssignments(guildId)
+            });
+            return;
+          }
+
+          if (method === "POST" && musicBotAssignMatch) {
+            const guildId = musicBotAssignMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+
+            const body = await readJson(req);
+            if (
+              typeof body.botIdentityId !== "string" ||
+              body.botIdentityId.length < 1 ||
+              body.botIdentityId.length > 100 ||
+              typeof body.voiceChannelId !== "string" ||
+              !/^\d{17,20}$/.test(body.voiceChannelId)
+            ) {
+              throw new RequestInputError("invalid_music_assignment", 400);
+            }
+
+            const channel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(body.voiceChannelId);
+            if (!channel || (channel.type !== 2 && channel.type !== 13)) {
+              throw new RequestInputError("voice_channel_required", 400);
+            }
+
+            const identities = await this.options.identities!.list();
+            const identity = identities.find((item) => item.id === body.botIdentityId);
+            if (!identity || !identity.enabled) throw new RequestInputError("bot_identity_not_available", 400);
+
+            const botMember = await this.options.client.guilds.cache.get(guildId)?.members.fetch(identity.clientId).catch(() => null);
+            if (!botMember?.user.bot) throw new RequestInputError("bot_identity_not_in_guild", 400);
+
+            await this.options.identities!.assignMusicVoice(guildId, body.botIdentityId, body.voiceChannelId);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "fleet.music.voice.assigned",
+              targetType: "bot-identity",
+              targetId: body.botIdentityId,
+              metadata: { voiceChannelId: body.voiceChannelId }
+            });
+            this.json(res, 200, {
+              ok: true,
+              guildId,
+              botIdentityId: body.botIdentityId,
+              voiceChannelId: body.voiceChannelId
+            });
+            return;
+          }
+
+          if (method === "DELETE" && musicBotItemMatch) {
+            const guildId = musicBotItemMatch[1] ?? "";
+            const botIdentityId = musicBotItemMatch[2] ?? "";
+            if (!guildId || !botIdentityId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_music_bot_not_found" });
+              return;
+            }
+
+            const removed = await this.options.identities!.unassignMusicVoice(guildId, botIdentityId);
+            if (!removed) {
+              this.json(res, 404, { error: "music_assignment_not_found" });
+              return;
+            }
+
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "fleet.music.voice.unassigned",
+              targetType: "bot-identity",
+              targetId: botIdentityId
+            });
+            this.json(res, 200, { ok: true, guildId, botIdentityId });
+            return;
+          }
+
           if (method === "GET" && path === "/api/guilds") {
             const guilds = [...this.options.client.guilds.cache.values()]
               .filter((guild) => !this.options.guildAccess || this.options.guildAccess(guild.id))
