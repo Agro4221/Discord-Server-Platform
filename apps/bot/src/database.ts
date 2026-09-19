@@ -29,7 +29,13 @@ export class Database {
       await client.query("COMMIT");
       return result;
     } catch (error) {
-      await client.query("ROLLBACK");
+      await client.query("ROLLBACK").catch((rollbackError) => {
+        logger.error("PostgreSQL transaction rollback failed", {
+          error: String(error),
+          rollbackError: String(rollbackError)
+        });
+      });
+      logger.warn("PostgreSQL transaction rolled back", { error: String(error) });
       throw error;
     } finally {
       client.release();
