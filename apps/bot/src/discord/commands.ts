@@ -3,7 +3,9 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
-  type Client
+  type Client,
+  type SlashCommandOptionsOnlyBuilder,
+  type SlashCommandSubcommandsOnlyBuilder
 } from "discord.js";
 import type { Database } from "../database.js";
 import { logger } from "../logger.js";
@@ -11,7 +13,7 @@ import { PermissionChecker } from "./permissions.js";
 import { TemporaryVoice } from "../modules/temporary-voice.js";
 import { Moderation } from "../modules/moderation.js";
 
-export function buildCommands(): SlashCommandBuilder[] {
+export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder | SlashCommandOptionsOnlyBuilder> {
   return [
     new SlashCommandBuilder()
       .setName("ping")
@@ -525,7 +527,7 @@ export async function handleCommand(
         return;
       }
 
-      await temporaryVoice.configure(interaction.guild.id, {
+      await temporaryVoice.configure(interaction.guild!.id, {
         enabled: true,
         triggerChannelId: trigger.id,
         categoryId: category?.id ?? null,
@@ -539,7 +541,7 @@ export async function handleCommand(
       });
 
       logger.info("Temporary voice configured", {
-        guildId: interaction.guild.id,
+        guildId: interaction.guild!.id,
         triggerChannelId: trigger.id,
         categoryId: category?.id ?? null,
         privateByDefault
@@ -561,7 +563,7 @@ export async function handleCommand(
     }
 
     const limit = interaction.options.getInteger("limit") ?? 10;
-    const cases = await moderation.history(interaction.guild.id, target.id, limit);
+    const cases = await moderation.history(interaction.guild!.id, target.id, limit);
     const content = cases.length === 0
       ? "История модерации пуста."
       : cases
@@ -581,7 +583,7 @@ export async function handleCommand(
     return;
   }
 
-  const member = await interaction.guild.members.fetch(target.id).catch(() => null);
+  const member = await interaction.guild!.members.fetch(target.id).catch(() => null);
   if (!member) {
     await interaction.reply({
       content: "Пользователь не найден среди участников сервера.",
