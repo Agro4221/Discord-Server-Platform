@@ -42,3 +42,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Added audit-event coverage for handled violations.
 - Fixed channel/role exemption ID parsing.
 - Live Discord matrix remains intentionally unchecked until the release-gate environment is exercised.
+
+
+### 2026-09-19 — Local deployment UX
+- Windows local launcher contract added and checked statically.
+- Actual Windows/Docker Desktop runtime execution remains a user-side/live validation task.

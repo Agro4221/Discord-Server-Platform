@@ -87,3 +87,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Added coverage for blocked words, mentions, links/invites, emoji spam, line length, excessive caps and repeated messages.
 - AutoMod violations now write durable `audit_events` entries with the rule, message ID and whether configured delete/timeout actions actually succeeded.
 - Fixed exemption ID parsing so comma-, whitespace-, newline- and tab-separated channel/role IDs are handled correctly.
+
+
+## 2026-09-19 — Local-first Windows launcher
+- Added `scripts/start-local.ps1` for the primary local-PC workflow.
+- First launch bootstraps `.env`, prompts only for Discord credentials and Dashboard admin password, generates local secrets, validates Compose, waits for bot + Dashboard health and opens Control Center.
+- `-Rebuild`, `-NoOpen` and `-Down` cover the common local lifecycle without requiring manual Docker commands.
+- Local ports remain loopback-only by default.
+- Windows runtime validation is not available in this execution environment; CI validates the surrounding deployment contract and the launcher is intentionally dependency-light.

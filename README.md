@@ -8,6 +8,18 @@ Discord Gateway -> Discord Core -> Typed Event Bus / Module Registry / Health & 
 
 Each feature module owns runtime logic and persistent settings. The dashboard receives field schemas from Core and renders the appropriate controls instead of hard-coding every module form.
 
+## Local-first usage
+
+The normal development/deployment target is the user's own PC. On Windows, start the complete local stack with:
+
+    powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1
+
+The launcher prepares `.env` on first run, asks for the three values that only the user can know, generates local secrets, waits for bot and Dashboard health, and opens the Control Center automatically.
+
+Control Center: `http://127.0.0.1:3000/`
+
+See `docs/LOCAL-SETUP.md` for options and troubleshooting. VPS deployment remains an optional later move using the same Docker topology.
+
 ## Control Center
 
 - module switch = runtime enable/disable

@@ -28,4 +28,18 @@ if (!envExample.includes("DISCORD_TOKEN_MUSIC2") || !envExample.includes("DISCOR
   throw new Error("Secondary Discord credential contract is not documented");
 }
 
+const localLauncher = await readFile("scripts/start-local.ps1", "utf8");
+for (const contract of [
+  "docker compose up -d",
+  "DASHBOARD_ADMIN_PASSWORD",
+  "MANAGEMENT_API_KEY",
+  "DASHBOARD_SESSION_SECRET",
+  "127.0.0.1",
+  "Start-Process"
+]) {
+  if (!localLauncher.includes(contract)) {
+    throw new Error("Local launcher contract missing: " + contract);
+  }
+}
+
 console.log("Deployment contract passed.");

@@ -94,3 +94,12 @@ Never write credentials, tokens or private user data here.
 - Added regression coverage for exemption parsing and audit-event emission.
 - Live Discord behavior remains unverified here; CI must provide the Node 24.17 dependency/build/test environment.
 - Next concrete focus remains richer AutoMod/Security response workflows, then Music provider/failover depth and broader fleet/release-gate validation.
+
+
+## 2026-09-19 — Local-first Windows launcher
+- Branch: `development`.
+- Added `scripts/start-local.ps1` as the local-PC entrypoint.
+- Updated README and LOCAL-SETUP to make the Windows local path the primary documented workflow.
+- Launcher bootstraps `.env`, generates management/database/Lavalink/session secrets, waits for bot and Dashboard health and auto-opens the Control Center.
+- Added static deployment-contract checks for the launcher.
+- Windows execution itself is not available in this Linux environment; this remains an explicit validation limitation.
