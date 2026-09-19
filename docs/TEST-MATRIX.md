@@ -90,3 +90,9 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-09-19 — Security audit-window snapshot
 - Destructive-burst audit-log executor lookup now uses the configured destructive window and is covered by deterministic cutoff tests.
 - Live destructive-event/audit-log correlation remains a release-gate validation case.
+
+
+### 2026-09-19 — Moderation unban coverage
+- Added slash-command shape coverage for /moderate unban.
+- Added service-level regression coverage for the Discord unban action and moderation-case persistence.
+- Live banned-user/unban behavior remains part of the Discord smoke test.
