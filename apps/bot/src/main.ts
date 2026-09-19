@@ -128,6 +128,11 @@ async function main(): Promise<void> {
     settings: dashboardSettings,
     transfer,
     backups,
+    giveaways: {
+      list: async (guildId) => giveaways.list(guildId),
+      end: async (guildId, giveawayId) => giveaways.endGiveaway(giveawayId, guildId),
+      reroll: async (guildId, giveawayId) => giveaways.rerollGiveaway(giveawayId, guildId)
+    },
     rolePanels: {
       list: async (guildId) => rolePanels.list(guildId),
       create: async (guildId, input, callbacks) =>
