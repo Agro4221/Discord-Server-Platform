@@ -165,42 +165,24 @@ export class Giveaways implements PlatformModule {
   }
 
   private async sweep(): Promise<void> {
-    const expired = await this.db.query<{
-      id: string;
-      guild_id: string;
-      channel_id: string;
-      message_id: string;
-      prize: string;
-      winners: number;
-    }>(
-      `SELECT id,guild_id,channel_id,message_id,prize,winners
-       FROM giveaways
-       WHERE status='running' AND ends_at <= now()
-       LIMIT 20`
+    const expired = await this.db.query<{ id: string; guild_id: string }>(
+      "SELECT id,guild_id FROM giveaways WHERE status='running' AND ends_at <= now() ORDER BY ends_at LIMIT 20"
     );
 
     for (const giveaway of expired.rows) {
-      const entries = await this.db.query<{ user_id: string }>(
-        "SELECT user_id FROM giveaway_entries WHERE giveaway_id=$1",
-        [giveaway.id]
-      );
+      const result = await this.finish(Number(giveaway.id), giveaway.guild_id);
+      if (!result || !this.client) continue;
 
-      const pool = [...entries.rows.map((row) => row.user_id)];
-      const selected: string[] = [];
-      while (pool.length > 0 && selected.length < giveaway.winners) {
-        selected.push(pool.splice(randomInt(pool.length), 1)[0]!);
+      const channel = this.client.channels.cache.get(result.channelId);
+      if (channel?.isTextBased() && "send" in channel) {
+        const text = result.winners.length
+          ? "🎉 Giveaway #" + result.id + " завершён! Победители: " + result.winners.map((userId) => "<@" + userId + ">").join(", ")
+          : "Giveaway #" + result.id + " завершён. Участников не было.";
+        await channel.send(text).catch(() => undefined);
       }
-
-      await this.db.transaction(async (client) => {
-        await client.query(
-          "UPDATE giveaways SET status='finished',selected_winners=$1::jsonb,finished_at=now() WHERE id=$2 AND status='running'",
-          [JSON.stringify(selected), giveaway.id]
-        );
-      });
-
-      loggerSafe(`Giveaway #${giveaway.id} finished`);
     }
   }
+
 }
 
 function loggerSafe(message: string): void {
