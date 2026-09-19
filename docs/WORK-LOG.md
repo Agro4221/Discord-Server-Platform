@@ -51,3 +51,22 @@ Never write credentials, tokens or private user data here.
 - Added `apps/bot/test/giveaways.test.ts` covering event-bus wiring and rejection after the Giveaway stops running.
 - CI run #277 passed with bot tests/typecheck/build and dashboard build.
 - Remaining release-gate work is unchanged: full live Discord E2E/chaos/soak/security validation, broader AutoMod/Security/Automation depth, Music multi-node failover/provider breadth, multi-bot fleet orchestration/routing, remote backup retention, and VPS install/upgrade tooling.
+
+
+## 2026-09-19 — Reliability and fleet hardening
+- Branch: `development`
+- Fixed sparse Discord member event payload handling in the shared Event Bus.
+- Fixed Dashboard Fleet API auth import that blocked production Dashboard builds.
+- Fixed AutoMod extended settings persistence and added regression coverage.
+- Hardened Security log-channel diagnostics and exposed destructive thresholds in slash setup.
+- Added Music shuffle/seek controls with control-plane permission checks.
+- Fixed Automation `contains` condition to use the configured event field.
+- Hardened automation import validation so malformed imported rules are rejected transactionally.
+- Added local and remote backup retention enforcement.
+- Hardened Notifications SSRF network filtering and added regression coverage.
+- Hardened VPS upgrade prerequisites and removed premature fleet readiness reporting.
+- Updated GitHub Actions checkout/setup-node to current Node 24-based action majors.
+- Added multi-bot Music routing: PostgreSQL assignment table, Management API, Dashboard controls, secondary-identity Music-only interaction routing and migration coverage.
+- Latest full CI baseline before the newest fleet commit passed all checks on commit `9838005dd3b0d8d6b37c5b616b06c148636a567c`.
+- Current fleet change still requires a complete CI run before being considered verified.
+- Next concrete work: finish Music repeat/autoplay/provider breadth, deepen Security/AutoMod response workflows, then expand fleet health/failover and full E2E/chaos/soak validation.
