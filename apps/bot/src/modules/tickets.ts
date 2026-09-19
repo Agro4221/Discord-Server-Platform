@@ -219,7 +219,14 @@ export class Tickets implements PlatformModule {
       const config = await this.config(interaction.guild!.id);
       if (!this.canStaff(interaction, config)) { await interaction.reply({ content: "Кнопка доступна только staff.", ephemeral: true }); return; }
       if (row.status !== "open") { await interaction.reply({ content: "Тикет уже закрыт.", ephemeral: true }); return; }
-      await this.db.query("UPDATE tickets SET claimed_by=$1 WHERE id=$2 AND status='open'", [interaction.user.id,ticketId]);
+      const claimed = await this.db.query<{ claimed_by: string }>(
+        "UPDATE tickets SET claimed_by=$1 WHERE id=$2 AND status='open' AND (claimed_by IS NULL OR claimed_by=$1) RETURNING claimed_by",
+        [interaction.user.id, ticketId]
+      );
+      if (!claimed.rows[0]) {
+        await interaction.reply({ content: "Тикет уже закреплён за другим staff или закрывается.", ephemeral: true });
+        return;
+      }
       await interaction.reply({ content: "Тикет закреплён за тобой.", ephemeral: true });
       return;
     }
@@ -227,13 +234,43 @@ export class Tickets implements PlatformModule {
     if (action === "close") {
       const config = await this.config(interaction.guild!.id);
       if (interaction.user.id !== row.creator_id && !this.canStaff(interaction, config)) { await interaction.reply({ content: "Недостаточно прав.", ephemeral: true }); return; }
-      const channel = interaction.guild!.channels.cache.get(row.channel_id);
+      const claimedClose = await this.db.query<{ channel_id: string }>(
+        "UPDATE tickets SET status='closing' WHERE id=$1 AND guild_id=$2 AND status='open' RETURNING channel_id",
+        [ticketId, interaction.guild!.id]
+      );
+      if (!claimedClose.rows[0]) {
+        await interaction.reply({ content: "Тикет уже закрывается или закрыт.", ephemeral: true });
+        return;
+      }
+
+      const channel = interaction.guild!.channels.cache.get(claimedClose.rows[0].channel_id);
       await interaction.deferReply({ ephemeral: true });
-      const transcript = channel?.type === ChannelType.GuildText ? await this.transcript(channel) : "Transcript unavailable.";
-      await this.db.transaction(async (client) => {
-        await client.query("INSERT INTO ticket_transcripts(ticket_id,guild_id,content) VALUES($1,$2,$3) ON CONFLICT(ticket_id) DO UPDATE SET content=EXCLUDED.content", [ticketId,interaction.guild!.id,transcript]);
-        await client.query("UPDATE tickets SET status='closed',closed_at=now() WHERE id=$1 AND status='open'", [ticketId]);
-      });
+      try {
+        const transcript = channel?.type === ChannelType.GuildText ? await this.transcript(channel) : "Transcript unavailable.";
+        await this.db.transaction(async (client) => {
+          await client.query(
+            "INSERT INTO ticket_transcripts(ticket_id,guild_id,content) VALUES($1,$2,$3) ON CONFLICT(ticket_id) DO UPDATE SET content=EXCLUDED.content",
+            [ticketId,interaction.guild!.id,transcript]
+          );
+          await client.query(
+            "UPDATE tickets SET status='closed',closed_at=now() WHERE id=$1 AND status='closing'",
+            [ticketId]
+          );
+        });
+      } catch (error) {
+        await this.db.query("UPDATE tickets SET status='open' WHERE id=$1 AND status='closing'", [ticketId])
+          .catch((rollbackError) => logger.error("Ticket close rollback failed", {
+            guildId: interaction.guild!.id,
+            ticketId,
+            error: String(rollbackError)
+          }));
+        logger.error("Ticket close transaction failed", {
+          guildId: interaction.guild!.id,
+          ticketId,
+          error: String(error)
+        });
+        throw error;
+      }
 
       if (config.transcriptChannelId) {
         const transcriptChannel = interaction.guild!.channels.cache.get(config.transcriptChannelId);
