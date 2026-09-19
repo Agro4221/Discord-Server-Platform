@@ -144,13 +144,14 @@ export class Tickets implements PlatformModule {
       ]
     });
 
+    let ticketId: string | undefined;
     try {
       const inserted = await this.db.query<{ id: string }>(
         `INSERT INTO tickets(guild_id,channel_id,creator_id,status)
          VALUES($1,$2,$3,'open') RETURNING id`,
         [interaction.guild!.id,channel.id,interaction.user.id]
       );
-      const ticketId = inserted.rows[0]?.id;
+      ticketId = inserted.rows[0]?.id;
       if (!ticketId) throw new Error("ticket_id_missing");
 
       await channel.send({
@@ -194,7 +195,7 @@ export class Tickets implements PlatformModule {
     } catch (error) {
       logger.warn("Ticket creation success response failed", {
         guildId: interaction.guild!.id,
-        ticketId,
+        ticketId: ticketId ?? "unknown",
         channelId: channel.id,
         error: String(error)
       });
