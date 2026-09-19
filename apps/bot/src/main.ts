@@ -28,6 +28,8 @@ import { ModuleSettingsRepository } from "./module-settings.js";
 import { AuditLog } from "./audit.js";
 import { PlatformEventBus } from "./events.js";
 import { BotIdentityRepository } from "./bot-identity.js";
+import { ConfigTransferService } from "./config-transfer.js";
+import { BackupService } from "./backup.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -38,6 +40,8 @@ async function main(): Promise<void> {
   const dashboardSettings = new DashboardSettingsService(database);
   const identities = new BotIdentityRepository(database);
   await identities.ensureIdentity(config.botIdentityId, config.discordClientId);
+  const transfer = new ConfigTransferService(database);
+  const backups = new BackupService(database, config.backupDirectory);
   const events = new PlatformEventBus();
 
   await health.start(config.healthHost, config.healthPort);
@@ -120,7 +124,9 @@ async function main(): Promise<void> {
     client,
     moduleSettings,
     auditLog,
-    settings: dashboardSettings
+    settings: dashboardSettings,
+    transfer,
+    backups
   });
   await management.start();
 
