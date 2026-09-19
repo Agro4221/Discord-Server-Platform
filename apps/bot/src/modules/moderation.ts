@@ -9,6 +9,17 @@ import type { PlatformModule, ModuleContext } from "../module.js";
 
 type ModerationAction = "warn" | "timeout" | "kick" | "ban" | "unban";
 
+export type ModerationCase = {
+  id: number;
+  guildId: string;
+  targetUserId: string;
+  moderatorUserId: string;
+  action: ModerationAction;
+  reason: string | null;
+  expiresAt: Date | null;
+  createdAt: Date;
+};
+
 export class Moderation implements PlatformModule {
   readonly name = "moderation";
 
@@ -36,26 +47,67 @@ export class Moderation implements PlatformModule {
     return Number(result.rows[0]?.id);
   }
 
+  async history(guildId: string, targetUserId: string, limit = 10): Promise<ModerationCase[]> {
+    const safeLimit = Math.min(Math.max(limit, 1), 50);
+    const result = await this.db.query<{
+      id: string;
+      guild_id: string;
+      target_user_id: string;
+      moderator_user_id: string;
+      action: ModerationAction;
+      reason: string | null;
+      expires_at: Date | null;
+      created_at: Date;
+    }>(
+      `SELECT id,guild_id,target_user_id,moderator_user_id,action,reason,expires_at,created_at
+       FROM moderation_cases
+       WHERE guild_id=$1 AND target_user_id=$2
+       ORDER BY created_at DESC
+       LIMIT $3`,
+      [guildId, targetUserId, safeLimit]
+    );
+
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      guildId: row.guild_id,
+      targetUserId: row.target_user_id,
+      moderatorUserId: row.moderator_user_id,
+      action: row.action,
+      reason: row.reason,
+      expiresAt: row.expires_at,
+      createdAt: row.created_at
+    }));
+  }
+
+  private async enabled(guildId: string): Promise<boolean> {
+    const result = await this.db.query<{ enabled: boolean }>(
+      "SELECT enabled FROM guild_modules WHERE guild_id=$1 AND module_key='moderation'",
+      [guildId]
+    );
+    return result.rows[0]?.enabled ?? true;
+  }
+
   async warn(interaction: ChatInputCommandInteraction, target: User, reason: string): Promise<void> {
-    if (!interaction.guild || !interaction.memberPermissions?.has(PermissionFlagsBits.ModerateMembers)) {
+    if (!interaction.guild || !await this.enabled(interaction.guild.id)) {
+      await interaction.reply({ content: "Модуль Moderation выключен для этого сервера.", ephemeral: true });
+      return;
+    }
+
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ModerateMembers)) {
       await interaction.reply({ content: "Недостаточно прав: Moderate Members.", ephemeral: true });
       return;
     }
 
-    const caseId = await this.record(
-      interaction.guild.id,
-      target.id,
-      interaction.user.id,
-      "warn",
-      reason
-    );
-
+    const caseId = await this.record(interaction.guild.id, target.id, interaction.user.id, "warn", reason);
     await interaction.reply({
       content: `Предупреждение выдано ${target}. Case #${caseId}.`,
       ephemeral: true
     });
 
-    await this.safeDm(target, `На сервере ${interaction.guild.name} тебе выдано предупреждение. Причина: ${reason}`);
+    await this.safeDm(
+      target,
+      `На сервере ${interaction.guild.name} тебе выдано предупреждение. Причина: ${reason}`
+    );
   }
 
   async timeout(
@@ -64,8 +116,21 @@ export class Moderation implements PlatformModule {
     durationMinutes: number,
     reason: string
   ): Promise<void> {
-    if (!interaction.guild || !interaction.memberPermissions?.has(PermissionFlagsBits.ModerateMembers)) {
+    if (!interaction.guild || !await this.enabled(interaction.guild.id)) {
+      await interaction.reply({ content: "Модуль Moderation выключен для этого сервера.", ephemeral: true });
+      return;
+    }
+
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ModerateMembers)) {
       await interaction.reply({ content: "Недостаточно прав: Moderate Members.", ephemeral: true });
+      return;
+    }
+
+    if (!member.moderatable) {
+      await interaction.reply({
+        content: "Я не могу применить timeout к этому участнику: проверь role hierarchy и права бота.",
+        ephemeral: true
+      });
       return;
     }
 
@@ -87,13 +152,26 @@ export class Moderation implements PlatformModule {
   }
 
   async kick(interaction: ChatInputCommandInteraction, member: GuildMember, reason: string): Promise<void> {
-    if (!interaction.guild || !interaction.memberPermissions?.has(PermissionFlagsBits.KickMembers)) {
+    if (!interaction.guild || !await this.enabled(interaction.guild.id)) {
+      await interaction.reply({ content: "Модуль Moderation выключен для этого сервера.", ephemeral: true });
+      return;
+    }
+
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.KickMembers)) {
       await interaction.reply({ content: "Недостаточно прав: Kick Members.", ephemeral: true });
       return;
     }
 
-    const caseId = await this.record(interaction.guild.id, member.id, interaction.user.id, "kick", reason);
+    if (!member.kickable) {
+      await interaction.reply({
+        content: "Я не могу исключить этого участника: проверь role hierarchy и права бота.",
+        ephemeral: true
+      });
+      return;
+    }
+
     await member.kick(reason);
+    const caseId = await this.record(interaction.guild.id, member.id, interaction.user.id, "kick", reason);
 
     await interaction.reply({
       content: `${member.user.tag} исключён. Case #${caseId}.`,
@@ -102,13 +180,26 @@ export class Moderation implements PlatformModule {
   }
 
   async ban(interaction: ChatInputCommandInteraction, member: GuildMember, reason: string): Promise<void> {
-    if (!interaction.guild || !interaction.memberPermissions?.has(PermissionFlagsBits.BanMembers)) {
+    if (!interaction.guild || !await this.enabled(interaction.guild.id)) {
+      await interaction.reply({ content: "Модуль Moderation выключен для этого сервера.", ephemeral: true });
+      return;
+    }
+
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.BanMembers)) {
       await interaction.reply({ content: "Недостаточно прав: Ban Members.", ephemeral: true });
       return;
     }
 
-    const caseId = await this.record(interaction.guild.id, member.id, interaction.user.id, "ban", reason);
+    if (!member.bannable) {
+      await interaction.reply({
+        content: "Я не могу заблокировать этого участника: проверь role hierarchy и права бота.",
+        ephemeral: true
+      });
+      return;
+    }
+
     await member.ban({ reason });
+    const caseId = await this.record(interaction.guild.id, member.id, interaction.user.id, "ban", reason);
 
     await interaction.reply({
       content: `${member.user.tag} заблокирован. Case #${caseId}.`,
