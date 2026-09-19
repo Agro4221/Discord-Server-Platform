@@ -370,6 +370,13 @@ const migrations = [
       "ALTER TABLE automod_settings ADD COLUMN IF NOT EXISTS exempt_channel_ids text NOT NULL DEFAULT '';",
       "ALTER TABLE automod_settings ADD COLUMN IF NOT EXISTS exempt_role_ids text NOT NULL DEFAULT '';"
     ])
+  },
+  {
+    version: 18,
+    name: "verification_quarantine_role",
+    sql: q([
+      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS quarantine_role_id text;"
+    ])
   }
 ] as const;
 
