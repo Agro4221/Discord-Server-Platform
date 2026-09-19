@@ -16,6 +16,8 @@ import { Economy } from "./modules/economy.js";
 import { Reminders } from "./modules/reminders.js";
 import { Starboard } from "./modules/starboard.js";
 import { AutomationEngine } from "./modules/automation-engine.js";
+import { Security } from "./modules/security.js";
+import { Notifications } from "./modules/notifications.js";
 import { createDiscordClient, registerCommands, routeCommand, wireDiscordEvents } from "./discord/bot.js";
 import { ConnectionSupervisor } from "./discord/connection-supervisor.js";
 import { ManagementApiServer } from "./management-api.js";
@@ -58,6 +60,8 @@ async function main(): Promise<void> {
   const reminders = new Reminders(database);
   const starboard = new Starboard(database);
   const automation = new AutomationEngine(database);
+  const security = new Security(database);
+  const notifications = new Notifications(database);
 
   const modules = new ModuleRegistry({
     client,
@@ -78,6 +82,8 @@ async function main(): Promise<void> {
   modules.register(reminders);
   modules.register(starboard);
   modules.register(automation);
+  modules.register(security);
+  modules.register(notifications);
 
   for (const name of modules.list()) health.setModule(name, "starting");
 
