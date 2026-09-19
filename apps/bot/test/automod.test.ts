@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AutoMod, detectAutoModViolation } from "../src/modules/automod.js";
+import { AutoMod, detectAutoModViolation, parseAutoModIdList } from "../src/modules/automod.js";
 
 test("AutoMod configure sends every extended setting to PostgreSQL", async () => {
   const queries: Array<{ text: string; values: readonly unknown[] }> = [];
@@ -179,4 +179,12 @@ test("AutoMod records a durable audit event for a handled violation", async () =
       timedOut: false
     }
   });
+});
+
+
+test("AutoMod exemption parser accepts whitespace- and comma-separated IDs", () => {
+  assert.deepEqual(
+    [...parseAutoModIdList("channel-1, channel-2\nchannel-3\tchannel-4")],
+    ["channel-1", "channel-2", "channel-3", "channel-4"]
+  );
 });
