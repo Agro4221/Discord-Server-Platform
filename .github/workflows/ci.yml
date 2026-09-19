@@ -28,9 +28,13 @@ jobs:
           --health-interval=5s
           --health-timeout=5s
           --health-retries=30
+
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
         with:
           node-version: 24.17.0
 
@@ -61,67 +65,8 @@ jobs:
       - name: Test bot
         run: npm test
 
-      - name: Build bot
-        run: npm run build:bot
-
-      - name: Build dashboard
-        run: npm run build -w apps/dashboard
- scripts/install-vps.sh
-          grep -q 'set -euo pipefail' scripts/upgrade.sh
-          grep -q 'management_api_host' docs/MASTER-PLAN.md || true
-
-      - name: Check observability contract
-        run: node scripts/check-observability.mjs
-
-      - name: Check deployment contract
-        run: node scripts/check-deployment-contract.mjs
-
-      - name: Typecheck bot
-        run: npm run typecheck
-
-      - name: Test bot
-        run: npm test
-
-      - name: Build bot
-        run: npm run build:bot
-
-      - name: Build dashboard
-        run: npm run build -w apps/dashboard
- scripts/upgrade.sh
-          grep -q 'management_api_host' docs/MASTER-PLAN.md || true
-
-      - name: Check observability contract
-        run: node scripts/check-observability.mjs
-
-      - name: Check deployment contract
-        run: node scripts/check-deployment-contract.mjs
-
-      - name: Typecheck bot
-        run: npm run typecheck
-
-      - name: Test bot
-        run: npm test
-
-      - name: Build bot
-        run: npm run build:bot
-
-      - name: Build dashboard
-        run: npm run build -w apps/dashboard
- scripts/install-vps.sh
-          grep -q 'set -euo pipefail' scripts/upgrade.sh
-          grep -q 'management_api_host' docs/MASTER-PLAN.md || true
-
-      - name: Check observability contract
-        run: node scripts/check-observability.mjs
-
-      - name: Check deployment contract
-        run: node scripts/check-deployment-contract.mjs
-
-      - name: Typecheck bot
-        run: npm run typecheck
-
-      - name: Test bot
-        run: npm test
+      - name: Build domain
+        run: npm run build:domain
 
       - name: Build bot
         run: npm run build:bot
