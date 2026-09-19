@@ -1,3 +1,5 @@
+import { resolveIdentityEnv } from "./bot-identity.js";
+
 export type AppConfig = {
   discordToken: string;
   discordClientId: string;
@@ -129,15 +131,17 @@ function parseLavalinkNodes(): AppConfig["lavalinkNodes"] {
 
 export function loadConfig(): AppConfig {
   const backupS3 = parseBackupS3();
+  const botIdentityId = process.env.BOT_IDENTITY_ID ?? "primary";
+  const discordCredentials = resolveIdentityEnv(botIdentityId);
   const nodeEnv = (process.env.NODE_ENV ?? "development") as AppConfig["nodeEnv"];
   if (!["development", "test", "production"].includes(nodeEnv)) {
     throw new Error("NODE_ENV must be development, test, or production");
   }
 
   return {
-    discordToken: required("DISCORD_TOKEN"),
-    discordClientId: required("DISCORD_CLIENT_ID"),
-    botIdentityId: process.env.BOT_IDENTITY_ID ?? "primary",
+    discordToken: discordCredentials.token,
+    discordClientId: discordCredentials.clientId,
+    botIdentityId,
     ...(process.env.DISCORD_TEST_GUILD_ID ? { discordTestGuildId: process.env.DISCORD_TEST_GUILD_ID } : {}),
     healthHost: process.env.HEALTH_HOST ?? "127.0.0.1",
     healthPort: port("HEALTH_PORT", 3001),
