@@ -1,0 +1,76 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: discord_platform
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-postgres}
+    volumes:
+      - dsp-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d discord_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [dsp]
+
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4.2.2
+    restart: unless-stopped
+    environment:
+      _JAVA_OPTIONS: "-Xms256m -Xmx768m"
+      LAVALINK_SERVER_PASSWORD: ${LAVALINK_PASSWORD:-change-me-local}
+    volumes:
+      - ./infrastructure/lavalink/application.yml:/opt/Lavalink/application.yml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:2333/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks: [dsp]
+
+  bot:
+    build:
+      context: .
+      dockerfile: apps/bot/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change-me-postgres}@postgres:5432/discord_platform
+      LAVALINK_HOST: lavalink
+      LAVALINK_PORT: 2333
+      HEALTH_HOST: 0.0.0.0
+      MANAGEMENT_API_HOST: 0.0.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      lavalink:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${HEALTH_PORT:-3001}:3001"
+      - "127.0.0.1:${MANAGEMENT_API_PORT:-3002}:3002"
+    networks: [dsp]
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+    restart: unless-stopped
+    environment:
+      BOT_HEALTH_URL: http://bot:3001/health
+      MANAGEMENT_API_URL: http://bot:3002
+      MANAGEMENT_API_KEY: ${MANAGEMENT_API_KEY}
+    depends_on:
+      - bot
+    ports:
+      - "127.0.0.1:${DASHBOARD_PORT:-3000}:3000"
+    networks: [dsp]
+
+networks:
+  dsp:
+    driver: bridge
+
+volumes:
+  dsp-postgres:
