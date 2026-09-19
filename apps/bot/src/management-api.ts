@@ -5,6 +5,8 @@ import { logger } from "./logger.js";
 import { ModuleSettingsRepository } from "./module-settings.js";
 import { MODULE_CATALOG, type ModuleKey } from "./modules/catalog.js";
 import { AuditLog } from "./audit.js";
+import { DashboardSettingsService, moduleExists } from "./dashboard-settings.js";
+import { guildResources } from "./discord/resources.js";
 
 type ApiOptions = {
   host: string;
@@ -13,6 +15,7 @@ type ApiOptions = {
   client: Client;
   moduleSettings: ModuleSettingsRepository;
   auditLog: AuditLog;
+  settings: DashboardSettingsService;
 };
 
 type RateWindow = { startedAt: number; count: number };
@@ -62,6 +65,74 @@ export class ManagementApiServer {
 
             const modules = await this.options.moduleSettings.list(guildId);
             this.json(res, 200, { guildId, catalog: MODULE_CATALOG, modules });
+            return;
+          }
+
+          const resourcesMatch = path.match(/^\/api\/guilds\/([^/]+)\/resources$/);
+          if (method === "GET" && resourcesMatch) {
+            const guildId = resourcesMatch[1];
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, guildResources(this.options.client, guildId));
+            return;
+          }
+
+          const settingsMatch = path.match(/^\/api\/guilds\/([^/]+)\/settings\/([^/]+)$/);
+          if (settingsMatch) {
+            const guildId = settingsMatch[1];
+            const moduleKey = settingsMatch[2] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (!moduleExists(moduleKey)) {
+              this.json(res, 400, { error: "unknown_module" });
+              return;
+            }
+
+            if (method === "GET") {
+              this.json(res, 200, {
+                guildId,
+                moduleKey,
+                schema: this.options.settings.schema(moduleKey)[0] ?? null,
+                values: await this.options.settings.get(guildId, moduleKey)
+              });
+              return;
+            }
+
+            if (method === "PUT") {
+              const body = await readJson(req);
+              const values = body.values;
+              if (!values || typeof values !== "object" || Array.isArray(values)) {
+                this.json(res, 400, { error: "values_must_be_object" });
+                return;
+              }
+
+              const saved = await this.options.settings.set(
+                guildId,
+                moduleKey,
+                values as Record<string, unknown>
+              );
+
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "module.settings.updated",
+                targetType: "module",
+                targetId: moduleKey,
+                metadata: { fields: Object.keys(values as object) }
+              });
+
+              this.json(res, 200, { guildId, moduleKey, values: saved });
+              return;
+            }
+          }
+
+          const schemasMatch = path === "/api/module-schemas"; 
+          if (method === "GET" && schemasMatch) {
+            this.json(res, 200, { schemas: this.options.settings.schema() });
             return;
           }
 
