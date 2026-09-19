@@ -300,7 +300,10 @@ async function assertSafeFeedUrl(raw: string): Promise<void> {
 
 export function isPrivateIp(address: string): boolean {
   if (net.isIPv4(address)) {
-    const [a,b] = address.split(".").map(Number);
+    const parts = address.split(".").map(Number);
+    const a = parts[0];
+    const b = parts[1];
+    if (a === undefined || b === undefined) return false;
     if (
       a === 0 ||
       a === 10 ||
@@ -327,10 +330,12 @@ export function isPrivateIp(address: string): boolean {
     return true;
   }
 
-  if (normalized.startsWith("::ffff:")) {
-    const mapped = normalized.slice("::ffff:").split(".").length === 4
-      ? normalized.slice("::ffff:")
-      : ipv4FromMappedHex(normalized.slice("::ffff:"));
+  const mappedPrefix = "::ffff:";
+  if (normalized.startsWith(mappedPrefix)) {
+    const mappedValue = normalized.slice(mappedPrefix.length);
+    const mapped = mappedValue.split(".").length === 4
+      ? mappedValue
+      : ipv4FromMappedHex(mappedValue);
     return net.isIPv4(mapped) ? isPrivateIp(mapped) : false;
   }
 
