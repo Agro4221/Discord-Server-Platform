@@ -25,6 +25,7 @@ type Rule = {
   enabled: boolean;
   event: string;
   all: Condition[];
+  any: Condition[];
   actions: Action[];
   cooldownSeconds: number;
 };
@@ -57,6 +58,7 @@ export function AutomationPanel({
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [enabled, setEnabled] = useState(true);
   const [conditions, setConditions] = useState<Condition[]>([]);
+  const [anyConditions, setAnyConditions] = useState<Condition[]>([]);
   const [actions, setActions] = useState<Action[]>([{ type: "send-message", channelId: "", content: "" }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -80,6 +82,7 @@ export function AutomationPanel({
     setCooldownSeconds(0);
     setEnabled(true);
     setConditions([]);
+    setAnyConditions([]);
     setActions([{ type: "send-message", channelId: "", content: "" }]);
     setError("");
   }
@@ -91,6 +94,7 @@ export function AutomationPanel({
     setCooldownSeconds(rule.cooldownSeconds);
     setEnabled(rule.enabled);
     setConditions(Array.isArray(rule.all) ? rule.all : []);
+    setAnyConditions(Array.isArray(rule.any) ? rule.any : []);
     setActions(Array.isArray(rule.actions) ? rule.actions : []);
     setError("");
   }
@@ -100,8 +104,14 @@ export function AutomationPanel({
       setError("Укажи название правила.");
       return;
     }
-    if (actions.length < 1 || actions.length > 10 || conditions.length > 10) {
-      setError("Нужно 0–10 условий и 1–10 действий.");
+    if (
+      actions.length < 1 ||
+      actions.length > 10 ||
+      conditions.length > 10 ||
+      anyConditions.length > 10 ||
+      conditions.length + anyConditions.length > 10
+    ) {
+      setError("Нужно максимум 10 условий суммарно и 1–10 действий.");
       return;
     }
     setSaving(true);
@@ -117,6 +127,7 @@ export function AutomationPanel({
           cooldownSeconds,
           enabled,
           conditions,
+          anyConditions,
           actions
         })
       });
@@ -149,11 +160,12 @@ export function AutomationPanel({
     }
   }
 
-  function updateCondition(index: number, patch: Partial<Condition>) {
-    setConditions((current) => current.map((item, i) => i === index ? { ...item, ...patch } as Condition : item));
+  function updateCondition(index: number, patch: Partial<Condition>, any = false) {
+    const setter = any ? setAnyConditions : setConditions;
+    setter((current) => current.map((item, i) => i === index ? { ...item, ...patch } as Condition : item));
   }
 
-  function replaceCondition(index: number, type: Condition["type"]) {
+  function replaceCondition(index: number, type: Condition["type"], any = false) {
     const next: Condition =
       type === "channel-is" ? { type, channelId: "" } :
       type === "matches" ? { type, left: "content", pattern: "" } :
@@ -161,7 +173,8 @@ export function AutomationPanel({
       type === "has-role" ? { type, userId: "@event", roleId: "" } :
       type === "cooldown-clear" ? { type, key: "" } :
       { type, left: "content", right: "" };
-    setConditions((current) => current.map((item, i) => i === index ? next : item));
+    const setter = any ? setAnyConditions : setConditions;
+    setter((current) => current.map((item, i) => i === index ? next : item));
   }
 
   function updateAction(index: number, patch: Partial<Action>) {
@@ -268,6 +281,80 @@ export function AutomationPanel({
       </section>
 
       <section style={sectionStyle}>
+        <div style={sectionTitle}>Conditions · ANY</div>
+        {anyConditions.length === 0 && <div style={{ opacity: 0.4, fontSize: 12 }}>Нет OR-условий. Заполни их, если достаточно любого совпадения.</div>}
+        {anyConditions.map((condition, index) => (
+          <div key={"any-" + index} style={rowStyle}>
+            <select value={condition.type} onChange={(e) => replaceCondition(index, e.target.value as Condition["type"], true)} style={inputStyle}>
+              <option value="contains">contains</option>
+              <option value="equals">equals</option>
+              <option value="matches">matches</option>
+              <option value="number-gte">number-gte</option>
+              <option value="number-lte">number-lte</option>
+              <option value="has-role">has-role</option>
+              <option value="channel-is">channel-is</option>
+              <option value="cooldown-clear">cooldown-clear</option>
+            </select>
+
+            {(condition.type === "contains" || condition.type === "equals" || condition.type === "matches") && (
+              <>
+                <select value={condition.left} onChange={(e) => updateCondition(index, { left: e.target.value }, true)} style={inputStyle}>
+                  {TEXT_FIELDS.map((field) => <option key={field}>{field}</option>)}
+                </select>
+                <input
+                  value={condition.type === "matches" ? condition.pattern : condition.right}
+                  maxLength={condition.type === "matches" ? 120 : 200}
+                  onChange={(e) => updateCondition(index, condition.type === "matches" ? { pattern: e.target.value } : { right: e.target.value }, true)}
+                  placeholder={condition.type === "matches" ? "Regex" : "Значение"}
+                  style={inputStyle}
+                />
+              </>
+            )}
+
+            {(condition.type === "number-gte" || condition.type === "number-lte") && (
+              <>
+                <select value={condition.left} onChange={(e) => updateCondition(index, { left: e.target.value }, true)} style={inputStyle}>
+                  {NUMBER_FIELDS.map((field) => <option key={field}>{field}</option>)}
+                </select>
+                <input type="number" value={condition.right} onChange={(e) => updateCondition(index, { right: Number(e.target.value) }, true)} style={inputStyle} />
+              </>
+            )}
+
+            {condition.type === "has-role" && (
+              <>
+                <input value={condition.userId} onChange={(e) => updateCondition(index, { userId: e.target.value }, true)} placeholder="@event или user ID" style={inputStyle} />
+                <select value={condition.roleId} onChange={(e) => updateCondition(index, { roleId: e.target.value }, true)} style={inputStyle}>
+                  <option value="">Роль</option>
+                  {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+                </select>
+              </>
+            )}
+
+            {condition.type === "channel-is" && (
+              <select value={condition.channelId} onChange={(e) => updateCondition(index, { channelId: e.target.value }, true)} style={inputStyle}>
+                <option value="">Канал</option>
+                {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+              </select>
+            )}
+
+            {condition.type === "cooldown-clear" && (
+              <input value={condition.key} maxLength={100} onChange={(e) => updateCondition(index, { key: e.target.value }, true)} placeholder="Имя cooldown key" style={inputStyle} />
+            )}
+
+            <button type="button" onClick={() => setAnyConditions((current) => current.filter((_, i) => i !== index))} style={buttonStyle("secondary")}>×</button>
+          </div>
+        ))}
+        <button
+          type="button"
+          disabled={saving || conditions.length + anyConditions.length >= 10}
+          onClick={() => setAnyConditions((current) => [...current, { type: "contains", left: "content", right: "" }])}
+          style={buttonStyle("secondary")}
+        >
+          + OR-условие
+        </button>
+      </section>
+
+      <section style={sectionStyle}>
         <div style={sectionTitle}>Actions</div>
         {actions.map((action, index) => (
           <div key={index} style={{ display: "grid", gridTemplateColumns: "minmax(150px,180px) minmax(0,1fr) auto", gap: 8 }}>
@@ -344,7 +431,7 @@ export function AutomationPanel({
           <div key={rule.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "10px 0", borderBottom: "1px solid #1d212b" }}>
             <div>
               <div style={{ fontWeight: 600 }}>{rule.name} · {rule.enabled ? "ON" : "OFF"}</div>
-              <div style={{ marginTop: 4, fontSize: 11, opacity: 0.45 }}>{rule.event} · {rule.all.length} conditions · {rule.actions.length} actions</div>
+              <div style={{ marginTop: 4, fontSize: 11, opacity: 0.45 }}>{rule.event} · {rule.all.length} ALL + {rule.any.length} ANY · {rule.actions.length} actions</div>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               <button type="button" disabled={saving} onClick={() => edit(rule)} style={buttonStyle("secondary")}>Изменить</button>
