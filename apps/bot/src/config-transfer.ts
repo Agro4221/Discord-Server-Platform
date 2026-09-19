@@ -25,7 +25,7 @@ const CONFIG_TABLES: ExportTable[] = [
     "enabled","max_joins","window_seconds","max_destructive_actions",
     "destructive_window_seconds","quarantine_role_id","log_channel_id"
   ] },
-  { table: "verification_settings", fields: ["enabled","channel_id","verified_role_id","log_channel_id","code_ttl_minutes"] },
+  { table: "verification_settings", fields: ["enabled","channel_id","verified_role_id","quarantine_role_id","log_channel_id","code_ttl_minutes"] },
   { table: "leveling_settings", fields: ["enabled","xp_per_message","cooldown_seconds","announce_level_up"] },
   { table: "starboard_settings", fields: ["channel_id","threshold","ignore_self_reaction","ignore_bots"] },
   { table: "music_settings", fields: ["enabled","preferred_text_channel_id","default_volume","announce_track_start"] }
@@ -245,11 +245,12 @@ export class ConfigTransferService {
     });
 
     await execute("verification_settings", "verification", [
-      "enabled","channel_id","verified_role_id","log_channel_id","code_ttl_minutes"
+      "enabled","channel_id","verified_role_id","quarantine_role_id","log_channel_id","code_ttl_minutes"
     ], {
       enabled: false,
       channel_id: null,
       verified_role_id: null,
+      quarantine_role_id: null,
       log_channel_id: null,
       code_ttl_minutes: 10
     });
