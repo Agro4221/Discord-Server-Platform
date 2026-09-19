@@ -152,9 +152,9 @@ export class Security implements PlatformModule {
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'destructive-burst',$2::jsonb)",
       [guildId,JSON.stringify({ type, actions: bucket.length, windowSeconds: config.destructiveWindowSeconds })]
     );
-    const executorIds = await this.findRecentExecutors(guildId, type);
-    for (const executorId of executorIds) {
-      await this.respondToExecutor(guildId, executorId, config, type);
+    const executors = await this.findRecentExecutors(guildId, type);
+    for (const executor of executors) {
+      await this.respondToExecutor(guildId, executor.userId, config, type, executor.count);
     }
     await this.alert(guildId, config, `Security: обнаружено ${bucket.length} destructive actions за ${config.destructiveWindowSeconds} сек.`);
   }
@@ -220,7 +220,7 @@ export class Security implements PlatformModule {
     await member.roles.add(role, "Security quarantine").catch(() => undefined);
   }
 
-  private async findRecentExecutors(guildId: string, type: string): Promise<string[]> {
+  private async findRecentExecutors(guildId: string, type: string): Promise<Array<{ userId: string; count: number }>> {
     const guild = this.client?.guilds.cache.get(guildId);
     if (!guild) return [];
     await new Promise((resolve) => setTimeout(resolve, 350));
@@ -230,23 +230,24 @@ export class Security implements PlatformModule {
     if (!logs) return [];
 
     const cutoff = Date.now() - 30_000;
-    const ids = new Set<string>();
+    const counts = new Map<string, number>();
     for (const entry of logs.entries.values()) {
       if (entry.createdTimestamp < cutoff || !entry.executorId) continue;
       if (entry.executorId === guild.members.me?.id) continue;
-      ids.add(entry.executorId);
+      counts.set(entry.executorId, (counts.get(entry.executorId) ?? 0) + 1);
     }
-    return [...ids];
+    return [...counts.entries()].map(([userId, count]) => ({ userId, count }));
   }
 
-  private async respondToExecutor(guildId: string, userId: string, config: SecurityConfig, type: string): Promise<void> {
+  private async respondToExecutor(guildId: string, userId: string, config: SecurityConfig, type: string, executorCount: number): Promise<void> {
     const guild = this.client?.guilds.cache.get(guildId);
     const member = guild ? await guild.members.fetch(userId).catch(() => null) : null;
-    if (!guild || !member || !member.manageable) return;
+    if (!guild || !member || !member.manageable || member.id === guild.ownerId) return;
     const botMember = guild.members.me;
     if (!botMember) return;
 
-    const removable = member.roles.cache.filter(
+    const removable = executorCount >= Math.ceil(config.maxDestructiveActions / 2) && !member.permissions.has(PermissionFlagsBits.Administrator)
+      ? member.roles.cache.filter(
       (role) => !role.managed && role.id !== guild.id && role.position < botMember.roles.highest.position
     );
     for (const role of removable.values()) {
@@ -257,7 +258,7 @@ export class Security implements PlatformModule {
 
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'response-applied',$2::jsonb)",
-      [guildId,JSON.stringify({ userId, trigger: type, removedRoles: removable.size, quarantine: Boolean(config.quarantineRoleId) })]
+      [guildId,JSON.stringify({ userId, trigger: type, executorCount, removedRoles: removable.size, quarantine: Boolean(config.quarantineRoleId) })]
     );
   }
 }
