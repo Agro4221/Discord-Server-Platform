@@ -128,6 +128,7 @@ function parseLavalinkNodes(): AppConfig["lavalinkNodes"] {
 }
 
 export function loadConfig(): AppConfig {
+  const backupS3 = parseBackupS3();
   const nodeEnv = (process.env.NODE_ENV ?? "development") as AppConfig["nodeEnv"];
   if (!["development", "test", "production"].includes(nodeEnv)) {
     throw new Error("NODE_ENV must be development, test, or production");
@@ -150,7 +151,7 @@ export function loadConfig(): AppConfig {
     lavalinkNodes: parseLavalinkNodes(),
     backupDirectory: process.env.BACKUP_DIRECTORY ?? "./data/backups",
     backupRetentionCount: integer("BACKUP_RETENTION_COUNT", 30, 1, 10_000),
-    ...(parseBackupS3() ? { backupS3: parseBackupS3()! } : {}),
+    ...(backupS3 ? { backupS3 } : {}),
     nodeEnv
   };
 }
