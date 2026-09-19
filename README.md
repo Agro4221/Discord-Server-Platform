@@ -1,32 +1,53 @@
 # Discord Server Platform
 
-Self-hosted Discord server platform focused on reliability, simple UX, local administration, modular features and optional multi-bot voice scaling.
+Self-hosted, local-first Discord server platform with modular Core, PostgreSQL persistence, local Control Center and Lavalink music.
 
-## Principles
-- Self-hosted first; VPS/cloud is optional.
-- No artificial premium wall in the self-hosted build.
-- Local dashboard is the primary configuration surface.
-- Modules fail independently where practical.
-- Persistent state lives outside process memory.
-- No default Administrator requirement.
-- One coherent private full build, with internal engineering checkpoints instead of many tiny public releases.
+## Architecture
 
-## Planned stack
-- TypeScript / Node.js 24+
-- discord.js
-- Next.js dashboard
-- PostgreSQL
-- Docker Compose
-- Lavalink 4.x
+Discord Gateway -> Discord Core -> Typed Event Bus / Module Registry / Health & Recovery / Audit / Management API -> Next.js Control Center
 
-## Project status
-Repository bootstrap is complete. Full product scope is fixed; implementation starts with the reliability-critical foundation, then expands without changing the core architecture.
+Each feature module owns runtime logic and persistent settings. The dashboard receives field schemas from Core and renders the appropriate controls instead of hard-coding every module form.
 
-See:
-- docs/MASTER-PLAN.md
-- docs/IMPLEMENTATION-ORDER.md
-- docs/FIRST-FUNCTIONS.md
-- docs/TEST-STRATEGY.md
+## Control Center
 
-## Security
-Never commit bot tokens, OAuth client secrets, provider secrets or database credentials.
+- module switch = runtime enable/disable
+- channel/role settings = Discord resource selectors
+- numeric limits = constrained numeric inputs
+- text = validated textareas
+- dangerous actions = explicit action buttons / confirmation flows
+- import/export = configuration payload
+- backup = local compressed snapshot
+- audit = persistent change history
+- health = Discord / PostgreSQL / module state
+
+The dashboard never receives bot tokens or provider secrets.
+
+## Feature modules
+
+- Moderation
+- AutoMod
+- Security / Anti-Raid
+- Temporary Voice
+- Welcome
+- Verification
+- Role Panels
+- Leveling
+- Tickets / Forms
+- Giveaways
+- Starboard
+- Economy + Shop
+- Reminders
+- Notifications
+- Automation
+- Music / Lavalink
+- Analytics
+
+## Deployment
+
+The same codebase supports local development, a single VPS deployment, and multiple bot identities as separate bot service instances sharing PostgreSQL/Lavalink.
+
+See docs/LOCAL-SETUP.md, docs/MULTI-BOT.md, docs/TEST-MATRIX.md, docs/PROJECT-STATE.md and docs/WORK-LOG.md.
+
+## Quality bar
+
+A feature is not considered complete from a happy-path demo alone. Verification includes permissions, invalid input, persistence, restart recovery, dependency failure, concurrency, abuse/security cases and cross-module interactions.
