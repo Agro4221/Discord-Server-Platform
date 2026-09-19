@@ -1,5 +1,7 @@
 import { Database } from "./database.js";
 
+const q = (lines: readonly string[]): string => lines.join("\n");
+
 const migrations = [
   {
     version: 1,
