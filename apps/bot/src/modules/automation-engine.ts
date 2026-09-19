@@ -70,20 +70,29 @@ export class AutomationEngine implements PlatformModule {
       ),
       context.events.on("member.update", ({ oldMember, newMember }) => this.executeMemberRoleDiff(oldMember, newMember)),
       context.events.on("message.create", (message) => this.executeFromMessage(message)),
-      context.events.on("message.delete", (message) => this.execute({
-        type: "message.delete", guildId: message.guildId, userId: message.author.id,
-        channelId: message.channelId, content: message.content, messageId: message.id,
-        numeric: { messageLength: message.content.length }
-      })),
-      context.events.on("message.update", ({ oldMessage, newMessage }) => this.execute({
-        type: "message.edit", guildId: newMessage.guildId, userId: newMessage.author.id,
-        channelId: newMessage.channelId, content: newMessage.content, messageId: newMessage.id,
-        numeric: { messageLength: newMessage.content.length, previousLength: oldMessage.content.length }
-      })),
-      context.events.on("reaction.add", ({ reaction, user }) => this.execute({
-        type: "reaction.add", guildId: reaction.message.guildId, userId: user.id,
-        channelId: reaction.message.channelId, messageId: reaction.message.id
-      })),
+      context.events.on("message.delete", (message) => {
+        if (!message.guildId) return;
+        return this.execute({
+          type: "message.delete", guildId: message.guildId, userId: message.author.id,
+          channelId: message.channelId, content: message.content, messageId: message.id,
+          numeric: { messageLength: message.content.length }
+        });
+      }),
+      context.events.on("message.update", ({ oldMessage, newMessage }) => {
+        if (!newMessage.guildId) return;
+        return this.execute({
+          type: "message.edit", guildId: newMessage.guildId, userId: newMessage.author.id,
+          channelId: newMessage.channelId, content: newMessage.content, messageId: newMessage.id,
+          numeric: { messageLength: newMessage.content.length, previousLength: oldMessage.content.length }
+        });
+      }),
+      context.events.on("reaction.add", ({ reaction, user }) => {
+        if (!reaction.message.guildId) return;
+        return this.execute({
+          type: "reaction.add", guildId: reaction.message.guildId, userId: user.id,
+          channelId: reaction.message.channelId, messageId: reaction.message.id
+        });
+      }),
       context.events.on("voice.state", ({ oldState, newState }) => this.executeFromVoice(oldState, newState)),
       context.events.on("moderation.case", (event) => this.execute({ type: "moderation.case", ...event })),
       context.events.on("ticket.create", (event) => this.execute({ type: "ticket.create", ...event })),
@@ -403,52 +412,51 @@ export class AutomationEngine implements PlatformModule {
     return result.rows[0]?.cooldown_seconds ?? 0;
   }
 
-  private conditionsMatch(
-    conditions: AutomationCondition[],
-    event: RuntimeEvent
-  ): boolean {
-    return conditions.every((condition) => {
+  private async conditionsMatch(conditions: AutomationCondition[], event: RuntimeEvent): Promise<boolean> {
+    for (const condition of conditions) {
       switch (condition.type) {
         case "channel-is":
-          return event.channelId === condition.channelId;
+          if (event.channelId !== condition.channelId) return false;
+          break;
         case "contains":
-          return (
-            typeof event.content === "string" &&
-            event.content.toLocaleLowerCase().includes(condition.right.toLocaleLowerCase())
-          );
+          if (typeof event.content !== "string" || !event.content.toLocaleLowerCase().includes(condition.right.toLocaleLowerCase())) return false;
+          break;
         case "equals":
-          return resolveTextField(event, condition.left) === condition.right;
+          if (resolveTextField(event, condition.left) !== condition.right) return false;
+          break;
         case "matches": {
           const value = resolveTextField(event, condition.left);
           if (value === undefined) return false;
           try {
-            return new RegExp(condition.pattern, "i").test(value);
+            if (!new RegExp(condition.pattern, "i").test(value)) return false;
           } catch {
             return false;
           }
+          break;
         }
         case "number-gte": {
           const value = event.numeric?.[String(condition.left)];
-          return value !== undefined && value >= condition.right;
+          if (value === undefined || value < condition.right) return false;
+          break;
         }
         case "number-lte": {
           const value = event.numeric?.[String(condition.left)];
-          return value !== undefined && value <= condition.right;
+          if (value === undefined || value > condition.right) return false;
+          break;
         }
         case "has-role": {
           const guild = this.client?.guilds.cache.get(event.guildId);
           const member = event.userId ? await guild?.members.fetch(event.userId).catch(() => null) : null;
-          return Boolean(member?.roles.cache.has(condition.roleId));
+          if (!member?.roles.cache.has(condition.roleId)) return false;
+          break;
         }
-        case "cooldown-clear": {
-          return Date.now() >= (this.keyedCooldowns.get(`${event.guildId}:${condition.key}`) ?? 0);
-        }
-        default:
-          return false;
+        case "cooldown-clear":
+          if (Date.now() < (this.keyedCooldowns.get(event.guildId + ":" + condition.key) ?? 0)) return false;
+          break;
       }
-    });
+    }
+    return true;
   }
-
   private async perform(actions: AutomationAction[], event: RuntimeEvent): Promise<void> {
     const client = this.client;
 
@@ -519,10 +527,6 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
-        logger.warn("Unsupported automation action skipped", {
-          guildId: event.guildId,
-          action: action.type
-        });
       } catch (error) {
         logger.warn("Automation action failed", {
           guildId: event.guildId,
