@@ -2,7 +2,7 @@ FROM node:24.17.0-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 COPY apps/dashboard/package*.json apps/dashboard/
-RUN npm install
+RUN npm ci
 COPY apps/dashboard apps/dashboard
 RUN npm run build -w apps/dashboard
 
