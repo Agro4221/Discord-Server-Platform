@@ -9,11 +9,13 @@ export class Reminders implements PlatformModule {
   private timer?: NodeJS.Timeout;
   private client?: Client;
   private running = false;
+  private identityId = "primary";
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+    this.identityId = context.identityId;
     this.unsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     this.timer = setInterval(() => void this.deliver(), 5_000);
     this.timer.unref();
@@ -66,16 +68,18 @@ export class Reminders implements PlatformModule {
          SET processing_until=now()+interval '2 minutes',
              delivery_attempts=delivery_attempts+1
          WHERE id IN (
-           SELECT id FROM reminders
-           WHERE delivered_at IS NULL
-             AND due_at <= now()
-             AND (processing_until IS NULL OR processing_until < now())
-           ORDER BY due_at ASC
+           SELECT r.id FROM reminders r
+           INNER JOIN guild_bot_assignments ga ON ga.guild_id = r.guild_id
+           WHERE r.delivered_at IS NULL
+             AND r.due_at <= now()
+             AND (r.processing_until IS NULL OR r.processing_until < now())
+             AND ga.bot_identity_id = $1
+           ORDER BY r.due_at ASC
            FOR UPDATE SKIP LOCKED
            LIMIT 50
          )
          RETURNING id,guild_id,user_id,content`
-      );
+      , [this.identityId]);
 
       for (const reminder of due.rows) {
         try {
