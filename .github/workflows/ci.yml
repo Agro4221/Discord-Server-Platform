@@ -43,6 +43,7 @@ jobs:
       - name: Validate deployment config
         run: |
           bash -n scripts/install-vps.sh scripts/upgrade.sh
+          cp .env.example .env
           docker compose config >/dev/null
 
       - name: Typecheck bot
