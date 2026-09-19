@@ -126,6 +126,21 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       )
       .addSubcommand((sub) =>
         sub
+          .setName("unban")
+          .setDescription("Unban a user")
+          .addUserOption((option) =>
+            option.setName("user").setDescription("Banned user").setRequired(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("reason")
+              .setDescription("Reason")
+              .setMaxLength(1000)
+              .setRequired(true)
+          )
+      )
+      .addSubcommand((sub) =>
+        sub
           .setName("history")
           .setDescription("Show recent moderation cases")
           .addUserOption((option) =>
