@@ -1,10 +1,7 @@
 import dns from "node:dns/promises";
 import net from "node:net";
 import { XMLParser } from "fast-xml-parser";
-import {
-  type ChatInputCommandInteraction,
-  type Client
-} from "discord.js";
+import { ChannelType, type ChatInputCommandInteraction, type Client } from "discord.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
@@ -45,7 +42,7 @@ export class Notifications implements PlatformModule {
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!interaction.inGuild() || interaction.commandName !== "feed") return;
-    if (!await moduleEnabled(this.db, interaction.guild.id, "notifications", false)) {
+    if (!await moduleEnabled(this.db, interaction.guild!.id, "notifications", false)) {
       await interaction.reply({ content: "Модуль Notifications выключен.", ephemeral: true });
       return;
     }
@@ -58,10 +55,11 @@ export class Notifications implements PlatformModule {
     const sub = interaction.options.getSubcommand();
     if (sub === "add") {
       const url = interaction.options.getString("url", true);
-      const channel = interaction.options.getChannel("channel", true);
+      const channelOption = interaction.options.getChannel("channel", true);
+      const channel = interaction.guild!.channels.cache.get(channelOption.id);
       const minutes = interaction.options.getInteger("minutes") ?? 5;
 
-      if (!channel.isTextBased()) {
+      if (!channel || channel.type !== ChannelType.GuildText) {
         await interaction.reply({ content: "Channel должен быть текстовым.", ephemeral: true });
         return;
       }
@@ -71,14 +69,14 @@ export class Notifications implements PlatformModule {
       await this.db.query(
         `INSERT INTO notification_feeds(guild_id,channel_id,url,interval_seconds)
          VALUES($1,$2,$3,$4)`,
-        [interaction.guild.id, channel.id, url, minutes * 60]
+        [interaction.guild!.id, channel.id, url, minutes * 60]
       );
 
       await this.db.query(
         `INSERT INTO guild_modules(guild_id,module_key,enabled)
          VALUES($1,'notifications',true)
          ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()`,
-        [interaction.guild.id]
+        [interaction.guild!.id]
       );
 
       await interaction.reply({ content: "Feed добавлен. Проверка начнётся автоматически.", ephemeral: true });
