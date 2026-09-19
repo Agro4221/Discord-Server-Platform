@@ -2,6 +2,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
+import { logger } from "../logger.js";
 
 type TicketConfig = {
   enabled: boolean;
@@ -172,9 +173,20 @@ export class Tickets implements PlatformModule {
       });
       await interaction.reply({ content: `Тикет создан: <#${channel.id}>.`, ephemeral: true });
     } catch (error) {
-      await channel.delete("Ticket creation rollback").catch(() => undefined);
+      await channel.delete("Ticket creation rollback").catch((deleteError) => {
+        logger.error("Ticket creation rollback channel delete failed", {
+          guildId: interaction.guild!.id,
+          channelId: channel.id,
+          error: String(deleteError)
+        });
+      });
+      logger.error("Ticket creation failed and was rolled back", {
+        guildId: interaction.guild!.id,
+        userId: interaction.user.id,
+        channelId: channel.id,
+        error: String(error)
+      });
       await interaction.reply({ content: "Не удалось создать тикет.", ephemeral: true });
-      void error;
     }
   }
 
@@ -227,7 +239,17 @@ export class Tickets implements PlatformModule {
         const transcriptChannel = interaction.guild!.channels.cache.get(config.transcriptChannelId);
         if (transcriptChannel?.isTextBased() && "send" in transcriptChannel) {
           const { AttachmentBuilder } = await import("discord.js");
-          await transcriptChannel.send({ content: `Transcript ticket #${ticketId}`, files: [new AttachmentBuilder(Buffer.from(transcript,"utf8"), { name: `ticket-${ticketId}.txt` })] }).catch(() => undefined);
+          await transcriptChannel.send({
+            content: `Transcript ticket #${ticketId}`,
+            files: [new AttachmentBuilder(Buffer.from(transcript,"utf8"), { name: `ticket-${ticketId}.txt` })]
+          }).catch((error) => {
+            logger.warn("Ticket transcript delivery failed", {
+              guildId: interaction.guild!.id,
+              ticketId,
+              channelId: config.transcriptChannelId,
+              error: String(error)
+            });
+          });
         }
       }
 
@@ -238,7 +260,16 @@ export class Tickets implements PlatformModule {
         channelId: row.channel_id
       });
       await interaction.editReply({ content: "Тикет закрыт и transcript сохранён." });
-      if (channel?.type === ChannelType.GuildText) await channel.delete("Ticket closed").catch(() => undefined);
+      if (channel?.type === ChannelType.GuildText) {
+        await channel.delete("Ticket closed").catch((error) => {
+          logger.warn("Ticket channel cleanup failed", {
+            guildId: interaction.guild!.id,
+            ticketId,
+            channelId: row.channel_id,
+            error: String(error)
+          });
+        });
+      }
     }
   }
 
@@ -250,7 +281,14 @@ export class Tickets implements PlatformModule {
   }
 
   private async transcript(channel: TextChannel): Promise<string> {
-    const messages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+    const messages = await channel.messages.fetch({ limit: 100 }).catch((error) => {
+      logger.warn("Ticket transcript fetch failed", {
+        guildId: channel.guild.id,
+        channelId: channel.id,
+        error: String(error)
+      });
+      return null;
+    });
     if (!messages) return "Transcript unavailable.";
     return [...messages.values()].sort((a,b) => a.createdTimestamp-b.createdTimestamp).map((message) => `[${new Date(message.createdTimestamp).toISOString()}] ${message.author.tag}: ${message.content}`).join("\n");
   }
