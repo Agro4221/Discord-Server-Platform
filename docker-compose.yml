@@ -30,6 +30,22 @@ services:
       retries: 20
     networks: [dsp]
 
+  lavalink2:
+    image: ghcr.io/lavalink-devs/lavalink:4.2.2
+    restart: unless-stopped
+    environment:
+      _JAVA_OPTIONS: "-Xms256m -Xmx768m"
+      LAVALINK_SERVER_PASSWORD: ${LAVALINK_PASSWORD:-change-me-local}
+      SERVER_PORT: 2334
+    volumes:
+      - ./infrastructure/lavalink/application.yml:/opt/Lavalink/application.yml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:2334/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks: [dsp]
+
   bot:
     build:
       context: .
@@ -41,12 +57,15 @@ services:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change-me-postgres}@postgres:5432/discord_platform
       LAVALINK_HOST: lavalink
       LAVALINK_PORT: 2333
+      LAVALINK_NODES: '[{"id":"local","host":"lavalink","port":2333,"password":"${LAVALINK_PASSWORD:-change-me-local}"},{"id":"local-2","host":"lavalink2","port":2334,"password":"${LAVALINK_PASSWORD:-change-me-local}"}]'
       HEALTH_HOST: 0.0.0.0
       MANAGEMENT_API_HOST: 0.0.0.0
     depends_on:
       postgres:
         condition: service_healthy
       lavalink:
+        condition: service_healthy
+      lavalink2:
         condition: service_healthy
     ports:
       - "127.0.0.1:${HEALTH_PORT:-3001}:3001"
