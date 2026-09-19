@@ -11,6 +11,7 @@
     "test": "tsx --test test/**/*.test.ts"
   },
   "dependencies": {
+    "@dsp/domain": "file:../../packages/domain",
     "discord.js": "^14.27.0",
     "pg": "^8.16.3"
   },
