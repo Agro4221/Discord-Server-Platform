@@ -32,7 +32,7 @@ export class Giveaways implements PlatformModule {
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!interaction.inGuild() || interaction.commandName !== "giveaway") return;
-    if (!await moduleEnabled(this.db, interaction.guild.id, "giveaways", false)) {
+    if (!await moduleEnabled(this.db, interaction.guild!.id, "giveaways", false)) {
       await interaction.reply({ content: "Модуль Giveaways выключен.", ephemeral: true });
       return;
     }
@@ -49,7 +49,7 @@ export class Giveaways implements PlatformModule {
     const created = await this.db.query<{ id: string }>(
       `INSERT INTO giveaways(guild_id,channel_id,host_user_id,prize,winners,ends_at,status)
        VALUES($1,$2,$3,$4,$5,$6,'running') RETURNING id`,
-      [interaction.guild.id, interaction.channelId, interaction.user.id, prize, winners, endsAt]
+      [interaction.guild!.id, interaction.channelId, interaction.user.id, prize, winners, endsAt]
     );
     const id = created.rows[0]?.id;
     if (!id) throw new Error("giveaway id missing");
@@ -75,14 +75,14 @@ export class Giveaways implements PlatformModule {
   }
 
   private async onInteraction(interaction: import("discord.js").Interaction): Promise<void> {
-    if (!interaction.isButton() || !interaction.customId.startsWith("dsp:giveaway:") || !interaction.guild) return;
+    if (!interaction.isButton() || !interaction.customId.startsWith("dsp:giveaway:") || !interaction.guild!) return;
     const [, , action, rawId] = interaction.customId.split(":");
     const id = Number(rawId);
     if (action !== "enter" || !Number.isSafeInteger(id)) return;
 
     const result = await this.db.query<{ status: string }>(
       "SELECT status FROM giveaways WHERE id=$1 AND guild_id=$2",
-      [id, interaction.guild.id]
+      [id, interaction.guild!.id]
     );
     if (result.rows[0]?.status !== "running") {
       await interaction.reply({ content: "Этот giveaway уже завершён.", ephemeral: true });
