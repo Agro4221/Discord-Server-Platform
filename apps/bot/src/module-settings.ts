@@ -8,7 +8,6 @@ const ENABLE_COLUMNS: Partial<Record<ModuleKey, [string, string]>> = {
   welcome: ["welcome_settings", "enabled"],
   verification: ["verification_settings", "enabled"],
   tickets: ["ticket_settings", "enabled"],
-  starboard: ["starboard_settings", "enabled"],
   music: ["music_settings", "enabled"]
 };
 
@@ -41,22 +40,9 @@ export class ModuleSettingsRepository {
       const mapping = ENABLE_COLUMNS[moduleKey];
       if (!mapping) return;
 
+      await this.ensureRuntimeRow(client, guildId, moduleKey);
+
       const [table, column] = mapping;
-      const columnsByModule = {
-        "guild_settings": ["guild_id", "temp_voice_enabled"],
-        "automod_settings": ["guild_id", "enabled"],
-        "security_settings": ["guild_id", "enabled"],
-        "welcome_settings": ["guild_id", "enabled"],
-        "verification_settings": ["guild_id", "enabled"],
-        "ticket_settings": ["guild_id", "enabled"],
-        "starboard_settings": ["guild_id", "enabled"],
-        "music_settings": ["guild_id", "enabled"]
-      } as const;
-
-      if (!columnsByModule[table as keyof typeof columnsByModule]) {
-        throw new Error("unsupported_module_enable_mapping");
-      }
-
       await client.query(
         `UPDATE "${table}" SET "${column}"=$1,updated_at=now() WHERE guild_id=$2`,
         [enabled, guildId]
@@ -79,9 +65,61 @@ export class ModuleSettingsRepository {
       "SELECT module_key,enabled FROM guild_modules WHERE guild_id=$1 ORDER BY module_key",
       [guildId]
     );
+    return Object.fromEntries(result.rows.map((row) => [row.module_key, row.enabled])) as Record<ModuleKey, boolean>;
+  }
 
-    return Object.fromEntries(
-      result.rows.map((row) => [row.module_key, row.enabled])
-    ) as Record<ModuleKey, boolean>;
+  private async ensureRuntimeRow(
+    client: import("pg").PoolClient,
+    guildId: string,
+    moduleKey: ModuleKey
+  ): Promise<void> {
+    switch (moduleKey) {
+      case "temporary-voice":
+        await client.query(
+          "INSERT INTO guild_settings(guild_id) VALUES($1) ON CONFLICT(guild_id) DO NOTHING",
+          [guildId]
+        );
+        break;
+      case "automod":
+        await client.query(
+          "INSERT INTO automod_settings(guild_id) VALUES($1) ON CONFLICT(guild_id) DO NOTHING",
+          [guildId]
+        );
+        break;
+      case "security":
+        await client.query(
+          "INSERT INTO security_settings(guild_id) VALUES($1) ON CONFLICT(guild_id) DO NOTHING",
+          [guildId]
+        );
+        break;
+      case "welcome":
+        await client.query(
+          "INSERT INTO welcome_settings(guild_id) VALUES($1) ON CONFLICT(guild_id) DO NOTHING",
+          [guildId]
+        );
+        break;
+      case "verification":
+        await client.query(
+          "INSERT INTO verification_settings(guild_id) VALUES($1) ON CONFLICT(guild_id) DO NOTHING",
+          [guildId]
+        );
+        break;
+      case "tickets":
+        await client.query(
+          "INSERT INTO ticket_settings(guild_id) VALUES($1) ON CONFLICT(guild_id) DO NOTHING",
+          [guildId]
+        );
+        break;
+      case "music":
+        await client.query(
+          "INSERT INTO music_settings(guild_id) VALUES($1) ON CONFLICT(guild_id) DO NOTHING",
+          [guildId]
+        );
+        break;
+      case "starboard":
+        break;
+      default:
+        break;
+    }
   }
 }
