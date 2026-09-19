@@ -80,3 +80,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Multi-bot Music routing now has persistent voice-channel assignments, Management API, Dashboard controls and secondary-identity Music-only command handling.
 - Background workers are identity-scoped through guild_bot_assignments so only the assigned bot process processes reminders, feeds, giveaways and Automation schedule rules.
 - Music repeat/autoplay is persisted and restored through player state / guild settings.
+
+
+## 2026-09-19 — AutoMod detection/audit hardening
+- Extracted AutoMod violation detection into a deterministic helper so content rules can be regression-tested without a live Discord message.
+- Added coverage for blocked words, mentions, links/invites, emoji spam, line length, excessive caps and repeated messages.
+- AutoMod violations now write durable `audit_events` entries with the rule, message ID and whether configured delete/timeout actions actually succeeded.
+- Fixed exemption ID parsing so comma-, whitespace-, newline- and tab-separated channel/role IDs are handled correctly.
