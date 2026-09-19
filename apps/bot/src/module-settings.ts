@@ -8,6 +8,7 @@ const ENABLE_COLUMNS: Partial<Record<ModuleKey, [string, string]>> = {
   welcome: ["welcome_settings", "enabled"],
   verification: ["verification_settings", "enabled"],
   tickets: ["ticket_settings", "enabled"],
+  leveling: ["leveling_settings", "enabled"],
   music: ["music_settings", "enabled"]
 };
 
@@ -107,6 +108,12 @@ export class ModuleSettingsRepository {
       case "tickets":
         await client.query(
           "INSERT INTO ticket_settings(guild_id) VALUES($1) ON CONFLICT(guild_id) DO NOTHING",
+          [guildId]
+        );
+        break;
+      case "leveling":
+        await client.query(
+          "INSERT INTO leveling_settings(guild_id) VALUES($1) ON CONFLICT(guild_id) DO NOTHING",
           [guildId]
         );
         break;
