@@ -86,11 +86,15 @@ type RateWindow = { startedAt: number; count: number };
 export class ManagementApiServer {
   private server?: Server;
   private readonly rateWindows = new Map<string, RateWindow>();
+  private rateCleanupTimer?: NodeJS.Timeout;
 
   constructor(private readonly options: ApiOptions) {}
 
   start(): Promise<void> {
     return new Promise((resolve, reject) => {
+      this.rateCleanupTimer = setInterval(() => this.cleanupRateWindows(), 60_000);
+      this.rateCleanupTimer.unref();
+
       this.server = createServer(async (req, res) => {
         try {
           const ip = req.socket.remoteAddress ?? "unknown";
@@ -958,8 +962,31 @@ export class ManagementApiServer {
     if (!this.server) return;
     const server = this.server;
     this.server = undefined;
+    if (this.rateCleanupTimer) clearInterval(this.rateCleanupTimer);
+    this.rateCleanupTimer = undefined;
+    this.rateWindows.clear();
     await new Promise<void>((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
+
+  private cleanupRateWindows(): void {
+    const cutoff = Date.now() - 60_000;
+    for (const [key, window] of this.rateWindows) {
+      if (window.startedAt < cutoff) this.rateWindows.delete(key);
+    }
+
+    if (this.rateWindows.size <= 10_000) return;
+
+    const oldest = [...this.rateWindows.entries()]
+      .sort((a, b) => a[1].startedAt - b[1].startedAt)
+      .slice(0, this.rateWindows.size - 10_000);
+
+    for (const [key] of oldest) this.rateWindows.delete(key);
+
+    logger.warn("Management API rate-limit state trimmed", {
+      removed: oldest.length,
+      remaining: this.rateWindows.size
     });
   }
 
