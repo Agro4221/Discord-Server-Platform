@@ -5,6 +5,7 @@ import { RolePanelsEditor } from "./role-panels-editor";
 import { BackupPanel } from "./backup-panel";
 import { GiveawaysPanel } from "./giveaways-panel";
 import { AnalyticsPanel } from "./analytics-panel";
+import { AutomationPanel } from "./automation-panel";
 
 type Guild = { id: string; name: string; icon: string | null };
 type ModuleState = Record<string, boolean>;
@@ -406,6 +407,12 @@ export function DashboardClient() {
                 <GiveawaysPanel guildId={guildId} onChanged={reloadAudit} />
               ) : selectedModule === "analytics" ? (
                 <AnalyticsPanel guildId={guildId} />
+              ) : selectedModule === "automation" ? (
+                <AutomationPanel
+                  guildId={guildId}
+                  channels={resources.channels.filter((resource) => resource.type === 0)}
+                  onChanged={reloadAudit}
+                />
               ) : !schema ? (
                 <div style={{ opacity: 0.58, padding: "24px 0" }}>
                   Для этого модуля пока нет dashboard schema. Его operational UI будет добавлен отдельно.
