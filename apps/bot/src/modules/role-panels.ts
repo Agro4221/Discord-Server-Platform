@@ -12,6 +12,11 @@ import { moduleEnabled } from "../module-utils.js";
 export type PanelRole = { roleId: string; label: string };
 export type RolePanelRecord = { id: number; guildId: string; channelId: string; messageId: string | null; title: string; roles: PanelRole[] };
 
+type PanelMessageCallbacks = {
+  deleteMessage: (channelId: string, messageId: string) => Promise<void>;
+  sendMessage: (channelId: string, content: string, components: ActionRowBuilder<ButtonBuilder>[]) => Promise<string>;
+};
+
 export class RolePanels implements PlatformModule {
   readonly name = "roles";
   private unsubscribe?: () => void;
@@ -44,17 +49,51 @@ export class RolePanels implements PlatformModule {
     }));
   }
 
-  async createPanel(guildId: string, channelId: string, roles: PanelRole[], title = "Выберите роли"): Promise<RolePanelRecord> {
+  async createPanel(
+    guildId: string,
+    channelId: string,
+    roles: PanelRole[],
+    title = "Выберите роли",
+    callbacks?: Pick<PanelMessageCallbacks, "deleteMessage" | "sendMessage">
+  ): Promise<RolePanelRecord> {
     if (!roles.length || roles.length > 5) throw new Error("panel_requires_1_to_5_roles");
-    const cleaned = roles.map((role) => ({ roleId: role.roleId, label: role.label.trim().slice(0,80) })).filter((role) => role.roleId && role.label);
+    const cleaned = [...new Map(
+      roles
+        .map((role) => ({ roleId: role.roleId, label: role.label.trim().slice(0,80) }))
+        .filter((role) => role.roleId && role.label)
+        .map((role) => [role.roleId, role])
+    ).values()];
     if (!cleaned.length) throw new Error("panel_roles_empty");
+
     const result = await this.db.query<{ id: string }>(
       "INSERT INTO role_panels(guild_id,channel_id,title,roles) VALUES($1,$2,$3,$4::jsonb) RETURNING id",
-      [guildId,channelId,title.slice(0,100),JSON.stringify(cleaned)]
+      [guildId,channelId,title.trim().slice(0,100) || "Выберите роли",JSON.stringify(cleaned)]
     );
     const id = Number(result.rows[0]?.id);
     if (!Number.isSafeInteger(id) || id < 1) throw new Error("role_panel_id_missing");
-    return (await this.list(guildId)).find((panel) => panel.id === id)!;
+
+    try {
+      let panel = (await this.list(guildId)).find((entry) => entry.id === id);
+      if (!panel) throw new Error("role_panel_not_found_after_create");
+
+      if (callbacks) {
+        const messageId = await callbacks.sendMessage(
+          channelId,
+          "🎭 **" + panel.title + "**",
+          [this.row(panel.id, panel.roles)]
+        );
+        await this.db.query(
+          "UPDATE role_panels SET message_id=$1 WHERE id=$2 AND guild_id=$3",
+          [messageId,id,guildId]
+        );
+        panel = { ...panel, messageId };
+      }
+
+      return panel;
+    } catch (error) {
+      await this.db.query("DELETE FROM role_panels WHERE id=$1 AND guild_id=$2", [id,guildId]);
+      throw error;
+    }
   }
 
   async updatePanel(
@@ -63,10 +102,8 @@ export class RolePanels implements PlatformModule {
     channelId: string,
     roles: PanelRole[],
     title: string,
-    callbacks: {
+    callbacks: PanelMessageCallbacks & {
       editMessage: (channelId: string, messageId: string, content: string, components: ActionRowBuilder<ButtonBuilder>[]) => Promise<void>;
-      deleteMessage: (channelId: string, messageId: string) => Promise<void>;
-      sendMessage: (channelId: string, content: string, components: ActionRowBuilder<ButtonBuilder>[]) => Promise<string>;
     }
   ): Promise<RolePanelRecord | null> {
     if (!roles.length || roles.length > 5) throw new Error("panel_requires_1_to_5_roles");
@@ -164,12 +201,19 @@ export class RolePanels implements PlatformModule {
       }
     }
 
-    const panel = await this.createPanel(guildId,channel.id,unique);
-    const message = await channel.send({
-      content: "🎭 **" + panel.title + "**",
-      components: [this.row(panel.id,unique)]
+    await this.createPanel(guildId,channel.id,unique,"Выберите роли",{
+      deleteMessage: async (channelId, messageId) => {
+        const target = interaction.guild!.channels.cache.get(channelId);
+        if (!target || target.type !== 0) return;
+        await target.messages.delete(messageId).catch(() => undefined);
+      },
+      sendMessage: async (channelId, content, components) => {
+        const target = interaction.guild!.channels.cache.get(channelId);
+        if (!target || target.type !== 0) throw new Error("role_panel_channel_missing");
+        const message = await target.send({ content, components });
+        return message.id;
+      }
     });
-    await this.db.query("UPDATE role_panels SET message_id=$1 WHERE id=$2", [message.id,panel.id]);
     await interaction.reply({ content: "Панель ролей создана.", ephemeral: true });
   }
 
