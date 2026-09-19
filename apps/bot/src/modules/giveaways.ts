@@ -63,15 +63,34 @@ export class Giveaways implements PlatformModule {
     }));
   }
 
-  async endGiveaway(id: number, guildId: string): Promise<{ id: number; channelId: string; winners: string[] } | null> {
+  async endGiveaway(id: number, guildId: string): Promise<{ id: number; channelId: string; messageId: string | null; winners: string[] } | null> {
     const result = await this.finish(id, guildId);
     if (!result || !this.client) return result;
 
     const channel = this.client.channels.cache.get(result.channelId);
+    const text = result.winners.length
+      ? "🎉 Giveaway #" + result.id + " завершён! Победители: " + result.winners.map((userId) => "<@" + userId + ">").join(", ")
+      : "Giveaway #" + result.id + " завершён. Участников не было.";
+
+    if (channel?.isTextBased() && "messages" in channel && result.messageId) {
+      const original = await channel.messages.fetch(result.messageId).catch(() => null);
+      if (original) {
+        await original.edit({
+          content: text,
+          components: [
+            new ActionRowBuilder<ButtonBuilder>().addComponents(
+              new ButtonBuilder()
+                .setCustomId("dsp:giveaway:finished:" + result.id)
+                .setLabel("Завершено")
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(true)
+            )
+          ]
+        }).catch(() => undefined);
+      }
+    }
+
     if (channel?.isTextBased() && "send" in channel) {
-      const text = result.winners.length
-        ? "🎉 Giveaway #" + result.id + " завершён! Победители: " + result.winners.map((userId) => "<@" + userId + ">").join(", ")
-        : "Giveaway #" + result.id + " завершён. Участников не было.";
       await channel.send(text).catch(() => undefined);
     }
 
@@ -111,7 +130,9 @@ export class Giveaways implements PlatformModule {
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
-    this.unsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const commandUnsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const interactionUnsubscribe = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
+    this.unsubscribe = () => { commandUnsubscribe(); interactionUnsubscribe(); };
     this.timer = setInterval(() => void this.sweep(), 5_000);
     this.timer.unref();
   }
@@ -171,7 +192,9 @@ export class Giveaways implements PlatformModule {
     const id = created.rows[0]?.id;
     if (!id) throw new Error("giveaway id missing");
 
-    const message = await interaction.channel!.send({
+    let message;
+    try {
+      message = await interaction.channel!.send({
       embeds: [
         new EmbedBuilder()
           .setTitle("🎉 Giveaway")
@@ -185,15 +208,20 @@ export class Giveaways implements PlatformModule {
             .setStyle(ButtonStyle.Success)
         )
       ]
-    });
+      });
 
-    await this.db.query("UPDATE giveaways SET message_id=$1 WHERE id=$2", [message.id, id]);
-    await interaction.reply({ content: "Giveaway создан.", ephemeral: true });
+      await this.db.query("UPDATE giveaways SET message_id=$1 WHERE id=$2", [message.id, id]);
+      await interaction.reply({ content: "Giveaway создан.", ephemeral: true });
+    } catch (error) {
+      if (message) await message.delete().catch(() => undefined);
+      await this.db.query("DELETE FROM giveaways WHERE id=$1 AND guild_id=$2", [id, interaction.guild!.id]).catch(() => undefined);
+      throw error;
+    }
   }
 
-  private async finish(id: number, guildId: string): Promise<{ id: number; channelId: string; winners: string[] } | null> {
-    const claimed = await this.db.query<{ id: string; channel_id: string; winners: number }>(
-      "UPDATE giveaways SET status='finishing' WHERE id=$1 AND guild_id=$2 AND status='running' RETURNING id,channel_id,winners",
+  private async finish(id: number, guildId: string): Promise<{ id: number; channelId: string; messageId: string | null; winners: string[] } | null> {
+    const claimed = await this.db.query<{ id: string; channel_id: string; message_id: string | null; winners: number }>(
+      "UPDATE giveaways SET status='finishing' WHERE id=$1 AND guild_id=$2 AND status='running' RETURNING id,channel_id,message_id,winners",
       [id, guildId]
     );
     const row = claimed.rows[0];
@@ -213,7 +241,7 @@ export class Giveaways implements PlatformModule {
         "UPDATE giveaways SET status='finished',selected_winners=$1::jsonb,finished_at=now() WHERE id=$2 AND status='finishing'",
         [JSON.stringify(winners), id]
       );
-      return { id, channelId: row.channel_id, winners };
+      return { id, channelId: row.channel_id, messageId: row.message_id, winners };
     } catch (error) {
       await this.db.query("UPDATE giveaways SET status='running' WHERE id=$1 AND status='finishing'", [id]);
       throw error;
@@ -221,24 +249,24 @@ export class Giveaways implements PlatformModule {
   }
 
   private async onInteraction(interaction: import("discord.js").Interaction): Promise<void> {
-    if (!interaction.isButton() || !interaction.customId.startsWith("dsp:giveaway:") || !interaction.guild!) return;
+    if (!interaction.isButton() || !interaction.customId.startsWith("dsp:giveaway:") || !interaction.guild) return;
     const [, , action, rawId] = interaction.customId.split(":");
     const id = Number(rawId);
     if (action !== "enter" || !Number.isSafeInteger(id)) return;
-
-    const result = await this.db.query<{ status: string }>(
-      "SELECT status FROM giveaways WHERE id=$1 AND guild_id=$2",
-      [id, interaction.guild!.id]
-    );
-    if (result.rows[0]?.status !== "running") {
-      await interaction.reply({ content: "Этот giveaway уже завершён.", ephemeral: true });
+    if (!await moduleEnabled(this.db, interaction.guild.id, "giveaways", false)) {
+      await interaction.reply({ content: "Модуль Giveaways выключен.", ephemeral: true });
       return;
     }
 
-    await this.db.query(
-      "INSERT INTO giveaway_entries(giveaway_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING",
-      [id, interaction.user.id]
+    const result = await this.db.query<{ giveaway_id: string }>(
+      "INSERT INTO giveaway_entries(giveaway_id,user_id) SELECT $1,$2 WHERE EXISTS (SELECT 1 FROM giveaways WHERE id=$1 AND guild_id=$3 AND status='running') ON CONFLICT DO NOTHING RETURNING giveaway_id",
+      [id, interaction.user.id, interaction.guild.id]
     );
+    if (!result.rows[0]) {
+      await interaction.reply({ content: "Этот giveaway уже завершён или не найден.", ephemeral: true });
+      return;
+    }
+
     await interaction.reply({ content: "Ты участвуешь! 🎉", ephemeral: true });
   }
 
