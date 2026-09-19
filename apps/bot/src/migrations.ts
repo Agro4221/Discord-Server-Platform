@@ -44,6 +44,29 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_moderation_cases_guild_target ON moderation_cases(guild_id, target_user_id, created_at DESC);
     `
   }
+  },
+  {
+    version: 3,
+    name: "audit_events",
+    sql: \`
+      CREATE TABLE IF NOT EXISTS audit_events (
+        id bigserial PRIMARY KEY,
+        guild_id text,
+        actor_user_id text,
+        source text NOT NULL,
+        action text NOT NULL,
+        target_type text,
+        target_id text,
+        metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_audit_events_guild_created
+        ON audit_events(guild_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_audit_events_action_created
+        ON audit_events(action, created_at DESC);
+    \`
+  }
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
