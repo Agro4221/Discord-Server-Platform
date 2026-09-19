@@ -159,18 +159,26 @@ export class Notifications implements PlatformModule {
 
     try {
       const feeds = await this.db.query<Feed>(
-        `SELECT nf.id,nf.guild_id AS "guildId",nf.channel_id AS "channelId",nf.url,
-                nf.interval_seconds AS "intervalSeconds",nf.last_item_key AS "lastItemKey"
-         FROM notification_feeds nf
-         INNER JOIN guild_bot_assignments ga
-           ON ga.guild_id=nf.guild_id
-         LEFT JOIN bot_heartbeats bh
-           ON bh.bot_identity_id=ga.bot_identity_id
-         WHERE nf.enabled=true
-           AND (ga.bot_identity_id=$1 OR ($1='primary' AND ga.bot_identity_id <> 'primary' AND bh.last_seen_at < now()-interval '90 seconds'))
-           AND (nf.last_polled_at IS NULL OR nf.last_polled_at <= now() - make_interval(secs => nf.interval_seconds))
-         ORDER BY nf.last_polled_at NULLS FIRST
-         LIMIT 20`,
+        `UPDATE notification_feeds nf
+         SET processing_until=now()+interval '2 minutes'
+         FROM (
+           SELECT nf2.id
+           FROM notification_feeds nf2
+           INNER JOIN guild_bot_assignments ga
+             ON ga.guild_id=nf2.guild_id
+           LEFT JOIN bot_heartbeats bh
+             ON bh.bot_identity_id=ga.bot_identity_id
+           WHERE nf2.enabled=true
+             AND (ga.bot_identity_id=$1 OR ($1='primary' AND ga.bot_identity_id <> 'primary' AND bh.last_seen_at < now()-interval '90 seconds'))
+             AND (nf2.processing_until IS NULL OR nf2.processing_until < now())
+             AND (nf2.last_polled_at IS NULL OR nf2.last_polled_at <= now() - make_interval(secs => nf2.interval_seconds))
+           ORDER BY nf2.last_polled_at NULLS FIRST
+           LIMIT 20
+           FOR UPDATE SKIP LOCKED
+         ) claim
+         WHERE nf.id=claim.id
+         RETURNING nf.id,nf.guild_id AS "guildId",nf.channel_id AS "channelId",nf.url,
+                   nf.interval_seconds AS "intervalSeconds",nf.last_item_key AS "lastItemKey"`,
         [this.identityId]
       );
 
@@ -250,13 +258,16 @@ ${first.url}`
     }
 
     await this.db.query(
-      "UPDATE notification_feeds SET last_item_key=$1,last_polled_at=now() WHERE id=$2",
+      "UPDATE notification_feeds SET last_item_key=$1,last_polled_at=now(),processing_until=NULL WHERE id=$2",
       [first.key, feed.id]
     );
   }
 
   private async markPolled(id: string, _error: string | null): Promise<void> {
-    await this.db.query("UPDATE notification_feeds SET last_polled_at=now() WHERE id=$1", [id]);
+    await this.db.query(
+      "UPDATE notification_feeds SET last_polled_at=now(),processing_until=NULL WHERE id=$1",
+      [id]
+    );
   }
 }
 
