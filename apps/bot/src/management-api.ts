@@ -762,7 +762,7 @@ class RequestInputError extends Error {
   }
 }
 
-async function validateAutomationPayload(
+function validateAutomationPayload(
   client: Client,
   guildId: string,
   event: string,
@@ -817,7 +817,7 @@ async function validateAutomationPayload(
   }
 }
 
-function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
   let size = 0;
   const chunks: Buffer[] = [];
 
