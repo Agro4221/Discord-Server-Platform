@@ -39,7 +39,7 @@ test("event bus extracts guild id from member ban events", async () => {
     received.push(member.guild.id);
   });
 
-  const member = { guild: { id: "123456789012345777" } } as never;
-  await bus.emit("member.ban", member);
+  const payload = { guildId: "123456789012345777", userId: "123456789012345778" };
+  await bus.emit("member.ban", payload);
   assert.deepEqual(received, ["123456789012345777"]);
 });
