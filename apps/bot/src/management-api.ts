@@ -21,6 +21,11 @@ type ApiOptions = {
   transfer: ConfigTransferService;
   backups: BackupService;
   actions: Record<string, (guildId: string) => Promise<unknown>>;
+  giveaways?: {
+    list: (guildId: string) => Promise<unknown[]>;
+    end: (guildId: string, giveawayId: number) => Promise<unknown>;
+    reroll: (guildId: string, giveawayId: number) => Promise<unknown>;
+  };
   rolePanels?: {
     list: (guildId: string) => Promise<unknown[]>;
     create: (
@@ -234,6 +239,53 @@ export class ManagementApiServer {
               targetId: file
             });
             this.json(res, 200, { ok: true, guildId, file });
+            return;
+          }
+
+          const giveawaysMatch = path.match(/^\/api\/guilds\/([^/]+)\/giveaways$/);
+          const giveawayActionMatch = path.match(/^\/api\/guilds\/([^/]+)\/giveaways\/(\\d+)\/(end|reroll)$/);
+
+          if ((giveawaysMatch || giveawayActionMatch) && !this.options.giveaways) {
+            this.json(res, 500, { error: "giveaways_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && giveawaysMatch) {
+            const guildId = giveawaysMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, giveaways: await this.options.giveaways!.list(guildId) });
+            return;
+          }
+
+          if (method === "POST" && giveawayActionMatch) {
+            const guildId = giveawayActionMatch[1] ?? "";
+            const giveawayId = Number(giveawayActionMatch[2]);
+            const action = giveawayActionMatch[3];
+            if (!guildId || !Number.isSafeInteger(giveawayId) || !action || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_giveaway_not_found" });
+              return;
+            }
+
+            const result = action === "end"
+              ? await this.options.giveaways!.end(guildId, giveawayId)
+              : await this.options.giveaways!.reroll(guildId, giveawayId);
+
+            if (result === null) {
+              this.json(res, 404, { error: "giveaway_not_found_or_not_actionable" });
+              return;
+            }
+
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "giveaway." + action,
+              targetType: "giveaway",
+              targetId: String(giveawayId)
+            });
+            this.json(res, 200, { ok: true, result });
             return;
           }
 
