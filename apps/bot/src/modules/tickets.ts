@@ -13,10 +13,12 @@ type TicketConfig = {
 export class Tickets implements PlatformModule {
   readonly name = "tickets";
   private unsubscribe?: () => void;
+  private events?: import("../events.js").PlatformEventBus;
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
+    this.events = context.events;
     const a = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const b = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
     this.unsubscribe = () => { a(); b(); };
@@ -162,6 +164,12 @@ export class Tickets implements PlatformModule {
         ]
       });
 
+      await this.events?.emit("ticket.create", {
+        guildId: interaction.guild!.id,
+        userId: interaction.user.id,
+        ticketId: Number(ticketId),
+        channelId: channel.id
+      });
       await interaction.reply({ content: `Тикет создан: <#${channel.id}>.`, ephemeral: true });
     } catch (error) {
       await channel.delete("Ticket creation rollback").catch(() => undefined);
@@ -223,6 +231,12 @@ export class Tickets implements PlatformModule {
         }
       }
 
+      await this.events?.emit("ticket.close", {
+        guildId: interaction.guild!.id,
+        userId: interaction.user.id,
+        ticketId,
+        channelId: row.channel_id
+      });
       await interaction.editReply({ content: "Тикет закрыт и transcript сохранён." });
       if (channel?.type === ChannelType.GuildText) await channel.delete("Ticket closed").catch(() => undefined);
     }
