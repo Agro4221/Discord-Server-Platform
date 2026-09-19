@@ -246,10 +246,12 @@ export class Security implements PlatformModule {
     const botMember = guild.members.me;
     if (!botMember) return;
 
-    const removable = executorCount >= Math.ceil(config.maxDestructiveActions / 2) && !member.permissions.has(PermissionFlagsBits.Administrator)
+    const removable = executorCount >= Math.ceil(config.maxDestructiveActions / 2) &&
+      !member.permissions.has(PermissionFlagsBits.Administrator)
       ? member.roles.cache.filter(
-      (role) => !role.managed && role.id !== guild.id && role.position < botMember.roles.highest.position
-    );
+          (role) => !role.managed && role.id !== guild.id && role.position < botMember.roles.highest.position
+        )
+      : member.roles.cache.filter(() => false);
     for (const role of removable.values()) {
       await member.roles.remove(role, "Security destructive burst response").catch(() => undefined);
     }
