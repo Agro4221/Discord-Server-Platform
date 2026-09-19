@@ -46,7 +46,6 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "deleteMessage", label: "Удалять нарушающее сообщение", type: "boolean" },
       { key: "timeoutMinutes", label: "Timeout, минут", type: "number", min: 0, max: 40320 }
     ],
-    actions: [{ id: "reload", label: "Перезагрузить правила", kind: "safe" }]
   },
   {
     key: "verification",
