@@ -53,6 +53,8 @@ test("giveaway participation buttons are wired to the platform interaction bus",
 test("giveaway participation is rejected atomically after the giveaway stops running", async () => {
   const db = {
     async query(sql: string) {
+      if (sql.startsWith("UPDATE giveaways SET status='running'")) return { rows: [], rowCount: 0 };
+      if (sql.startsWith("UPDATE giveaways SET status='finished'")) return { rows: [], rowCount: 0 };
       if (sql.startsWith("SELECT enabled FROM guild_modules")) {
         return { rows: [{ enabled: true }] };
       }
