@@ -115,17 +115,11 @@ export function wireDiscordEvents(
     void events.emit("role.delete", role);
   });
 
-  client.on("guildBanAdd", async (ban) => {
-    const member = ban.guild.members.cache.get(ban.user.id)
-      ?? await ban.guild.members.fetch(ban.user.id).catch((error) => {
-        logger.warn("Discord ban member lookup failed", {
-          guildId: ban.guild.id,
-          userId: ban.user.id,
-          error: String(error)
-        });
-        return null;
-      });
-    if (member) void events.emit("member.ban", member);
+  client.on("guildBanAdd", (ban) => {
+    void events.emit("member.ban", {
+      guildId: ban.guild.id,
+      userId: ban.user.id
+    });
   });
 }
 
