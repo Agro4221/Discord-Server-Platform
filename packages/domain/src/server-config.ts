@@ -4,6 +4,7 @@ export type ServerModuleKey =
   | "security"
   | "temporary-voice"
   | "welcome"
+  | "verification"
   | "roles"
   | "leveling"
   | "tickets"
