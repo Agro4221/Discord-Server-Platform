@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { RolePanelsEditor } from "./role-panels-editor";
 import { BackupPanel } from "./backup-panel";
+import { GiveawaysPanel } from "./giveaways-panel";
 
 type Guild = { id: string; name: string; icon: string | null };
 type ModuleState = Record<string, boolean>;
@@ -393,12 +394,15 @@ export function DashboardClient() {
 
             <div style={{ ...panelStyle, padding: 22 }}>
               {selectedModule === "roles" ? (
+
                 <RolePanelsEditor
                   guildId={guildId}
                   channels={resources.channels.filter((resource) => resource.type === 0)}
                   roles={resources.roles}
                   onChanged={reloadAudit}
                 />
+              ) : selectedModule === "giveaways" ? (
+                <GiveawaysPanel guildId={guildId} onChanged={reloadAudit} />
               ) : !schema ? (
                 <div style={{ opacity: 0.58, padding: "24px 0" }}>
                   Для этого модуля пока нет dashboard schema. Его operational UI будет добавлен отдельно.
