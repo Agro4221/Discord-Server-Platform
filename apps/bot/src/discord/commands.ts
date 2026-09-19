@@ -517,7 +517,7 @@ export async function handleCommand(
         return;
       }
 
-      const checker = new PermissionChecker(interaction.guild);
+      const checker = new PermissionChecker(interaction.guild!);
       const missing = checker.botMissing(PermissionChecker.requiredForTemporaryVoice());
       if (missing.length > 0) {
         await interaction.reply({
