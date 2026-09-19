@@ -298,6 +298,27 @@ const migrations = [
       ");"
     ])
   }
+  },
+  {
+    version: 12,
+    name: "economy_shop",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS economy_shop_items (",
+      "  id bigserial PRIMARY KEY, guild_id text NOT NULL, name text NOT NULL,",
+      "  description text NOT NULL, price bigint NOT NULL CHECK(price > 0),",
+      "  role_id text, stock integer CHECK(stock IS NULL OR stock >= 0),",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_economy_shop_guild_enabled ON economy_shop_items(guild_id,enabled);",
+      "CREATE TABLE IF NOT EXISTS economy_transactions (",
+      "  id bigserial PRIMARY KEY, guild_id text NOT NULL, user_id text NOT NULL,",
+      "  type text NOT NULL, amount bigint NOT NULL, metadata jsonb NOT NULL DEFAULT '{}'::jsonb,",
+      "  created_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_economy_transactions_guild_user ON economy_transactions(guild_id,user_id,created_at DESC);"
+    ])
+  }
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
