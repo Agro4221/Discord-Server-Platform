@@ -15,6 +15,7 @@ import {
 } from "lavalink-client";
 import type { Database } from "../database.js";
 import type { AppConfig } from "../config.js";
+import type { BotIdentityRepository } from "../bot-identity.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
@@ -73,17 +74,30 @@ export class Music implements PlatformModule {
   private unsubscribe?: () => void;
   private rawHandler?: (data: unknown) => void;
   private readyHandler?: () => void;
+  private directInteractionHandler?: (interaction: Interaction) => void;
   private manager?: LavalinkManager;
   private client?: Client;
   private initialized = false;
 
   constructor(
     private readonly db: Database,
-    private readonly config: AppConfig
+    private readonly config: AppConfig,
+    private readonly identities: BotIdentityRepository
   ) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+
+    if (this.config.botIdentityId !== "primary") {
+      this.directInteractionHandler = (interaction) => {
+        if (interaction.isChatInputCommand() && interaction.commandName === "music") {
+          void this.onCommand(interaction);
+        } else if (interaction.isButton() && interaction.customId.startsWith("dsp:music:")) {
+          void this.onInteraction(interaction);
+        }
+      };
+      this.client.on("interactionCreate", this.directInteractionHandler);
+    }
 
     const queueStore = new PostgresQueueStore(this.db, this.config.botIdentityId);
     const persistedSessions = await this.db.query<{ node_id: string; session_id: string }>(
@@ -242,7 +256,12 @@ export class Music implements PlatformModule {
       this.client.off("ready", this.readyHandler);
     }
 
+    if (this.client && this.directInteractionHandler) {
+      this.client.off("interactionCreate", this.directInteractionHandler);
+    }
+
     this.rawHandler = undefined;
+    this.directInteractionHandler = undefined;
     this.readyHandler = undefined;
     this.manager = undefined;
     this.client = undefined;
@@ -266,6 +285,10 @@ export class Music implements PlatformModule {
 
     const member = await guild.members.fetch(interaction.user.id);
     const voice = member.voice.channel;
+    const existingPlayer = this.manager.players.get(guild.id);
+    const ownershipChannelId = voice?.id ?? existingPlayer?.voiceChannelId ?? null;
+
+    if (!await this.ensureMusicOwnership(interaction, ownershipChannelId)) return;
 
     switch (interaction.options.getSubcommand()) {
       case "play":
@@ -408,7 +431,7 @@ export class Music implements PlatformModule {
       await interaction.reply({ content: "Для перемешивания нужно минимум два трека в очереди.", ephemeral: true });
       return;
     }
-    player.queue.shuffle();
+    await Promise.resolve(player.queue.shuffle());
     await this.persistPlayer(player);
     await interaction.reply({ content: "🔀 Очередь перемешана.", ephemeral: true });
   }
@@ -429,6 +452,35 @@ export class Music implements PlatformModule {
     }
     await player.seek(positionSeconds * 1000);
     await interaction.reply({ content: `⏩ Позиция: **${positionSeconds} сек.**`, ephemeral: true });
+  }
+
+  private async ensureMusicOwnership(
+    interaction: ChatInputCommandInteraction,
+    voiceChannelId: string | null
+  ): Promise<boolean> {
+    if (!voiceChannelId) {
+      return this.config.botIdentityId === "primary";
+    }
+
+    const owner = await this.identities.musicVoiceOwner(interaction.guildId!, voiceChannelId);
+    if (owner) {
+      if (owner === this.config.botIdentityId) return true;
+      await interaction.reply({
+        content: `Этот голосовой канал закреплён за bot identity **${owner}**.`,
+        ephemeral: true
+      });
+      return false;
+    }
+
+    if (this.config.botIdentityId !== "primary") {
+      await interaction.reply({
+        content: "Эта voice channel не назначена данной bot identity.",
+        ephemeral: true
+      });
+      return false;
+    }
+
+    return true;
   }
 
   private async canControl(interaction: ChatInputCommandInteraction, voiceChannelId: string | null): Promise<boolean> {
