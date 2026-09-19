@@ -6,6 +6,7 @@ import {
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
+import { logger } from "../logger.js";
 
 type ShopItem = {
   id: number;
@@ -125,8 +126,31 @@ export class Economy implements PlatformModule {
       if (item.roleId) {
         const role = interaction.guild!.roles.cache.get(item.roleId);
         const member = await interaction.guild!.members.fetch(interaction.user.id);
-        if (role && member.manageable && role.position < (interaction.guild!.members.me?.roles.highest.position ?? 0)) {
-          await member.roles.add(role, "Economy shop purchase").catch(() => undefined);
+        if (!role || !member.manageable || role.position >= (interaction.guild!.members.me?.roles.highest.position ?? 0)) {
+          await this.refundPurchase(guildId, interaction.user.id, item);
+          await interaction.reply({
+            content: "Покупка отменена: бот не может выдать настроенную роль. Coins возвращены.",
+            ephemeral: true
+          });
+          return;
+        }
+
+        try {
+          await member.roles.add(role, "Economy shop purchase");
+        } catch (error) {
+          await this.refundPurchase(guildId, interaction.user.id, item);
+          logger.error("Economy role grant failed; purchase refunded", {
+            guildId,
+            userId: interaction.user.id,
+            itemId: item.id,
+            price: item.price.toString(),
+            error: String(error)
+          });
+          await interaction.reply({
+            content: "Не удалось выдать роль. Покупка отменена, coins возвращены.",
+            ephemeral: true
+          });
+          return;
         }
       }
       await interaction.reply({ content: `✅ Куплено: **${item.name}** за ${item.price.toString()} coins.`, ephemeral: true });
@@ -193,6 +217,23 @@ export class Economy implements PlatformModule {
         [guildId,userId,"-" + item.price.toString(),JSON.stringify({itemId:item.id})]
       );
       return true;
+    });
+  }
+
+  private async refundPurchase(guildId: string, userId: string, item: ShopItem): Promise<void> {
+    await this.db.transaction(async (client) => {
+      await client.query(
+        "UPDATE economy_accounts SET balance=balance+$3::bigint,updated_at=now() WHERE guild_id=$1 AND user_id=$2",
+        [guildId, userId, item.price.toString()]
+      );
+      await client.query(
+        "UPDATE economy_shop_items SET stock=CASE WHEN stock IS NULL THEN NULL ELSE stock+1 END,updated_at=now() WHERE id=$1 AND guild_id=$2",
+        [item.id, guildId]
+      );
+      await client.query(
+        "INSERT INTO economy_transactions(guild_id,user_id,type,amount,metadata) VALUES($1,$2,'purchase-refund',$3,$4::jsonb)",
+        [guildId, userId, item.price.toString(), JSON.stringify({ itemId: item.id, reason: "role_grant_failed" })]
+      );
     });
   }
 
