@@ -377,6 +377,21 @@ const migrations = [
     sql: q([
       "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS quarantine_role_id text;"
     ])
+  },
+  {
+    version: 19,
+    name: "music_bot_assignments",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS guild_music_bot_assignments (",
+      "  guild_id text NOT NULL,",
+      "  bot_identity_id text NOT NULL REFERENCES bot_identities(id) ON DELETE CASCADE,",
+      "  voice_channel_id text NOT NULL,",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,bot_identity_id),",
+      "  UNIQUE(guild_id,voice_channel_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_guild_music_bot_assignments_guild ON guild_music_bot_assignments(guild_id);"
+    ])
   }
 ] as const;
 
