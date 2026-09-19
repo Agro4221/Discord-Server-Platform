@@ -2,6 +2,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionF
 import crypto from "node:crypto";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
+import { logger } from "../logger.js";
 import { moduleEnabled } from "../module-utils.js";
 
 type VerificationConfig = {
@@ -16,7 +17,7 @@ type VerificationConfig = {
 export class Verification implements PlatformModule {
   readonly name = "verification";
   private unsubscribe?: () => void;
-  private readonly codes = new Map<string, { hash: string; expiresAt: number }>();
+  private readonly codes = new Map<string, { hash: string; expiresAt: number; attempts: number }>();
 
   constructor(private readonly db: Database) {}
 
@@ -150,14 +151,28 @@ export class Verification implements PlatformModule {
       const bot = member.guild.members.me;
       if (quarantineRole && bot?.permissions.has(PermissionFlagsBits.ManageRoles) &&
           !quarantineRole.managed && quarantineRole.position < bot.roles.highest.position) {
-        await member.roles.add(quarantineRole, "Verification quarantine").catch(() => undefined);
+        await member.roles.add(quarantineRole, "Verification quarantine").catch((error) => {
+          logger.warn("Verification quarantine role assignment failed", {
+            guildId: member.guild.id,
+            userId: member.id,
+            roleId: quarantineRole.id,
+            error: String(error)
+          });
+        });
       }
     }
 
     if (config.logChannelId) {
       const channel = member.guild.channels.cache.get(config.logChannelId);
       if (channel?.isTextBased() && "send" in channel) {
-        await channel.send("🛂 Verification: новый участник ожидает подтверждения — <@" + member.id + ">").catch(() => undefined);
+        await channel.send("🛂 Verification: новый участник ожидает подтверждения — <@" + member.id + ">").catch((error) => {
+          logger.warn("Verification pending notification failed", {
+            guildId: member.guild.id,
+            channelId: channel.id,
+            userId: member.id,
+            error: String(error)
+          });
+        });
       }
     }
   }
@@ -188,14 +203,24 @@ export class Verification implements PlatformModule {
     const code = crypto.randomInt(100000, 1_000_000).toString();
     const hash = crypto.createHash("sha256").update(code).digest("hex");
     const expiresAt = Date.now() + config.codeTtlMinutes * 60_000;
-    this.codes.set(key, { hash, expiresAt });
-    await interaction.reply({
+    this.codes.set(key, { hash, expiresAt, attempts: 0 });
+    try {
+      await interaction.reply({
       content: `Твой одноразовый код: **${code}**`,
       ephemeral: true,
       components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId(`dsp:verify:confirm:${code}`).setLabel("Подтвердить").setStyle(ButtonStyle.Success)
       )]
-    });
+      });
+    } catch (error) {
+      this.codes.delete(key);
+      logger.warn("Verification code issue reply failed", {
+        guildId: interaction.guild!.id,
+        userId: interaction.user.id,
+        error: String(error)
+      });
+      throw error;
+    }
   }
 
   private async confirm(interaction: import("discord.js").ButtonInteraction, code: string): Promise<void> {
@@ -207,8 +232,19 @@ export class Verification implements PlatformModule {
       return;
     }
     const hash = crypto.createHash("sha256").update(code).digest("hex");
-    if (hash !== entry.hash) {
-      await interaction.reply({ content: "Неверный код.", ephemeral: true });
+    const expected = Buffer.from(entry.hash, "hex");
+    const provided = Buffer.from(hash, "hex");
+    if (
+      expected.length !== provided.length ||
+      !crypto.timingSafeEqual(expected, provided)
+    ) {
+      entry.attempts += 1;
+      if (entry.attempts >= 5) {
+        this.codes.delete(key);
+        await interaction.reply({ content: "Слишком много неверных попыток. Получи новый код.", ephemeral: true });
+        return;
+      }
+      await interaction.reply({ content: `Неверный код. Осталось попыток: ${5 - entry.attempts}.`, ephemeral: true });
       return;
     }
     const config = await this.config(interaction.guild!.id);
@@ -222,7 +258,14 @@ export class Verification implements PlatformModule {
     if (config.quarantineRoleId && member.roles.cache.has(config.quarantineRoleId)) {
       const quarantineRole = interaction.guild!.roles.cache.get(config.quarantineRoleId);
       if (quarantineRole && quarantineRole.position < (interaction.guild!.members.me?.roles.highest.position ?? 0)) {
-        await member.roles.remove(quarantineRole, "Verification passed").catch(() => undefined);
+        await member.roles.remove(quarantineRole, "Verification passed").catch((error) => {
+          logger.warn("Verification quarantine removal failed", {
+            guildId: interaction.guild!.id,
+            userId: interaction.user.id,
+            roleId: quarantineRole.id,
+            error: String(error)
+          });
+        });
       }
     }
     this.codes.delete(key);
@@ -230,7 +273,14 @@ export class Verification implements PlatformModule {
     if (config.logChannelId) {
       const channel = interaction.guild!.channels.cache.get(config.logChannelId);
       if (channel?.isTextBased() && "send" in channel) {
-        await channel.send(`✅ Verification: ${interaction.user.tag} подтвердил аккаунт.`).catch(() => undefined);
+        await channel.send(`✅ Verification: ${interaction.user.tag} подтвердил аккаунт.`).catch((error) => {
+          logger.warn("Verification success notification failed", {
+            guildId: interaction.guild!.id,
+            channelId: channel.id,
+            userId: interaction.user.id,
+            error: String(error)
+          });
+        });
       }
     }
   }
