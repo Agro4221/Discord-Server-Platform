@@ -220,6 +220,16 @@ export function buildCommands(): SlashCommandBuilder[] {
               .setMaxLength(200)
               .setRequired(true)
           )
+      )
+      .addSubcommand((sub) => sub
+        .setName("end")
+        .setDescription("End a running giveaway")
+        .addIntegerOption((o) => o.setName("id").setDescription("Giveaway id").setMinValue(1).setRequired(true))
+      )
+      .addSubcommand((sub) => sub
+        .setName("reroll")
+        .setDescription("Reroll a finished giveaway")
+        .addIntegerOption((o) => o.setName("id").setDescription("Giveaway id").setMinValue(1).setRequired(true))
       ),
 
     new SlashCommandBuilder()
@@ -338,6 +348,40 @@ export function buildCommands(): SlashCommandBuilder[] {
     new SlashCommandBuilder()
       .setName("analytics")
       .setDescription("Server analytics"),
+    new SlashCommandBuilder()
+      .setName("automod")
+      .setDescription("AutoMod")
+      .addSubcommand((sub) => sub.setName("setup").setDescription("Configure AutoMod")
+        .addStringOption((o) => o.setName("blocked-words").setDescription("Comma/newline separated blocked words").setMaxLength(5000))
+        .addIntegerOption((o) => o.setName("max-mentions").setDescription("Max mentions").setMinValue(1).setMaxValue(50))
+        .addNumberOption((o) => o.setName("caps-ratio").setDescription("Caps ratio 0-1").setMinValue(0).setMaxValue(1))
+        .addIntegerOption((o) => o.setName("repeats").setDescription("Repeated messages threshold").setMinValue(2).setMaxValue(20))
+        .addIntegerOption((o) => o.setName("window").setDescription("Repeat window seconds").setMinValue(2).setMaxValue(120))
+        .addBooleanOption((o) => o.setName("delete").setDescription("Delete violating messages"))
+        .addIntegerOption((o) => o.setName("timeout").setDescription("Timeout minutes").setMinValue(0).setMaxValue(40320))
+      ),
+
+    new SlashCommandBuilder()
+      .setName("welcome")
+      .setDescription("Welcome messages")
+      .addSubcommand((sub) => sub.setName("setup").setDescription("Configure Welcome")
+        .addChannelOption((o) => o.setName("channel").setDescription("Welcome channel").addChannelTypes(ChannelType.GuildText))
+        .addStringOption((o) => o.setName("message").setDescription("Welcome message").setMaxLength(2000))
+        .addBooleanOption((o) => o.setName("dm").setDescription("Send DM"))
+        .addBooleanOption((o) => o.setName("embed").setDescription("Use embed"))
+      ),
+
+    new SlashCommandBuilder()
+      .setName("leveling")
+      .setDescription("Leveling")
+      .addSubcommand((sub) => sub.setName("setup").setDescription("Configure Leveling")
+        .addIntegerOption((o) => o.setName("xp").setDescription("XP per message").setMinValue(1).setMaxValue(1000))
+        .addIntegerOption((o) => o.setName("cooldown").setDescription("Cooldown seconds").setMinValue(0).setMaxValue(3600))
+        .addBooleanOption((o) => o.setName("announce").setDescription("Announce level ups"))
+      )
+      .addSubcommand((sub) => sub.setName("rank").setDescription("Show rank")
+        .addUserOption((o) => o.setName("user").setDescription("User")))
+      .addSubcommand((sub) => sub.setName("top").setDescription("Show leaderboard")),
     new SlashCommandBuilder()
       .setName("security")
       .setDescription("Security / anti-raid")
