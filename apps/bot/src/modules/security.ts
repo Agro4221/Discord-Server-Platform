@@ -104,7 +104,7 @@ export class Security implements PlatformModule {
       created_at: Date | string;
       metadata: { windowSeconds?: number };
     }>(
-      "SELECT guild_id,event_type,created_at,metadata FROM security_events WHERE event_type IN ('raid-detected','destructive-burst') AND created_at >= now() - interval '5 minutes' ORDER BY created_at DESC"
+      "SELECT guild_id,event_type,created_at,metadata FROM security_events WHERE event_type IN ('raid-detected','destructive-burst') AND created_at >= now() - interval '5 minutes' ORDER BY created_at DESC LIMIT 10000"
     );
 
     const now = Date.now();
@@ -280,6 +280,16 @@ export class Security implements PlatformModule {
     for (const [guildId, entries] of this.destructive) {
       const latest = entries.at(-1)?.timestamp ?? 0;
       if (latest < cutoff) this.destructive.delete(guildId);
+    }
+
+    for (const [guildId, until] of this.raidActiveUntil) {
+      if (until <= now) this.raidActiveUntil.delete(guildId);
+    }
+    for (const [guildId, until] of this.destructiveActiveUntil) {
+      if (until <= now) this.destructiveActiveUntil.delete(guildId);
+    }
+    for (const [guildId, at] of this.alertAt) {
+      if (at <= now - 60_000) this.alertAt.delete(guildId);
     }
 
     const maxGuilds = 10_000;
