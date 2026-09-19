@@ -9,6 +9,7 @@ import { randomInt } from "node:crypto";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
+import { logger } from "../logger.js";
 
 export class Giveaways implements PlatformModule {
   readonly name = "giveaways";
@@ -75,7 +76,15 @@ export class Giveaways implements PlatformModule {
       : "Giveaway #" + result.id + " завершён. Участников не было.";
 
     if (channel?.isTextBased() && "messages" in channel && result.messageId) {
-      const original = await channel.messages.fetch(result.messageId).catch(() => null);
+      const original = await channel.messages.fetch(result.messageId).catch((error) => {
+        logger.warn("Giveaway original message fetch failed", {
+          guildId,
+          giveawayId: result.id,
+          messageId: result.messageId,
+          error: String(error)
+        });
+        return null;
+      });
       if (original) {
         await original.edit({
           content: text,
@@ -88,12 +97,26 @@ export class Giveaways implements PlatformModule {
                 .setDisabled(true)
             )
           ]
-        }).catch(() => undefined);
+        }).catch((error) => {
+          logger.warn("Giveaway original message update failed", {
+            guildId,
+            giveawayId: result.id,
+            messageId: result.messageId,
+            error: String(error)
+          });
+        });
       }
     }
 
     if (channel?.isTextBased() && "send" in channel) {
-      await channel.send(text).catch(() => undefined);
+      await channel.send(text).catch((error) => {
+        logger.warn("Giveaway result message failed", {
+          guildId,
+          giveawayId: result.id,
+          channelId: result.channelId,
+          error: String(error)
+        });
+      });
     }
 
     return result;
@@ -126,6 +149,7 @@ export class Giveaways implements PlatformModule {
       return winners;
     } catch (error) {
       await this.db.query("UPDATE giveaways SET status='finished' WHERE id=$1 AND status='rerolling'", [id]);
+      logger.error("Giveaway reroll failed", { guildId, giveawayId: id, error: String(error) });
       throw error;
     }
   }
@@ -218,8 +242,29 @@ export class Giveaways implements PlatformModule {
       await this.db.query("UPDATE giveaways SET message_id=$1 WHERE id=$2", [message.id, id]);
       await interaction.reply({ content: "Giveaway создан.", ephemeral: true });
     } catch (error) {
-      if (message) await message.delete().catch(() => undefined);
-      await this.db.query("DELETE FROM giveaways WHERE id=$1 AND guild_id=$2", [id, interaction.guild!.id]).catch(() => undefined);
+      if (message) {
+        await message.delete().catch((deleteError) => {
+          logger.warn("Giveaway rollback message delete failed", {
+            guildId: interaction.guild!.id,
+            giveawayId: id,
+            messageId: message.id,
+            error: String(deleteError)
+          });
+        });
+      }
+      await this.db.query("DELETE FROM giveaways WHERE id=$1 AND guild_id=$2", [id, interaction.guild!.id])
+        .catch((cleanupError) => {
+          logger.error("Giveaway rollback database cleanup failed", {
+            guildId: interaction.guild!.id,
+            giveawayId: id,
+            error: String(cleanupError)
+          });
+        });
+      logger.error("Giveaway publication failed and was rolled back", {
+        guildId: interaction.guild!.id,
+        giveawayId: id,
+        error: String(error)
+      });
       throw error;
     }
   }
@@ -254,6 +299,11 @@ export class Giveaways implements PlatformModule {
       return { id, channelId: row.channel_id, messageId: row.message_id, winners };
     } catch (error) {
       await this.db.query("UPDATE giveaways SET status='running' WHERE id=$1 AND status='finishing'", [id]);
+      logger.error("Giveaway finishing failed and was reverted to running", {
+        guildId,
+        giveawayId: id,
+        error: String(error)
+      });
       throw error;
     }
   }
@@ -281,13 +331,24 @@ export class Giveaways implements PlatformModule {
   }
 
   private async sweep(): Promise<void> {
-    const expired = await this.db.query<{ id: string; guild_id: string }>(
+    try {
+      const expired = await this.db.query<{ id: string; guild_id: string }>(
       "SELECT g.id,g.guild_id FROM giveaways g INNER JOIN guild_bot_assignments ga ON ga.guild_id=g.guild_id AND ga.bot_identity_id=$1 WHERE g.status='running' AND g.ends_at <= now() ORDER BY g.ends_at LIMIT 20",
       [this.identityId]
     );
 
-    for (const giveaway of expired.rows) {
-      await this.endGiveaway(Number(giveaway.id), giveaway.guild_id).catch(() => undefined);
+      for (const giveaway of expired.rows) {
+        await this.endGiveaway(Number(giveaway.id), giveaway.guild_id).catch((error) => {
+          logger.error("Giveaway scheduled finish failed", {
+            identityId: this.identityId,
+            guildId: giveaway.guild_id,
+            giveawayId: giveaway.id,
+            error: String(error)
+          });
+        });
+      }
+    } catch (error) {
+      logger.error("Giveaway worker cycle failed", { identityId: this.identityId, error: String(error) });
     }
   }
 
