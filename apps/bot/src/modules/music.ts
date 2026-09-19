@@ -29,23 +29,23 @@ class PostgresQueueStore implements QueueStoreManager {
     return [guildId, this.botIdentityId];
   }
 
-  async get(guildId: string): Promise<string | null> {
+  async get(guildId: string): Promise<StoredQueue | string | undefined> {
     const [storedGuild, identity] = this.keyGuild(guildId);
     const result = await this.db.query<{ data: unknown }>(
       "SELECT data FROM music_queue_store WHERE guild_id=$1 AND bot_identity_id=$2",
       [storedGuild, identity]
     );
-    return result.rows[0] ? JSON.stringify(result.rows[0].data) : null;
+    return result.rows[0] ? JSON.stringify(result.rows[0].data) : undefined;
   }
 
-  async set(guildId: string, data: string): Promise<void> {
+  async set(guildId: string, data: StoredQueue | string): Promise<void> {
     const [storedGuild, identity] = this.keyGuild(guildId);
     await this.db.query(
       `INSERT INTO music_queue_store(guild_id,bot_identity_id,data)
        VALUES($1,$2,$3::jsonb)
        ON CONFLICT(guild_id,bot_identity_id)
        DO UPDATE SET data=EXCLUDED.data,updated_at=now()`,
-      [storedGuild, identity, data]
+      [storedGuild, identity, typeof data === "string" ? data : JSON.stringify(data)]
     );
   }
 
@@ -57,12 +57,14 @@ class PostgresQueueStore implements QueueStoreManager {
     );
   }
 
-  async parse(data: string): Promise<Partial<StoredQueue>> {
-    return JSON.parse(data) as Partial<StoredQueue>;
+  async parse(data: StoredQueue | string): Promise<Partial<StoredQueue>> {
+    return typeof data === "string"
+      ? JSON.parse(data) as Partial<StoredQueue>
+      : data;
   }
 
-  stringify(data: Partial<StoredQueue>): string {
-    return JSON.stringify(data);
+  stringify(data: StoredQueue | string): string {
+    return typeof data === "string" ? data : JSON.stringify(data);
   }
 }
 
@@ -129,7 +131,8 @@ export class Music implements PlatformModule {
     });
 
     this.rawHandler = (data) => {
-      void this.manager?.sendRawData(data);
+      const rawPayload = data as Parameters<LavalinkManager["sendRawData"]>[0];
+      void this.manager?.sendRawData(rawPayload);
     };
     this.client.on("raw", this.rawHandler);
 
@@ -199,7 +202,7 @@ export class Music implements PlatformModule {
     this.unsubscribe = undefined;
 
     if (this.client && this.rawHandler) {
-      this.client.off("raw", this.rawHandler);
+      this.client.off("raw", this.rawHandler as never);
     }
 
     if (this.client && this.readyHandler) {
@@ -345,8 +348,7 @@ export class Music implements PlatformModule {
       await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
       return;
     }
-    player.queue.clear();
-    await player.destroy();
+    await player.stopPlaying(true, false);
     await interaction.reply({ content: "⏹️ Остановлено.", ephemeral: true });
   }
 
@@ -428,7 +430,7 @@ export class Music implements PlatformModule {
     const action = interaction.customId.slice("dsp:music:".length);
     if (action === "pause") await player.pause(!player.paused);
     else if (action === "skip") await player.skip();
-    else if (action === "stop") await player.destroy();
+    else if (action === "stop") await player.stopPlaying(true, false);
 
     await interaction.reply({
       content:
@@ -439,7 +441,12 @@ export class Music implements PlatformModule {
     });
   }
 
-  private async persistPlayer(player: any): Promise<void> {
+  private async persistPlayer(player: {
+    guildId: string;
+    voiceChannelId: string | null;
+    textChannelId: string | null;
+    toJSON(): unknown;
+  }): Promise<void> {
     await this.db.query(
       `INSERT INTO music_players(
         guild_id,bot_identity_id,voice_channel_id,text_channel_id,state
