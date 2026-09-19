@@ -64,3 +64,12 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Giveaway completion disables the original participation button and posts the final result.
 - Regression coverage added for button wiring and post-finalization rejection.
 - Latest relevant CI run: #277 on commit d5d0ca40b7e3841049c6b74e46a6822a8aeed882 passed typecheck, bot tests, bot build and dashboard build.
+
+
+## 2026-09-19 — Multi-bot Music routing hardening
+- Added migration 19 with persistent per-guild, per-voice-channel Music bot assignments.
+- Added repository and Management API support for assigning/unassigning Music identities.
+- Control Center Bot Fleet now manages Music assignments alongside identity health.
+- Secondary bot identities register only Music commands and handle only Music interactions for assigned voice channels; the shared Platform Event Bus remains scoped by general guild ownership.
+- Removed premature fleet `ready` heartbeat before Discord Gateway login.
+- Added Music `shuffle` and `seek` controls with voice-channel / Manage Server authorization.
