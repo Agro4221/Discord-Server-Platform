@@ -248,21 +248,8 @@ export class Giveaways implements PlatformModule {
     );
 
     for (const giveaway of expired.rows) {
-      const result = await this.finish(Number(giveaway.id), giveaway.guild_id);
-      if (!result || !this.client) continue;
-
-      const channel = this.client.channels.cache.get(result.channelId);
-      if (channel?.isTextBased() && "send" in channel) {
-        const text = result.winners.length
-          ? "🎉 Giveaway #" + result.id + " завершён! Победители: " + result.winners.map((userId) => "<@" + userId + ">").join(", ")
-          : "Giveaway #" + result.id + " завершён. Участников не было.";
-        await channel.send(text).catch(() => undefined);
-      }
+      await this.endGiveaway(Number(giveaway.id), giveaway.guild_id).catch(() => undefined);
     }
   }
 
-}
-
-function loggerSafe(message: string): void {
-  console.log(JSON.stringify({ ts: new Date().toISOString(), level: "INFO", message }));
 }
