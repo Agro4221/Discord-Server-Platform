@@ -50,14 +50,15 @@ export class Starboard implements PlatformModule {
 
     if (interaction.options.getSubcommand() !== "setup") return;
 
-    const channel = interaction.options.getChannel("channel", true);
-    if (!channel.isTextBased()) {
+    const channelOption = interaction.options.getChannel("channel", true);
+    const channel = interaction.guild!.channels.cache.get(channelOption.id);
+    if (!channel || channel.type !== 0) {
       await interaction.reply({ content: "Starboard channel должен быть текстовым.", ephemeral: true });
       return;
     }
 
     await this.configure(
-      interaction.guild.id,
+      interaction.guild!.id,
       channel.id,
       interaction.options.getInteger("threshold") ?? 3
     );
