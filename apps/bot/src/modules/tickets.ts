@@ -244,9 +244,10 @@ export class Tickets implements PlatformModule {
       }
 
       const channel = interaction.guild!.channels.cache.get(claimedClose.rows[0].channel_id);
+      let transcript = "Transcript unavailable.";
       await interaction.deferReply({ ephemeral: true });
       try {
-        const transcript = channel?.type === ChannelType.GuildText ? await this.transcript(channel) : "Transcript unavailable.";
+        transcript = channel?.type === ChannelType.GuildText ? await this.transcript(channel) : transcript;
         await this.db.transaction(async (client) => {
           await client.query(
             "INSERT INTO ticket_transcripts(ticket_id,guild_id,content) VALUES($1,$2,$3) ON CONFLICT(ticket_id) DO UPDATE SET content=EXCLUDED.content",
