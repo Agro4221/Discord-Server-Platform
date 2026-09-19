@@ -15,34 +15,31 @@ Full build — implementation + continuous verification.
 - Health/readiness endpoint and Discord connection supervision.
 - Durable audit log.
 - Local protected Management API.
-- Schema-driven Next.js Control Center with session auth, module toggles, Discord channel/role selectors, settings forms, import/export and backups.
+- Schema-driven Next.js Control Center with session auth, module toggles, Discord channel/role selectors, settings forms, import/export, backup management, module actions and specialized admin panels.
 - Moderation with case history.
 - Temporary Voice with idempotency, ownership and reconciliation.
 - AutoMod, Welcome, Verification, Leveling.
 - Tickets with modal intake, staff claim, close and transcript.
-- Role Panels with role hierarchy/tamper checks.
-- Giveaways with durable entries and scheduled finishing.
+- Role Panels with role hierarchy/tamper checks and Dashboard CRUD/publishing editor.
+- Giveaways with durable entries, scheduled finishing, Dashboard history/end/reroll operations.
 - Economy with daily/pay/leaderboard, shop and transaction ledger.
 - Reminders with retry/lease semantics.
 - Starboard.
-- Automation engine with persisted rules and cooldowns.
+- Automation engine with persisted rules/cooldowns and a constrained Dashboard builder.
 - Security/Anti-Raid and destructive burst detection.
 - Notifications with HTTPS feed validation and SSRF protections.
-- Analytics minute buckets.
+- Analytics minute buckets with Dashboard reporting.
 - Music/Lavalink foundation with persistent queue store and bot identity namespace.
 - Multi-bot identity persistence for separate-process fleet deployment.
-- Config transfer and compressed local backups.
+- Config transfer and compressed local backups with guild-scoped restore/delete controls.
 - Docker Compose / Dockerfiles for local-to-VPS topology.
 
 ## Still under development
-- Comprehensive multi-role panel editor and richer Dashboard action panels.
-- Complete Giveaway admin UI/history/reroll UX.
 - Full AutoMod rule editor beyond current core rules.
 - Full Security response workflow beyond alert/quarantine.
-- Full Automation condition/action catalog and visual builder.
-- Music provider breadth, player resume restoration and multi-node failover validation.
+- Full Automation condition/action catalog beyond the currently supported safe builder.
+- Music provider breadth and multi-node failover validation.
 - Multi-bot fleet orchestrator/health UI; current model is separate bot processes sharing DB/Lavalink.
-- Full analytics Dashboard charts/reporting.
 - Production backup retention/remote backup integration.
 - Full E2E/chaos/soak/security test suite.
 - VPS installer/reverse-proxy/upgrade tooling.
