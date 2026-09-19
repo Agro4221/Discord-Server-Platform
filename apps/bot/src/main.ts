@@ -133,6 +133,9 @@ async function main(): Promise<void> {
       end: async (guildId, giveawayId) => giveaways.endGiveaway(giveawayId, guildId),
       reroll: async (guildId, giveawayId) => giveaways.rerollGiveaway(giveawayId, guildId)
     },
+    analytics: {
+      report: async (guildId, hours) => analytics.report(guildId, hours)
+    },
     rolePanels: {
       list: async (guildId) => rolePanels.list(guildId),
       create: async (guildId, input, callbacks) =>
