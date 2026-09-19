@@ -540,7 +540,7 @@ export class AutomationEngine implements PlatformModule {
   }
 }
 
-function validateAutomationRule(
+export function validateAutomationRule(
   event: AutomationEvent,
   conditions: AutomationCondition[],
   actions: AutomationAction[]
