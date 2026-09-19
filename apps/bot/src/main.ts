@@ -32,6 +32,7 @@ async function main(): Promise<void> {
   const database = new Database(config.databaseUrl);
   const moduleSettings = new ModuleSettingsRepository(database);
   const auditLog = new AuditLog(database);
+  const dashboardSettings = new DashboardSettingsService(database);
   const events = new PlatformEventBus();
 
   await health.start(config.healthHost, config.healthPort);
@@ -109,7 +110,8 @@ async function main(): Promise<void> {
     apiKey: config.managementApiKey,
     client,
     moduleSettings,
-    auditLog
+    auditLog,
+    settings: dashboardSettings
   });
   await management.start();
 
