@@ -87,8 +87,10 @@ export class AutoMod implements PlatformModule {
     const next = { ...current, ...patch };
     await this.db.query(
       `INSERT INTO automod_settings
-       (guild_id,enabled,blocked_words,max_mentions,max_caps_ratio,max_repeated_messages,repeated_window_seconds,delete_message,timeout_minutes)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       (guild_id,enabled,blocked_words,max_mentions,max_caps_ratio,max_repeated_messages,
+        repeated_window_seconds,block_links,block_invites,max_links,max_emojis,max_line_length,
+        exempt_channel_ids,exempt_role_ids,delete_message,timeout_minutes)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        ON CONFLICT(guild_id) DO UPDATE SET
        enabled=EXCLUDED.enabled,blocked_words=EXCLUDED.blocked_words,
        max_mentions=EXCLUDED.max_mentions,max_caps_ratio=EXCLUDED.max_caps_ratio,
@@ -149,7 +151,8 @@ export class AutoMod implements PlatformModule {
       timeout_minutes: number;
     }>(
       `SELECT enabled,blocked_words,max_mentions,max_caps_ratio,max_repeated_messages,
-              repeated_window_seconds,delete_message,timeout_minutes
+              repeated_window_seconds,block_links,block_invites,max_links,max_emojis,
+              max_line_length,exempt_channel_ids,exempt_role_ids,delete_message,timeout_minutes
        FROM automod_settings WHERE guild_id=$1`,
       [guildId]
     );
