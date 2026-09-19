@@ -1,8 +1,10 @@
-import { createServer, type Server } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { timingSafeEqual } from "node:crypto";
 import type { Client } from "discord.js";
 import { logger } from "./logger.js";
 import { ModuleSettingsRepository } from "./module-settings.js";
 import { MODULE_CATALOG, type ModuleKey } from "./modules/catalog.js";
+import { AuditLog } from "./audit.js";
 
 type ApiOptions = {
   host: string;
@@ -10,10 +12,14 @@ type ApiOptions = {
   apiKey: string;
   client: Client;
   moduleSettings: ModuleSettingsRepository;
+  auditLog: AuditLog;
 };
+
+type RateWindow = { startedAt: number; count: number };
 
 export class ManagementApiServer {
   private server?: Server;
+  private readonly rateWindows = new Map<string, RateWindow>();
 
   constructor(private readonly options: ApiOptions) {}
 
@@ -21,6 +27,12 @@ export class ManagementApiServer {
     return new Promise((resolve, reject) => {
       this.server = createServer(async (req, res) => {
         try {
+          const ip = req.socket.remoteAddress ?? "unknown";
+          if (!this.allowedRate(ip)) {
+            this.json(res, 429, { error: "rate_limited" });
+            return;
+          }
+
           if (!this.authorized(req.headers.authorization)) {
             this.json(res, 401, { error: "unauthorized" });
             return;
@@ -47,11 +59,30 @@ export class ManagementApiServer {
               this.json(res, 404, { error: "guild_not_found" });
               return;
             }
+
             const modules = await this.options.moduleSettings.list(guildId);
+            this.json(res, 200, { guildId, catalog: MODULE_CATALOG, modules });
+            return;
+          }
+
+          const auditMatch = path.match(/^\/api\/guilds\/([^/]+)\/audit$/);
+          if (method === "GET" && auditMatch) {
+            const guildId = auditMatch[1];
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+
+            const limitRaw = url.searchParams.get("limit");
+            const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 50;
+            if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+              this.json(res, 400, { error: "invalid_limit" });
+              return;
+            }
+
             this.json(res, 200, {
               guildId,
-              catalog: MODULE_CATALOG,
-              modules
+              events: await this.options.auditLog.recent(guildId, limit)
             });
             return;
           }
@@ -60,6 +91,7 @@ export class ManagementApiServer {
           if (method === "PUT" && moduleMatch) {
             const guildId = moduleMatch[1];
             const moduleKey = moduleMatch[2] as ModuleKey;
+
             if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
               this.json(res, 404, { error: "guild_not_found" });
               return;
@@ -76,13 +108,26 @@ export class ManagementApiServer {
             }
 
             await this.options.moduleSettings.set(guildId, moduleKey, body.enabled);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: body.enabled ? "module.enabled" : "module.disabled",
+              targetType: "module",
+              targetId: moduleKey,
+              metadata: {}
+            });
+
             this.json(res, 200, { guildId, moduleKey, enabled: body.enabled });
-            logger.info("Guild module toggled", { guildId, moduleKey, enabled: body.enabled });
             return;
           }
 
           this.json(res, 404, { error: "not_found" });
         } catch (error) {
+          if (error instanceof RequestInputError) {
+            this.json(res, error.status, { error: error.code });
+            return;
+          }
+
           logger.error("Management API request failed", { error: String(error) });
           this.json(res, 500, { error: "internal_error" });
         }
@@ -101,41 +146,75 @@ export class ManagementApiServer {
     const server = this.server;
     this.server = undefined;
     await new Promise<void>((resolve, reject) => {
-      server.close((error) => error ? reject(error) : resolve());
+      server.close((error) => (error ? reject(error) : resolve()));
     });
   }
 
   private authorized(header: string | undefined): boolean {
     if (!header?.startsWith("Bearer ")) return false;
-    return header.slice("Bearer ".length) === this.options.apiKey;
+    const received = Buffer.from(header.slice("Bearer ".length));
+    const expected = Buffer.from(this.options.apiKey);
+    return received.length === expected.length && timingSafeEqual(received, expected);
   }
 
-  private json(res: import("node:http").ServerResponse, status: number, body: unknown): void {
+  private allowedRate(key: string): boolean {
+    const now = Date.now();
+    const window = this.rateWindows.get(key);
+
+    if (!window || now - window.startedAt >= 60_000) {
+      this.rateWindows.set(key, { startedAt: now, count: 1 });
+      return true;
+    }
+
+    window.count += 1;
+    return window.count <= 120;
+  }
+
+  private json(res: ServerResponse, status: number, body: unknown): void {
     res.writeHead(status, {
       "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store"
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff"
     });
     res.end(JSON.stringify(body));
   }
 }
 
-async function readJson(req: import("node:http").IncomingMessage): Promise<Record<string, unknown>> {
+class RequestInputError extends Error {
+  constructor(
+    readonly code: string,
+    readonly status: number
+  ) {
+    super(code);
+  }
+}
+
+async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
   let size = 0;
   const chunks: Buffer[] = [];
 
   for await (const chunk of req) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += buffer.length;
-    if (size > 1_048_576) throw new Error("request_too_large");
+    if (size > 64 * 1024) {
+      throw new RequestInputError("request_too_large", 413);
+    }
     chunks.push(buffer);
   }
 
   const text = Buffer.concat(chunks).toString("utf8");
   if (!text) return {};
 
-  const parsed: unknown = JSON.parse(text);
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("invalid_json_object");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new RequestInputError("invalid_json", 400);
   }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new RequestInputError("invalid_json_object", 400);
+  }
+
   return parsed as Record<string, unknown>;
 }
