@@ -118,10 +118,12 @@ export class Leveling implements PlatformModule {
     if (!Number.isSafeInteger(currentXp) || currentXp < 0) return;
     const nextLevel = Math.floor(Math.sqrt(currentXp / 100));
     if (nextLevel > row.level) {
-      await this.db.query(
-        "UPDATE leveling_users SET level=$1,updated_at=now() WHERE guild_id=$2 AND user_id=$3",
+      const claimed = await this.db.query<{ level: number }>(
+        "UPDATE leveling_users SET level=$1,updated_at=now() WHERE guild_id=$2 AND user_id=$3 AND level < $1 RETURNING level",
         [nextLevel, message.guild.id, message.author.id]
       );
+      if (!claimed.rows[0]) return;
+
       if (setting.announce_level_up) {
         if ("send" in message.channel) {
           await message.channel.send(
