@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { sessionCookie } from "../../../../lib/auth";
+import { assertSameOrigin, sessionCookie } from "../../../../lib/auth";
 
-export async function POST() {
+export async function POST(request: Request) {
+  try { assertSameOrigin(request); } catch { return NextResponse.json({ error: "bad_origin" }, { status: 403 }); }
   const response = NextResponse.json({ ok: true });
   response.cookies.set({
     name: sessionCookie,
