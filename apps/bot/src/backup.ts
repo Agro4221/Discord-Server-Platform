@@ -36,32 +36,46 @@ export class BackupService {
   }
 
   async restoreGuildBackup(targetGuildId: string, file: string): Promise<void> {
-    const path = join(this.directory, basename(file));
+    const safe = this.safeBackupName(file);
+    if (!this.belongsToGuild(safe, targetGuildId)) throw new Error("backup_guild_mismatch");
+    const path = join(this.directory, safe);
     const raw = await readGzip(path);
     const payload = JSON.parse(raw) as unknown;
     await new ConfigTransferService(this.db).importGuild(targetGuildId, payload);
   }
 
-  async listBackups(): Promise<string[]> {
+  async listBackups(guildId?: string): Promise<string[]> {
     await this.ensureDirectory();
     const entries = await readdir(this.directory);
-    return entries.filter((entry) => /^guild-\d{17,20}-\d+\.json\.gz$/.test(entry)).sort().reverse();
+    return entries
+      .filter((entry) => /^guild-\d{17,20}-\d+\.json\.gz$/.test(entry))
+      .filter((entry) => !guildId || entry.startsWith("guild-" + guildId + "-"))
+      .sort()
+      .reverse();
   }
 
-  async deleteBackup(file: string): Promise<void> {
-    const safe = basename(file);
-    if (!/^guild-\d{17,20}-\d+\.json\.gz$/.test(safe)) {
-      throw new Error("invalid_backup_name");
-    }
+  async deleteBackup(file: string, guildId?: string): Promise<void> {
+    const safe = this.safeBackupName(file);
+    if (guildId && !this.belongsToGuild(safe, guildId)) throw new Error("backup_guild_mismatch");
     await unlink(join(this.directory, safe));
   }
 
-  async readBackup(file: string): Promise<unknown> {
+  async readBackup(file: string, guildId?: string): Promise<unknown> {
+    const safe = this.safeBackupName(file);
+    if (guildId && !this.belongsToGuild(safe, guildId)) throw new Error("backup_guild_mismatch");
+    return JSON.parse(await readGzip(join(this.directory, safe)));
+  }
+
+  private safeBackupName(file: string): string {
     const safe = basename(file);
     if (!/^guild-\d{17,20}-\d+\.json\.gz$/.test(safe)) {
       throw new Error("invalid_backup_name");
     }
-    return JSON.parse(await readGzip(join(this.directory, safe)));
+    return safe;
+  }
+
+  private belongsToGuild(file: string, guildId: string): boolean {
+    return file.startsWith("guild-" + guildId + "-");
   }
 }
 
