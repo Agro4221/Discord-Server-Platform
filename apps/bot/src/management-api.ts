@@ -7,6 +7,8 @@ import { MODULE_CATALOG, type ModuleKey } from "./modules/catalog.js";
 import { AuditLog } from "./audit.js";
 import { DashboardSettingsService, moduleExists } from "./dashboard-settings.js";
 import { guildResources } from "./discord/resources.js";
+import { ConfigTransferService } from "./config-transfer.js";
+import { BackupService } from "./backup.js";
 
 type ApiOptions = {
   host: string;
@@ -16,6 +18,8 @@ type ApiOptions = {
   moduleSettings: ModuleSettingsRepository;
   auditLog: AuditLog;
   settings: DashboardSettingsService;
+  transfer: ConfigTransferService;
+  backups: BackupService;
 };
 
 type RateWindow = { startedAt: number; count: number };
@@ -65,6 +69,80 @@ export class ManagementApiServer {
 
             const modules = await this.options.moduleSettings.list(guildId);
             this.json(res, 200, { guildId, catalog: MODULE_CATALOG, modules });
+            return;
+          }
+
+          const exportMatch = path.match(/^\/api\/guilds\/([^/]+)\/export$/);
+          if (method === "GET" && exportMatch) {
+            const guildId = exportMatch[1];
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const payload = await this.options.transfer.exportGuild(guildId);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "config.exported",
+              targetType: "guild",
+              targetId: guildId
+            });
+            this.json(res, 200, payload);
+            return;
+          }
+
+          const importMatch = path.match(/^\/api\/guilds\/([^/]+)\/import$/);
+          if (method === "POST" && importMatch) {
+            const guildId = importMatch[1];
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            if (!body.payload) {
+              this.json(res, 400, { error: "payload_required" });
+              return;
+            }
+            await this.options.transfer.importGuild(guildId, body.payload);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "config.imported",
+              targetType: "guild",
+              targetId: guildId
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const backupMatch = path.match(/^\/api\/guilds\/([^/]+)\/backup$/);
+          if (method === "POST" && backupMatch) {
+            const guildId = backupMatch[1];
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const file = await this.options.backups.createGuildBackup(guildId);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "backup.created",
+              targetType: "backup",
+              targetId: file
+            });
+            this.json(res, 200, { ok: true, file: file.split("/").pop() ?? file });
+            return;
+          }
+
+          const backupsMatch = path.match(/^\/api\/guilds\/([^/]+)\/backups$/);
+          if (method === "GET" && backupsMatch) {
+            const guildId = backupsMatch[1];
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const backups = await this.options.backups.listBackups();
+            this.json(res, 200, { guildId, backups });
             return;
           }
 
