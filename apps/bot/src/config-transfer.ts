@@ -152,6 +152,29 @@ export class ConfigTransferService {
           );
         }
       }
+
+      const rolesModule = data.modules.find((module) => module.key === "roles");
+      const rolePanels = rolesModule?.settings.role_panels;
+      if (rolePanels !== undefined && !Array.isArray(rolePanels)) {
+        throw new Error("invalid_role_panels");
+      }
+
+      if (Array.isArray(rolePanels)) {
+        const normalizedPanels = rolePanels.map((panel) => normalizeImportedRolePanel(panel));
+        await client.query("DELETE FROM role_panels WHERE guild_id=$1", [targetGuildId]);
+        for (const panel of normalizedPanels) {
+          await client.query(
+            "INSERT INTO role_panels(guild_id,channel_id,message_id,title,roles) VALUES($1,$2,$3,$4,$5::jsonb)",
+            [
+              targetGuildId,
+              panel.channelId,
+              panel.messageId,
+              panel.title,
+              JSON.stringify(panel.roles)
+            ]
+          );
+        }
+      }
     });
   }
 
@@ -332,12 +355,16 @@ function validateExport(payload: unknown): asserts payload is ServerConfigExport
     throw new Error("invalid_modules");
   }
 
+  const seenModules = new Set<string>();
+
   for (const module of record.modules) {
     if (!module || typeof module !== "object") throw new Error("invalid_module");
     const item = module as Record<string, unknown>;
     if (typeof item.key !== "string" || !MODULE_CATALOG.some((known) => known.key === item.key)) {
       throw new Error("unknown_module");
     }
+    if (seenModules.has(item.key)) throw new Error("duplicate_module");
+    seenModules.add(item.key);
     if (typeof item.enabled !== "boolean") throw new Error("invalid_module_enabled");
     if (!item.settings || typeof item.settings !== "object" || Array.isArray(item.settings)) {
       throw new Error("invalid_module_settings");
@@ -390,5 +417,58 @@ function normalizeImportedAutomationRule(value: unknown): NormalizedAutomationRu
     conditions: object.conditions as AutomationCondition[],
     actions: object.actions as AutomationAction[],
     cooldownSeconds: object.cooldown_seconds
+  };
+}
+
+
+type ImportedRolePanel = {
+  channelId: string;
+  messageId: string | null;
+  title: string;
+  roles: Array<{ roleId: string; label: string }>;
+};
+
+function normalizeImportedRolePanel(value: unknown): ImportedRolePanel {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("invalid_role_panel");
+  }
+
+  const object = value as Record<string, unknown>;
+  if (
+    typeof object.channel_id !== "string" ||
+    !/^\d{17,20}$/.test(object.channel_id) ||
+    object.message_id !== null && object.message_id !== undefined &&
+      (typeof object.message_id !== "string" || !/^\d{17,20}$/.test(object.message_id)) ||
+    typeof object.title !== "string" ||
+    object.title.length > 100 ||
+    !Array.isArray(object.roles) ||
+    object.roles.length < 1 ||
+    object.roles.length > 5
+  ) {
+    throw new Error("invalid_role_panel");
+  }
+
+  const roles = object.roles.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new Error("invalid_role_panel_role");
+    }
+    const role = entry as Record<string, unknown>;
+    if (
+      typeof role.roleId !== "string" ||
+      !/^\d{17,20}$/.test(role.roleId) ||
+      typeof role.label !== "string" ||
+      !role.label.trim() ||
+      role.label.length > 80
+    ) {
+      throw new Error("invalid_role_panel_role");
+    }
+    return { roleId: role.roleId, label: role.label.trim().slice(0, 80) };
+  });
+
+  return {
+    channelId: object.channel_id,
+    messageId: typeof object.message_id === "string" ? object.message_id : null,
+    title: object.title.trim().slice(0, 100) || "Выберите роли",
+    roles
   };
 }
