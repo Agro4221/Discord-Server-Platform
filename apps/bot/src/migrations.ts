@@ -315,6 +315,14 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_economy_transactions_guild_user ON economy_transactions(guild_id,user_id,created_at DESC);"
     ])
   }
+  {
+    version: 13,
+    name: "security_destructive_thresholds",
+    sql: q([
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS max_destructive_actions integer NOT NULL DEFAULT 5;",
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS destructive_window_seconds integer NOT NULL DEFAULT 20;"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
