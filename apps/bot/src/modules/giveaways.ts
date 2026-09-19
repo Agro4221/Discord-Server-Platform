@@ -224,6 +224,7 @@ export class Giveaways implements PlatformModule {
     if (!id) throw new Error("giveaway id missing");
 
     let message: Message | undefined;
+    let publishedMessageId: string | undefined;
     try {
       message = await interaction.channel!.send({
       embeds: [
@@ -242,14 +243,16 @@ export class Giveaways implements PlatformModule {
       });
 
       if (!message) throw new Error("giveaway_message_missing");
-      await this.db.query("UPDATE giveaways SET message_id=$1 WHERE id=$2", [message.id, id]);
+      publishedMessageId = message.id;
+      await this.db.query("UPDATE giveaways SET message_id=$1 WHERE id=$2", [publishedMessageId, id]);
     } catch (error) {
       if (message) {
+        const rollbackMessageId = publishedMessageId;
         await message.delete().catch((deleteError) => {
           logger.warn("Giveaway rollback message delete failed", {
             guildId: interaction.guild!.id,
             giveawayId: id,
-            messageId: message.id,
+            messageId: rollbackMessageId,
             error: String(deleteError)
           });
         });
