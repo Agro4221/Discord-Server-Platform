@@ -283,6 +283,12 @@ export class Music implements PlatformModule {
       case "stop":
         await this.stop(interaction);
         break;
+      case "shuffle":
+        await this.shuffle(interaction);
+        break;
+      case "seek":
+        await this.seek(interaction);
+        break;
       case "queue":
         await this.queue(interaction);
         break;
@@ -363,6 +369,7 @@ export class Music implements PlatformModule {
       await interaction.reply({ content: "Музыкальный плеер не запущен.", ephemeral: true });
       return;
     }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
     if (paused) await player.pause();
     else await player.resume();
     await interaction.reply({ content: paused ? "⏸️ Пауза." : "▶️ Продолжаю.", ephemeral: true });
@@ -374,6 +381,7 @@ export class Music implements PlatformModule {
       await interaction.reply({ content: "Очередь пуста.", ephemeral: true });
       return;
     }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
     await player.skip();
     await interaction.reply({ content: "⏭️ Пропущено.", ephemeral: true });
   }
@@ -384,8 +392,56 @@ export class Music implements PlatformModule {
       await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
       return;
     }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
     await player.stopPlaying();
     await interaction.reply({ content: "⏹️ Остановлено.", ephemeral: true });
+  }
+
+  private async shuffle(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Очередь пуста.", ephemeral: true });
+      return;
+    }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
+    if (player.queue.tracks.length < 2) {
+      await interaction.reply({ content: "Для перемешивания нужно минимум два трека в очереди.", ephemeral: true });
+      return;
+    }
+    player.queue.shuffle();
+    await this.persistPlayer(player);
+    await interaction.reply({ content: "🔀 Очередь перемешана.", ephemeral: true });
+  }
+
+  private async seek(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    const track = player?.queue.current;
+    if (!player || !track) {
+      await interaction.reply({ content: "Сейчас ничего не играет.", ephemeral: true });
+      return;
+    }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
+    const positionSeconds = interaction.options.getInteger("seconds", true);
+    const duration = Number(track.info.duration ?? 0);
+    if (duration > 0 && positionSeconds * 1000 >= duration) {
+      await interaction.reply({ content: "Позиция выходит за длительность текущего трека.", ephemeral: true });
+      return;
+    }
+    await player.seek(positionSeconds * 1000);
+    await interaction.reply({ content: `⏩ Позиция: **${positionSeconds} сек.**`, ephemeral: true });
+  }
+
+  private async canControl(interaction: ChatInputCommandInteraction, voiceChannelId: string | null): Promise<boolean> {
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    const manageGuild = interaction.memberPermissions?.has("ManageGuild") ?? false;
+    const allowed = canControlMusic(member?.voice.channelId ?? null, voiceChannelId, manageGuild);
+    if (!allowed) {
+      await interaction.reply({
+        content: "Управлять музыкой можно из того же голосового канала или с правом Manage Server.",
+        ephemeral: true
+      });
+    }
+    return allowed;
   }
 
   private async queue(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -460,6 +516,16 @@ export class Music implements PlatformModule {
     const player = this.manager?.players.get(interaction.guild.id);
     if (!player) {
       await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+
+    const manageGuild = interaction.memberPermissions?.has("ManageGuild") ?? false;
+    const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+    if (!canControlMusic(member?.voice.channelId ?? null, player.voiceChannelId, manageGuild)) {
+      await interaction.reply({
+        content: "Управлять музыкой можно из того же голосового канала или с правом Manage Server.",
+        ephemeral: true
+      });
       return;
     }
 
@@ -602,4 +668,17 @@ export class Music implements PlatformModule {
       await channel.send(text).catch(() => undefined);
     }
   }
+}
+
+
+export function canControlMusic(
+  memberVoiceChannelId: string | null,
+  playerVoiceChannelId: string | null,
+  manageGuild: boolean
+): boolean {
+  return manageGuild || (
+    Boolean(memberVoiceChannelId) &&
+    Boolean(playerVoiceChannelId) &&
+    memberVoiceChannelId === playerVoiceChannelId
+  );
 }
