@@ -103,8 +103,9 @@ export class TemporaryVoice implements PlatformModule {
     if (this.creationInFlight.has(key)) return;
 
     const existing = this.roomsByOwner(newState.guild.id, member.id);
-    if (existing.length > 0) {
-      const existingChannel = newState.guild.channels.cache.get(existing[0]);
+    const existingId = existing[0];
+    if (existingId) {
+      const existingChannel = newState.guild.channels.cache.get(existingId);
       if (existingChannel?.type === ChannelType.GuildVoice && member.voice.channelId === config.triggerChannelId) {
         await member.voice.setChannel(existingChannel).catch(() => undefined);
       }
