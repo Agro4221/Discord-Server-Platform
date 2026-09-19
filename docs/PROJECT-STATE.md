@@ -142,3 +142,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Same-channel Role Panel edits now restore the previous Discord message when the following PostgreSQL update fails.
 - This prevents the Dashboard/Discord state from diverging after an SQL failure.
 - Added a regression fixture for the rollback sequence.
+
+
+## 2026-09-19 — Security audit-window consistency
+- Destructive-burst executor lookup now uses the configured `destructiveWindowSeconds` (clamped to the same 5–300 second range as configuration) instead of a fixed 30-second window.
+- Added deterministic regression coverage for the lookback calculation.
