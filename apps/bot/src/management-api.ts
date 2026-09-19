@@ -23,7 +23,14 @@ type ApiOptions = {
   actions: Record<string, (guildId: string) => Promise<unknown>>;
   rolePanels?: {
     list: (guildId: string) => Promise<unknown[]>;
-    create: (guildId: string, input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }> }) => Promise<unknown>;
+    create: (
+      guildId: string,
+      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }> },
+      callbacks: {
+        deleteMessage: (channelId: string, messageId: string) => Promise<void>;
+        sendMessage: (channelId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => Promise<string>;
+      }
+    ) => Promise<unknown>;
     update: (
       guildId: string,
       panelId: number,
@@ -260,12 +267,6 @@ export class ManagementApiServer {
           }
 
           if ((method === "POST" || method === "PUT") && (rolePanelsMatch || rolePanelItemMatch)) {
-            if (method !== "POST") {
-              try {
-                // PUT is also a state-changing endpoint and is protected by the dashboard same-origin layer.
-              } catch {}
-            }
-
             const guildId = rolePanelsMatch?.[1] ?? rolePanelItemMatch?.[1] ?? "";
             const panelId = rolePanelItemMatch ? Number(rolePanelItemMatch[2]) : null;
             const guild = guildId ? this.options.client.guilds.cache.get(guildId) : null;
@@ -341,7 +342,7 @@ export class ManagementApiServer {
             };
 
             const result = panelId === null
-              ? await this.options.rolePanels!.create(guildId, input)
+              ? await this.options.rolePanels!.create(guildId, input, helpers)
               : await this.options.rolePanels!.update(guildId, panelId, input, helpers);
 
             await this.options.auditLog.record({
