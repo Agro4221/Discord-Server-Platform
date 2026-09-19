@@ -261,6 +261,48 @@ const migrations = [
         ON automation_rules(guild_id,enabled);
     \`
   }
+  },
+  {
+    version: 7,
+    name: "security_notifications",
+    sql: \`
+      CREATE TABLE IF NOT EXISTS security_settings (
+        guild_id text PRIMARY KEY,
+        enabled boolean NOT NULL DEFAULT false,
+        max_joins integer NOT NULL DEFAULT 10,
+        window_seconds integer NOT NULL DEFAULT 20,
+        quarantine_role_id text,
+        log_channel_id text,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS security_events (
+        id bigserial PRIMARY KEY,
+        guild_id text NOT NULL,
+        event_type text NOT NULL,
+        metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_security_events_guild_created
+        ON security_events(guild_id,created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS notification_feeds (
+        id bigserial PRIMARY KEY,
+        guild_id text NOT NULL,
+        channel_id text NOT NULL,
+        url text NOT NULL,
+        enabled boolean NOT NULL DEFAULT true,
+        interval_seconds integer NOT NULL DEFAULT 300 CHECK(interval_seconds BETWEEN 60 AND 86400),
+        last_item_key text,
+        last_polled_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_feed_guild_url
+        ON notification_feeds(guild_id,url);
+    \`
+  }
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
