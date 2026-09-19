@@ -30,6 +30,8 @@ type Listener<K extends keyof PlatformEventMap> = (
 export class PlatformEventBus {
   private readonly listeners = new Map<keyof PlatformEventMap, Set<Listener<any>>>();
 
+  constructor(private readonly guildFilter?: (guildId: string) => boolean) {}
+
   on<K extends keyof PlatformEventMap>(
     event: K,
     listener: Listener<K>
@@ -48,6 +50,9 @@ export class PlatformEventBus {
     event: K,
     payload: PlatformEventMap[K]
   ): Promise<void> {
+    const guildId = extractGuildId(event, payload);
+    if (guildId && this.guildFilter && !this.guildFilter(guildId)) return;
+
     const listeners = [
       ...(this.listeners.get(event) ?? [])
     ] as Listener<K>[];
@@ -72,4 +77,37 @@ export class PlatformEventBus {
       }
     }
   }
+}
+
+function extractGuildId<K extends keyof PlatformEventMap>(
+  event: K,
+  payload: PlatformEventMap[K]
+): string | null {
+  if (event === "interaction" || event === "interaction.command") {
+    const interaction = payload as Interaction;
+    return interaction.guildId ?? null;
+  }
+  if (event === "voice.state") {
+    return (payload as { newState: VoiceState }).newState.guild.id;
+  }
+  if (event === "message.create" || event === "message.delete") {
+    return (payload as Message).guildId;
+  }
+  if (event === "message.update") {
+    return (payload as { newMessage: Message }).newMessage.guildId;
+  }
+  if (event === "reaction.add") {
+    return (payload as { reaction: MessageReaction }).reaction.message.guildId;
+  }
+  if (event === "member.add" || event === "member.remove" || event === "member.update") {
+    const member = payload as GuildMember | { newMember: GuildMember };
+    return "newMember" in member ? member.newMember.guild.id : member.guild.id;
+  }
+  if (event === "channel.delete") {
+    return (payload as { guildId: string | null }).guildId;
+  }
+  if (event === "role.delete") {
+    return (payload as import("discord.js").Role).guild.id;
+  }
+  return null;
 }
