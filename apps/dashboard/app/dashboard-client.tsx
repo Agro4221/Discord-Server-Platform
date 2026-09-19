@@ -157,6 +157,31 @@ export function DashboardClient() {
     }
   }
 
+  async function runAction(action: ModuleAction) {
+    if (!guildId || !selectedModule) return;
+    if (action.kind === "danger" && !window.confirm(action.confirmation ?? "Подтвердить действие?")) return;
+
+    setSaving(true);
+    setError("");
+    setActionMessage("");
+
+    try {
+      const response = await fetch(
+        "/api/guilds/" + encodeURIComponent(guildId) + "/actions/" +
+        encodeURIComponent(selectedModule) + "/" + encodeURIComponent(action.id),
+        { method: "POST" }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "action_failed");
+      setActionMessage(action.label + " — выполнено.");
+      await reloadAudit();
+    } catch {
+      setError("Не удалось выполнить действие.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveSettings() {
     if (!guildId || !selectedModule) return;
     setSaving(true);
@@ -398,6 +423,22 @@ export function DashboardClient() {
                       />
                     ))}
                   </div>
+
+                  {schema.actions?.length ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 18 }}>
+                      {schema.actions.map((action) => (
+                        <button
+                          type="button"
+                          key={action.id}
+                          disabled={saving}
+                          onClick={() => void runAction(action)}
+                          style={buttonStyle(action.kind === "danger" ? "danger" : "secondary")}
+                        >
+                          {action.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
 
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 22, paddingTop: 18, borderTop: "1px solid #202530" }}>
                     <button
