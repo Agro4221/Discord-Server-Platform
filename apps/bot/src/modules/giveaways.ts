@@ -15,6 +15,7 @@ export class Giveaways implements PlatformModule {
   private unsubscribe?: () => void;
   private timer?: NodeJS.Timeout;
   private client?: import("discord.js").Client;
+  private events?: import("../events.js").PlatformEventBus;
 
   constructor(private readonly db: Database) {}
 
@@ -130,6 +131,7 @@ export class Giveaways implements PlatformModule {
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+    this.events = context.events;
     const commandUnsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const interactionUnsubscribe = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
     this.unsubscribe = () => { commandUnsubscribe(); interactionUnsubscribe(); };
@@ -143,6 +145,7 @@ export class Giveaways implements PlatformModule {
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
     this.client = undefined;
+    this.events = undefined;
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -241,6 +244,11 @@ export class Giveaways implements PlatformModule {
         "UPDATE giveaways SET status='finished',selected_winners=$1::jsonb,finished_at=now() WHERE id=$2 AND status='finishing'",
         [JSON.stringify(winners), id]
       );
+      await this.events?.emit("giveaway.end", {
+        guildId,
+        giveawayId: id,
+        winners
+      });
       return { id, channelId: row.channel_id, messageId: row.message_id, winners };
     } catch (error) {
       await this.db.query("UPDATE giveaways SET status='running' WHERE id=$1 AND status='finishing'", [id]);
