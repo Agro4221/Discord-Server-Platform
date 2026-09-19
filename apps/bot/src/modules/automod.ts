@@ -44,6 +44,7 @@ export class AutoMod implements PlatformModule {
   readonly name = "automod";
   private unsubscribe?: () => void;
   private readonly recent = new Map<string, { content: string; timestamp: number }[]>();
+  private inspectedMessages = 0;
 
   constructor(private readonly db: Database) {}
 
@@ -57,6 +58,7 @@ export class AutoMod implements PlatformModule {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.recent.clear();
+    this.inspectedMessages = 0;
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -228,6 +230,8 @@ export class AutoMod implements PlatformModule {
     const cutoff = now - config.repeatedWindowSeconds * 1000;
     const recent = bucket.filter((item) => item.timestamp >= cutoff).slice(-20);
     this.recent.set(key, recent);
+    this.inspectedMessages += 1;
+    if (this.inspectedMessages % 100 === 0) this.pruneRecent(now);
 
     if (!reason && recent.filter((item) => item.content === normalized).length >= config.maxRepeatedMessages) {
       reason = "repeated_message";
@@ -281,4 +285,27 @@ export class AutoMod implements PlatformModule {
       });
     });
   }
+
+  private pruneRecent(now: number): void {
+    const cutoff = now - 120_000;
+    for (const [key, entries] of this.recent) {
+      const latest = entries.at(-1)?.timestamp ?? 0;
+      if (latest < cutoff) this.recent.delete(key);
+    }
+
+    const maxKeys = 10_000;
+    if (this.recent.size <= maxKeys) return;
+
+    const oldest = [...this.recent.entries()]
+      .sort((a, b) => (a[1].at(-1)?.timestamp ?? 0) - (b[1].at(-1)?.timestamp ?? 0))
+      .slice(0, this.recent.size - maxKeys);
+
+    for (const [key] of oldest) this.recent.delete(key);
+    logger.warn("AutoMod recent-message cache trimmed", {
+      removed: oldest.length,
+      remaining: this.recent.size
+    });
+  }
 }
+
+
