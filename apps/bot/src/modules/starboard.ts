@@ -93,11 +93,13 @@ export class Starboard implements PlatformModule {
   }
 
   private async onReaction(reaction: MessageReaction, user: User): Promise<void> {
-    if (!reaction.message.guild) return;
+    const guild = reaction.message.guild;
+    if (!guild) return;
+    const guildId = guild.id;
 
-    const config = await this.getConfig(reaction.message.guild.id);
+    const config = await this.getConfig(guildId);
     if (!config) return;
-    if (!await moduleEnabled(this.db, reaction.message.guild.id, "starboard", false)) return;
+    if (!await moduleEnabled(this.db, guildId, "starboard", false)) return;
     if (reaction.emoji.name !== "⭐") return;
     if (config.ignoreBots && user.bot) return;
     if (config.ignoreSelfReaction && reaction.message.author?.id === user.id) return;
@@ -115,7 +117,7 @@ export class Starboard implements PlatformModule {
     const count = reaction.count ?? 0;
     if (count < config.threshold) return;
 
-    const channel = reaction.message.guild.channels.cache.get(config.channelId);
+    const channel = guild.channels.cache.get(config.channelId);
     if (!channel?.isTextBased() || !(("send" in channel))) return;
 
     const embed = new EmbedBuilder()
@@ -132,18 +134,18 @@ export class Starboard implements PlatformModule {
     await this.db.transaction(async (client) => {
       await client.query(
         "SELECT pg_advisory_xact_lock(hashtext($1))",
-        [reaction.message.guild.id + ":" + reaction.message.id]
+        [guildId + ":" + reaction.message.id]
       );
 
       const existing = await client.query<{ starboard_message_id: string | null }>(
         "SELECT starboard_message_id FROM starboard_entries WHERE guild_id=$1 AND source_message_id=$2",
-        [reaction.message.guild.id, reaction.message.id]
+        [guildId, reaction.message.id]
       );
 
       if (existing.rows[0]?.starboard_message_id) {
         const message = await channel.messages.fetch(existing.rows[0].starboard_message_id).catch((error) => {
           logger.warn("Starboard message fetch failed", {
-            guildId: reaction.message.guild.id,
+            guildId: guildId,
             sourceMessageId: reaction.message.id,
             starboardMessageId: existing.rows[0]?.starboard_message_id,
             error: String(error)
@@ -154,7 +156,7 @@ export class Starboard implements PlatformModule {
         if (message) {
           await message.edit({ embeds: [embed] }).catch((error) => {
             logger.warn("Starboard message update failed", {
-              guildId: reaction.message.guild.id,
+              guildId: guildId,
               sourceMessageId: reaction.message.id,
               starboardMessageId: message.id,
               error: String(error)
@@ -166,7 +168,7 @@ export class Starboard implements PlatformModule {
 
       const sent = await channel.send({ embeds: [embed] }).catch((error) => {
         logger.error("Starboard publication failed", {
-          guildId: reaction.message.guild.id,
+          guildId: guildId,
           sourceMessageId: reaction.message.id,
           channelId: config.channelId,
           error: String(error)
@@ -181,11 +183,11 @@ export class Starboard implements PlatformModule {
          VALUES($1,$2,$3)
          ON CONFLICT(guild_id,source_message_id)
          DO UPDATE SET starboard_message_id=EXCLUDED.starboard_message_id`,
-        [reaction.message.guild.id, reaction.message.id, sent.id]
+        [guildId, reaction.message.id, sent.id]
       );
     }).catch((error) => {
       logger.error("Starboard transaction failed", {
-        guildId: reaction.message.guild.id,
+        guildId: guildId,
         sourceMessageId: reaction.message.id,
         error: String(error)
       });
