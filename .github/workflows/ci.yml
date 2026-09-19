@@ -35,7 +35,7 @@ jobs:
           node-version: 24.17.0
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Check source hygiene
         run: node scripts/check-source-hygiene.mjs
