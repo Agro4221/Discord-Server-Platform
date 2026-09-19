@@ -68,7 +68,7 @@ export class AutoMod implements PlatformModule {
     await interaction.reply({ content: "AutoMod настроен и включён.", ephemeral: true });
   }
 
-  async configure(guildId: string, patch: Partial<AutoModConfig>): Promise<void>
+  async configure(guildId: string, patch: Partial<AutoModConfig>): Promise<void> {
     const current = await this.getConfig(guildId);
     const next = { ...current, ...patch };
     await this.db.query(
