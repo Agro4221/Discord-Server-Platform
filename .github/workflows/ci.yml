@@ -53,7 +53,7 @@ jobs:
         run: |
           grep -Eq '^set -E?euo pipefail
           grep -Eq '^set -E?euo pipefail
-          grep -q 'management_api_host' docs/MASTER-PLAN.md || true
+          test -s docs/MASTER-PLAN.md
 
       - name: Check observability contract
         run: node scripts/check-observability.mjs
