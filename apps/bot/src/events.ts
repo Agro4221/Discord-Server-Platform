@@ -19,7 +19,7 @@ export type PlatformEventMap = {
   "member.add": GuildMember;
   "member.remove": GuildMember;
   "member.update": { oldMember: GuildMember; newMember: GuildMember };
-  "channel.delete": import("discord.js").GuildChannel | import("discord.js").ThreadChannel;
+  "channel.delete": import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel;
   "role.delete": import("discord.js").Role;
 };
 
