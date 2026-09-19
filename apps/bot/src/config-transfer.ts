@@ -19,7 +19,12 @@ const CONFIG_TABLES: ExportTable[] = [
   ]},
   { table: "welcome_settings", fields: ["enabled","channel_id","message","dm","embed"] },
   { table: "ticket_settings", fields: ["enabled","category_id","staff_role_id","transcript_channel_id"] },
-  { table: "security_settings", fields: ["enabled","max_joins","window_seconds","quarantine_role_id","log_channel_id"] },
+  { table: "security_settings", fields: [
+    "enabled","max_joins","window_seconds","max_destructive_actions",
+    "destructive_window_seconds","quarantine_role_id","log_channel_id"
+  ] },
+  { table: "verification_settings", fields: ["enabled","channel_id","verified_role_id","log_channel_id","code_ttl_minutes"] },
+  { table: "leveling_settings", fields: ["enabled","xp_per_message","cooldown_seconds","announce_level_up"] },
   { table: "starboard_settings", fields: ["channel_id","threshold","ignore_self_reaction","ignore_bots"] },
   { table: "music_settings", fields: ["enabled","preferred_text_channel_id","default_volume","announce_track_start"] }
 ];
@@ -213,13 +218,35 @@ export class ConfigTransferService {
     });
 
     await execute("security_settings", "security", [
-      "enabled","max_joins","window_seconds","quarantine_role_id","log_channel_id"
+      "enabled","max_joins","window_seconds","max_destructive_actions",
+      "destructive_window_seconds","quarantine_role_id","log_channel_id"
     ], {
       enabled: false,
       max_joins: 10,
       window_seconds: 20,
+      max_destructive_actions: 5,
+      destructive_window_seconds: 20,
       quarantine_role_id: null,
       log_channel_id: null
+    });
+
+    await execute("verification_settings", "verification", [
+      "enabled","channel_id","verified_role_id","log_channel_id","code_ttl_minutes"
+    ], {
+      enabled: false,
+      channel_id: null,
+      verified_role_id: null,
+      log_channel_id: null,
+      code_ttl_minutes: 10
+    });
+
+    await execute("leveling_settings", "leveling", [
+      "enabled","xp_per_message","cooldown_seconds","announce_level_up"
+    ], {
+      enabled: false,
+      xp_per_message: 10,
+      cooldown_seconds: 30,
+      announce_level_up: true
     });
 
     await execute("starboard_settings", "starboard", [
@@ -249,6 +276,8 @@ function tableToModule(table: string): ServerModuleConfig["key"] | null {
     case "welcome_settings": return "welcome";
     case "ticket_settings": return "tickets";
     case "security_settings": return "security";
+    case "verification_settings": return "verification";
+    case "leveling_settings": return "leveling";
     case "starboard_settings": return "starboard";
     case "music_settings": return "music";
     default: return null;
