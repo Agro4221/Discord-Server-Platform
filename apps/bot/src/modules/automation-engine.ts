@@ -46,6 +46,7 @@ export class AutomationEngine implements PlatformModule {
   private scheduleTimer?: NodeJS.Timeout;
   private identityId = "primary";
   private executionCounter = 0;
+  private lastScheduleMinute: number | null = null;
 
   constructor(private readonly db: Database) {}
 
@@ -124,6 +125,7 @@ export class AutomationEngine implements PlatformModule {
     this.cooldowns.clear();
     this.keyedCooldowns.clear();
     this.executionCounter = 0;
+    this.lastScheduleMinute = null;
     if (this.scheduleTimer) clearInterval(this.scheduleTimer);
     this.scheduleTimer = undefined;
     this.client = undefined;
@@ -355,6 +357,10 @@ export class AutomationEngine implements PlatformModule {
   private async emitSchedules(): Promise<void> {
     await this.reload();
     const now = new Date();
+    const minute = Math.floor(now.getTime() / 60_000);
+    if (this.lastScheduleMinute === minute) return;
+    this.lastScheduleMinute = minute;
+
     for (const guildId of this.rules.keys()) {
       await this.execute({
         type: "schedule",
@@ -677,4 +683,9 @@ function renderTemplate(value: string, event: RuntimeEvent): string {
     .replaceAll("{channelId}", event.channelId ?? "{channelId}")
     .replaceAll("{messageId}", event.messageId ?? "{messageId}")
     .replaceAll("{content}", event.content ?? "{content}");
+}
+
+
+export function shouldEmitSchedule(minute: number, lastMinute: number | null): boolean {
+  return lastMinute !== minute;
 }
