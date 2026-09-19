@@ -11,7 +11,6 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/dashboard/.next ./apps/dashboard/.next
-COPY --from=build /app/apps/dashboard/public ./apps/dashboard/public
 COPY --from=build /app/apps/dashboard/package.json ./apps/dashboard/package.json
 WORKDIR /app/apps/dashboard
 CMD ["npm", "start"]
