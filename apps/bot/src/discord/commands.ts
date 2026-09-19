@@ -426,6 +426,27 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .addSubcommand((sub) => sub.setName("shuffle").setDescription("Shuffle the queue"))
       .addSubcommand((sub) =>
         sub
+          .setName("repeat")
+          .setDescription("Set repeat mode")
+          .addStringOption((o) =>
+            o.setName("mode")
+              .setDescription("Repeat mode")
+              .addChoices(
+                { name: "Off", value: "off" },
+                { name: "Track", value: "track" },
+                { name: "Queue", value: "queue" }
+              )
+              .setRequired(true)
+          )
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName("autoplay")
+          .setDescription("Enable or disable autoplay")
+          .addBooleanOption((o) => o.setName("enabled").setDescription("Autoplay state"))
+      )
+      .addSubcommand((sub) =>
+        sub
           .setName("seek")
           .setDescription("Seek within the current track")
           .addIntegerOption((o) => o.setName("seconds").setDescription("Position in seconds").setMinValue(0).setMaxValue(86400).setRequired(true))
