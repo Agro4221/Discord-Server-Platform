@@ -136,6 +136,30 @@ async function main(): Promise<void> {
     analytics: {
       report: async (guildId, hours) => analytics.report(guildId, hours)
     },
+    automation: {
+      list: async (guildId) => automation.listRules(guildId),
+      create: async (guildId, input) => automation.createRule(
+        guildId,
+        input.name,
+        input.event as import("@dsp/domain").AutomationEvent,
+        input.conditions as import("@dsp/domain").AutomationCondition[],
+        input.actions as import("@dsp/domain").AutomationAction[],
+        input.cooldownSeconds
+      ).then(async () => (await automation.listRules(guildId))[0]),
+      update: async (guildId, ruleId, input) => automation.updateRule(
+        guildId,
+        ruleId,
+        {
+          name: input.name,
+          event: input.event as import("@dsp/domain").AutomationEvent,
+          conditions: input.conditions as import("@dsp/domain").AutomationCondition[],
+          actions: input.actions as import("@dsp/domain").AutomationAction[],
+          cooldownSeconds: input.cooldownSeconds,
+          enabled: input.enabled
+        }
+      ),
+      delete: async (guildId, ruleId) => automation.deleteRule(guildId, ruleId)
+    },
     rolePanels: {
       list: async (guildId) => rolePanels.list(guildId),
       create: async (guildId, input, callbacks) =>
