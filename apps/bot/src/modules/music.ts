@@ -528,7 +528,7 @@ export class Music implements PlatformModule {
 
         if (data.track && typeof data.track === "object") {
           player.queue.current = this.manager!.utils.buildTrack(
-            data.track,
+            data.track as Parameters<LavalinkManager["utils"]["buildTrack"]>[0],
             player.queue.current?.requester ?? this.client?.user
           );
         }
