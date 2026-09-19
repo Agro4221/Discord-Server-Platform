@@ -69,12 +69,17 @@ export class Reminders implements PlatformModule {
          SET processing_until=now()+interval '2 minutes',
              delivery_attempts=delivery_attempts+1
          WHERE id IN (
-           SELECT r.id FROM reminders r
+           SELECT r.id
+           FROM reminders r
            INNER JOIN guild_bot_assignments ga ON ga.guild_id = r.guild_id
+           LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id = ga.bot_identity_id
            WHERE r.delivered_at IS NULL
              AND r.due_at <= now()
              AND (r.processing_until IS NULL OR r.processing_until < now())
-             AND ga.bot_identity_id = $1
+             AND (
+               ga.bot_identity_id = $1
+               OR ($1 = 'primary' AND ga.bot_identity_id <> 'primary' AND bh.last_seen_at < now()-interval '90 seconds')
+             )
            ORDER BY r.due_at ASC
            FOR UPDATE SKIP LOCKED
            LIMIT 50
