@@ -24,8 +24,17 @@ type ApiOptions = {
   rolePanels?: {
     list: (guildId: string) => Promise<unknown[]>;
     create: (guildId: string, input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }> }) => Promise<unknown>;
-    update: (guildId: string, panelId: number, input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }> }) => Promise<unknown>;
-    delete: (guildId: string, panelId: number) => Promise<boolean>;
+    update: (
+      guildId: string,
+      panelId: number,
+      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }> },
+      callbacks: {
+        editMessage: (channelId: string, messageId: string, content: string, components: unknown[]) => Promise<void>;
+        deleteMessage: (channelId: string, messageId: string) => Promise<void>;
+        sendMessage: (channelId: string, content: string, components: unknown[]) => Promise<string>;
+      }
+    ) => Promise<unknown>;
+    delete: (guildId: string, panelId: number, deleteMessage: (channelId: string, messageId: string) => Promise<void>) => Promise<boolean>;
   };
 };
 
@@ -364,7 +373,15 @@ export class ManagementApiServer {
               return;
             }
 
-            const deleted = await this.options.rolePanels!.delete(guildId,panelId);
+            const deleted = await this.options.rolePanels!.delete(
+              guildId,
+              panelId,
+              async (channelId: string, messageId: string) => {
+                const channel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(channelId);
+                if (!channel || channel.type !== 0) return;
+                await channel.messages.delete(messageId).catch(() => undefined);
+              }
+            );
             if (!deleted) {
               this.json(res, 404, { error: "panel_not_found" });
               return;
