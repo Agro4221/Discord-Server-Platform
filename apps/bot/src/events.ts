@@ -19,6 +19,13 @@ export type PlatformEventMap = {
   "member.add": GuildMember;
   "member.remove": GuildMember;
   "member.update": { oldMember: GuildMember; newMember: GuildMember };
+  "member.role.add": { guildId: string; userId: string; roleId: string };
+  "member.role.remove": { guildId: string; userId: string; roleId: string };
+  "moderation.case": { guildId: string; userId: string; action: string; caseId: number };
+  "ticket.create": { guildId: string; userId: string; ticketId: number; channelId: string };
+  "ticket.close": { guildId: string; userId: string; ticketId: number; channelId: string };
+  "giveaway.end": { guildId: string; giveawayId: number; winners: string[] };
+  "schedule": { guildId: string; timestamp: number };
   "channel.delete": import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel;
   "role.delete": import("discord.js").Role;
 };
@@ -102,6 +109,11 @@ function extractGuildId<K extends keyof PlatformEventMap>(
   if (event === "member.add" || event === "member.remove" || event === "member.update") {
     const member = payload as GuildMember | { newMember: GuildMember };
     return "newMember" in member ? member.newMember.guild.id : member.guild.id;
+  }
+  if (event === "member.role.add" || event === "member.role.remove" ||
+      event === "moderation.case" || event === "ticket.create" || event === "ticket.close" ||
+      event === "giveaway.end" || event === "schedule") {
+    return (payload as { guildId: string }).guildId;
   }
   if (event === "channel.delete") {
     return (payload as { guildId: string | null }).guildId;
