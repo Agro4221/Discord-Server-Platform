@@ -21,6 +21,12 @@ type ApiOptions = {
   transfer: ConfigTransferService;
   backups: BackupService;
   actions: Record<string, (guildId: string) => Promise<unknown>>;
+  rolePanels?: {
+    list: (guildId: string) => Promise<unknown[]>;
+    create: (guildId: string, input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }> }) => Promise<unknown>;
+    update: (guildId: string, panelId: number, input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }> }) => Promise<unknown>;
+    delete: (guildId: string, panelId: number) => Promise<boolean>;
+  };
 };
 
 type RateWindow = { startedAt: number; count: number };
@@ -234,6 +240,145 @@ export class ManagementApiServer {
               this.json(res, 200, { guildId, moduleKey, values: saved });
               return;
             }
+          }
+
+          const rolePanelsMatch = path.match(/^\/api\/guilds\/([^/]+)\/role-panels$/);
+          const rolePanelItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/role-panels\/(\d+)$/);
+
+          if ((rolePanelsMatch || rolePanelItemMatch) && !this.options.rolePanels) {
+            this.json(res, 500, { error: "role_panels_unavailable" });
+            return;
+          }
+
+          if ((method === "POST" || method === "PUT") && (rolePanelsMatch || rolePanelItemMatch)) {
+            if (method !== "POST") {
+              try {
+                // PUT is also a state-changing endpoint and is protected by the dashboard same-origin layer.
+              } catch {}
+            }
+
+            const guildId = rolePanelsMatch?.[1] ?? rolePanelItemMatch?.[1] ?? "";
+            const panelId = rolePanelItemMatch ? Number(rolePanelItemMatch[2]) : null;
+            const guild = guildId ? this.options.client.guilds.cache.get(guildId) : null;
+            if (!guild || (panelId !== null && !Number.isSafeInteger(panelId))) {
+              this.json(res, 404, { error: "guild_or_panel_not_found" });
+              return;
+            }
+
+            const body = await readJson(req);
+            const channelId = body.channelId;
+            const title = body.title;
+            const rawRoles = body.roles;
+
+            if (
+              typeof channelId !== "string" ||
+              channelId.length > 64 ||
+              (title !== undefined && (typeof title !== "string" || title.length > 100)) ||
+              !Array.isArray(rawRoles) ||
+              rawRoles.length < 1 ||
+              rawRoles.length > 5
+            ) {
+              throw new RequestInputError("invalid_panel", 400);
+            }
+
+            const roles = rawRoles.map((entry) => {
+              if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new RequestInputError("invalid_panel", 400);
+              const item = entry as Record<string, unknown>;
+              if (typeof item.roleId !== "string" || typeof item.label !== "string" || item.roleId.length > 64 || item.label.length > 80 || !item.label.trim()) {
+                throw new RequestInputError("invalid_panel", 400);
+              }
+              return { roleId: item.roleId, label: item.label.trim() };
+            });
+
+            const uniqueRoleIds = new Set(roles.map((role) => role.roleId));
+            if (uniqueRoleIds.size !== roles.length) throw new RequestInputError("duplicate_roles", 400);
+
+            const channel = guild.channels.cache.get(channelId);
+            const botMember = guild.members.me;
+            if (!channel || channel.type !== 0) throw new RequestInputError("text_channel_required", 400);
+            if (!botMember?.permissions.has("ManageRoles")) throw new RequestInputError("bot_missing_manage_roles", 400);
+
+            for (const entry of roles) {
+              const role = guild.roles.cache.get(entry.roleId);
+              if (!role || role.managed || role.id === guild.id || role.position >= botMember.roles.highest.position) {
+                throw new RequestInputError("role_not_manageable", 400);
+              }
+            }
+
+            const input = {
+              channelId,
+              title: typeof title === "string" ? title : undefined,
+              roles
+            };
+
+            const helpers = {
+              editMessage: async (oldChannelId: string, messageId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => {
+                const oldChannel = guild.channels.cache.get(oldChannelId);
+                if (!oldChannel || oldChannel.type !== 0) throw new Error("role_panel_old_channel_missing");
+                const message = await oldChannel.messages.fetch(messageId);
+                await message.edit({ content, components });
+              },
+              deleteMessage: async (oldChannelId: string, messageId: string) => {
+                const oldChannel = guild.channels.cache.get(oldChannelId);
+                if (!oldChannel || oldChannel.type !== 0) return;
+                await oldChannel.messages.delete(messageId).catch(() => undefined);
+              },
+              sendMessage: async (newChannelId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => {
+                const target = guild.channels.cache.get(newChannelId);
+                if (!target || target.type !== 0) throw new Error("role_panel_channel_missing");
+                const message = await target.send({ content, components });
+                return message.id;
+              }
+            };
+
+            const result = panelId === null
+              ? await this.options.rolePanels!.create(guildId, input)
+              : await this.options.rolePanels!.update(guildId, panelId, input, helpers);
+
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: panelId === null ? "role-panel.created" : "role-panel.updated",
+              targetType: "role-panel",
+              targetId: String((result as { id?: number })?.id ?? panelId ?? "unknown")
+            });
+            this.json(res, 200, { ok: true, panel: result });
+            return;
+          }
+
+          if (method === "GET" && rolePanelsMatch) {
+            const guildId = rolePanelsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, panels: await this.options.rolePanels!.list(guildId) });
+            return;
+          }
+
+          if (method === "DELETE" && rolePanelItemMatch) {
+            const guildId = rolePanelItemMatch[1] ?? "";
+            const panelId = Number(rolePanelItemMatch[2]);
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !Number.isSafeInteger(panelId)) {
+              this.json(res, 404, { error: "guild_or_panel_not_found" });
+              return;
+            }
+
+            const deleted = await this.options.rolePanels!.delete(guildId,panelId);
+            if (!deleted) {
+              this.json(res, 404, { error: "panel_not_found" });
+              return;
+            }
+
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "role-panel.deleted",
+              targetType: "role-panel",
+              targetId: String(panelId)
+            });
+            this.json(res, 200, { ok: true });
+            return;
           }
 
           const schemasMatch = path === "/api/module-schemas"; 
