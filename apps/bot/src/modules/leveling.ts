@@ -82,21 +82,21 @@ export class Leveling implements PlatformModule {
     }
   }
 
-  private async onMessage(message: Message): Promise<void>
+  private async onMessage(message: Message): Promise<void> {
     if (!message.guild || message.author.bot) return;
     if (!await moduleEnabled(this.db, message.guild.id, "leveling", false)) return;
-
-    const key = `${message.guild.id}:${message.author.id}`;
-    const now = Date.now();
-    const previous = this.cooldowns.get(key) ?? 0;
-    if (now - previous < setting.cooldown_seconds * 1000) return;
-    this.cooldowns.set(key, now);
 
     const settings = await this.db.query<{ xp_per_message: number; cooldown_seconds: number; announce_level_up: boolean }>(
       "SELECT xp_per_message,cooldown_seconds,announce_level_up FROM leveling_settings WHERE guild_id=$1",
       [message.guild.id]
     );
     const setting = settings.rows[0] ?? { xp_per_message: 10, cooldown_seconds: 30, announce_level_up: true };
+    const key = `${message.guild.id}:${message.author.id}`;
+    const now = Date.now();
+    const previous = this.cooldowns.get(key) ?? 0;
+    if (now - previous < setting.cooldown_seconds * 1000) return;
+    this.cooldowns.set(key, now);
+
     const xp = setting.xp_per_message;
     const result = await this.db.query<{ xp: number; level: number }>(
       `INSERT INTO leveling_users(guild_id,user_id,xp,level)
