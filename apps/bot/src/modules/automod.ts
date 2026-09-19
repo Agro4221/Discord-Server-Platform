@@ -1,4 +1,4 @@
-import type { Message } from "discord.js";
+import { PermissionFlagsBits, type ChatInputCommandInteraction, type Message } from "discord.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
@@ -34,7 +34,9 @@ export class AutoMod implements PlatformModule {
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
-    this.unsubscribe = context.events.on("message.create", (message) => this.inspect(message));
+    const a = context.events.on("message.create", (message) => this.inspect(message));
+    const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    this.unsubscribe = () => { a(); b(); };
   }
 
   async shutdown(): Promise<void> {
@@ -43,7 +45,30 @@ export class AutoMod implements PlatformModule {
     this.recent.clear();
   }
 
-  async configure(guildId: string, patch: Partial<AutoModConfig>): Promise<void> {
+  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+    if (!interaction.inGuild() || interaction.commandName !== "automod") return;
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+      await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
+      return;
+    }
+    if (interaction.options.getSubcommand() !== "setup") return;
+
+    const blocked = interaction.options.getString("blocked-words");
+    await this.configure(interaction.guild.id, {
+      enabled: true,
+      blockedWords: blocked ? blocked.split(/[,\n]/).map((item) => item.trim()).filter(Boolean).slice(0, 500) : undefined,
+      maxMentions: interaction.options.getInteger("max-mentions") ?? 6,
+      maxCapsRatio: interaction.options.getNumber("caps-ratio") ?? 0.85,
+      maxRepeatedMessages: interaction.options.getInteger("repeats") ?? 5,
+      repeatedWindowSeconds: interaction.options.getInteger("window") ?? 10,
+      deleteMessage: interaction.options.getBoolean("delete") ?? true,
+      timeoutMinutes: interaction.options.getInteger("timeout") ?? 0
+    });
+
+    await interaction.reply({ content: "AutoMod настроен и включён.", ephemeral: true });
+  }
+
+  async configure(guildId: string, patch: Partial<AutoModConfig>): Promise<void>
     const current = await this.getConfig(guildId);
     const next = { ...current, ...patch };
     await this.db.query(
@@ -113,6 +138,7 @@ export class AutoMod implements PlatformModule {
     if (!await moduleEnabled(this.db, message.guild.id, "automod", false)) return;
 
     const config = await this.getConfig(message.guild.id);
+    if (!config.enabled) return;
     const content = message.content;
     const normalized = content.toLocaleLowerCase();
 
