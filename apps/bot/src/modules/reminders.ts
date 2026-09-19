@@ -30,7 +30,7 @@ export class Reminders implements PlatformModule {
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!interaction.inGuild() || interaction.commandName !== "remind") return;
-    if (!await moduleEnabled(this.db, interaction.guild.id, "reminders", false)) {
+    if (!await moduleEnabled(this.db, interaction.guild!.id, "reminders", false)) {
       await interaction.reply({ content: "Модуль Reminders выключен.", ephemeral: true });
       return;
     }
@@ -42,7 +42,7 @@ export class Reminders implements PlatformModule {
     const result = await this.db.query<{ id: string }>(
       `INSERT INTO reminders(guild_id,user_id,channel_id,content,due_at)
        VALUES($1,$2,$3,$4,$5) RETURNING id`,
-      [interaction.guild.id,interaction.user.id,interaction.channelId,text,dueAt]
+      [interaction.guild!.id,interaction.user.id,interaction.channelId,text,dueAt]
     );
 
     await interaction.reply({
