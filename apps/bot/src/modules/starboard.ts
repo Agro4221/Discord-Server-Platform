@@ -7,6 +7,7 @@ import {
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
+import { logger } from "../logger.js";
 
 type StarboardConfig = {
   channelId: string;
@@ -102,19 +103,20 @@ export class Starboard implements PlatformModule {
     if (config.ignoreSelfReaction && reaction.message.author?.id === user.id) return;
 
     if (reaction.message.partial) {
-      await reaction.message.fetch().catch(() => undefined);
+      await reaction.message.fetch().catch((error) => {
+        logger.warn("Starboard partial message fetch failed", {
+          guildId: reaction.message.guild?.id,
+          sourceMessageId: reaction.message.id,
+          error: String(error)
+        });
+      });
     }
 
     const count = reaction.count ?? 0;
     if (count < config.threshold) return;
 
-    const existing = await this.db.query<{ starboard_message_id: string | null }>(
-      "SELECT starboard_message_id FROM starboard_entries WHERE guild_id=$1 AND source_message_id=$2",
-      [reaction.message.guild.id, reaction.message.id]
-    );
-
     const channel = reaction.message.guild.channels.cache.get(config.channelId);
-    if (!channel?.isTextBased() || !("send" in channel)) return;
+    if (!channel?.isTextBased() || !(("send" in channel))) return;
 
     const embed = new EmbedBuilder()
       .setAuthor({
@@ -127,28 +129,67 @@ export class Starboard implements PlatformModule {
         text: `Source channel: ${reaction.message.channelId} · ${reaction.message.id}`
       });
 
-    if (existing.rows[0]?.starboard_message_id) {
-      const message = await channel.messages
-        .fetch(existing.rows[0].starboard_message_id)
-        .catch(() => null);
+    await this.db.transaction(async (client) => {
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext($1))",
+        [reaction.message.guild.id + ":" + reaction.message.id]
+      );
 
-      if (message) {
-        await message.edit({ embeds: [embed] }).catch(() => undefined);
-        return;
+      const existing = await client.query<{ starboard_message_id: string | null }>(
+        "SELECT starboard_message_id FROM starboard_entries WHERE guild_id=$1 AND source_message_id=$2",
+        [reaction.message.guild.id, reaction.message.id]
+      );
+
+      if (existing.rows[0]?.starboard_message_id) {
+        const message = await channel.messages.fetch(existing.rows[0].starboard_message_id).catch((error) => {
+          logger.warn("Starboard message fetch failed", {
+            guildId: reaction.message.guild.id,
+            sourceMessageId: reaction.message.id,
+            starboardMessageId: existing.rows[0]?.starboard_message_id,
+            error: String(error)
+          });
+          return null;
+        });
+
+        if (message) {
+          await message.edit({ embeds: [embed] }).catch((error) => {
+            logger.warn("Starboard message update failed", {
+              guildId: reaction.message.guild.id,
+              sourceMessageId: reaction.message.id,
+              starboardMessageId: message.id,
+              error: String(error)
+            });
+          });
+          return;
+        }
       }
-    }
 
-    const sent = await channel.send({ embeds: [embed] });
+      const sent = await channel.send({ embeds: [embed] }).catch((error) => {
+        logger.error("Starboard publication failed", {
+          guildId: reaction.message.guild.id,
+          sourceMessageId: reaction.message.id,
+          channelId: config.channelId,
+          error: String(error)
+        });
+        throw error;
+      });
 
-    await this.db.query(
-      `INSERT INTO starboard_entries(
-         guild_id,source_message_id,starboard_message_id
-       )
-       VALUES($1,$2,$3)
-       ON CONFLICT(guild_id,source_message_id)
-       DO UPDATE SET starboard_message_id=EXCLUDED.starboard_message_id`,
-      [reaction.message.guild.id, reaction.message.id, sent.id]
-    );
+      await client.query(
+        `INSERT INTO starboard_entries(
+           guild_id,source_message_id,starboard_message_id
+         )
+         VALUES($1,$2,$3)
+         ON CONFLICT(guild_id,source_message_id)
+         DO UPDATE SET starboard_message_id=EXCLUDED.starboard_message_id`,
+        [reaction.message.guild.id, reaction.message.id, sent.id]
+      );
+    }).catch((error) => {
+      logger.error("Starboard transaction failed", {
+        guildId: reaction.message.guild.id,
+        sourceMessageId: reaction.message.id,
+        error: String(error)
+      });
+    });
   }
 
   async configure(
