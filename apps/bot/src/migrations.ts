@@ -332,6 +332,19 @@ const migrations = [
       "ALTER TABLE reminders ADD COLUMN IF NOT EXISTS processing_until timestamptz;"
     ])
   }
+,
+  {
+    version: 15,
+    name: "bot_heartbeats",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS bot_heartbeats (",
+      "  bot_identity_id text PRIMARY KEY REFERENCES bot_identities(id) ON DELETE CASCADE,",
+      "  status text NOT NULL CHECK(status IN ('starting','ready','degraded','stopped')),",
+      "  last_seen_at timestamptz NOT NULL DEFAULT now(),",
+      "  guild_count integer NOT NULL DEFAULT 0 CHECK(guild_count >= 0)",
+      ");"
+    ])
+  }
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
