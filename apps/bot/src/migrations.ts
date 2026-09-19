@@ -423,6 +423,13 @@ const migrations = [
       "ALTER TABLE giveaways ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();",
       "CREATE INDEX IF NOT EXISTS idx_giveaways_state_updated ON giveaways(status,updated_at);"
     ])
+  },
+  {
+    version: 24,
+    name: "automation_any_conditions",
+    sql: q([
+      "ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS any_conditions jsonb NOT NULL DEFAULT '[]'::jsonb;"
+    ])
   }
 ] as const;
 
