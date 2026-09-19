@@ -13,11 +13,13 @@ import { Moderation } from "../modules/moderation.js";
 
 export function buildCommands(): SlashCommandBuilder[] {
   return [
-    new SlashCommandBuilder().setName("ping").setDescription("Check platform health"),
+    new SlashCommandBuilder()
+      .setName("ping")
+      .setDescription("Check platform health"),
+
     new SlashCommandBuilder()
       .setName("setup")
       .setDescription("Configure the server")
-      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
       .addSubcommand((sub) =>
         sub
           .setName("temp-voice")
@@ -36,64 +38,133 @@ export function buildCommands(): SlashCommandBuilder[] {
               .addChannelTypes(ChannelType.GuildCategory)
           )
           .addIntegerOption((option) =>
-            option.setName("limit").setDescription("Default user limit (0 = unlimited)").setMinValue(0).setMaxValue(99)
+            option
+              .setName("limit")
+              .setDescription("Default user limit (0 = unlimited)")
+              .setMinValue(0)
+              .setMaxValue(99)
           )
           .addBooleanOption((option) =>
-            option.setName("private").setDescription("Make rooms private to their owner")
+            option
+              .setName("private")
+              .setDescription("Make rooms private to their owner")
           )
       ),
+
     new SlashCommandBuilder()
       .setName("moderate")
       .setDescription("Moderation actions")
-      .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
       .addSubcommand((sub) =>
         sub
           .setName("warn")
           .setDescription("Warn a user")
-          .addUserOption((option) => option.setName("user").setDescription("User").setRequired(true))
-          .addStringOption((option) => option.setName("reason").setDescription("Reason").setMaxLength(1000).setRequired(true))
+          .addUserOption((option) =>
+            option.setName("user").setDescription("User").setRequired(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("reason")
+              .setDescription("Reason")
+              .setMaxLength(1000)
+              .setRequired(true)
+          )
       )
       .addSubcommand((sub) =>
         sub
           .setName("timeout")
           .setDescription("Timeout a member")
-          .addUserOption((option) => option.setName("user").setDescription("Member").setRequired(true))
-          .addIntegerOption((option) => option.setName("minutes").setDescription("Duration in minutes").setMinValue(1).setMaxValue(40320).setRequired(true))
-          .addStringOption((option) => option.setName("reason").setDescription("Reason").setMaxLength(1000).setRequired(true))
+          .addUserOption((option) =>
+            option.setName("user").setDescription("Member").setRequired(true)
+          )
+          .addIntegerOption((option) =>
+            option
+              .setName("minutes")
+              .setDescription("Duration in minutes")
+              .setMinValue(1)
+              .setMaxValue(40320)
+              .setRequired(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("reason")
+              .setDescription("Reason")
+              .setMaxLength(1000)
+              .setRequired(true)
+          )
       )
       .addSubcommand((sub) =>
         sub
           .setName("kick")
           .setDescription("Kick a member")
-          .addUserOption((option) => option.setName("user").setDescription("Member").setRequired(true))
-          .addStringOption((option) => option.setName("reason").setDescription("Reason").setMaxLength(1000).setRequired(true))
+          .addUserOption((option) =>
+            option.setName("user").setDescription("Member").setRequired(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("reason")
+              .setDescription("Reason")
+              .setMaxLength(1000)
+              .setRequired(true)
+          )
       )
       .addSubcommand((sub) =>
         sub
           .setName("ban")
           .setDescription("Ban a member")
-          .addUserOption((option) => option.setName("user").setDescription("Member").setRequired(true))
-          .addStringOption((option) => option.setName("reason").setDescription("Reason").setMaxLength(1000).setRequired(true))
+          .addUserOption((option) =>
+            option.setName("user").setDescription("Member").setRequired(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("reason")
+              .setDescription("Reason")
+              .setMaxLength(1000)
+              .setRequired(true)
+          )
       )
       .addSubcommand((sub) =>
         sub
           .setName("history")
           .setDescription("Show recent moderation cases")
-          .addUserOption((option) => option.setName("user").setDescription("User").setRequired(true))
-          .addIntegerOption((option) => option.setName("limit").setDescription("Number of cases").setMinValue(1).setMaxValue(50))
+          .addUserOption((option) =>
+            option.setName("user").setDescription("User").setRequired(true)
+          )
+          .addIntegerOption((option) =>
+            option
+              .setName("limit")
+              .setDescription("Number of cases")
+              .setMinValue(1)
+              .setMaxValue(50)
+          )
       ),
+
     new SlashCommandBuilder()
       .setName("ticket")
       .setDescription("Ticket system")
-      .addSubcommand((sub) => sub.setName("create").setDescription("Create a support ticket"))
+      .addSubcommand((sub) =>
+        sub.setName("create").setDescription("Create a support ticket")
+      )
       .addSubcommand((sub) =>
         sub
           .setName("setup")
           .setDescription("Configure tickets")
-          .addChannelOption((o) => o.setName("category").setDescription("Ticket category").addChannelTypes(ChannelType.GuildCategory))
-          .addRoleOption((o) => o.setName("staff-role").setDescription("Staff role"))
-          .addChannelOption((o) => o.setName("transcript-channel").setDescription("Transcript channel").addChannelTypes(ChannelType.GuildText))
+          .addChannelOption((option) =>
+            option
+              .setName("category")
+              .setDescription("Ticket category")
+              .addChannelTypes(ChannelType.GuildCategory)
+          )
+          .addRoleOption((option) =>
+            option.setName("staff-role").setDescription("Staff role")
+          )
+          .addChannelOption((option) =>
+            option
+              .setName("transcript-channel")
+              .setDescription("Transcript channel")
+              .addChannelTypes(ChannelType.GuildText)
+          )
       ),
+
     new SlashCommandBuilder()
       .setName("roles")
       .setDescription("Role panels")
@@ -101,10 +172,25 @@ export function buildCommands(): SlashCommandBuilder[] {
         sub
           .setName("panel")
           .setDescription("Create a role panel")
-          .addChannelOption((o) => o.setName("channel").setDescription("Text channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
-          .addRoleOption((o) => o.setName("role").setDescription("Role to toggle").setRequired(true))
-          .addStringOption((o) => o.setName("label").setDescription("Button label").setMaxLength(80).setRequired(true))
+          .addChannelOption((option) =>
+            option
+              .setName("channel")
+              .setDescription("Text channel")
+              .addChannelTypes(ChannelType.GuildText)
+              .setRequired(true)
+          )
+          .addRoleOption((option) =>
+            option.setName("role").setDescription("Role to toggle").setRequired(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("label")
+              .setDescription("Button label")
+              .setMaxLength(80)
+              .setRequired(true)
+          )
       ),
+
     new SlashCommandBuilder()
       .setName("giveaway")
       .setDescription("Giveaways")
@@ -112,10 +198,30 @@ export function buildCommands(): SlashCommandBuilder[] {
         sub
           .setName("create")
           .setDescription("Create a giveaway")
-          .addIntegerOption((o) => o.setName("minutes").setDescription("Duration").setMinValue(1).setMaxValue(10080).setRequired(true))
-          .addIntegerOption((o) => o.setName("winners").setDescription("Winner count").setMinValue(1).setMaxValue(100))
-          .addStringOption((o) => o.setName("prize").setDescription("Prize").setMaxLength(200).setRequired(true))
+          .addIntegerOption((option) =>
+            option
+              .setName("minutes")
+              .setDescription("Duration")
+              .setMinValue(1)
+              .setMaxValue(10080)
+              .setRequired(true)
+          )
+          .addIntegerOption((option) =>
+            option
+              .setName("winners")
+              .setDescription("Winner count")
+              .setMinValue(1)
+              .setMaxValue(100)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("prize")
+              .setDescription("Prize")
+              .setMaxLength(200)
+              .setRequired(true)
+          )
       ),
+
     new SlashCommandBuilder()
       .setName("economy")
       .setDescription("Economy")
@@ -123,15 +229,114 @@ export function buildCommands(): SlashCommandBuilder[] {
         sub
           .setName("balance")
           .setDescription("Show balance")
-          .addUserOption((o) => o.setName("user").setDescription("User"))
+          .addUserOption((option) => option.setName("user").setDescription("User"))
       )
-      .addSubcommand((sub) => sub.setName("daily").setDescription("Claim daily coins"))
+      .addSubcommand((sub) =>
+        sub.setName("daily").setDescription("Claim daily coins")
+      )
       .addSubcommand((sub) =>
         sub
           .setName("pay")
           .setDescription("Transfer coins")
-          .addUserOption((o) => o.setName("user").setDescription("Recipient").setRequired(true))
-          .addIntegerOption((o) => o.setName("amount").setDescription("Amount").setMinValue(1).setMaxValue(1_000_000).setRequired(true))
+          .addUserOption((option) =>
+            option.setName("user").setDescription("Recipient").setRequired(true)
+          )
+          .addIntegerOption((option) =>
+            option
+              .setName("amount")
+              .setDescription("Amount")
+              .setMinValue(1)
+              .setMaxValue(1_000_000)
+              .setRequired(true)
+          )
+      ),
+
+    new SlashCommandBuilder()
+      .setName("remind")
+      .setDescription("Create a reminder")
+      .addIntegerOption((option) =>
+        option
+          .setName("minutes")
+          .setDescription("Delay in minutes")
+          .setMinValue(1)
+          .setMaxValue(525600)
+          .setRequired(true)
+      )
+      .addStringOption((option) =>
+        option
+          .setName("text")
+          .setDescription("Reminder text")
+          .setMaxLength(1000)
+          .setRequired(true)
+      ),
+
+    new SlashCommandBuilder()
+      .setName("starboard")
+      .setDescription("Starboard")
+      .addSubcommand((sub) =>
+        sub
+          .setName("setup")
+          .setDescription("Configure starboard")
+          .addChannelOption((option) =>
+            option
+              .setName("channel")
+              .setDescription("Starboard channel")
+              .addChannelTypes(ChannelType.GuildText)
+              .setRequired(true)
+          )
+          .addIntegerOption((option) =>
+            option
+              .setName("threshold")
+              .setDescription("Stars required")
+              .setMinValue(1)
+              .setMaxValue(100)
+          )
+      ),
+
+    new SlashCommandBuilder()
+      .setName("automation")
+      .setDescription("Automation rules")
+      .addSubcommand((sub) =>
+        sub
+          .setName("create")
+          .setDescription("Create a simple automation rule")
+          .addStringOption((option) =>
+            option.setName("name").setDescription("Rule name").setMaxLength(80).setRequired(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("event")
+              .setDescription("Trigger event")
+              .addChoices(
+                { name: "Member joins", value: "member.join" },
+                { name: "Member leaves", value: "member.leave" },
+                { name: "Message created", value: "message.create" },
+                { name: "Voice joins", value: "voice.join" },
+                { name: "Voice leaves", value: "voice.leave" },
+                { name: "Voice moves", value: "voice.move" }
+              )
+              .setRequired(true)
+          )
+          .addChannelOption((option) =>
+            option.setName("channel").setDescription("Optional event channel filter")
+          )
+          .addStringOption((option) =>
+            option.setName("match").setDescription("Optional message text filter").setMaxLength(200)
+          )
+          .addChannelOption((option) =>
+            option
+              .setName("response-channel")
+              .setDescription("Channel to send the response to")
+              .addChannelTypes(ChannelType.GuildText)
+              .setRequired(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("response")
+              .setDescription("Response text")
+              .setMaxLength(2000)
+              .setRequired(true)
+          )
       )
   ];
 }
@@ -199,9 +404,12 @@ export async function handleCommand(
         content: `Готово. Вход в <#${trigger.id}> теперь создаёт временную комнату.`,
         ephemeral: true
       });
+
       logger.info("Temporary voice configured", {
         guildId: interaction.guild.id,
-        triggerChannelId: trigger.id
+        triggerChannelId: trigger.id,
+        categoryId: category?.id ?? null,
+        privateByDefault
       });
     }
     return;
@@ -213,13 +421,22 @@ export async function handleCommand(
   const target = interaction.options.getUser("user", true);
 
   if (subcommand === "history") {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ModerateMembers) &&
+        !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+      await interaction.reply({ content: "Недостаточно прав.", ephemeral: true });
+      return;
+    }
+
     const limit = interaction.options.getInteger("limit") ?? 10;
     const cases = await moderation.history(interaction.guild.id, target.id, limit);
     const content = cases.length === 0
       ? "История модерации пуста."
       : cases
-          .map((item) => `#${item.id} · ${item.action} · ${item.reason ?? "без причины"} · <t:${Math.floor(item.createdAt.getTime() / 1000)}:R>`)
+          .map((item) =>
+            `#${item.id} · ${item.action} · ${item.reason ?? "без причины"} · <t:${Math.floor(item.createdAt.getTime() / 1000)}:R>`
+          )
           .join("\n");
+
     await interaction.reply({ content, ephemeral: true });
     return;
   }
@@ -233,12 +450,20 @@ export async function handleCommand(
 
   const member = await interaction.guild.members.fetch(target.id).catch(() => null);
   if (!member) {
-    await interaction.reply({ content: "Пользователь не найден среди участников сервера.", ephemeral: true });
+    await interaction.reply({
+      content: "Пользователь не найден среди участников сервера.",
+      ephemeral: true
+    });
     return;
   }
 
   if (subcommand === "timeout") {
-    await moderation.timeout(interaction, member, interaction.options.getInteger("minutes", true), reason);
+    await moderation.timeout(
+      interaction,
+      member,
+      interaction.options.getInteger("minutes", true),
+      reason
+    );
   } else if (subcommand === "kick") {
     await moderation.kick(interaction, member, reason);
   } else if (subcommand === "ban") {
