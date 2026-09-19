@@ -9,6 +9,39 @@ export class Analytics implements PlatformModule {
 
   constructor(private readonly db: Database) {}
 
+  async report(guildId: string, hours = 24): Promise<{
+    hours: number;
+    totals: Record<string, number>;
+    points: Array<{ bucketStart: string; eventType: string; count: number }>;
+  }> {
+    const boundedHours = Math.min(Math.max(Math.trunc(hours), 1), 168);
+    const result = await this.db.query<{
+      event_type: string;
+      bucket_start: string;
+      count: string | number;
+    }>(
+      `SELECT event_type,bucket_start,count::text AS count
+       FROM analytics_events
+       WHERE guild_id=$1
+         AND bucket_start >= now() - make_interval(hours => $2)
+       ORDER BY bucket_start ASC,event_type ASC`,
+      [guildId, boundedHours]
+    );
+
+    const totals: Record<string, number> = {};
+    const points = result.rows.map((row) => {
+      const count = Number(row.count);
+      totals[row.event_type] = (totals[row.event_type] ?? 0) + count;
+      return {
+        bucketStart: row.bucket_start,
+        eventType: row.event_type,
+        count: Number.isFinite(count) ? count : 0
+      };
+    });
+
+    return { hours: boundedHours, totals, points };
+  }
+
   async init(context: ModuleContext): Promise<void> {
     const a = context.events.on("member.add", (member) => this.count(member.guild.id, "member_join"));
     const b = context.events.on("member.remove", (member) => this.count(member.guild.id, "member_leave"));
