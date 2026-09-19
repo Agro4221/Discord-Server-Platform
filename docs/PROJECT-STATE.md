@@ -55,3 +55,12 @@ Full build — implementation + continuous verification.
 Read docs/WORK-LOG.md before continuing work in a new chat.
 Read docs/TEST-MATRIX.md before declaring a subsystem complete.
 Never commit credentials, bot tokens, provider secrets or private user data.
+
+
+## 2026-09-19 — Giveaway lifecycle hardening
+- Fixed Giveaway participation buttons by subscribing the module to the shared `interaction` event.
+- Entry insertion is now atomic against the `running` status, preventing a late click from entering during/after finalization.
+- Failed giveaway publication now rolls the database row back and removes a partially created Discord message.
+- Giveaway completion disables the original participation button and posts the final result.
+- Regression coverage added for button wiring and post-finalization rejection.
+- Latest relevant CI run: #277 on commit d5d0ca40b7e3841049c6b74e46a6822a8aeed882 passed typecheck, bot tests, bot build and dashboard build.

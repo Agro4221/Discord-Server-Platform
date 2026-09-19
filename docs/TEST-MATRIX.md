@@ -27,3 +27,11 @@ This is the master index for verification work. New subsystems must add cases he
 | Backup / restore | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 
 Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
+
+
+## Verification snapshots
+
+### 2026-09-19
+- **Giveaways:** CI regression coverage now verifies the participation button is actually wired to the platform event bus and that entry is rejected after the Giveaway is no longer running.
+- **CI run #277:** passed on branch `development`; source hygiene, bot typecheck, bot tests, bot build and Dashboard build were successful.
+- The matrix below intentionally remains unchecked for live Discord behavior until the full release-gate suite is executed with real Discord/PostgreSQL/Lavalink dependencies.

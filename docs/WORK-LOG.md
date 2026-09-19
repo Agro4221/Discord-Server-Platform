@@ -40,3 +40,14 @@ Never write credentials, tokens or private user data here.
 - Bot regression suite currently reports 10/10 passing tests.
 - Remaining engineering scope: AutoMod/Security depth, Music provider breadth + multi-node failover, multi-bot fleet orchestration/routing, remote backup retention, VPS install/upgrade tooling, and full live E2E/chaos/soak/security validation.
 - Do not declare release complete until those remaining areas are either implemented or explicitly accepted as known limitations and the broader release-gate tests are run.
+
+
+## 2026-09-19 — Release hardening: Giveaway lifecycle
+- Branch HEAD after this pass: d5d0ca40b7e3841049c6b74e46a6822a8aeed882
+- Found and fixed a functional gap where Giveaway participation buttons were rendered but never connected to the platform interaction event bus.
+- Hardened entry insertion to be atomic with the Giveaway `running` state, removing a timing race with finalization.
+- Hardened creation rollback so a Discord send or database message-id update failure does not leave a live orphan Giveaway.
+- Giveaway completion now disables the original participation button and leaves a final result message.
+- Added `apps/bot/test/giveaways.test.ts` covering event-bus wiring and rejection after the Giveaway stops running.
+- CI run #277 passed with bot tests/typecheck/build and dashboard build.
+- Remaining release-gate work is unchanged: full live Discord E2E/chaos/soak/security validation, broader AutoMod/Security/Automation depth, Music multi-node failover/provider breadth, multi-bot fleet orchestration/routing, remote backup retention, and VPS install/upgrade tooling.
