@@ -9,6 +9,8 @@ test("giveaway participation buttons are wired to the platform interaction bus",
   const db = {
     async query(sql: string) {
       calls.push(sql);
+      if (sql.startsWith("UPDATE giveaways SET status='running'")) return { rows: [], rowCount: 0 };
+      if (sql.startsWith("UPDATE giveaways SET status='finished'")) return { rows: [], rowCount: 0 };
       if (sql.startsWith("SELECT enabled FROM guild_modules")) {
         return { rows: [{ enabled: true }] };
       }
