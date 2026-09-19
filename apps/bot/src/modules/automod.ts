@@ -54,7 +54,7 @@ export class AutoMod implements PlatformModule {
     if (interaction.options.getSubcommand() !== "setup") return;
 
     const blocked = interaction.options.getString("blocked-words");
-    await this.configure(interaction.guild.id, {
+    await this.configure(interaction.guild!.id, {
       enabled: true,
       blockedWords: blocked ? blocked.split(/[,\n]/).map((item) => item.trim()).filter(Boolean).slice(0, 500) : undefined,
       maxMentions: interaction.options.getInteger("max-mentions") ?? 6,
@@ -179,7 +179,7 @@ export class AutoMod implements PlatformModule {
     });
 
     if (config.deleteMessage) {
-      await message.delete("AutoMod violation").catch(() => undefined);
+      await message.delete().catch(() => undefined);
     }
 
     if (config.timeoutMinutes > 0 && message.member?.moderatable) {
