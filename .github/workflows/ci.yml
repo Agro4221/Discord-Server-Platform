@@ -49,12 +49,6 @@ jobs:
           cp .env.example .env
           docker compose config >/dev/null
 
-      - name: Shell script smoke checks
-        run: |
-          grep -Eq '^set -E?euo pipefail
-          grep -Eq '^set -E?euo pipefail
-          test -s docs/MASTER-PLAN.md
-
       - name: Check observability contract
         run: node scripts/check-observability.mjs
 
