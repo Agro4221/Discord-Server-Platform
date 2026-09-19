@@ -70,7 +70,9 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
     title: "Security / Anti-Raid",
     fields: [
       { key: "maxJoins", label: "Входов до тревоги", type: "number", min: 2, max: 200 },
-      { key: "windowSeconds", label: "Окно, сек.", type: "number", min: 5, max: 300 },
+      { key: "windowSeconds", label: "Окно Anti-Raid, сек.", type: "number", min: 5, max: 300 },
+      { key: "maxDestructiveActions", label: "Destructive actions до тревоги", type: "number", min: 2, max: 100 },
+      { key: "destructiveWindowSeconds", label: "Окно destructive actions, сек.", type: "number", min: 5, max: 300 },
       { key: "quarantineRoleId", label: "Quarantine role", type: "role" },
       { key: "logChannelId", label: "Security log channel", type: "channel" }
     ],
