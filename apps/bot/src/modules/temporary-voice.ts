@@ -107,7 +107,14 @@ export class TemporaryVoice implements PlatformModule {
     if (existingId) {
       const existingChannel = newState.guild.channels.cache.get(existingId);
       if (existingChannel?.type === ChannelType.GuildVoice && member.voice.channelId === config.triggerChannelId) {
-        await member.voice.setChannel(existingChannel).catch(() => undefined);
+        await member.voice.setChannel(existingChannel).catch((error) => {
+          logger.warn("Temporary voice move to existing room failed", {
+            guildId: newState.guild.id,
+            userId: member.id,
+            channelId: existingId,
+            error: String(error)
+          });
+        });
       }
       return;
     }
@@ -234,7 +241,13 @@ export class TemporaryVoice implements PlatformModule {
         error: String(error)
       });
       this.rooms.delete(channel.id);
-      await channel.delete("Temporary voice setup failed").catch(() => undefined);
+      await channel.delete("Temporary voice setup failed").catch((deleteError) => {
+        logger.error("Temporary voice rollback channel delete failed", {
+          guildId: guild.id,
+          channelId: channel.id,
+          error: String(deleteError)
+        });
+      });
     }
   }
 
@@ -277,7 +290,14 @@ export class TemporaryVoice implements PlatformModule {
     const room = this.rooms.get(channel.id);
     if (!room) return;
 
-    await channel.permissionOverwrites.delete(oldOwnerId).catch(() => undefined);
+    await channel.permissionOverwrites.delete(oldOwnerId).catch((error) => {
+      logger.warn("Temporary voice old-owner permission cleanup failed", {
+        guildId: channel.guild.id,
+        channelId: channel.id,
+        ownerId: oldOwnerId,
+        error: String(error)
+      });
+    });
     await channel.permissionOverwrites.edit(newOwnerId, {
       ViewChannel: true,
       Connect: true,
@@ -318,7 +338,13 @@ export class TemporaryVoice implements PlatformModule {
     for (const channelId of ids) {
       const channel = guild?.channels.cache.get(channelId);
       if (channel?.type === ChannelType.GuildVoice && channel.members.size === 0) {
-        await channel.delete("Temporary voice module disabled").catch(() => undefined);
+        await channel.delete("Temporary voice module disabled").catch((error) => {
+          logger.warn("Temporary voice disabled cleanup failed", {
+            guildId,
+            channelId,
+            error: String(error)
+          });
+        });
       }
       await this.removeRoomRecord(channelId);
     }
