@@ -37,3 +37,12 @@ The general guild assignment remains the ownership boundary for the shared Platf
 - A secondary identity registers only the `/music` command and Music button interactions, then serves only voice channels assigned to that identity.
 - Dashboard Control Center exposes these assignments under Bot Fleet.
 - Assignment changes are audited and persisted in PostgreSQL.
+
+
+## Control plane and background workers
+
+The primary bot process remains the local control plane for guilds it can see in Discord, even when event ownership is assigned to a secondary identity. This keeps Dashboard administration available after a fleet assignment changes.
+
+Background workers use `guild_bot_assignments` as their ownership boundary. Reminders, Notifications, Giveaways and Automation schedule reloads only process guilds assigned to the current `BOT_IDENTITY_ID`, preventing duplicate delivery/finalization across processes.
+
+Music assignment is independent from the general guild assignment because one guild can use multiple bot identities simultaneously in different voice channels. The Music assignment table enforces one identity per voice channel and one voice channel per identity within a guild.
