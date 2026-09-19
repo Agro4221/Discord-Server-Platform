@@ -49,6 +49,9 @@ jobs:
       - name: Check observability contract
         run: node scripts/check-observability.mjs
 
+      - name: Check deployment contract
+        run: node scripts/check-deployment-contract.mjs
+
       - name: Typecheck bot
         run: npm run typecheck
 
