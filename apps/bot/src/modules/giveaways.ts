@@ -18,6 +18,97 @@ export class Giveaways implements PlatformModule {
 
   constructor(private readonly db: Database) {}
 
+  async list(guildId: string): Promise<Array<{
+    id: number;
+    channelId: string;
+    messageId: string | null;
+    hostUserId: string;
+    prize: string;
+    winners: number;
+    endsAt: string;
+    status: string;
+    selectedWinners: string[];
+    createdAt: string;
+    finishedAt: string | null;
+  }>> {
+    const result = await this.db.query<{
+      id: string;
+      channel_id: string;
+      message_id: string | null;
+      host_user_id: string;
+      prize: string;
+      winners: number;
+      ends_at: string;
+      status: string;
+      selected_winners: unknown;
+      created_at: string;
+      finished_at: string | null;
+    }>(
+      "SELECT id,channel_id,message_id,host_user_id,prize,winners,ends_at,status,selected_winners,created_at,finished_at FROM giveaways WHERE guild_id=$1 ORDER BY id DESC LIMIT 100",
+      [guildId]
+    );
+
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      channelId: row.channel_id,
+      messageId: row.message_id,
+      hostUserId: row.host_user_id,
+      prize: row.prize,
+      winners: row.winners,
+      endsAt: row.ends_at,
+      status: row.status,
+      selectedWinners: Array.isArray(row.selected_winners) ? row.selected_winners.filter((id): id is string => typeof id === "string") : [],
+      createdAt: row.created_at,
+      finishedAt: row.finished_at
+    }));
+  }
+
+  async endGiveaway(id: number, guildId: string): Promise<{ id: number; channelId: string; winners: string[] } | null> {
+    const result = await this.finish(id, guildId);
+    if (!result || !this.client) return result;
+
+    const channel = this.client.channels.cache.get(result.channelId);
+    if (channel?.isTextBased() && "send" in channel) {
+      const text = result.winners.length
+        ? "🎉 Giveaway #" + result.id + " завершён! Победители: " + result.winners.map((userId) => "<@" + userId + ">").join(", ")
+        : "Giveaway #" + result.id + " завершён. Участников не было.";
+      await channel.send(text).catch(() => undefined);
+    }
+
+    return result;
+  }
+
+  async rerollGiveaway(id: number, guildId: string): Promise<string[] | null> {
+    const claimed = await this.db.query<{ winners: number }>(
+      "UPDATE giveaways SET status='rerolling' WHERE id=$1 AND guild_id=$2 AND status='finished' RETURNING winners",
+      [id, guildId]
+    );
+    const row = claimed.rows[0];
+    if (!row) return null;
+
+    try {
+      const entries = await this.db.query<{ user_id: string }>(
+        "SELECT user_id FROM giveaway_entries WHERE giveaway_id=$1",
+        [id]
+      );
+      const pool = entries.rows.map((entry) => entry.user_id);
+      const winners: string[] = [];
+      while (pool.length && winners.length < row.winners) {
+        winners.push(pool.splice(randomInt(pool.length), 1)[0]!);
+      }
+
+      await this.db.query(
+        "UPDATE giveaways SET status='finished',selected_winners=$1::jsonb,finished_at=now() WHERE id=$2 AND status='rerolling'",
+        [JSON.stringify(winners), id]
+      );
+
+      return winners;
+    } catch (error) {
+      await this.db.query("UPDATE giveaways SET status='finished' WHERE id=$1 AND status='rerolling'", [id]);
+      throw error;
+    }
+  }
+
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
     this.unsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
@@ -47,7 +138,7 @@ export class Giveaways implements PlatformModule {
     const subcommand = interaction.options.getSubcommand();
     if (subcommand === "end") {
       const id = interaction.options.getInteger("id", true);
-      const result = await this.finish(id, interaction.guild!.id);
+      const result = await this.endGiveaway(id, interaction.guild!.id);
       const text = result
         ? (result.winners.length
           ? "🎉 Giveaway #" + id + " завершён. Победители: " + result.winners.map((userId) => "<@" + userId + ">").join(", ")
@@ -58,24 +149,11 @@ export class Giveaways implements PlatformModule {
     }
     if (subcommand === "reroll") {
       const id = interaction.options.getInteger("id", true);
-      const row = (await this.db.query<{ guild_id: string; winners: number; status: string }>(
-        "SELECT guild_id,winners,status FROM giveaways WHERE id=$1",[id]
-      )).rows[0];
-      if (!row || row.guild_id !== interaction.guild!.id || row.status !== "finished") {
-        await interaction.reply({ content: "Reroll доступен только для завершённого giveaway.", ephemeral: true });
-        return;
-      }
-      const entries = await this.db.query<{ user_id: string }>(
-        "SELECT user_id FROM giveaway_entries WHERE giveaway_id=$1",[id]
-      );
-      const pool = entries.rows.map((entry) => entry.user_id);
-      const winners: string[] = [];
-      while (pool.length && winners.length < row.winners) {
-        winners.push(pool.splice(randomInt(pool.length), 1)[0]!);
-      }
-      await this.db.query("UPDATE giveaways SET selected_winners=$1::jsonb,finished_at=now() WHERE id=$2",[JSON.stringify(winners),id]);
+      const winners = await this.rerollGiveaway(id, interaction.guild!.id);
       await interaction.reply({
-        content: winners.length ? "🔄 Reroll #" + id + ": " + winners.map((userId) => "<@" + userId + ">").join(", ") : "Нет участников для reroll.",
+        content: winners === null
+          ? "Reroll доступен только для завершённого giveaway."
+          : (winners.length ? "🔄 Reroll #" + id + ": " + winners.map((userId) => "<@" + userId + ">").join(", ") : "Нет участников для reroll."),
         ephemeral: true
       });
       return;
