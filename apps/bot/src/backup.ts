@@ -96,9 +96,10 @@ export class BackupService {
     );
 
     if (this.s3 && this.remote) {
-      let token: string | undefined;
-      do {
-        const response = await this.s3.send(new ListObjectsV2Command({
+      try {
+        let token: string | undefined;
+        do {
+          const response = await this.s3.send(new ListObjectsV2Command({
           Bucket: this.remote.bucket,
           Prefix: this.remotePrefix(guildId),
           ContinuationToken: token
@@ -109,8 +110,11 @@ export class BackupService {
           const name = object.Key.slice(prefixLength);
           if (/^guild-\d{17,20}-\d+\.json\.gz$/.test(name)) result.add(name);
         }
-        token = response.IsTruncated ? response.NextContinuationToken : undefined;
-      } while (token);
+          token = response.IsTruncated ? response.NextContinuationToken : undefined;
+        } while (token);
+      } catch (error) {
+        logger.warn("Remote backup listing failed; local backups retained", { error: String(error) });
+      }
     }
 
     return [...result].sort().reverse();
@@ -177,7 +181,12 @@ export class BackupService {
   }
 
   private async pruneGuildBackups(guildId: string): Promise<void> {
-    const backups = await this.listBackups(guildId);
+    const entries = await readdir(this.directory);
+    const backups = entries
+      .filter((entry) => /^guild-\\d{17,20}-\\d+\\.json\\.gz$/.test(entry))
+      .filter((entry) => entry.startsWith("guild-" + guildId + "-"))
+      .sort()
+      .reverse();
     for (const filename of backups.slice(this.retentionCount)) {
       await unlink(join(this.directory, filename)).catch(() => undefined);
       if (this.s3 && this.remote) {
@@ -229,6 +238,7 @@ async function gunzipBuffer(input: Buffer): Promise<Buffer> {
 function isNotFound(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   if ("name" in error && (error as { name?: unknown }).name === "NoSuchKey") return true;
+  if ("code" in error && (error as { code?: unknown }).code === "ENOENT") return true;
   if ("$metadata" in error) {
     return (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404;
   }
