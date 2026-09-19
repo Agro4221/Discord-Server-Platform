@@ -32,6 +32,12 @@ type ApiOptions = {
   analytics?: {
     report: (guildId: string, hours?: number) => Promise<unknown>;
   };
+  notifications?: {
+    list: (guildId: string) => Promise<unknown[]>;
+    create: (guildId: string, channelId: string, url: string, intervalSeconds: number) => Promise<unknown>;
+    update: (guildId: string, feedId: number, input: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean }) => Promise<boolean>;
+    delete: (guildId: string, feedId: number) => Promise<boolean>;
+  };
   automation?: {
     list: (guildId: string) => Promise<unknown[]>;
     create: (guildId: string, input: {
@@ -350,6 +356,88 @@ export class ManagementApiServer {
               targetId: String(giveawayId)
             });
             this.json(res, 200, { ok: true, result });
+            return;
+          }
+
+          const feedsMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds$/);
+          const feedItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds\/(\\d+)$/);
+
+          if ((feedsMatch || feedItemMatch) && !this.options.notifications) {
+            this.json(res, 500, { error: "notifications_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && feedsMatch) {
+            const guildId = feedsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, feeds: await this.options.notifications!.list(guildId) });
+            return;
+          }
+
+          if ((method === "POST" && feedsMatch) || (method === "PUT" && feedItemMatch)) {
+            const guildId = feedsMatch?.[1] ?? feedItemMatch?.[1] ?? "";
+            const feedId = feedItemMatch ? Number(feedItemMatch[2]) : null;
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || (feedId !== null && !Number.isSafeInteger(feedId))) {
+              this.json(res, 404, { error: "guild_or_feed_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+
+            if (feedId === null) {
+              if (typeof body.channelId !== "string" || !/^\\d{17,20}$/.test(body.channelId) ||
+                  typeof body.url !== "string" || body.url.length > 2000 ||
+                  typeof body.intervalSeconds !== "number" || !Number.isFinite(body.intervalSeconds)) {
+                throw new RequestInputError("invalid_feed", 400);
+              }
+              const channel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(body.channelId);
+              if (!channel || channel.type !== 0) throw new RequestInputError("text_channel_required", 400);
+              const result = await this.options.notifications!.create(guildId, body.channelId, body.url, Math.trunc(body.intervalSeconds));
+              await this.options.auditLog.record({ guildId, source: "dashboard", action: "feed.created", targetType: "feed", targetId: String((result as { id?: number })?.id ?? "unknown") });
+              this.json(res, 200, { ok: true, feed: result });
+              return;
+            }
+
+            const input: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean } = {};
+            if (body.channelId !== undefined) input.channelId = body.channelId;
+            if (body.url !== undefined) input.url = body.url;
+            if (body.intervalSeconds !== undefined) input.intervalSeconds = body.intervalSeconds;
+            if (body.enabled !== undefined) input.enabled = body.enabled;
+
+            if (input.channelId !== undefined) {
+              const channel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(input.channelId);
+              if (!channel || channel.type !== 0) throw new RequestInputError("text_channel_required", 400);
+            }
+            if (input.url !== undefined && (typeof input.url !== "string" || input.url.length > 2000)) throw new RequestInputError("invalid_feed_url", 400);
+            if (input.intervalSeconds !== undefined && (typeof input.intervalSeconds !== "number" || !Number.isFinite(input.intervalSeconds))) throw new RequestInputError("invalid_interval", 400);
+            if (input.enabled !== undefined && typeof input.enabled !== "boolean") throw new RequestInputError("invalid_enabled", 400);
+
+            const updated = await this.options.notifications!.update(guildId, feedId, input);
+            if (!updated) {
+              this.json(res, 404, { error: "feed_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({ guildId, source: "dashboard", action: "feed.updated", targetType: "feed", targetId: String(feedId) });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          if (method === "DELETE" && feedItemMatch) {
+            const guildId = feedItemMatch[1] ?? "";
+            const feedId = Number(feedItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(feedId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_feed_not_found" });
+              return;
+            }
+            const deleted = await this.options.notifications!.delete(guildId, feedId);
+            if (!deleted) {
+              this.json(res, 404, { error: "feed_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({ guildId, source: "dashboard", action: "feed.deleted", targetType: "feed", targetId: String(feedId) });
+            this.json(res, 200, { ok: true });
             return;
           }
 
