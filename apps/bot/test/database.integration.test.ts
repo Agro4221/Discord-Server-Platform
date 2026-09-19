@@ -188,3 +188,64 @@ test("config transfer and local backup round-trip preserve guild configuration",
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+
+test("background jobs are isolated by guild bot assignment", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const primaryGuild = "123456789012345690";
+  const secondaryGuild = "123456789012345691";
+  try {
+    await migrate(db);
+
+    await db.query("DELETE FROM reminders WHERE guild_id IN ($1,$2)", [primaryGuild, secondaryGuild]);
+    await db.query("DELETE FROM notification_feeds WHERE guild_id IN ($1,$2)", [primaryGuild, secondaryGuild]);
+    await db.query("DELETE FROM giveaways WHERE guild_id IN ($1,$2)", [primaryGuild, secondaryGuild]);
+    await db.query("DELETE FROM guild_bot_assignments WHERE guild_id IN ($1,$2)", [primaryGuild, secondaryGuild]);
+    await db.query("DELETE FROM bot_identities WHERE id IN ('worker-primary-test','worker-secondary-test')");
+
+    await db.query(
+      "INSERT INTO bot_identities(id,client_id,enabled) VALUES('worker-primary-test','123456789012345692',true),('worker-secondary-test','123456789012345693',true)"
+    );
+    await db.query(
+      "INSERT INTO guild_bot_assignments(guild_id,bot_identity_id) VALUES($1,'worker-primary-test'),($2,'worker-secondary-test')",
+      [primaryGuild, secondaryGuild]
+    );
+    await db.query(
+      "INSERT INTO reminders(guild_id,user_id,content,due_at) VALUES($1,'123456789012345694','primary',now()),($2,'123456789012345695','secondary',now())",
+      [primaryGuild, secondaryGuild]
+    );
+    await db.query(
+      "INSERT INTO notification_feeds(guild_id,channel_id,url,interval_seconds,enabled) VALUES($1,'123456789012345696','https://example.com/feed-primary',60,true),($2,'123456789012345697','https://example.com/feed-secondary',60,true)",
+      [primaryGuild, secondaryGuild]
+    );
+    await db.query(
+      "INSERT INTO giveaways(guild_id,channel_id,host_user_id,prize,winners,ends_at,status) VALUES($1,'123456789012345698','123456789012345699','primary',1,now(),'running'),($2,'123456789012345700','123456789012345701','secondary',1,now(),'running')",
+      [primaryGuild, secondaryGuild]
+    );
+
+    const reminderRows = await db.query<{ guild_id: string }>(
+      "SELECT r.guild_id FROM reminders r INNER JOIN guild_bot_assignments ga ON ga.guild_id=r.guild_id AND ga.bot_identity_id=$1 WHERE r.guild_id IN ($2,$3) ORDER BY r.guild_id",
+      ["worker-secondary-test", primaryGuild, secondaryGuild]
+    );
+    assert.deepEqual(reminderRows.rows.map((row) => row.guild_id), [secondaryGuild]);
+
+    const feedRows = await db.query<{ guild_id: string }>(
+      "SELECT nf.guild_id FROM notification_feeds nf INNER JOIN guild_bot_assignments ga ON ga.guild_id=nf.guild_id AND ga.bot_identity_id=$1 WHERE nf.guild_id IN ($2,$3) ORDER BY nf.guild_id",
+      ["worker-secondary-test", primaryGuild, secondaryGuild]
+    );
+    assert.deepEqual(feedRows.rows.map((row) => row.guild_id), [secondaryGuild]);
+
+    const giveawayRows = await db.query<{ guild_id: string }>(
+      "SELECT g.guild_id FROM giveaways g INNER JOIN guild_bot_assignments ga ON ga.guild_id=g.guild_id AND ga.bot_identity_id=$1 WHERE g.guild_id IN ($2,$3) ORDER BY g.guild_id",
+      ["worker-secondary-test", primaryGuild, secondaryGuild]
+    );
+    assert.deepEqual(giveawayRows.rows.map((row) => row.guild_id), [secondaryGuild]);
+  } finally {
+    await db.query("DELETE FROM reminders WHERE guild_id IN ($1,$2)", [primaryGuild, secondaryGuild]).catch(() => undefined);
+    await db.query("DELETE FROM notification_feeds WHERE guild_id IN ($1,$2)", [primaryGuild, secondaryGuild]).catch(() => undefined);
+    await db.query("DELETE FROM giveaways WHERE guild_id IN ($1,$2)", [primaryGuild, secondaryGuild]).catch(() => undefined);
+    await db.query("DELETE FROM guild_bot_assignments WHERE guild_id IN ($1,$2)", [primaryGuild, secondaryGuild]).catch(() => undefined);
+    await db.query("DELETE FROM bot_identities WHERE id IN ('worker-primary-test','worker-secondary-test')").catch(() => undefined);
+    await db.close();
+  }
+});
