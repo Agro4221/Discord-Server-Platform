@@ -816,28 +816,62 @@ function validateAutomationPayload(
   actions: unknown[]
 ): void {
   const supportedEvents = new Set([
-    "member.join","member.leave","message.create","voice.join","voice.leave","voice.move"
+    "member.join","member.leave","member.role.add","member.role.remove",
+    "message.create","message.delete","message.edit","reaction.add",
+    "voice.join","voice.leave","voice.move","moderation.case",
+    "ticket.create","ticket.close","giveaway.end","schedule"
   ]);
   if (!supportedEvents.has(event)) throw new RequestInputError("unsupported_automation_event", 400);
+
+  const guild = client.guilds.cache.get(guildId);
+  if (!guild) throw new RequestInputError("guild_not_found", 404);
+
+  const stringFields = new Set(["content","userId","channelId","messageId","guildId"]);
+  const numericFields = new Set(["memberCount","messageLength","mentionCount","previousLength","giveawayId","winnerCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"]);
 
   for (const condition of conditions) {
     if (!condition || typeof condition !== "object" || Array.isArray(condition)) {
       throw new RequestInputError("invalid_automation_condition", 400);
     }
     const item = condition as Record<string, unknown>;
-    if (item.type === "channel-is") {
-      if (typeof item.channelId !== "string") throw new RequestInputError("invalid_condition_channel", 400);
-      const channel = client.guilds.cache.get(guildId)?.channels.cache.get(item.channelId);
-      if (!channel || channel.type !== 0) throw new RequestInputError("invalid_condition_channel", 400);
-      continue;
-    }
-    if (item.type === "contains" || item.type === "equals") {
-      if (item.left !== "content" || typeof item.right !== "string" || item.right.length > 200) {
-        throw new RequestInputError("invalid_content_condition", 400);
+    switch (item.type) {
+      case "channel-is": {
+        if (typeof item.channelId !== "string" || !/^\\d{17,20}$/.test(item.channelId)) throw new RequestInputError("invalid_condition_channel", 400);
+        const channel = guild.channels.cache.get(item.channelId);
+        if (!channel || !channel.isTextBased()) throw new RequestInputError("invalid_condition_channel", 400);
+        break;
       }
-      continue;
+      case "contains":
+      case "equals":
+        if (typeof item.left !== "string" || !stringFields.has(item.left) || typeof item.right !== "string" || item.right.length > 200) {
+          throw new RequestInputError("invalid_content_condition", 400);
+        }
+        break;
+      case "matches":
+        if (typeof item.left !== "string" || !stringFields.has(item.left) || typeof item.pattern !== "string" || item.pattern.length > 120) {
+          throw new RequestInputError("invalid_regex_condition", 400);
+        }
+        try { new RegExp(item.pattern); } catch { throw new RequestInputError("invalid_regex_condition", 400); }
+        break;
+      case "number-gte":
+      case "number-lte":
+        if (typeof item.left !== "string" || !numericFields.has(item.left) || typeof item.right !== "number" || !Number.isFinite(item.right)) {
+          throw new RequestInputError("invalid_numeric_condition", 400);
+        }
+        break;
+      case "has-role":
+        if (typeof item.userId !== "string" || (!/^\\d{17,20}$/.test(item.userId)) ||
+            typeof item.roleId !== "string" || !/^\\d{17,20}$/.test(item.roleId) ||
+            !guild.roles.cache.has(item.roleId)) {
+          throw new RequestInputError("invalid_role_condition", 400);
+        }
+        break;
+      case "cooldown-clear":
+        if (typeof item.key !== "string" || !item.key.trim() || item.key.length > 100) throw new RequestInputError("invalid_cooldown_key", 400);
+        break;
+      default:
+        throw new RequestInputError("unsupported_automation_condition", 400);
     }
-    throw new RequestInputError("unsupported_automation_condition", 400);
   }
 
   for (const action of actions) {
@@ -845,21 +879,53 @@ function validateAutomationPayload(
       throw new RequestInputError("invalid_automation_action", 400);
     }
     const item = action as Record<string, unknown>;
-    if (item.type === "log") {
-      if (typeof item.message !== "string" || item.message.length > 1000) {
-        throw new RequestInputError("invalid_log_action", 400);
+    switch (item.type) {
+      case "log":
+        if (typeof item.message !== "string" || !item.message.length || item.message.length > 1000) throw new RequestInputError("invalid_log_action", 400);
+        break;
+      case "send-message": {
+        if (typeof item.channelId !== "string" || typeof item.content !== "string" || !item.content.length || item.content.length > 2000) {
+          throw new RequestInputError("invalid_send_message_action", 400);
+        }
+        const channel = guild.channels.cache.get(item.channelId);
+        if (!channel || channel.type !== 0) throw new RequestInputError("invalid_send_message_channel", 400);
+        break;
       }
-      continue;
-    }
-    if (item.type === "send-message") {
-      if (typeof item.channelId !== "string" || typeof item.content !== "string" || item.content.length > 2000) {
-        throw new RequestInputError("invalid_send_message_action", 400);
+      case "dm-user":
+        if (typeof item.userId !== "string" || (item.userId !== "@event" && !/^\\d{17,20}$/.test(item.userId)) ||
+            typeof item.content !== "string" || !item.content.length || item.content.length > 2000) {
+          throw new RequestInputError("invalid_dm_action", 400);
+        }
+        break;
+      case "add-role":
+      case "remove-role":
+        if (typeof item.userId !== "string" || (item.userId !== "@event" && !/^\\d{17,20}$/.test(item.userId)) ||
+            typeof item.roleId !== "string" || !/^\\d{17,20}$/.test(item.roleId) ||
+            !guild.roles.cache.get(item.roleId)) {
+          throw new RequestInputError("invalid_role_action", 400);
+        }
+        break;
+      case "timeout":
+        if (typeof item.userId !== "string" || (item.userId !== "@event" && !/^\\d{17,20}$/.test(item.userId)) ||
+            typeof item.durationSeconds !== "number" || !Number.isInteger(item.durationSeconds) || item.durationSeconds < 1 || item.durationSeconds > 2419200 ||
+            typeof item.reason !== "string" || !item.reason.length || item.reason.length > 500) {
+          throw new RequestInputError("invalid_timeout_action", 400);
+        }
+        break;
+      case "delete-message": {
+        if (typeof item.channelId !== "string" || (item.channelId !== "@event" && !/^\\d{17,20}$/.test(item.channelId)) ||
+            typeof item.messageId !== "string" || (item.messageId !== "@event" && !/^\\d{17,20}$/.test(item.messageId))) {
+          throw new RequestInputError("invalid_delete_message_action", 400);
+        }
+        if (item.channelId !== "@event") {
+          const channel = guild.channels.cache.get(item.channelId);
+          if (!channel || !channel.isTextBased()) throw new RequestInputError("invalid_delete_message_channel", 400);
+        }
+        break;
       }
-      const channel = client.guilds.cache.get(guildId)?.channels.cache.get(item.channelId);
-      if (!channel || channel.type !== 0) throw new RequestInputError("invalid_send_message_channel", 400);
-      continue;
+      default:
+        throw new RequestInputError("unsupported_automation_action", 400);
     }
-    throw new RequestInputError("unsupported_automation_action", 400);
   }
 }
 
