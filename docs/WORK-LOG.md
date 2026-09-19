@@ -29,3 +29,14 @@ At the end of substantial work, update this file with:
 - architecture decisions that changed
 
 Never write credentials, tokens or private user data here.
+## 2026-09-19 — Continuous build phase: Control Center completion pass
+- Branch HEAD: 1f55be443aa2736fb72d8d4431baff6d3a2e6095
+- Completed Dashboard admin layers for Role Panels, Giveaways, Analytics, Automation and backup management.
+- Added guild-scoped backup restore/delete and rejected cross-guild imports without explicit resource remapping.
+- Added persisted Lavalink session-resume restoration and fixed current lavalink-client API compatibility.
+- Added complete settings coverage for Verification, Leveling and Security destructive thresholds in config transfer.
+- Replaced the Security hierarchy demo action with a real bot-permission/role-hierarchy check.
+- Latest CI run #273 on this exact HEAD passed: dependency install, source hygiene, bot typecheck, bot tests, bot build and dashboard build.
+- Bot regression suite currently reports 10/10 passing tests.
+- Remaining engineering scope: AutoMod/Security depth, Music provider breadth + multi-node failover, multi-bot fleet orchestration/routing, remote backup retention, VPS install/upgrade tooling, and full live E2E/chaos/soak/security validation.
+- Do not declare release complete until those remaining areas are either implemented or explicitly accepted as known limitations and the broader release-gate tests are run.
