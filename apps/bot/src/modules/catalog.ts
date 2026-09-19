@@ -4,6 +4,7 @@ export type ModuleKey =
   | "security"
   | "temporary-voice"
   | "welcome"
+  | "verification"
   | "roles"
   | "leveling"
   | "tickets"
@@ -26,7 +27,8 @@ export const MODULE_CATALOG: readonly {
   { key: "automod", title: "AutoMod", description: "Automated content and anti-spam controls", defaultEnabled: false },
   { key: "security", title: "Security", description: "Anti-raid, lockdown and anti-nuke controls", defaultEnabled: false },
   { key: "temporary-voice", title: "Temporary Voice", description: "Temporary voice rooms", defaultEnabled: false },
-  { key: "welcome", title: "Welcome", description: "Welcome, goodbye and verification", defaultEnabled: false },
+  { key: "welcome", title: "Welcome", description: "Welcome and goodbye messages", defaultEnabled: false },
+  { key: "verification", title: "Verification", description: "Member verification and verified role", defaultEnabled: false },
   { key: "roles", title: "Roles", description: "Role panels and self-assignment", defaultEnabled: false },
   { key: "leveling", title: "Leveling", description: "XP, ranks and leaderboards", defaultEnabled: false },
   { key: "tickets", title: "Tickets", description: "Support tickets and transcripts", defaultEnabled: false },
