@@ -240,14 +240,16 @@ export class Security implements PlatformModule {
     targetType?: string,
     targetId?: string
   ): Promise<void> {
-    await this.auditLog?.record({
-      guildId,
-      source: "system",
-      action,
-      targetType: targetType ?? null,
-      targetId: targetId ?? null,
-      metadata
-    }).catch((error) => {
+    try {
+      await this.auditLog?.record({
+        guildId,
+        source: "system",
+        action,
+        targetType: targetType ?? null,
+        targetId: targetId ?? null,
+        metadata
+      });
+    } catch (error) {
       console.warn(JSON.stringify({
         ts: new Date().toISOString(),
         level: "WARN",
@@ -256,7 +258,7 @@ export class Security implements PlatformModule {
         action,
         error: String(error)
       }));
-    });
+    }
   }
 
   private async alert(guildId: string, config: SecurityConfig, message: string): Promise<void> {
