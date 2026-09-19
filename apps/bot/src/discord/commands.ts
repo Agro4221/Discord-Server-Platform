@@ -394,6 +394,8 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .setDescription("Configure anti-raid")
           .addIntegerOption((o) => o.setName("max-joins").setDescription("Joins in the window").setMinValue(2).setMaxValue(200).setRequired(true))
           .addIntegerOption((o) => o.setName("window").setDescription("Window in seconds").setMinValue(5).setMaxValue(300).setRequired(true))
+          .addIntegerOption((o) => o.setName("max-destructive").setDescription("Destructive actions before alert").setMinValue(2).setMaxValue(100))
+          .addIntegerOption((o) => o.setName("destructive-window").setDescription("Destructive action window in seconds").setMinValue(5).setMaxValue(300))
           .addRoleOption((o) => o.setName("quarantine-role").setDescription("Optional quarantine role"))
           .addChannelOption((o) => o.setName("log-channel").setDescription("Security log channel").addChannelTypes(ChannelType.GuildText))
       ),
