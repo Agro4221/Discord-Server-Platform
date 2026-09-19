@@ -294,6 +294,29 @@ export function buildCommands(): SlashCommandBuilder[] {
       ),
 
     new SlashCommandBuilder()
+      .setName("security")
+      .setDescription("Security / anti-raid")
+      .addSubcommand((sub) =>
+        sub
+          .setName("setup")
+          .setDescription("Configure anti-raid")
+          .addIntegerOption((o) => o.setName("max-joins").setDescription("Joins in the window").setMinValue(2).setMaxValue(200).setRequired(true))
+          .addIntegerOption((o) => o.setName("window").setDescription("Window in seconds").setMinValue(5).setMaxValue(300).setRequired(true))
+          .addRoleOption((o) => o.setName("quarantine-role").setDescription("Optional quarantine role"))
+          .addChannelOption((o) => o.setName("log-channel").setDescription("Security log channel").addChannelTypes(ChannelType.GuildText))
+      ),
+    new SlashCommandBuilder()
+      .setName("feed")
+      .setDescription("External notification feeds")
+      .addSubcommand((sub) =>
+        sub
+          .setName("add")
+          .setDescription("Add an RSS/Atom feed")
+          .addStringOption((o) => o.setName("url").setDescription("HTTPS feed URL").setMaxLength(2000).setRequired(true))
+          .addChannelOption((o) => o.setName("channel").setDescription("Destination channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
+          .addIntegerOption((o) => o.setName("minutes").setDescription("Polling interval").setMinValue(1).setMaxValue(1440))
+      ),
+    new SlashCommandBuilder()
       .setName("automation")
       .setDescription("Automation rules")
       .addSubcommand((sub) =>
