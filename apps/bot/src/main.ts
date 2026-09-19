@@ -5,7 +5,11 @@ import { HealthServer } from "./health.js";
 import { logger } from "./logger.js";
 import { ModuleRegistry } from "./module-registry.js";
 import { TemporaryVoice } from "./modules/temporary-voice.js";
+import { Moderation } from "./modules/moderation.js";
 import { createDiscordClient, registerCommands, wireDiscordEvents } from "./discord/bot.js";
+import { ConnectionSupervisor } from "./discord/connection-supervisor.js";
+import { ManagementApiServer } from "./management-api.js";
+import { ModuleSettingsRepository } from "./module-settings.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -22,36 +26,59 @@ async function main(): Promise<void> {
   } catch (error) {
     health.set({ database: "down", status: "degraded", lastError: "database startup failed" });
     logger.error("Database startup failed", { error: String(error) });
+    await health.stop().catch(() => undefined);
+    await database.close().catch(() => undefined);
     throw error;
   }
 
   const client = createDiscordClient();
   const temporaryVoice = new TemporaryVoice(database, () => client.guilds.cache.values());
+  const moderation = new Moderation(database);
 
   const modules = new ModuleRegistry();
   modules.register(temporaryVoice);
+  modules.register(moderation);
 
   for (const name of modules.list()) health.setModule(name, "starting");
 
-  wireDiscordEvents(client, database, temporaryVoice, (status) => {
-    health.set({ discord: status });
-    if (status === "ready") health.set({ status: "ready" });
-    else health.set({ status: "degraded" });
+  const supervisor = new ConnectionSupervisor(client, (status) => {
+    health.set({
+      discord: status,
+      status: status === "ready" ? "ready" : "degraded"
+    });
   });
+  supervisor.start();
 
-  await modules.initAll();
-  for (const name of modules.list()) health.setModule(name, "ready");
+  const moduleStatus = await modules.initAll();
+  for (const [name, status] of Object.entries(moduleStatus)) {
+    health.setModule(name, status);
+  }
 
+  const management = new ManagementApiServer({
+    host: config.managementApiHost,
+    port: config.managementApiPort,
+    apiKey: config.managementApiKey,
+    client,
+    moduleSettings
+  });
+  await management.start();
+
+  wireDiscordEvents(client, database, temporaryVoice, moderation);
   await registerCommands(config, client);
   await client.login(config.discordToken);
 
+  let shuttingDown = false;
   const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+
     logger.info("Shutdown requested", { signal });
+    supervisor.stop();
     await modules.shutdownAll();
     client.destroy();
-    await management.stop();
-    await database.close();
-    await health.stop();
+    await management.stop().catch(() => undefined);
+    await database.close().catch(() => undefined);
+    await health.stop().catch(() => undefined);
   };
 
   process.once("SIGINT", () => void shutdown("SIGINT"));
