@@ -14,10 +14,12 @@ export class Giveaways implements PlatformModule {
   readonly name = "giveaways";
   private unsubscribe?: () => void;
   private timer?: NodeJS.Timeout;
+  private client?: import("discord.js").Client;
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
+    this.client = context.client;
     this.unsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     this.timer = setInterval(() => void this.sweep(), 5_000);
     this.timer.unref();
@@ -28,6 +30,7 @@ export class Giveaways implements PlatformModule {
     this.unsubscribe = undefined;
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
+    this.client = undefined;
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -41,6 +44,42 @@ export class Giveaways implements PlatformModule {
       return;
     }
 
+    const subcommand = interaction.options.getSubcommand();
+    if (subcommand === "end") {
+      const id = interaction.options.getInteger("id", true);
+      const result = await this.finish(id, interaction.guild!.id);
+      const text = result
+        ? (result.winners.length
+          ? "🎉 Giveaway #" + id + " завершён. Победители: " + result.winners.map((userId) => "<@" + userId + ">").join(", ")
+          : "Giveaway #" + id + " завершён, но участников не было.")
+        : "Giveaway не найден или уже завершён.";
+      await interaction.reply({ content: text, ephemeral: true });
+      return;
+    }
+    if (subcommand === "reroll") {
+      const id = interaction.options.getInteger("id", true);
+      const row = (await this.db.query<{ guild_id: string; winners: number; status: string }>(
+        "SELECT guild_id,winners,status FROM giveaways WHERE id=$1",[id]
+      )).rows[0];
+      if (!row || row.guild_id !== interaction.guild!.id || row.status !== "finished") {
+        await interaction.reply({ content: "Reroll доступен только для завершённого giveaway.", ephemeral: true });
+        return;
+      }
+      const entries = await this.db.query<{ user_id: string }>(
+        "SELECT user_id FROM giveaway_entries WHERE giveaway_id=$1",[id]
+      );
+      const pool = entries.rows.map((entry) => entry.user_id);
+      const winners: string[] = [];
+      while (pool.length && winners.length < row.winners) {
+        winners.push(pool.splice(randomInt(pool.length), 1)[0]!);
+      }
+      await this.db.query("UPDATE giveaways SET selected_winners=$1::jsonb,finished_at=now() WHERE id=$2",[JSON.stringify(winners),id]);
+      await interaction.reply({
+        content: winners.length ? "🔄 Reroll #" + id + ": " + winners.map((userId) => "<@" + userId + ">").join(", ") : "Нет участников для reroll.",
+        ephemeral: true
+      });
+      return;
+    }
     const minutes = interaction.options.getInteger("minutes", true);
     const winners = interaction.options.getInteger("winners") ?? 1;
     const prize = interaction.options.getString("prize", true);
