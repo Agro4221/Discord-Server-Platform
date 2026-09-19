@@ -12,6 +12,22 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/discord_platform_test
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: discord_platform_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d discord_platform_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,6 +39,11 @@ jobs:
 
       - name: Check source hygiene
         run: node scripts/check-source-hygiene.mjs
+
+      - name: Validate deployment config
+        run: |
+          bash -n scripts/install-vps.sh scripts/upgrade.sh
+          docker compose config >/dev/null
 
       - name: Typecheck bot
         run: npm run typecheck
