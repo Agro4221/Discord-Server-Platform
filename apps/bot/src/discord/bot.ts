@@ -12,6 +12,7 @@ import { logger } from "../logger.js";
 import { buildCommands, handleCommand } from "./commands.js";
 import { TemporaryVoice } from "../modules/temporary-voice.js";
 import { Moderation } from "../modules/moderation.js";
+import type { PlatformEventBus } from "../events.js";
 
 export function createDiscordClient(): Client {
   return new Client({
@@ -47,39 +48,46 @@ export async function registerCommands(config: AppConfig, _client: Client): Prom
 
 export function wireDiscordEvents(
   client: Client,
-  db: Database,
-  temporaryVoice: TemporaryVoice,
-  moderation: Moderation
+  events: PlatformEventBus
 ): void {
-  client.once(Events.ClientReady, (readyClient) => {
-    temporaryVoice.markReady();
-    logger.info("Discord client ready", {
-      user: readyClient.user.tag,
-      guilds: readyClient.guilds.cache.size
-    });
-  });
-
-  client.on(Events.Warn, (message) => {
-    logger.warn("Discord warning", { message });
+  client.on(Events.InteractionCreate, (interaction) => {
+    if (interaction.isChatInputCommand()) {
+      void events.emit("interaction.command", interaction);
+    }
   });
 
   client.on(Events.VoiceStateUpdate, (oldState, newState) => {
-    void temporaryVoice.handleVoiceState(oldState, newState).catch((error) => {
-      logger.error("Temporary voice handler failed", {
-        guildId: newState.guild.id,
-        userId: newState.id,
-        error: String(error)
-      });
-    });
+    void events.emit("voice.state", { oldState, newState });
   });
 
-  client.on(Events.InteractionCreate, (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
-    void routeCommand(client, interaction, db, temporaryVoice, moderation);
+  client.on(Events.MessageCreate, (message) => {
+    void events.emit("message.create", message);
+  });
+
+  client.on(Events.MessageDelete, (message) => {
+    if (!message.partial) void events.emit("message.delete", message);
+  });
+
+  client.on(Events.MessageUpdate, (oldMessage, newMessage) => {
+    if (!oldMessage.partial && !newMessage.partial) {
+      void events.emit("message.update", { oldMessage, newMessage });
+    }
+  });
+
+  client.on(Events.GuildMemberAdd, (member) => {
+    void events.emit("member.add", member);
+  });
+
+  client.on(Events.GuildMemberRemove, (member) => {
+    void events.emit("member.remove", member);
+  });
+
+  client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
+    void events.emit("member.update", { oldMember, newMember });
   });
 }
 
-async function routeCommand(
+export async function routeCommand(
   client: Client,
   interaction: ChatInputCommandInteraction,
   db: Database,
