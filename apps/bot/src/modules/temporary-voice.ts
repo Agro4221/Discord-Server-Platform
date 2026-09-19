@@ -324,6 +324,18 @@ export class TemporaryVoice implements PlatformModule {
     }
   }
 
+  async reconcileGuild(guildId: string): Promise<void> {
+    if (!this.ready) return;
+    const guild = [...this.getGuilds()].find((candidate) => candidate.id === guildId);
+    if (!guild) return;
+
+    const staleIds = [...this.rooms.entries()]
+      .filter(([channelId, room]) => room.guildId === guildId && (!guild.channels.cache.get(channelId) || guild.channels.cache.get(channelId)?.type !== ChannelType.GuildVoice))
+      .map(([channelId]) => channelId);
+
+    for (const channelId of staleIds) await this.removeRoomRecord(channelId);
+  }
+
   async reconcile(): Promise<void> {
     if (!this.ready) return;
 
