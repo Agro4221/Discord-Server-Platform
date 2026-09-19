@@ -88,7 +88,8 @@ async function main(): Promise<void> {
     client,
     db: database,
     auditLog,
-    events
+    events,
+    identityId: config.botIdentityId
   });
 
   modules.register(temporaryVoice);
@@ -130,7 +131,10 @@ async function main(): Promise<void> {
     port: config.managementApiPort,
     apiKey: config.managementApiKey,
     client,
-    guildAccess: (guildId: string) => identities.ownsGuild(guildId),
+    guildAccess: (guildId: string) =>
+      config.botIdentityId === "primary"
+        ? client.guilds.cache.has(guildId)
+        : identities.ownsGuild(guildId),
     identities,
     moduleSettings,
     auditLog,
