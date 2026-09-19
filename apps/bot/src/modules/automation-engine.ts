@@ -109,6 +109,69 @@ export class AutomationEngine implements PlatformModule {
     await interaction.reply({ content: "Automation rule создано.", ephemeral: true });
   }
 
+  async listRules(guildId: string): Promise<AutomationRule[]> {
+    const result = await this.db.query<{
+      id: string;
+      guild_id: string;
+      name: string;
+      enabled: boolean;
+      event: AutomationEvent;
+      conditions: AutomationCondition[];
+      actions: AutomationAction[];
+      cooldown_seconds: number;
+    }>(
+      "SELECT id,guild_id,name,enabled,event,conditions,actions,cooldown_seconds FROM automation_rules WHERE guild_id=$1 ORDER BY id DESC",
+      [guildId]
+    );
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      guildId: row.guild_id,
+      name: row.name,
+      enabled: row.enabled,
+      all: row.conditions ?? [],
+      any: [],
+      event: row.event,
+      actions: row.actions ?? []
+    }));
+  }
+
+  async updateRule(
+    guildId: string,
+    ruleId: string,
+    input: { name: string; event: AutomationEvent; conditions: AutomationCondition[]; actions: AutomationAction[]; cooldownSeconds: number; enabled?: boolean }
+  ): Promise<boolean> {
+    validateAutomationRule(input.event, input.conditions, input.actions);
+    const result = await this.db.query(
+      `UPDATE automation_rules
+       SET name=$1,event=$2,conditions=$3::jsonb,actions=$4::jsonb,cooldown_seconds=$5,enabled=$6,updated_at=now()
+       WHERE id=$7 AND guild_id=$8`,
+      [
+        input.name.trim().slice(0,80) || "Automation rule",
+        input.event,
+        JSON.stringify(input.conditions),
+        JSON.stringify(input.actions),
+        Math.min(Math.max(Math.trunc(input.cooldownSeconds),0),86400),
+        input.enabled !== false,
+        ruleId,
+        guildId
+      ]
+    );
+    if (result.rowCount !== 1) return false;
+    await this.reload();
+    return true;
+  }
+
+  async deleteRule(guildId: string, ruleId: string): Promise<boolean> {
+    const result = await this.db.query(
+      "DELETE FROM automation_rules WHERE id=$1 AND guild_id=$2",
+      [ruleId,guildId]
+    );
+    if (result.rowCount !== 1) return false;
+    await this.reload();
+    return true;
+  }
+
   async reload(): Promise<void> {
     const result = await this.db.query<{
       id: string;
