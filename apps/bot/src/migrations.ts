@@ -399,6 +399,30 @@ const migrations = [
     sql: q([
       "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS autoplay boolean NOT NULL DEFAULT false;"
     ])
+  },
+  {
+    version: 21,
+    name: "notification_feed_processing_lease",
+    sql: q([
+      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS processing_until timestamptz;",
+      "CREATE INDEX IF NOT EXISTS idx_notification_feeds_processing ON notification_feeds(enabled,processing_until,last_polled_at);"
+    ])
+  },
+  {
+    version: 22,
+    name: "ticket_closing_recovery",
+    sql: q([
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS closing_at timestamptz;",
+      "CREATE INDEX IF NOT EXISTS idx_tickets_closing ON tickets(status,closing_at);"
+    ])
+  },
+  {
+    version: 23,
+    name: "giveaway_state_recovery",
+    sql: q([
+      "ALTER TABLE giveaways ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();",
+      "CREATE INDEX IF NOT EXISTS idx_giveaways_state_updated ON giveaways(status,updated_at);"
+    ])
   }
 ] as const;
 
