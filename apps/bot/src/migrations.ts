@@ -78,6 +78,56 @@ const migrations = [
         ON audit_events(action, created_at DESC);
     `
   }
+  },
+  {
+    version: 4,
+    name: "community_foundation",
+    sql: \`
+      CREATE TABLE IF NOT EXISTS automod_settings (
+        guild_id text PRIMARY KEY,
+        enabled boolean NOT NULL DEFAULT false,
+        blocked_words text[] NOT NULL DEFAULT '{}',
+        max_mentions integer NOT NULL DEFAULT 6,
+        max_caps_ratio real NOT NULL DEFAULT 0.85,
+        max_repeated_messages integer NOT NULL DEFAULT 5,
+        repeated_window_seconds integer NOT NULL DEFAULT 10,
+        delete_message boolean NOT NULL DEFAULT true,
+        timeout_minutes integer NOT NULL DEFAULT 0,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS automod_events (
+        id bigserial PRIMARY KEY,
+        guild_id text NOT NULL,
+        user_id text NOT NULL,
+        message_id text NOT NULL,
+        rule text NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_automod_events_guild_created
+        ON automod_events(guild_id, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS welcome_settings (
+        guild_id text PRIMARY KEY,
+        enabled boolean NOT NULL DEFAULT false,
+        channel_id text,
+        message text NOT NULL DEFAULT 'Добро пожаловать, {mention}, на {server}!',
+        dm boolean NOT NULL DEFAULT false,
+        embed boolean NOT NULL DEFAULT true,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS leveling_users (
+        guild_id text NOT NULL,
+        user_id text NOT NULL,
+        xp integer NOT NULL DEFAULT 0,
+        level integer NOT NULL DEFAULT 0,
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY(guild_id,user_id)
+      );
+    \`
+  }
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
