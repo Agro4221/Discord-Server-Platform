@@ -317,6 +317,27 @@ export function buildCommands(): SlashCommandBuilder[] {
           .addIntegerOption((o) => o.setName("minutes").setDescription("Polling interval").setMinValue(1).setMaxValue(1440))
       ),
     new SlashCommandBuilder()
+      .setName("music")
+      .setDescription("Music player")
+      .addSubcommand((sub) =>
+        sub
+          .setName("play")
+          .setDescription("Play a song or search YouTube")
+          .addStringOption((o) => o.setName("query").setDescription("Song, artist, URL or playlist").setMaxLength(2000).setRequired(true))
+      )
+      .addSubcommand((sub) => sub.setName("pause").setDescription("Pause playback"))
+      .addSubcommand((sub) => sub.setName("resume").setDescription("Resume playback"))
+      .addSubcommand((sub) => sub.setName("skip").setDescription("Skip current track"))
+      .addSubcommand((sub) => sub.setName("stop").setDescription("Stop and clear queue"))
+      .addSubcommand((sub) => sub.setName("queue").setDescription("Show queue"))
+      .addSubcommand((sub) => sub.setName("nowplaying").setDescription("Show current track"))
+      .addSubcommand((sub) =>
+        sub
+          .setName("volume")
+          .setDescription("Show/change volume")
+          .addIntegerOption((o) => o.setName("value").setDescription("0-200").setMinValue(0).setMaxValue(200))
+      ),
+    new SlashCommandBuilder()
       .setName("automation")
       .setDescription("Automation rules")
       .addSubcommand((sub) =>
