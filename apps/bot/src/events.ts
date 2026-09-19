@@ -7,6 +7,7 @@ import type {
   User,
   VoiceState
 } from "discord.js";
+import { logger } from "./logger.js";
 
 export type PlatformEventMap = {
   interaction: Interaction;
@@ -71,16 +72,11 @@ export class PlatformEventBus {
     for (let i = 0; i < settled.length; i += 1) {
       const result = settled[i];
       if (result?.status === "rejected") {
-        console.error(
-          JSON.stringify({
-            ts: new Date().toISOString(),
-            level: "ERROR",
-            message: "Platform event listener failed",
-            event,
-            listenerIndex: i,
-            error: String(result.reason)
-          })
-        );
+        logger.error("Platform event listener failed", {
+          event,
+          listenerIndex: i,
+          error: String(result.reason)
+        });
       }
     }
   }
