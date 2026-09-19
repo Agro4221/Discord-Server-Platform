@@ -35,7 +35,7 @@ jobs:
           node-version: 24.17.0
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Check source hygiene
         run: node scripts/check-source-hygiene.mjs
@@ -45,6 +45,9 @@ jobs:
           bash -n scripts/install-vps.sh scripts/upgrade.sh
           cp .env.example .env
           docker compose config >/dev/null
+
+      - name: Check observability contract
+        run: node scripts/check-observability.mjs
 
       - name: Typecheck bot
         run: npm run typecheck
