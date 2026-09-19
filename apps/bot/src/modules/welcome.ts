@@ -66,7 +66,7 @@ export class Welcome implements PlatformModule {
     await interaction.reply({ content: "Welcome настроен и включён.", ephemeral: true });
   }
 
-  async getConfig(guildId: string): Promise<WelcomeConfig>
+  async getConfig(guildId: string): Promise<WelcomeConfig> {
     const result = await this.db.query<{
       enabled: boolean;
       channel_id: string | null;
