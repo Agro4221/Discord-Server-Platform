@@ -20,8 +20,8 @@ export type AutomationCondition =
   | { type: "equals"; left: string; right: string }
   | { type: "contains"; left: string; right: string }
   | { type: "matches"; left: string; pattern: string }
-  | { type: "number-gte"; left: number; right: number }
-  | { type: "number-lte"; left: number; right: number }
+  | { type: "number-gte"; left: string; right: number }
+  | { type: "number-lte"; left: string; right: number }
   | { type: "has-role"; userId: string; roleId: string }
   | { type: "channel-is"; channelId: string }
   | { type: "cooldown-clear"; key: string };
