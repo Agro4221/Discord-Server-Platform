@@ -9,6 +9,7 @@ export type ModuleContext = {
   db: Database;
   auditLog: AuditLog;
   events: PlatformEventBus;
+  identityId: string;
 };
 
 export interface PlatformModule {
