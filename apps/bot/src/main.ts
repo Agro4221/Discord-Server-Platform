@@ -32,6 +32,8 @@ import { BotIdentityRepository } from "./bot-identity.js";
 import { ConfigTransferService } from "./config-transfer.js";
 import { BackupService } from "./backup.js";
 
+let fatalCleanup: (() => Promise<void>) | undefined;
+
 async function main(): Promise<void> {
   const config = loadConfig();
   const health = new HealthServer();
@@ -47,6 +49,10 @@ async function main(): Promise<void> {
     config.backupRetentionCount,
     config.backupS3
   );
+
+  let supervisor: ConnectionSupervisor | undefined;
+  let management: ManagementApiServer | undefined;
+  let fleetTimer: NodeJS.Timeout | undefined;
   await health.start(config.healthHost, config.healthPort);
 
   try {
@@ -114,7 +120,7 @@ async function main(): Promise<void> {
 
   for (const name of modules.list()) health.setModule(name, "starting");
 
-  const supervisor = new ConnectionSupervisor(client, (status) => {
+  supervisor = new ConnectionSupervisor(client, (status) => {
     health.set({
       discord: status,
       status: status === "ready" ? "ready" : "degraded"
@@ -128,7 +134,7 @@ async function main(): Promise<void> {
     health.setModule(name, status);
   }
 
-  const management = new ManagementApiServer({
+  management = new ManagementApiServer({
     host: config.managementApiHost,
     port: config.managementApiPort,
     apiKey: config.managementApiKey,
@@ -202,7 +208,7 @@ async function main(): Promise<void> {
   await identities.claimUnassignedGuilds([...client.guilds.cache.keys()]);
   await identities.refreshAssignments();
 
-  const fleetTimer = setInterval(() => {
+  fleetTimer = setInterval(() => {
     void identities.refreshAssignments()
       .then(() => identities.heartbeat("ready", client.guilds.cache.size))
       .catch((error) => logger.warn("Fleet heartbeat failed", { error: String(error) }));
@@ -215,20 +221,15 @@ async function main(): Promise<void> {
 
   await client.login(config.discordToken);
 
-  let shuttingDown = false;
-  const shutdown = async (signal: string) => {
-    if (shuttingDown) return;
-    shuttingDown = true;
-
-    logger.info("Shutdown requested", { signal });
-    supervisor.stop();
-    clearInterval(fleetTimer);
+  fatalCleanup = async () => {
+    supervisor?.stop();
+    if (fleetTimer) clearInterval(fleetTimer);
     await identities.heartbeat("stopped", client.guilds.cache.size).catch((error) => {
       logger.warn("Stopped fleet heartbeat failed", { identityId: config.botIdentityId, error: String(error) });
     });
     await modules.shutdownAll();
     client.destroy();
-    await management.stop().catch((error) => {
+    await management?.stop().catch((error) => {
       logger.warn("Management API shutdown failed", { error: String(error) });
     });
     await database.close().catch((error) => {
@@ -237,6 +238,16 @@ async function main(): Promise<void> {
     await health.stop().catch((error) => {
       logger.warn("Health server shutdown failed", { error: String(error) });
     });
+    fatalCleanup = undefined;
+  };
+
+  let shuttingDown = false;
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+
+    logger.info("Shutdown requested", { signal });
+    await fatalCleanup?.();
   };
 
   process.once("SIGINT", () => void shutdown("SIGINT"));
@@ -252,7 +263,12 @@ async function main(): Promise<void> {
   });
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   logger.error("Fatal startup error", { error: String(error) });
+  try {
+    await fatalCleanup?.();
+  } catch (cleanupError) {
+    logger.error("Fatal startup cleanup failed", { error: String(cleanupError) });
+  }
   process.exitCode = 1;
 });
