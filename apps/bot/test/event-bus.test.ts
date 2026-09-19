@@ -30,3 +30,16 @@ test("event bus isolates one rejected listener", async () => {
   await events.emit("member.add", { id: "member-1" } as never);
   assert.equal(healthy, true);
 });
+
+
+test("event bus extracts guild id from member ban events", async () => {
+  const bus = new PlatformEventBus();
+  const received: string[] = [];
+  bus.on("member.ban", (member) => {
+    received.push(member.guild.id);
+  });
+
+  const member = { guild: { id: "123456789012345777" } } as never;
+  await bus.emit("member.ban", member);
+  assert.deepEqual(received, ["123456789012345777"]);
+});
