@@ -49,7 +49,7 @@ const migrations = [
         module_key text NOT NULL,
         enabled boolean NOT NULL DEFAULT false,
         updated_at timestamptz NOT NULL DEFAULT now(),
-        PRIMARY KEY(guild_id, module_key)
+        PRIMARY KEY (guild_id, module_key)
       );
 
       CREATE INDEX IF NOT EXISTS idx_guild_modules_enabled
@@ -77,12 +77,11 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_audit_events_action_created
         ON audit_events(action, created_at DESC);
     `
-  }
   },
   {
     version: 4,
     name: "community_foundation",
-    sql: \`
+    sql: `
       CREATE TABLE IF NOT EXISTS automod_settings (
         guild_id text PRIMARY KEY,
         enabled boolean NOT NULL DEFAULT false,
@@ -121,18 +120,17 @@ const migrations = [
       CREATE TABLE IF NOT EXISTS leveling_users (
         guild_id text NOT NULL,
         user_id text NOT NULL,
-        xp integer NOT NULL DEFAULT 0,
-        level integer NOT NULL DEFAULT 0,
+        xp bigint NOT NULL DEFAULT 0 CHECK (xp >= 0),
+        level integer NOT NULL DEFAULT 0 CHECK (level >= 0),
         updated_at timestamptz NOT NULL DEFAULT now(),
-        PRIMARY KEY(guild_id,user_id)
+        PRIMARY KEY (guild_id, user_id)
       );
-    \`
-  }
+    `
   },
   {
     version: 5,
     name: "support_community",
-    sql: \`
+    sql: `
       CREATE TABLE IF NOT EXISTS ticket_settings (
         guild_id text PRIMARY KEY,
         enabled boolean NOT NULL DEFAULT false,
@@ -153,8 +151,12 @@ const migrations = [
         closed_at timestamptz
       );
 
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_open_ticket_per_creator
+        ON tickets(guild_id, creator_id)
+        WHERE status = 'open';
+
       CREATE INDEX IF NOT EXISTS idx_tickets_guild_status
-        ON tickets(guild_id,status);
+        ON tickets(guild_id, status);
 
       CREATE TABLE IF NOT EXISTS ticket_transcripts (
         ticket_id bigint PRIMARY KEY REFERENCES tickets(id) ON DELETE CASCADE,
@@ -192,13 +194,13 @@ const migrations = [
       );
 
       CREATE INDEX IF NOT EXISTS idx_giveaways_running
-        ON giveaways(status,ends_at);
+        ON giveaways(status, ends_at);
 
       CREATE TABLE IF NOT EXISTS giveaway_entries (
         giveaway_id bigint NOT NULL REFERENCES giveaways(id) ON DELETE CASCADE,
         user_id text NOT NULL,
         created_at timestamptz NOT NULL DEFAULT now(),
-        PRIMARY KEY(giveaway_id,user_id)
+        PRIMARY KEY (giveaway_id, user_id)
       );
 
       CREATE TABLE IF NOT EXISTS economy_accounts (
@@ -207,15 +209,14 @@ const migrations = [
         balance bigint NOT NULL DEFAULT 0 CHECK (balance >= 0),
         last_daily timestamptz,
         updated_at timestamptz NOT NULL DEFAULT now(),
-        PRIMARY KEY(guild_id,user_id)
+        PRIMARY KEY (guild_id, user_id)
       );
-    \`
-  }
+    `
   },
   {
     version: 6,
     name: "automation_and_utilities",
-    sql: \`
+    sql: `
       CREATE TABLE IF NOT EXISTS reminders (
         id bigserial PRIMARY KEY,
         guild_id text NOT NULL,
@@ -224,16 +225,20 @@ const migrations = [
         content text NOT NULL,
         due_at timestamptz NOT NULL,
         delivered_at timestamptz,
+        delivery_attempts integer NOT NULL DEFAULT 0,
+        last_error text,
         created_at timestamptz NOT NULL DEFAULT now()
       );
 
       CREATE INDEX IF NOT EXISTS idx_reminders_due
-        ON reminders(delivered_at,due_at);
+        ON reminders(delivered_at, due_at);
 
       CREATE TABLE IF NOT EXISTS starboard_settings (
         guild_id text PRIMARY KEY,
         channel_id text NOT NULL,
         threshold integer NOT NULL DEFAULT 3 CHECK (threshold > 0 AND threshold <= 100),
+        ignore_self_reaction boolean NOT NULL DEFAULT true,
+        ignore_bots boolean NOT NULL DEFAULT true,
         updated_at timestamptz NOT NULL DEFAULT now()
       );
 
@@ -242,7 +247,7 @@ const migrations = [
         source_message_id text NOT NULL,
         starboard_message_id text NOT NULL,
         created_at timestamptz NOT NULL DEFAULT now(),
-        PRIMARY KEY(guild_id,source_message_id)
+        PRIMARY KEY (guild_id, source_message_id)
       );
 
       CREATE TABLE IF NOT EXISTS automation_rules (
@@ -253,19 +258,19 @@ const migrations = [
         event text NOT NULL,
         conditions jsonb NOT NULL DEFAULT '[]'::jsonb,
         actions jsonb NOT NULL DEFAULT '[]'::jsonb,
+        cooldown_seconds integer NOT NULL DEFAULT 0,
         created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now()
       );
 
       CREATE INDEX IF NOT EXISTS idx_automation_rules_guild_enabled
-        ON automation_rules(guild_id,enabled);
-    \`
-  }
+        ON automation_rules(guild_id, enabled);
+    `
   },
   {
     version: 7,
     name: "security_notifications",
-    sql: \`
+    sql: `
       CREATE TABLE IF NOT EXISTS security_settings (
         guild_id text PRIMARY KEY,
         enabled boolean NOT NULL DEFAULT false,
@@ -285,7 +290,7 @@ const migrations = [
       );
 
       CREATE INDEX IF NOT EXISTS idx_security_events_guild_created
-        ON security_events(guild_id,created_at DESC);
+        ON security_events(guild_id, created_at DESC);
 
       CREATE TABLE IF NOT EXISTS notification_feeds (
         id bigserial PRIMARY KEY,
@@ -293,15 +298,15 @@ const migrations = [
         channel_id text NOT NULL,
         url text NOT NULL,
         enabled boolean NOT NULL DEFAULT true,
-        interval_seconds integer NOT NULL DEFAULT 300 CHECK(interval_seconds BETWEEN 60 AND 86400),
+        interval_seconds integer NOT NULL DEFAULT 300 CHECK (interval_seconds BETWEEN 60 AND 86400),
         last_item_key text,
         last_polled_at timestamptz,
         created_at timestamptz NOT NULL DEFAULT now()
       );
 
       CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_feed_guild_url
-        ON notification_feeds(guild_id,url);
-    \`
+        ON notification_feeds(guild_id, url);
+    `
   }
 ] as const;
 
