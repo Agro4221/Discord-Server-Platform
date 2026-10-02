@@ -1,0 +1,26 @@
+{
+  "name": "@dsp/bot",
+  "private": true,
+  "version": "0.0.0-dev",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test test/**/*.test.ts"
+  },
+  "dependencies": {
+    "@dsp/domain": "file:../../packages/domain",
+    "discord.js": "^14.27.0",
+    "pg": "^8.16.3",
+    "fast-xml-parser": "^5.11.1",
+    "lavalink-client": "^2.11.0",
+    "@aws-sdk/client-s3": "^3.1135.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/pg": "^8.15.5",
+    "tsx": "^4.20.5"
+  }
+}

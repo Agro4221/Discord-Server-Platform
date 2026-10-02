@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "development"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/discord_platform_test
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: discord_platform_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d discord_platform_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.17.0
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
+      - name: Check source hygiene
+        run: node scripts/check-source-hygiene.mjs
+
+      - name: Validate deployment config
+        run: |
+          bash -n scripts/install-vps.sh scripts/upgrade.sh
+          cp .env.example .env
+          docker compose config >/dev/null
+
+      - name: Check observability contract
+        run: node scripts/check-observability.mjs
+
+      - name: Check deployment contract
+        run: node scripts/check-deployment-contract.mjs
+
+      - name: Typecheck bot
+        run: npm run typecheck
+
+      - name: Test bot
+        run: npm test
+
+      - name: Build domain
+        run: npm run build:domain
+
+      - name: Build bot
+        run: npm run build:bot
+
+      - name: Build dashboard
+        run: npm run build -w apps/dashboard

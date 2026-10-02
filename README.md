@@ -1,0 +1,101 @@
+# Discord Server Platform
+
+Self-hosted Discord server platform for administration, moderation, community features, automation, temporary voice rooms, notifications and music.
+
+> Current state: release candidate for live validation. CI/typecheck/tests/builds cover the implemented feature set, but live Discord/VPS/Windows validation is still environment-dependent.
+
+## Implemented
+
+- Discord core with typed event bus and module lifecycle.
+- PostgreSQL persistence and versioned migrations.
+- Health/readiness endpoint and Gateway connection supervision.
+- Durable audit logging.
+- Protected local Management API.
+- Next.js Control Center with authenticated sessions, functional navigation, module settings, capability/function index, import/export and backup management.
+- Moderation with case history, warnings, timeout, kick, ban and unban.
+- Temporary Voice with ownership, idempotency and restart reconciliation.
+- AutoMod, Welcome, Verification and Leveling.
+- Tickets with modal intake, staff claim, close and transcript.
+- Role Panels with hierarchy/tamper checks and dashboard CRUD/publishing.
+- Giveaways with durable entries, scheduling, history, end/reroll operations and rollback handling.
+- Economy, Reminders and Starboard.
+- Automation engine with persisted rules/cooldowns and a constrained dashboard builder.
+- Security / Anti-Raid and destructive-burst detection.
+- Notifications with HTTPS feed validation and SSRF protections.
+- Analytics with durable minute buckets and dashboard reporting.
+- Music/Lavalink foundation with persistent queue state.
+- Multi-bot identity persistence and per-voice Music routing.
+- Config import/export and compressed local backups.
+- Docker Compose plus Dockerfiles for local-to-VPS topology.
+- Native Windows startup scripts for a low-overhead local runtime.
+
+## Still under development / needs live validation
+
+| Area | Status | What is missing |
+|---|---|---|
+| AutoMod | 🟡 | Richer rule editor and response policies |
+| Security | 🟡 | Full quarantine/response workflow |
+| Automation | 🟡 | Wider condition/action catalog |
+| Music | 🟡 | More providers and multi-node failover validation |
+| Multi-bot fleet | 🟡 | Full automated orchestration/failover |
+| E2E / chaos / soak | 🟡 | Full live and long-running validation |
+| VPS deployment | 🟡 | Clean-host installer/reverse-proxy acceptance drill |
+| Windows UX | 🟡 | Real launcher/browser behavior validation |
+| Live Discord integrations | 🟡 | Requires user-owned Discord test environment |
+
+## Architecture
+
+~~~text
+apps/
+├── bot
+├── dashboard
+└── worker
+
+packages/
+├── domain
+└── ...
+
+infrastructure/
+└── docker
+
+docs/
+└── architecture, setup, operations and test strategy
+~~~
+
+The detailed design is documented in docs/MASTER-PLAN.md, docs/IMPLEMENTATION-ORDER.md, docs/QUALITY-BAR.md and docs/TEST-STRATEGY.md.
+
+## Security
+
+Real credentials belong only in .env or another secret store.
+
+Never commit:
+
+- Discord bot tokens;
+- OAuth client secrets;
+- database passwords;
+- provider API keys;
+- dashboard passwords/session secrets;
+- backup credentials;
+- runtime databases or user data.
+
+The repository includes an automated source-hygiene check for obvious credential patterns.
+
+## Verification
+
+The project uses GitHub Actions for dependency installation/audit, source/deployment/observability checks, bot typecheck/tests/build, domain build and dashboard build.
+
+Automated verification is not a substitute for a live Discord server, real provider credentials or a clean-host VPS/Windows acceptance test.
+
+## Local deployment
+
+The primary local workflow is the Windows launcher:
+
+~~~powershell
+scripts/start-local.ps1
+~~~
+
+Docker Compose is the main service topology. See docs/LOCAL-SETUP.md and docs/ADMIN-GUIDE.md.
+
+## Public snapshot
+
+This repository is prepared as an engineering project, with secrets, runtime state and historical private repository history removed from the public Git graph. The code and documentation intentionally distinguish implemented behavior from planned or environment-dependent functionality.

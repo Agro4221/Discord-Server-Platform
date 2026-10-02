@@ -1,0 +1,14 @@
+# Public Dashboard reverse proxy.
+# Keep bot health (3001) and Management API (3002) private.
+
+{$DOMAIN} {
+  encode gzip
+  reverse_proxy 127.0.0.1:3000
+
+  header {
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    Referrer-Policy strict-origin-when-cross-origin
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  }
+}
