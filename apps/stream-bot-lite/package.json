@@ -1,0 +1,29 @@
+{
+  "name": "agro-discord-stream-bot-lite",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Small standalone Discord bot: music, temporary voice rooms, and stream announcements.",
+  "type": "module",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@discordjs/voice": "^0.19.2",
+    "better-sqlite3": "^13.0.3",
+    "discord.js": "^14.27.0",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "ffmpeg-static": "^5.3.0",
+    "opusscript": "^0.1.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
