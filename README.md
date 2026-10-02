@@ -1,101 +1,143 @@
 # Discord Server Platform
 
-Self-hosted Discord server platform for administration, moderation, community features, automation, temporary voice rooms, notifications and music.
+> **RU:** Самостоятельно размещаемая платформа для управления Discord-серверами: модерация, временные голосовые комнаты, автоматизация, сообщество, музыка, уведомления и административная панель.
+>
+> **EN:** A self-hosted Discord server platform for moderation, temporary voice rooms, automation, community features, music, notifications and centralized administration.
 
-> Current state: release candidate for live validation. CI/typecheck/tests/builds cover the implemented feature set, but live Discord/VPS/Windows validation is still environment-dependent.
+> **🚧 Status / Статус:** Release Candidate / кандидат в релиз для live-проверки. Автоматические проверки покрывают реализованную часть, но реальный Discord-сервер, Windows и VPS ещё требуют окруженческой валидации.
 
-## Implemented
+## 🗺️ Platform overview / Общая схема
 
-- Discord core with typed event bus and module lifecycle.
-- PostgreSQL persistence and versioned migrations.
-- Health/readiness endpoint and Gateway connection supervision.
-- Durable audit logging.
-- Protected local Management API.
-- Next.js Control Center with authenticated sessions, functional navigation, module settings, capability/function index, import/export and backup management.
-- Moderation with case history, warnings, timeout, kick, ban and unban.
-- Temporary Voice with ownership, idempotency and restart reconciliation.
-- AutoMod, Welcome, Verification and Leveling.
-- Tickets with modal intake, staff claim, close and transcript.
-- Role Panels with hierarchy/tamper checks and dashboard CRUD/publishing.
-- Giveaways with durable entries, scheduling, history, end/reroll operations and rollback handling.
-- Economy, Reminders and Starboard.
-- Automation engine with persisted rules/cooldowns and a constrained dashboard builder.
-- Security / Anti-Raid and destructive-burst detection.
-- Notifications with HTTPS feed validation and SSRF protections.
-- Analytics with durable minute buckets and dashboard reporting.
-- Music/Lavalink foundation with persistent queue state.
-- Multi-bot identity persistence and per-voice Music routing.
-- Config import/export and compressed local backups.
-- Docker Compose plus Dockerfiles for local-to-VPS topology.
-- Native Windows startup scripts for a low-overhead local runtime.
+~~~mermaid
+flowchart TB
+    U["Admin / User"] --> D["Next.js Control Center"]
+    D --> API["Protected Management API"]
+    API --> C["Discord Core"]
 
-## Still under development / needs live validation
+    C --> MOD["Moderation"]
+    C --> TV["Temporary Voice"]
+    C --> AUTO["Automation"]
+    C --> COM["Community"]
+    C --> TICK["Tickets"]
+    C --> MUSIC["Music / Lavalink"]
+    C --> NOTIFY["Notifications"]
+    C --> SEC["Security / Anti-Raid"]
 
-| Area | Status | What is missing |
-|---|---|---|
-| AutoMod | 🟡 | Richer rule editor and response policies |
-| Security | 🟡 | Full quarantine/response workflow |
-| Automation | 🟡 | Wider condition/action catalog |
-| Music | 🟡 | More providers and multi-node failover validation |
-| Multi-bot fleet | 🟡 | Full automated orchestration/failover |
-| E2E / chaos / soak | 🟡 | Full live and long-running validation |
-| VPS deployment | 🟡 | Clean-host installer/reverse-proxy acceptance drill |
-| Windows UX | 🟡 | Real launcher/browser behavior validation |
-| Live Discord integrations | 🟡 | Requires user-owned Discord test environment |
-
-## Architecture
-
-~~~text
-apps/
-├── bot
-├── dashboard
-└── worker
-
-packages/
-├── domain
-└── ...
-
-infrastructure/
-└── docker
-
-docs/
-└── architecture, setup, operations and test strategy
+    C --> BUS["Event Bus + Module Registry"]
+    C --> DB["PostgreSQL"]
+    C --> AUD["Audit Log"]
+    W["Background Workers"] --> DB
 ~~~
 
-The detailed design is documented in docs/MASTER-PLAN.md, docs/IMPLEMENTATION-ORDER.md, docs/QUALITY-BAR.md and docs/TEST-STRATEGY.md.
+## 🏗️ Architecture / Архитектура
 
-## Security
+~~~mermaid
+graph LR
+    BOT["apps/bot"] --> DOMAIN["packages/domain"]
+    DASH["apps/dashboard"] --> API["Management API"]
+    API --> BOT
+    WORK["apps/worker"] --> BOT
+    BOT --> PG["PostgreSQL"]
+    BOT --> DC["Discord Gateway / REST"]
+    BOT --> LV["Lavalink"]
+    INF["infrastructure/docker"] --> BOT
+    DOC["docs"] -. design .-> BOT
+~~~
 
-Real credentials belong only in .env or another secret store.
+## ✅ Implemented / Реализовано
 
-Never commit:
+| Area / Область | State | Details / Детали |
+|---|---|---|
+| Discord Core | ✅ | Event bus, lifecycle, health and supervision |
+| PostgreSQL | ✅ | Durable state + versioned migrations |
+| Control Center | ✅ | Authenticated dashboard and functional navigation |
+| Moderation | ✅ | Cases, warnings, timeout, kick, ban, unban |
+| Temporary Voice | ✅ | Ownership, idempotency and reconciliation |
+| Tickets | ✅ | Intake, claim, close and transcript |
+| Role Panels | ✅ | CRUD, hierarchy checks and publishing |
+| Giveaways | ✅ | Durable entries, scheduling, finish/reroll |
+| Economy | ✅ | Economy, shop and transaction ledger |
+| Reminders | ✅ | Retry/lease semantics |
+| Starboard | ✅ | Durable publishing |
+| Notifications | ✅ | HTTPS validation and SSRF protections |
+| Analytics | ✅ | Persistent metrics and dashboard reporting |
+| Backups | ✅ | Local compressed backups and scoped restore |
+| Docker topology | ✅ | Local-to-VPS architecture |
+| Native Windows runtime | ✅ | Low-overhead launcher |
 
-- Discord bot tokens;
-- OAuth client secrets;
-- database passwords;
-- provider API keys;
-- dashboard passwords/session secrets;
-- backup credentials;
-- runtime databases or user data.
+## 🟡 In progress / В работе
 
-The repository includes an automated source-hygiene check for obvious credential patterns.
+| Area / Область | State | Remaining work / Осталось |
+|---|---|---|
+| AutoMod | 🟡 | Richer editor and response policies |
+| Security | 🟡 | Full response/quarantine workflow |
+| Automation | 🟡 | Wider condition/action catalog |
+| Music | 🟡 | More providers and failover validation |
+| Multi-bot fleet | 🟡 | Full orchestration/failover |
+| E2E / chaos / soak | 🟡 | Full live and long-running tests |
+| VPS | 🟡 | Clean-host acceptance drill |
+| Windows UX | 🟡 | Real desktop validation |
 
-## Verification
+## 🔄 Typical request / Типичный поток
 
-The project uses GitHub Actions for dependency installation/audit, source/deployment/observability checks, bot typecheck/tests/build, domain build and dashboard build.
+~~~mermaid
+sequenceDiagram
+    participant U as User
+    participant D as Dashboard
+    participant A as Management API
+    participant C as Discord Core
+    participant DB as PostgreSQL
+    participant G as Discord
 
-Automated verification is not a substitute for a live Discord server, real provider credentials or a clean-host VPS/Windows acceptance test.
+    U->>D: Action / настройка
+    D->>A: Authenticated request
+    A->>C: Validate + execute
+    C->>DB: Persist + audit
+    C->>G: Discord API
+    G-->>C: Result
+    C-->>D: Status
+    D-->>U: Result + diagnostics
+~~~
 
-## Local deployment
+## 🧪 Verification / Проверка
 
-The primary local workflow is the Windows launcher:
+~~~mermaid
+flowchart LR
+    SRC["Source"] --> H["Hygiene checks"]
+    H --> T["Typecheck"]
+    T --> UT["Unit / regression tests"]
+    UT --> B["Builds"]
+    B --> LIVE["Live Discord"]
+    LIVE --> CHAOS["E2E / chaos / soak"]
+~~~
+
+GitHub Actions covers the automated stages. Live Discord credentials and clean-host Windows/VPS testing remain external validation steps.
+
+## 🧑‍💻 About the author / Об авторе
+
+**RU:** Я пока новичок в разработке и учусь прямо на этом проекте. Здесь я осваиваю TypeScript, Node.js, Discord API, PostgreSQL, веб-разработку, архитектуру больших приложений, тестирование и деплой. Поэтому проект для меня одновременно рабочая система, эксперимент и учебная площадка.
+
+**EN:** I am still a beginner developer and I am learning by building this project. It is my practical playground for TypeScript, Node.js, the Discord API, PostgreSQL, web development, larger application architecture, testing and deployment.
+
+## 📚 Documentation / Документация
+
+- docs/MASTER-PLAN.md — architecture / архитектура
+- docs/PROJECT-STATE.md — current state / состояние
+- docs/ADMIN-GUIDE.md — administration / администрирование
+- docs/LOCAL-SETUP.md — local setup / локальный запуск
+- docs/TEST-STRATEGY.md — testing / стратегия тестирования
+- docs/TEST-MATRIX.md — verification matrix / матрица проверок
+
+## 🚀 Local deployment / Локальный запуск
 
 ~~~powershell
 scripts/start-local.ps1
 ~~~
 
-Docker Compose is the main service topology. See docs/LOCAL-SETUP.md and docs/ADMIN-GUIDE.md.
+Docker Compose is the main service topology; native Windows mode is intended for low-overhead local use.
 
-## Public snapshot
+---
 
-This repository is prepared as an engineering project, with secrets, runtime state and historical private repository history removed from the public Git graph. The code and documentation intentionally distinguish implemented behavior from planned or environment-dependent functionality.
+**RU:** README намеренно показывает не только готовую функциональность, но и границы текущей реализации.
+
+**EN:** The README intentionally documents both implemented functionality and the current limits of the project.
