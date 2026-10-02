@@ -1,84 +1,125 @@
-# Discord Server Platform
+# 🤖 Discord Server Platform
 
-> **RU:** Самостоятельно размещаемая платформа для управления Discord-серверами: модерация, временные голосовые комнаты, автоматизация, сообщество, музыка, уведомления и административная панель.
+> Самостоятельно размещаемая платформа для управления Discord-серверами: модерация, временные голосовые комнаты, автоматизация, тикеты, роли, розыгрыши, экономика, уведомления, музыка и единый Control Center.
 >
-> **EN:** A self-hosted Discord server platform for moderation, temporary voice rooms, automation, community features, music, notifications and centralized administration.
+> Идея проекта — собрать не набор разрозненных Discord-команд, а **модульную серверную платформу**, которую можно запускать локально на Windows или разворачивать в Docker/VPS-сценарии.
 
-> **🚧 Status / Статус:** Release Candidate / кандидат в релиз для live-проверки. Автоматические проверки покрывают реализованную часть, но реальный Discord-сервер, Windows и VPS ещё требуют окруженческой валидации.
+![TypeScript](https://img.shields.io/badge/TypeScript-Node.js-3178C6?logo=typescript&logoColor=white)
+![Discord](https://img.shields.io/badge/Discord-API-5865F2?logo=discord&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-Control%20Center-000000?logo=next.js&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-supported-2496ED?logo=docker&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-native-0078D6?logo=windows&logoColor=white)
 
-## 🗺️ Platform overview / Общая схема
+> 🚧 **Статус:** **Release Candidate / Кандидат в релиз для live-проверки**
+>
+> Основная серверная часть, Control Center, база данных, модули и CI-проверки уже собраны. При этом полноценная live-проверка Discord, длительные тесты, clean-host Windows/VPS и часть advanced-сценариев ещё требуют отдельной валидации.
+
+## ✨ Что уже есть
+
+| Возможность | Статус |
+|---|---|
+| 🤖 Discord Core | ✅ |
+| 🗄️ PostgreSQL + migrations | ✅ |
+| 🖥️ Next.js Control Center | ✅ |
+| 🛡️ Moderation cases | ✅ |
+| 🔊 Temporary Voice | ✅ |
+| 🎫 Tickets + transcripts | ✅ |
+| 🎭 Role Panels | ✅ |
+| 🎁 Giveaways | ✅ |
+| 💰 Economy + shop + ledger | ✅ |
+| ⏰ Reminders | ✅ |
+| ⭐ Starboard | ✅ |
+| 🔔 Notifications | ✅ |
+| 📊 Analytics | ✅ |
+| 💾 Backups / restore | ✅ |
+| 🐳 Docker topology | ✅ |
+| 🪟 Native Windows runtime | ✅ |
+
+## 🟡 Что ещё развивается
+
+| Компонент | Статус | Что осталось |
+|---|---|---|
+| AutoMod | 🟡 | Более гибкий editor и policy workflow |
+| Security / Anti-Raid | 🟡 | Полный response / quarantine workflow |
+| Automation | 🟡 | Более широкий набор условий и действий |
+| Music / Lavalink | 🟡 | Дополнительные providers и failover validation |
+| Multi-bot fleet | 🟡 | Полная оркестрация и failover |
+| E2E / chaos / soak | 🟡 | Полный live и long-running цикл |
+| VPS | 🟡 | Clean-host acceptance |
+| Windows UX | 🟡 | Реальная desktop-валидация |
+
+## 🏗️ Архитектура
+
+~~~text
+              ┌────────────────────────────┐
+              │     Next.js Control Center │
+              └─────────────┬──────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────┐
+              │  Protected Management API  │
+              └─────────────┬──────────────┘
+                            │
+                            ▼
+              ┌────────────────────────────┐
+              │        Discord Core        │
+              └─────┬───────┬───────┬──────┘
+                    │       │       │
+              ┌─────▼─┐ ┌───▼───┐ ┌─▼─────────┐
+              │Modules│ │Event  │ │Background │
+              │       │ │Bus    │ │Workers    │
+              └─────┬─┘ └───┬───┘ └────┬──────┘
+                    │       │          │
+                    └───────┴────┬─────┘
+                                 ▼
+                         ┌──────────────┐
+                         │  PostgreSQL  │
+                         └──────────────┘
+~~~
+
+## 🧩 Platform overview
 
 ~~~mermaid
 flowchart TB
-    U["Admin / User"] --> D["Next.js Control Center"]
-    D --> API["Protected Management API"]
-    API --> C["Discord Core"]
+    ADMIN["Admin / User"] --> DASH["Next.js Control Center"]
+    DASH --> API["Protected Management API"]
+    API --> CORE["Discord Core"]
 
-    C --> MOD["Moderation"]
-    C --> TV["Temporary Voice"]
-    C --> AUTO["Automation"]
-    C --> COM["Community"]
-    C --> TICK["Tickets"]
-    C --> MUSIC["Music / Lavalink"]
-    C --> NOTIFY["Notifications"]
-    C --> SEC["Security / Anti-Raid"]
+    CORE --> MOD["Moderation"]
+    CORE --> VOICE["Temporary Voice"]
+    CORE --> AUTO["Automation"]
+    CORE --> COMMUNITY["Community"]
+    CORE --> TICKETS["Tickets"]
+    CORE --> MUSIC["Music / Lavalink"]
+    CORE --> NOTIFY["Notifications"]
+    CORE --> SECURITY["Security / Anti-Raid"]
 
-    C --> BUS["Event Bus + Module Registry"]
-    C --> DB["PostgreSQL"]
-    C --> AUD["Audit Log"]
-    W["Background Workers"] --> DB
+    CORE --> REG["Module Registry + Event Bus"]
+    CORE --> DB["PostgreSQL"]
+    CORE --> AUDIT["Audit Log"]
+    WORKERS["Background Workers"] --> DB
 ~~~
 
-## 🏗️ Architecture / Архитектура
+## 📦 Repository structure
 
-~~~mermaid
-graph LR
-    BOT["apps/bot"] --> DOMAIN["packages/domain"]
-    DASH["apps/dashboard"] --> API["Management API"]
-    API --> BOT
-    WORK["apps/worker"] --> BOT
-    BOT --> PG["PostgreSQL"]
-    BOT --> DC["Discord Gateway / REST"]
-    BOT --> LV["Lavalink"]
-    INF["infrastructure/docker"] --> BOT
-    DOC["docs"] -. design .-> BOT
+~~~text
+apps/
+├─ bot/              # Discord runtime
+├─ dashboard/        # Next.js Control Center
+└─ worker/           # background jobs
+
+packages/
+└─ domain/           # shared domain logic
+
+infrastructure/
+└─ docker/           # container topology
+
+docs/
+└─ ...               # architecture, setup and testing docs
 ~~~
 
-## ✅ Implemented / Реализовано
-
-| Area / Область | State | Details / Детали |
-|---|---|---|
-| Discord Core | ✅ | Event bus, lifecycle, health and supervision |
-| PostgreSQL | ✅ | Durable state + versioned migrations |
-| Control Center | ✅ | Authenticated dashboard and functional navigation |
-| Moderation | ✅ | Cases, warnings, timeout, kick, ban, unban |
-| Temporary Voice | ✅ | Ownership, idempotency and reconciliation |
-| Tickets | ✅ | Intake, claim, close and transcript |
-| Role Panels | ✅ | CRUD, hierarchy checks and publishing |
-| Giveaways | ✅ | Durable entries, scheduling, finish/reroll |
-| Economy | ✅ | Economy, shop and transaction ledger |
-| Reminders | ✅ | Retry/lease semantics |
-| Starboard | ✅ | Durable publishing |
-| Notifications | ✅ | HTTPS validation and SSRF protections |
-| Analytics | ✅ | Persistent metrics and dashboard reporting |
-| Backups | ✅ | Local compressed backups and scoped restore |
-| Docker topology | ✅ | Local-to-VPS architecture |
-| Native Windows runtime | ✅ | Low-overhead launcher |
-
-## 🟡 In progress / В работе
-
-| Area / Область | State | Remaining work / Осталось |
-|---|---|---|
-| AutoMod | 🟡 | Richer editor and response policies |
-| Security | 🟡 | Full response/quarantine workflow |
-| Automation | 🟡 | Wider condition/action catalog |
-| Music | 🟡 | More providers and failover validation |
-| Multi-bot fleet | 🟡 | Full orchestration/failover |
-| E2E / chaos / soak | 🟡 | Full live and long-running tests |
-| VPS | 🟡 | Clean-host acceptance drill |
-| Windows UX | 🟡 | Real desktop validation |
-
-## 🔄 Typical request / Типичный поток
+## 🔄 Типичный сценарий
 
 ~~~mermaid
 sequenceDiagram
@@ -89,7 +130,7 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant G as Discord
 
-    U->>D: Action / настройка
+    U->>D: Изменение настройки
     D->>A: Authenticated request
     A->>C: Validate + execute
     C->>DB: Persist + audit
@@ -99,45 +140,95 @@ sequenceDiagram
     D-->>U: Result + diagnostics
 ~~~
 
-## 🧪 Verification / Проверка
+## 🛠️ Основные подсистемы
 
-~~~mermaid
-flowchart LR
-    SRC["Source"] --> H["Hygiene checks"]
-    H --> T["Typecheck"]
-    T --> UT["Unit / regression tests"]
-    UT --> B["Builds"]
-    B --> LIVE["Live Discord"]
-    LIVE --> CHAOS["E2E / chaos / soak"]
-~~~
+**Moderation** — кейсы, предупреждения, timeout, kick, ban, unban и история.
 
-GitHub Actions covers the automated stages. Live Discord credentials and clean-host Windows/VPS testing remain external validation steps.
+**Temporary Voice** — временные голосовые комнаты с ownership/idempotency и reconciliation.
 
-## 🧑‍💻 About the author / Об авторе
+**Community** — tickets, role panels, giveaways, economy, reminders, starboard и другие серверные функции.
 
-**RU:** Я пока новичок в разработке и учусь прямо на этом проекте. Здесь я осваиваю TypeScript, Node.js, Discord API, PostgreSQL, веб-разработку, архитектуру больших приложений, тестирование и деплой. Поэтому проект для меня одновременно рабочая система, эксперимент и учебная площадка.
+**Automation** — событийно-условная система для автоматизации действий.
 
-**EN:** I am still a beginner developer and I am learning by building this project. It is my practical playground for TypeScript, Node.js, the Discord API, PostgreSQL, web development, larger application architecture, testing and deployment.
+**Security / Anti-Raid** — защитные сценарии вокруг подозрительной активности и ограничений действий.
 
-## 📚 Documentation / Документация
+**Notifications** — внешние feed/webhook-сценарии с HTTPS/SSRF-проверками.
 
-- docs/MASTER-PLAN.md — architecture / архитектура
-- docs/PROJECT-STATE.md — current state / состояние
-- docs/ADMIN-GUIDE.md — administration / администрирование
-- docs/LOCAL-SETUP.md — local setup / локальный запуск
-- docs/TEST-STRATEGY.md — testing / стратегия тестирования
-- docs/TEST-MATRIX.md — verification matrix / матрица проверок
+**Music** — интеграция через Lavalink.
 
-## 🚀 Local deployment / Локальный запуск
+**Control Center** — управление сервером, конфигурацией, модулями, ролями, каналами, backup/import/export и диагностикой.
+
+## 🚀 Быстрый старт
+
+Основной локальный сценарий:
 
 ~~~powershell
 scripts/start-local.ps1
 ~~~
 
-Docker Compose is the main service topology; native Windows mode is intended for low-overhead local use.
+Также доступна Docker-топология проекта.
+
+Перед первым live-запуском необходимо подготовить собственные Discord credentials и локальное окружение. Рекомендуется сначала пройти автоматические проверки, затем выполнить live-проверку на тестовом сервере.
+
+## 🧪 Проверка
+
+~~~mermaid
+flowchart LR
+    SRC["Source"] --> H["Secret / hygiene checks"]
+    H --> TYPE["Typecheck"]
+    TYPE --> TEST["Unit / regression tests"]
+    TEST --> BUILD["Builds"]
+    BUILD --> LIVE["Live Discord validation"]
+    LIVE --> SOAK["E2E / chaos / soak"]
+~~~
+
+GitHub Actions покрывает автоматические этапы. Реальная Discord-аутентификация и длительные сценарии зависят от пользовательского сервера и окружения.
+
+## 🔐 Безопасность
+
+Проект предполагает, что внешний Discord-контент, webhook/feed-данные и пользовательский ввод недоверен.
+
+Отдельное внимание уделено:
+
+- защищённому Management API;
+- audit log;
+- проверкам внешних URL;
+- SSRF-защите для notification/feed сценариев;
+- валидации конфигурации;
+- разделению административных действий и Discord runtime.
+
+Секреты и локальные credentials не должны попадать в Git.
+
+## 🗺️ Roadmap
+
+~~~mermaid
+flowchart LR
+    A["Release candidate"] --> B["Live Discord validation"]
+    B --> C["E2E / chaos / soak"]
+    C --> D["Cleaner Windows deployment"]
+    D --> E["VPS acceptance"]
+    E --> F["Stable platform release"]
+~~~
+
+Долгосрочная цель — получить модульную Discord-платформу, которую можно запускать локально, переносить на сервер и расширять без превращения проекта в монолит.
+
+## 🧑‍💻 Об авторе
+
+Я пока **новичок в разработке** и учусь, собирая эту платформу на практике. Проект помогает мне разбираться с TypeScript, Node.js, Discord API, PostgreSQL, Next.js, асинхронными задачами, архитектурой серверных приложений, тестированием и деплоем.
+
+Поэтому некоторые решения ещё развиваются. README намеренно показывает границы текущей реализации и не называет то, что не прошло нужную проверку, «готовым».
+
+## 📚 Документация
+
+~~~text
+docs/MASTER-PLAN.md
+docs/PROJECT-STATE.md
+docs/ADMIN-GUIDE.md
+docs/LOCAL-SETUP.md
+docs/TEST-STRATEGY.md
+docs/TEST-MATRIX.md
+~~~
 
 ---
 
-**RU:** README намеренно показывает не только готовую функциональность, но и границы текущей реализации.
-
-**EN:** The README intentionally documents both implemented functionality and the current limits of the project.
+> 🤖 **Discord Server Platform — практический self-hosted проект, который постепенно превращается из набора Discord-функций в единую управляемую платформу.**
