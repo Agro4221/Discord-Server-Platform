@@ -514,6 +514,11 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .addUserOption((o) => o.setName("user").setDescription("User")),
 
     new SlashCommandBuilder()
+      .setName("achievements")
+      .setDescription("Show community achievements")
+      .addUserOption((o) => o.setName("user").setDescription("User")),
+
+    new SlashCommandBuilder()
       .setName("birthday")
       .setDescription("Manage birthdays")
       .addSubcommand((sub) =>
