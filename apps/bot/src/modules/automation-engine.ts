@@ -1487,11 +1487,19 @@ export function validateAutomationRule(
         if (!["pause","resume","skip","stop","shuffle","repeat","seek","volume","autoplay"].includes(action.action)) {
           throw new Error("invalid_music_control_action");
         }
-        if (action.action === "repeat" && !["off","track","queue"].includes(action.mode)) throw new Error("invalid_music_repeat_mode");
-        if ((action.action === "seek" || action.action === "volume") && (!Number.isInteger(action.value) || action.value < 0 || action.value > 86400)) {
-          throw new Error("invalid_music_control_value");
+        if (action.action === "repeat") {
+          if (!action.mode || !["off","track","queue"].includes(action.mode)) throw new Error("invalid_music_repeat_mode");
         }
-        if (action.action === "volume" && action.value > 200) throw new Error("invalid_music_volume");
+        if (action.action === "seek") {
+          if (typeof action.value !== "number" || !Number.isInteger(action.value) || action.value < 0 || action.value > 86400) {
+            throw new Error("invalid_music_control_value");
+          }
+        }
+        if (action.action === "volume") {
+          if (typeof action.value !== "number" || !Number.isInteger(action.value) || action.value < 0 || action.value > 200) {
+            throw new Error("invalid_music_volume");
+          }
+        }
         if (action.action === "autoplay" && typeof action.enabled !== "boolean") throw new Error("invalid_music_autoplay_value");
         break;
       case "log":
