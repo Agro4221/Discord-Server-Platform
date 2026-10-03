@@ -619,6 +619,10 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addRoleOption((o) => o.setName("quarantine-role").setDescription("Role applied until verification"))
           .addChannelOption((o) => o.setName("log-channel").setDescription("Optional log channel").addChannelTypes(ChannelType.GuildText))
           .addIntegerOption((o) => o.setName("ttl").setDescription("Code lifetime in minutes").setMinValue(2).setMaxValue(60))
+          .addStringOption((o) => o.setName("panel-title").setDescription("Verification panel title").setMaxLength(256))
+          .addStringOption((o) => o.setName("panel-description").setDescription("Verification panel description").setMaxLength(4096))
+          .addStringOption((o) => o.setName("issue-button").setDescription("Button label for issuing a code").setMaxLength(80))
+          .addStringOption((o) => o.setName("confirm-button").setDescription("Button label for confirmation").setMaxLength(80))
       )
       .addSubcommand((sub) =>
         sub
