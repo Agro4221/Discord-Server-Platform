@@ -861,6 +861,29 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_birthdays_date ON birthdays(guild_id,month,day);"
     ])
+  } ,
+  {
+    version: 53,
+    name: "invite_tracking",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS invite_stats (",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  joins integer NOT NULL DEFAULT 0 CHECK(joins >= 0),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,user_id)",
+      ");",
+      "CREATE TABLE IF NOT EXISTS invite_events (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  inviter_id text,",
+      "  invite_code text,",
+      "  created_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_invite_events_guild_created ON invite_events(guild_id,created_at DESC);",
+      "CREATE INDEX IF NOT EXISTS idx_invite_events_inviter ON invite_events(guild_id,inviter_id,created_at DESC);"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
