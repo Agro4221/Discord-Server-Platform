@@ -125,6 +125,8 @@ type ApiOptions = {
     listCleanupRules?: (guildId: string) => Promise<unknown[]>;
     saveCleanupRule?: (guildId: string, channelId: string, intervalSeconds: number, maxMessages: number, enabled?: boolean) => Promise<void>;
     deleteCleanupRule?: (guildId: string, id: number) => Promise<boolean>;
+    applyLockdown?: (guildId: string, actorUserId: string) => Promise<{ locked: number; failed: number }>;
+    releaseLockdown?: (guildId: string, actorUserId: string) => Promise<{ restored: number; failed: number }>;
   };
   music?: Music;
   leveling?: Leveling;
@@ -1577,6 +1579,42 @@ export class ManagementApiServer {
             return;
           }
 
+          const moderationLockdownMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/lockdown$/);
+
+          if (moderationLockdownMatch && !this.options.moderation) {
+            this.json(res, 500, { error: "moderation_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && moderationLockdownMatch) {
+            const guildId = moderationLockdownMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const rows = await this.options.settings.dbQuery<{ count: string }>("SELECT count(*)::text AS count FROM moderation_channel_locks WHERE guild_id=$1",[guildId]);
+            this.json(res, 200, { guildId, active: Number(rows.rows[0]?.count ?? 0) > 0, lockedChannels: Number(rows.rows[0]?.count ?? 0) });
+            return;
+          }
+
+          if (method === "POST" && moderationLockdownMatch) {
+            const guildId = moderationLockdownMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            if (typeof body.enabled !== "boolean") throw new RequestInputError("invalid_lockdown_state",400);
+            const result = body.enabled
+              ? await this.options.moderation!.applyLockdown(guildId,"dashboard")
+              : await this.options.moderation!.releaseLockdown(guildId,"dashboard");
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: body.enabled ? "moderation.lockdown.applied" : "moderation.lockdown.released",
+              targetType: "guild", targetId: guildId, metadata: result
+            });
+            this.json(res,200,{ok:true,result});
+            return;
+          }
           const moderationEscalationsMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/escalations$/);
           const moderationEscalationItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/escalations\/(\d+)$/);
 
