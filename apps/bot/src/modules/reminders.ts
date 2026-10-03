@@ -58,9 +58,12 @@ export class Reminders implements PlatformModule {
     if (commandName === "afk") {
       const rawReason = args.join(" ").trim();
       const result = await this.setOrClearAfk(message.guild.id, message.author.id, rawReason || null);
-      await message.reply(result.cleared
-        ? "👋 AFK снят. С возвращением!"
-        : "💤 AFK включён: " + result.record!.reason);
+      await message.reply({
+        content: result.cleared
+          ? "👋 AFK снят. С возвращением!"
+          : "💤 AFK включён: " + result.record!.reason,
+        allowedMentions: { parse: [] }
+      });
       return true;
     }
 
@@ -171,7 +174,8 @@ export class Reminders implements PlatformModule {
         content: result.cleared
           ? "👋 AFK снят. С возвращением!"
           : "💤 AFK включён: " + result.record!.reason,
-        ephemeral: true
+        ephemeral: true,
+        allowedMentions: { parse: [] }
       });
       return;
     }
@@ -271,7 +275,10 @@ export class Reminders implements PlatformModule {
           const notices = afkUsers.map((entry) =>
             formatAfkNotice("<@" + entry.userId + ">", entry.reason, entry.sinceAt)
           );
-          await message.reply("💬 " + notices.join("\n").slice(0, 1900));
+          await message.reply({
+            content: "💬 " + notices.join("\n").slice(0, 1900),
+            allowedMentions: { users: afkUsers.map((entry) => entry.userId) }
+          });
         }
       }
 
