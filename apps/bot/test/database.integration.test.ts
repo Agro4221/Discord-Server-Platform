@@ -135,6 +135,10 @@ test("config transfer preserves automation workflow presets", { skip: !enabled }
   const guildId = "123456789012345750";
   try {
     await migrate(db);
+    await db.query(
+      "INSERT INTO guild_modules(guild_id,module_key,enabled) VALUES($1,'automation',true) ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()",
+      [guildId]
+    );
     await db.query("DELETE FROM automation_workflow_presets WHERE guild_id=$1", [guildId]);
     await db.query(
       "INSERT INTO automation_workflow_presets(guild_id,name,event,conditions,any_conditions,actions,cooldown_seconds) VALUES($1,'welcome_flow','member.join',$2::jsonb,$3::jsonb,$4::jsonb,30)",
@@ -167,6 +171,7 @@ test("config transfer preserves automation workflow presets", { skip: !enabled }
     }]);
   } finally {
     await db.query("DELETE FROM automation_workflow_presets WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.query("DELETE FROM guild_modules WHERE guild_id=$1 AND module_key='automation'", [guildId]).catch(() => undefined);
     await db.close();
   }
 });
