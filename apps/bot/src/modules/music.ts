@@ -40,6 +40,14 @@ export function nextMusicQueueRepeatMode(mode: MusicRepeatMode): MusicRepeatMode
 export function clampMusicVolume(value: number): number {
   return Math.min(200, Math.max(0, Math.round(value)));
 }
+export function trimMusicQueueToPosition<T>(queue: T[], position: number): T | null {
+  if (!Number.isInteger(position) || position < 1 || position > queue.length) return null;
+  const target = queue[position - 1] ?? null;
+  if (!target) return null;
+  queue.splice(0, position - 1);
+  return target;
+}
+
 
 class PostgresQueueStore implements QueueStoreManager {
   constructor(
@@ -213,6 +221,9 @@ export class Music implements PlatformModule {
           return;
         }
         this.lastPlayedTracks.set(player.guildId, track);
+        await this.recordHistory(player.guildId, track).catch((error) => {
+          logger.warn("Music history write failed", { guildId: player.guildId, error: String(error) });
+        });
         if (await this.announceTrackStart(player.guildId)) {
           await this.announce(channelId, `🎵 Сейчас играет **${track.info.title}** — ${track.info.author}`);
         }
@@ -607,6 +618,12 @@ export class Music implements PlatformModule {
         break;
       case "skip":
         await this.skip(interaction);
+        break;
+      case "skip-to":
+        await this.skipTo(interaction);
+        break;
+      case "history":
+        await this.history(interaction);
         break;
       case "stop":
         await this.stop(interaction);
@@ -1419,6 +1436,81 @@ export class Music implements PlatformModule {
     return Boolean(djRole && member.roles.cache.has(djRole));
   }
 
+  private async skipTo(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Skip-to доступен DJ или Manage Server.", ephemeral: true });
+      return;
+    }
+    const position = interaction.options.getInteger("position", true);
+    const target = trimMusicQueueToPosition(player.queue.tracks, position);
+    if (!target) {
+      await interaction.reply({ content: "Укажи позицию существующего трека из очереди.", ephemeral: true });
+      return;
+    }
+    await player.skip();
+    await this.persistPlayer(player);
+    await this.syncController(player);
+    await interaction.reply({ content: "⏭️ Пропущено до #" + position + ": **" + target.info.title + "**", ephemeral: true });
+  }
+
+  private async history(interaction: ChatInputCommandInteraction): Promise<void> {
+    const rows = await this.recentHistory(interaction.guildId!, 20);
+    if (!rows.length) {
+      await interaction.reply({ content: "🎵 История проигрывания пока пуста.", ephemeral: true });
+      return;
+    }
+    const lines = rows.map((row, index) =>
+      (index + 1) + ". **" + row.title + "** — " + row.author +
+      (row.requesterId ? " · <@" + row.requesterId + ">" : "") +
+      " · " + formatDurationSeconds(Math.floor(row.durationMs / 1000))
+    );
+    await interaction.reply({ content: "📜 **Недавно проиграно**\n" + lines.join("\n"), ephemeral: true });
+  }
+
+  private async recentHistory(guildId: string, limit = 20): Promise<Array<{
+    title: string;
+    author: string;
+    requesterId: string | null;
+    durationMs: number;
+    playedAt: string;
+  }>> {
+    const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 50);
+    const result = await this.db.query<{
+      title: string;
+      author: string;
+      requester_id: string | null;
+      duration_ms: string;
+      played_at: string;
+    }>(
+      "SELECT title,author,requester_id,duration_ms,played_at FROM music_history WHERE guild_id=$1 AND bot_identity_id=$2 ORDER BY played_at DESC,id DESC LIMIT $3",
+      [guildId, this.config.botIdentityId, safeLimit]
+    );
+    return result.rows.map((row) => ({
+      title: row.title,
+      author: row.author,
+      requesterId: row.requester_id,
+      durationMs: Number(row.duration_ms) || 0,
+      playedAt: row.played_at
+    }));
+  }
+
+  private async recordHistory(guildId: string, track: Track): Promise<void> {
+    const requesterId = typeof track.requester?.id === "string" ? track.requester.id : null;
+    await this.db.query(
+      "INSERT INTO music_history(guild_id,bot_identity_id,requester_id,title,author,url,duration_ms) VALUES($1,$2,$3,$4,$5,$6,$7)",
+      [guildId,this.config.botIdentityId,requesterId,String(track.info.title ?? "Unknown track").slice(0,500),String(track.info.author ?? "").slice(0,300),(track.info.uri ?? null) as string | null,Math.max(0,Math.trunc(Number(track.info.duration ?? 0)))]
+    );
+    await this.db.query(
+      "DELETE FROM music_history WHERE id IN (SELECT id FROM music_history WHERE guild_id=$1 AND bot_identity_id=$2 ORDER BY played_at DESC,id DESC OFFSET 200)",
+      [guildId, this.config.botIdentityId]
+    );
+  }
   private async queue(interaction: ChatInputCommandInteraction): Promise<void> {
     const player = this.manager?.players.get(interaction.guildId!);
     if (!player) {
@@ -1568,7 +1660,7 @@ export class Music implements PlatformModule {
     const aliases: Record<string, string> = { playlist: "queue" };
     const action = aliases[commandName] ?? commandName;
     const supported = new Set([
-      "play", "pause", "resume", "previous", "skip", "stop", "shuffle",
+      "play", "pause", "resume", "previous", "skip", "skip-to", "history", "stop", "shuffle",
       "queue", "nowplaying", "lyrics", "repeat", "seek", "volume", "autoplay"
     ]);
     if (!supported.has(action)) return false;
@@ -1667,6 +1759,24 @@ export class Music implements PlatformModule {
     } else if (action === "skip") {
       await player.skip();
       await message.reply("⏭️ Следующий трек.");
+    } else if (action === "skip-to") {
+      const position = Number(args[0]);
+      const target = trimMusicQueueToPosition(player.queue.tracks, position);
+      if (!target) {
+        await message.reply("Использование: !skip-to <позиция>.");
+        return true;
+      }
+      await player.skip();
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await message.reply("⏭️ Пропущено до #" + position + ": **" + target.info.title + "**");
+    } else if (action === "history") {
+      const rows = await this.recentHistory(message.guild.id, 20);
+      if (!rows.length) {
+        await message.reply("🎵 История проигрывания пока пуста.");
+        return true;
+      }
+      await message.reply("📜 **Недавно проиграно**\n" + rows.map((row, index) => (index + 1) + ". **" + row.title + "** — " + row.author).join("\n"));
     } else if (action === "stop") {
       await player.stopPlaying();
       await message.reply("⏹️ Остановлено.");
