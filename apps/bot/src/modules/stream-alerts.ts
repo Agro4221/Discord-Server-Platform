@@ -246,8 +246,8 @@ export class StreamAlerts implements PlatformModule {
   private async fetchKickChannel(target:string,targetId:string|null):Promise<KickChannel>{
     const token=await this.getKickToken();
     const query=new URLSearchParams();
-    if(targetId&&/^\\d+$/.test(targetId))query.set("broadcaster_user_id",targetId);
-    else if(/^\\d+$/.test(target))query.set("broadcaster_user_id",target);
+    if(targetId&&/^\d+$/.test(targetId))query.set("broadcaster_user_id",targetId);
+    else if(/^\d+$/.test(target))query.set("broadcaster_user_id",target);
     else query.set("slug",target);
     const response=await fetch("https://api.kick.com/public/v1/channels?"+query.toString(),{
       headers:{Authorization:"Bearer "+token},
@@ -261,8 +261,8 @@ export class StreamAlerts implements PlatformModule {
   }
 
   private async resolveKickTargetId(target:string,targetId:string|null):Promise<string|null>{
-    if(targetId&&/^\\d+$/.test(targetId))return targetId;
-    if(/^\\d+$/.test(target))return target;
+    if(targetId&&/^\d+$/.test(targetId))return targetId;
+    if(/^\d+$/.test(target))return target;
     const channel=await this.fetchKickChannel(target,targetId);
     return channel.broadcaster_user_id!=null?String(channel.broadcaster_user_id):null;
   }
@@ -346,7 +346,7 @@ export class StreamAlerts implements PlatformModule {
 export function normalizeTarget(platform:StreamAlertPlatform,raw:string):string{
   const value=raw.trim();if(!value)throw new Error("stream_alert_target_required");
   if(platform==="kick"){
-    const fromUrl=value.match(/^https?:\\/\\/(?:www\\.)?kick\\.com\\/([^/?#]+)/i)?.[1];
+    const fromUrl=value.match(/^https?:\/\/(?:www\.)?kick\.com\/([^/?#]+)/i)?.[1];
     const candidate=(fromUrl??value).replace(/^@/,"").trim().toLowerCase();
     if(/^\\d+$/.test(candidate))return candidate;
     if(!/^[a-z0-9._-]{1,25}$/.test(candidate))throw new Error("invalid_kick_target");
