@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -79,4 +79,13 @@ test("Music progress formatter handles paused and live tracks", () => {
   const liveTrack = { info: { duration: 0 } } as never;
   const livePlayer = { paused: true, lastPosition: 5000 } as never;
   assert.equal(formatTrackProgress(livePlayer, liveTrack), "`0:05 / live`");
+});
+
+test("Music skip-to keeps the selected queued track at the front", () => {
+  const queue = ["one", "two", "three"];
+  const target = trimMusicQueueToPosition(queue, 2);
+  assert.equal(target, "two");
+  assert.deepEqual(queue, ["two", "three"]);
+  assert.equal(trimMusicQueueToPosition(queue, 0), null);
+  assert.deepEqual(queue, ["two", "three"]);
 });
