@@ -1,6 +1,7 @@
 import { PermissionFlagsBits, type ChatInputCommandInteraction, type Message } from "discord.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
+import type { PlatformEventBus } from "../events.js";
 import type { AuditLog } from "../audit.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
@@ -47,11 +48,13 @@ export class AutoMod implements PlatformModule {
   private readonly recent = new Map<string, { content: string; timestamp: number }[]>();
   private inspectedMessages = 0;
   private auditLog?: AuditLog;
+  private events?: PlatformEventBus;
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.auditLog = context.auditLog;
+    this.events = context.events;
     const a = context.events.on("message.create", (message) => this.inspect(message));
     const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     this.unsubscribe = () => { a(); b(); };
@@ -63,6 +66,7 @@ export class AutoMod implements PlatformModule {
     this.recent.clear();
     this.inspectedMessages = 0;
     this.auditLog = undefined;
+    this.events = undefined;
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -329,7 +333,54 @@ export class AutoMod implements PlatformModule {
       recent.map((item) => item.content)
     );
 
-    if (!reason) return;
+    if (reason) {
+      await this.applyBaseViolation(message, reason, config);
+      return;
+    }
+
+    const rules = await this.db.query<{
+      detector: string;
+      threshold: number | string | null;
+      window_seconds: number | null;
+      action: "delete" | "timeout" | "warn" | "log";
+      timeout_minutes: number;
+      affected_role_ids: string[];
+      ignored_role_ids: string[];
+      affected_channel_ids: string[];
+      ignored_channel_ids: string[];
+      ignore_moderators: boolean;
+      message_template: string;
+    }>(
+      "SELECT detector,threshold,window_seconds,action,timeout_minutes,affected_role_ids,ignored_role_ids,affected_channel_ids,ignored_channel_ids,ignore_moderators,message_template " +
+      "FROM automod_rules WHERE guild_id=$1 AND enabled=true ORDER BY id",
+      [message.guild.id]
+    );
+
+    const roleIds = message.member?.roles.cache.map((role) => role.id) ?? [];
+
+    for (const rule of rules.rows) {
+      if (rule.ignored_channel_ids?.includes(message.channelId)) continue;
+      if (rule.affected_channel_ids?.length && !rule.affected_channel_ids.includes(message.channelId)) continue;
+      if (rule.ignored_role_ids?.some((id) => roleIds.includes(id))) continue;
+      if (rule.affected_role_ids?.length && !rule.affected_role_ids.some((id) => roleIds.includes(id))) continue;
+
+      if (
+        rule.ignore_moderators &&
+        message.member?.permissions.has(PermissionFlagsBits.ManageMessages)
+      ) continue;
+
+      if (!detectorMatches(
+        rule,
+        message,
+        recent.map((item) => item.content),
+        config
+      )) {
+        continue;
+      }
+
+      await this.applyRule(message, rule);
+      return;
+    }
 
     logger.info("AutoMod violation", {
       guildId: message.guild.id,
@@ -413,6 +464,39 @@ export class AutoMod implements PlatformModule {
     }
   }
 
+  private async applyBaseViolation(
+    message: Message,
+    reason: string,
+    config: AutoModConfig
+  ): Promise<void> {
+    let deleted = false;
+    if (config.deleteMessage) {
+      await message.delete().then(() => { deleted = true; }).catch(() => undefined);
+    }
+
+    let timedOut = false;
+    if (config.timeoutMinutes > 0 && message.member?.moderatable) {
+      await message.member
+        .timeout(config.timeoutMinutes * 60_000, "AutoMod: " + reason)
+        .then(() => { timedOut = true; })
+        .catch(() => undefined);
+    }
+
+    await this.db.query(
+      "INSERT INTO automod_events(guild_id,user_id,message_id,rule,created_at) VALUES($1,$2,$3,$4,now())",
+      [message.guild!.id, message.author.id, message.id, reason]
+    ).catch(() => undefined);
+
+    await this.auditLog?.record({
+      guildId: message.guild!.id,
+      source: "system",
+      action: "automod.violation",
+      targetType: "user",
+      targetId: message.author.id,
+      metadata: { messageId: message.id, rule: reason, deleted, timedOut }
+    }).catch(() => undefined);
+  }
+
   private async applyRule(
     message: Message,
     rule: {
@@ -448,6 +532,13 @@ export class AutoMod implements PlatformModule {
       "INSERT INTO automod_events(guild_id,user_id,message_id,rule,created_at) VALUES($1,$2,$3,$4,now())",
       [message.guild!.id,message.author.id,message.id,rule.detector]
     ).catch(() => undefined);
+
+    if (rule.action === "warn") {
+      await this.db.query(
+        "INSERT INTO moderation_cases(guild_id,target_user_id,moderator_user_id,action,reason,created_at) VALUES($1,$2,'system','warn',$3,now())",
+        [message.guild!.id, message.author.id, "AutoMod: " + rule.detector]
+      ).catch(() => undefined);
+    }
 
     await this.auditLog?.record({
       guildId: message.guild!.id,
