@@ -2,6 +2,7 @@ import {
   EmbedBuilder,
   PermissionFlagsBits,
   type ChatInputCommandInteraction,
+  type Client,
   type GuildMember,
   type TextChannel
 } from "discord.js";
@@ -41,10 +42,12 @@ const defaultConfig: WelcomeConfig = {
 export class Welcome implements PlatformModule {
   readonly name = "welcome";
   private unsubscribe?: () => void;
+  private client?: Client;
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
+    this.client = context.client;
     const a = context.events.on("member.add", (member) => this.onJoin(member));
     const b = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     const c = context.events.on("member.remove", (member) => this.onLeave(member));
@@ -54,6 +57,7 @@ export class Welcome implements PlatformModule {
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    this.client = undefined;
   }
 
   async handlePrefixCommand(message: import("discord.js").Message, commandName: string, args: string[]): Promise<boolean> {
@@ -115,6 +119,50 @@ export class Welcome implements PlatformModule {
     });
 
     await interaction.reply({ content: "Welcome настроен и включён.", ephemeral: true });
+  }
+
+  async dashboardTest(guildId: string, channelId: string | null, kind: "welcome" | "goodbye"): Promise<{ channelId: string; kind: "welcome" | "goodbye" }> {
+    const guild = this.client?.guilds.cache.get(guildId);
+    if (!guild) throw new Error("guild_not_found");
+
+    const config = await this.getConfig(guildId);
+    const targetId = (channelId || (kind === "goodbye" ? config.goodbyeChannelId : config.channelId) || config.channelId)?.trim();
+    if (!targetId) throw new Error("welcome_test_channel_required");
+
+    const channel = guild.channels.cache.get(targetId);
+    if (!channel || channel.type !== 0) throw new Error("welcome_test_channel_invalid");
+
+    const me = guild.members.me;
+    const permissions = channel.permissionsFor(me ?? guild.roles.everyone);
+    if (!me || !permissions?.has(PermissionFlagsBits.ViewChannel) || !permissions.has(PermissionFlagsBits.SendMessages)) {
+      throw new Error("welcome_test_channel_forbidden");
+    }
+
+    const source = kind === "goodbye" ? config.goodbyeMessage : config.message;
+    const content = renderTemplate(source, {
+      mention: "@example-user",
+      user: "example-user",
+      server: guild.name
+    });
+    const useEmbed = kind === "goodbye" ? config.goodbyeEmbed : config.embed;
+
+    if (useEmbed && !permissions.has(PermissionFlagsBits.EmbedLinks)) {
+      throw new Error("welcome_test_embed_forbidden");
+    }
+
+    if (useEmbed) {
+      await (channel as TextChannel).send({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle(kind === "goodbye" ? "До встречи, " + guild.name : "Добро пожаловать на " + guild.name)
+            .setDescription(content)
+        ]
+      });
+    } else {
+      await (channel as TextChannel).send(content);
+    }
+
+    return { channelId: channel.id, kind };
   }
 
   async getConfig(guildId: string): Promise<WelcomeConfig> {
