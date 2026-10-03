@@ -169,7 +169,8 @@ export class Welcome implements PlatformModule {
   }
 
   async sendPreview(guildId: string): Promise<{ channelId: string; messageId: string }> {
-    const guild = this.clientGuild(guildId);
+    const guild = this.guildResolver?.(guildId);
+    if (!guild) throw new Error("guild_not_available");
     const config = await this.getConfig(guildId);
     if (!config.enabled || !config.channelId) throw new Error("welcome_preview_not_configured");
     const channel = guild.channels.cache.get(config.channelId);
@@ -193,12 +194,6 @@ export class Welcome implements PlatformModule {
 
     const message = await channel.send("🔎 Welcome preview\n" + content);
     return { channelId: channel.id, messageId: message.id };
-  }
-
-  private clientGuild(guildId: string): import("discord.js").Guild {
-    const guild = this.lastGuilds.get(guildId);
-    if (!guild) throw new Error("guild_not_available");
-    return guild;
   }
 
   private async onJoin(member: GuildMember): Promise<void> {
