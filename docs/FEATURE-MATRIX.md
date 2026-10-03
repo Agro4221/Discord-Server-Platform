@@ -73,7 +73,7 @@
 | Giveaway requirements / templates | 🟡 |
 | Starboard | ✅ |
 | Economy / shop / ledger | ✅ |
-| Reputation / social profiles | 🟡 |
+| Reputation / social profiles | ✅ |
 | Polls / suggestions | ✅ | Polls implemented; suggestions remain
 | Birthdays / achievements | 🟡 |
 | Invite tracking | 🟡 |
