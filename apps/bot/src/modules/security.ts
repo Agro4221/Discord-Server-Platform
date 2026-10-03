@@ -74,9 +74,11 @@ export class Security implements PlatformModule {
       destructiveWindowSeconds: row?.destructive_window_seconds ?? 20,
       quarantineRoleId: row?.quarantine_role_id ?? null,
       logChannelId: row?.log_channel_id ?? null,
-      raidQuarantineEnabled: row?.raid_quarantine_enabled ?? true,
-      destructiveRoleRemoval: row?.destructive_role_removal ?? true,
-      destructiveQuarantineEnabled: row?.destructive_quarantine_enabled ?? true
+      ...securityResponsePolicy({
+        raidQuarantine: row?.raid_quarantine_enabled,
+        destructiveRoleRemoval: row?.destructive_role_removal,
+        destructiveQuarantine: row?.destructive_quarantine_enabled
+      })
     };
   }
 
@@ -487,6 +489,14 @@ export function shouldTriggerSecurityIncident(
 
 export function securityIncidentCooldownUntil(createdAt: number, windowSeconds: number): number {
   return createdAt + Math.max(windowSeconds * 1000, 60_000);
+}
+
+export function securityResponsePolicy(input: Partial<{ raidQuarantine: boolean; destructiveRoleRemoval: boolean; destructiveQuarantine: boolean }>): { raidQuarantine: boolean; destructiveRoleRemoval: boolean; destructiveQuarantine: boolean } {
+  return {
+    raidQuarantine: input.raidQuarantine ?? true,
+    destructiveRoleRemoval: input.destructiveRoleRemoval ?? true,
+    destructiveQuarantine: input.destructiveQuarantine ?? true
+  };
 }
 
 export function securityResponseThreshold(maxDestructiveActions: number): number {
