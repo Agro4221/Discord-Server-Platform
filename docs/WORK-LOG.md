@@ -276,3 +276,8 @@ Never write credentials, tokens or private user data here.
 - CI run **#1245** (`37151126039`) passed the full automated pipeline on development head `7ac4f4505479d518f8c55847466111124ca0ea6d`.
 - Security now has a dedicated Control Center surface with active-incident visibility, hierarchy/readiness diagnostics and guarded incident-closing operations.
 - Security snapshot access is exposed through the Management API and local Dashboard proxy; existing generic configuration remains available alongside the operational panel.
+
+## 2026-10-04 — Temporary Voice controls verified
+- CI run **#1249** (`37151439742`) passed on development head `9a442b65c77a3cabc497f94635ef4efc6bfd6527`.
+- Temporary Voice now exposes `/voice` and prefix controls for room info, lock/unlock, user limit, rename, ownership transfer and permit/reject access.
+- Command policy and prefix routing include the new `voice` command; slash command contract coverage was added.

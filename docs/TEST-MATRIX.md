@@ -131,3 +131,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-04 — Security Center verification
 - CI run **#1245** passed the full automated matrix after adding the Security Control Center and local security snapshot route.
 - Live Discord role hierarchy, permission, incident and quarantine restoration behavior still require the live acceptance environment.
+
+## 2026-10-04 — Temporary Voice verification
+- CI run **#1249** passed the full automated matrix after adding `/voice` and prefix room-control routing.
+- Command registration and required option ordering are covered by the command contract tests; live Discord permission behavior remains an acceptance check.

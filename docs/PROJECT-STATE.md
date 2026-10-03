@@ -224,3 +224,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-04 — Security Center verified
 - Development head `7ac4f4505479d518f8c55847466111124ca0ea6d` passed CI run **#1245**.
 - Security is now a full Control Center module with active incident monitoring and Discord readiness checks.
+
+## 2026-10-04 — Temporary Voice controls verified
+- Development head `9a442b65c77a3cabc497f94635ef4efc6bfd6527` passed CI run **#1249**.
+- Temporary Voice now supports user-facing room management through the Discord command surface while server setup remains Dashboard-configured.
