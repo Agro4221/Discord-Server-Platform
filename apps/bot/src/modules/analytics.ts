@@ -12,6 +12,7 @@ import type { ChatInputCommandInteraction } from "discord.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
+import { logger } from "../logger.js";
 
 function normalizeAnalyticsSettings(input: Partial<AnalyticsSettings>): AnalyticsSettings {
   const allowed = new Set<AnalyticsSettings["visibleCounters"][number]>(["message","member_join","member_leave","voice_join","voice_leave","voice_move"]);
