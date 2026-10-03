@@ -509,6 +509,11 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       ),
 
     new SlashCommandBuilder()
+      .setName("invites")
+      .setDescription("Show invite statistics")
+      .addUserOption((o) => o.setName("user").setDescription("User")),
+
+    new SlashCommandBuilder()
       .setName("birthday")
       .setDescription("Manage birthdays")
       .addSubcommand((sub) =>
