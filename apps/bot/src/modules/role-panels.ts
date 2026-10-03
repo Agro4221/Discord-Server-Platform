@@ -22,6 +22,7 @@ export type RolePanelRecord = {
   roles: PanelRole[];
   selectionMode: RoleSelectionMode;
   maxSelections: number;
+  durationMinutes: number;
 };
 
 type PanelMessageCallbacks = {
@@ -32,23 +33,32 @@ type PanelMessageCallbacks = {
 export class RolePanels implements PlatformModule {
   readonly name = "roles";
   private unsubscribe?: () => void;
+  private expiryTimer?: NodeJS.Timeout;
+  private client?: ModuleContext["client"];
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
+    this.client = context.client;
     const a = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const b = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
     this.unsubscribe = () => { a(); b(); };
+    this.expiryTimer = setInterval(() => void this.processExpiredAssignments(), 30_000);
+    this.expiryTimer.unref();
+    await this.processExpiredAssignments();
   }
 
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    if (this.expiryTimer) clearInterval(this.expiryTimer);
+    this.expiryTimer = undefined;
+    this.client = undefined;
   }
 
   async list(guildId: string): Promise<RolePanelRecord[]> {
-    const result = await this.db.query<{ id: string; guild_id: string; channel_id: string; message_id: string | null; title: string; roles: PanelRole[]; selection_mode: RoleSelectionMode; max_selections: number }>(
-      "SELECT id,guild_id,channel_id,message_id,title,roles,selection_mode,max_selections FROM role_panels WHERE guild_id=$1 ORDER BY id DESC",
+    const result = await this.db.query<{ id: string; guild_id: string; channel_id: string; message_id: string | null; title: string; roles: PanelRole[]; selection_mode: RoleSelectionMode; max_selections: number; duration_minutes: number }>(
+      "SELECT id,guild_id,channel_id,message_id,title,roles,selection_mode,max_selections,duration_minutes FROM role_panels WHERE guild_id=$1 ORDER BY id DESC",
       [guildId]
     );
     return result.rows.map((row) => ({
@@ -59,7 +69,8 @@ export class RolePanels implements PlatformModule {
       title: row.title,
       roles: Array.isArray(row.roles) ? row.roles : [],
       selectionMode: row.selection_mode ?? "toggle",
-      maxSelections: Math.min(Math.max(Number(row.max_selections ?? 1), 1), 5)
+      maxSelections: Math.min(Math.max(Number(row.max_selections ?? 1), 1), 5),
+      durationMinutes: Math.min(Math.max(Number(row.duration_minutes ?? 0), 0), 43200)
     }));
   }
 
@@ -70,6 +81,7 @@ export class RolePanels implements PlatformModule {
     title = "Выберите роли",
     selectionMode: RoleSelectionMode = "toggle",
     maxSelections = 1,
+    durationMinutes = 0,
     callbacks?: Pick<PanelMessageCallbacks, "deleteMessage" | "sendMessage">
   ): Promise<RolePanelRecord> {
     if (!roles.length || roles.length > 5) throw new Error("panel_requires_1_to_5_roles");
@@ -82,9 +94,10 @@ export class RolePanels implements PlatformModule {
     if (!cleaned.length) throw new Error("panel_roles_empty");
 
     const normalizedMax = selectionMode === "max" ? Math.min(Math.max(Math.trunc(maxSelections), 1), cleaned.length) : 1;
+    const normalizedDuration = Math.min(Math.max(Math.trunc(durationMinutes), 0), 43200);
     const result = await this.db.query<{ id: string }>(
-      "INSERT INTO role_panels(guild_id,channel_id,title,roles,selection_mode,max_selections) VALUES($1,$2,$3,$4::jsonb,$5,$6) RETURNING id",
-      [guildId,channelId,title.trim().slice(0,100) || "Выберите роли",JSON.stringify(cleaned),selectionMode,normalizedMax]
+      "INSERT INTO role_panels(guild_id,channel_id,title,roles,selection_mode,max_selections,duration_minutes) VALUES($1,$2,$3,$4::jsonb,$5,$6,$7) RETURNING id",
+      [guildId,channelId,title.trim().slice(0,100) || "Выберите роли",JSON.stringify(cleaned),selectionMode,normalizedMax,normalizedDuration]
     );
     const id = Number(result.rows[0]?.id);
     if (!Number.isSafeInteger(id) || id < 1) throw new Error("role_panel_id_missing");
@@ -144,6 +157,7 @@ export class RolePanels implements PlatformModule {
     title: string,
     selectionMode: RoleSelectionMode = "toggle",
     maxSelections = 1,
+    durationMinutes = 0,
     callbacks: PanelMessageCallbacks & {
       editMessage: (channelId: string, messageId: string, content: string, components: ActionRowBuilder<ButtonBuilder>[]) => Promise<void>;
     }
@@ -168,8 +182,8 @@ export class RolePanels implements PlatformModule {
       await callbacks.editMessage(current.channelId, current.messageId, content, components);
       try {
         await this.db.query(
-          "UPDATE role_panels SET title=$1,roles=$2::jsonb,selection_mode=$3,max_selections=$4 WHERE id=$5 AND guild_id=$6",
-          [nextTitle,JSON.stringify(cleaned),selectionMode,selectionMode === "max" ? Math.min(Math.max(Math.trunc(maxSelections),1),cleaned.length) : 1,panelId,guildId]
+          "UPDATE role_panels SET title=$1,roles=$2::jsonb,selection_mode=$3,max_selections=$4,duration_minutes=$5 WHERE id=$6 AND guild_id=$7",
+          [nextTitle,JSON.stringify(cleaned),selectionMode,selectionMode === "max" ? Math.min(Math.max(Math.trunc(maxSelections),1),cleaned.length) : 1,Math.min(Math.max(Math.trunc(durationMinutes),0),43200),panelId,guildId]
         );
       } catch (error) {
         await callbacks.editMessage(
@@ -191,8 +205,8 @@ export class RolePanels implements PlatformModule {
       const newMessageId = await callbacks.sendMessage(channelId, content, components);
       try {
         await this.db.query(
-          "UPDATE role_panels SET channel_id=$1,title=$2,roles=$3::jsonb,message_id=$4,selection_mode=$5,max_selections=$6 WHERE id=$7 AND guild_id=$8",
-          [channelId,nextTitle,JSON.stringify(cleaned),newMessageId,selectionMode,selectionMode === "max" ? Math.min(Math.max(Math.trunc(maxSelections),1),cleaned.length) : 1,panelId,guildId]
+          "UPDATE role_panels SET channel_id=$1,title=$2,roles=$3::jsonb,message_id=$4,selection_mode=$5,max_selections=$6,duration_minutes=$7 WHERE id=$8 AND guild_id=$9",
+          [channelId,nextTitle,JSON.stringify(cleaned),newMessageId,selectionMode,selectionMode === "max" ? Math.min(Math.max(Math.trunc(maxSelections),1),cleaned.length) : 1,Math.min(Math.max(Math.trunc(durationMinutes),0),43200),panelId,guildId]
         );
       } catch (error) {
         await callbacks.deleteMessage(channelId,newMessageId).catch((deleteError) => {
@@ -346,7 +360,8 @@ export class RolePanels implements PlatformModule {
 
     const selectionMode = (interaction.options.getString("mode") as RoleSelectionMode | null) ?? "toggle";
     const maxSelections = interaction.options.getInteger("max-selections") ?? 1;
-    await this.createPanel(guildId,channel.id,unique,"Выберите роли",selectionMode,maxSelections,{
+    const durationMinutes = interaction.options.getInteger("duration") ?? 0;
+    await this.createPanel(guildId,channel.id,unique,"Выберите роли",selectionMode,maxSelections,durationMinutes,{
       deleteMessage: async (channelId, messageId) => {
         const target = interaction.guild!.channels.cache.get(channelId);
         if (!target || target.type !== 0) return;
@@ -368,6 +383,34 @@ export class RolePanels implements PlatformModule {
     await interaction.reply({ content: "Панель ролей создана.", ephemeral: true });
   }
 
+  private async processExpiredAssignments(): Promise<void> {
+    if (!this.client) return;
+    const result = await this.db.query<{
+      guild_id: string;
+      panel_id: string;
+      user_id: string;
+      role_id: string;
+    }>(
+      "DELETE FROM role_panel_assignments WHERE expires_at <= now() RETURNING guild_id,panel_id,user_id,role_id"
+    );
+
+    for (const assignment of result.rows) {
+      const guild = this.client.guilds.cache.get(assignment.guild_id);
+      const member = guild?.members.cache.get(assignment.user_id) ?? await guild?.members.fetch(assignment.user_id).catch(() => null);
+      const role = guild?.roles.cache.get(assignment.role_id);
+      if (!member || !role) continue;
+      await member.roles.remove(role,"Timed role panel assignment expired").catch((error) => {
+        logger.warn("Timed role expiration failed", {
+          guildId: assignment.guild_id,
+          panelId: assignment.panel_id,
+          userId: assignment.user_id,
+          roleId: assignment.role_id,
+          error: String(error)
+        });
+      });
+    }
+  }
+
   private row(panelId: number, roles: PanelRole[]) {
     return new ActionRowBuilder<ButtonBuilder>().addComponents(
       roles.slice(0,5).map((role) => new ButtonBuilder()
@@ -382,8 +425,8 @@ export class RolePanels implements PlatformModule {
     const [, , panelRaw, roleId] = interaction.customId.split(":");
     const panelId = Number(panelRaw);
     if (!Number.isSafeInteger(panelId) || !roleId) return;
-    const result = await this.db.query<{ guild_id: string; roles: PanelRole[] | null; selection_mode: RoleSelectionMode; max_selections: number }>(
-      "SELECT guild_id,roles,selection_mode,max_selections FROM role_panels WHERE id=$1",[panelId]
+    const result = await this.db.query<{ guild_id: string; roles: PanelRole[] | null; selection_mode: RoleSelectionMode; max_selections: number; duration_minutes: number }>(
+      "SELECT guild_id,roles,selection_mode,max_selections,duration_minutes FROM role_panels WHERE id=$1",[panelId]
     );
     const row = result.rows[0];
     if (!row || row.guild_id !== interaction.guild.id) { await interaction.reply({ content: "Панель не найдена.", ephemeral: true }); return; }
@@ -395,6 +438,10 @@ export class RolePanels implements PlatformModule {
     if (!role || !bot?.roles.highest || role.position >= bot.roles.highest.position) { await interaction.reply({ content: "Эта роль сейчас недоступна.", ephemeral: true }); return; }
     if (member.roles.cache.has(role.id)) {
       await member.roles.remove(role,"Role panel toggle");
+      await this.db.query(
+        "DELETE FROM role_panel_assignments WHERE panel_id=$1 AND user_id=$2 AND role_id=$3",
+        [panelId,interaction.user.id,role.id]
+      );
       await interaction.reply({ content: "Роль " + role.name + " снята.", ephemeral: true });
       return;
     }
@@ -422,6 +469,16 @@ export class RolePanels implements PlatformModule {
     }
 
     await member.roles.add(role,"Role panel toggle");
-    await interaction.reply({ content: "Роль " + role.name + " выдана.", ephemeral: true });
+    const durationMinutes = Math.min(Math.max(Number(row.duration_minutes ?? 0), 0), 43200);
+    if (durationMinutes > 0) {
+      await this.db.query(
+        "INSERT INTO role_panel_assignments(guild_id,panel_id,user_id,role_id,expires_at) VALUES($1,$2,$3,$4,now()+make_interval(mins => $5)) ON CONFLICT(panel_id,user_id,role_id) DO UPDATE SET expires_at=EXCLUDED.expires_at",
+        [interaction.guild.id,panelId,interaction.user.id,role.id,durationMinutes]
+      );
+    }
+    await interaction.reply({
+      content: "Роль " + role.name + " выдана." + (durationMinutes > 0 ? " Время действия: " + durationMinutes + " мин." : ""),
+      ephemeral: true
+    });
   }
 }
