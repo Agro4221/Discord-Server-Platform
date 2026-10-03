@@ -34,6 +34,7 @@ type RuntimeEvent = {
   messageId?: string;
   userIsBot?: boolean;
   channelType?: import("@dsp/domain").AutomationChannelType;
+  permissions?: import("@dsp/domain").AutomationPermission[];
   numeric?: Record<string, number>;
   roleIds?: string[];
 };
@@ -297,6 +298,7 @@ export class AutomationEngine implements PlatformModule {
     roleIds?: string[];
     userIsBot?: boolean;
     channelType?: import("@dsp/domain").AutomationChannelType;
+    permissions?: import("@dsp/domain").AutomationPermission[];
     numeric?: Record<string, number>;
   }): Promise<{
     matched: boolean;
@@ -313,6 +315,7 @@ export class AutomationEngine implements PlatformModule {
       userIsBot: input.userIsBot,
       channelId: input.channelId,
       channelType: input.channelType,
+      permissions: Array.isArray(input.permissions) ? input.permissions.slice(0, 20) : [],
       roleIds: Array.isArray(input.roleIds) ? input.roleIds.slice(0, 20) : [],
       numeric: Object.fromEntries(
         Object.entries(input.numeric ?? {})
@@ -976,10 +979,19 @@ export class AutomationEngine implements PlatformModule {
         }
         case "has-role":
         case "not-has-role": {
-          const guild = this.client?.guilds.cache.get(event.guildId);
-          const userId = resolveUserReference(condition.userId, event.userId);
-          const member = userId ? await guild?.members.fetch(userId).catch(() => null) : null;
-          const hasRole = Boolean(member?.roles.cache.has(condition.roleId));
+          const referencedUserId = resolveUserReference(condition.userId, event.userId);
+          let hasRole = event.userId === referencedUserId
+            ? Boolean(event.roleIds?.includes(condition.roleId))
+            : false;
+          if (event.userId !== referencedUserId) {
+            const guild = this.client?.guilds.cache.get(event.guildId);
+            const member = referencedUserId ? await guild?.members.fetch(referencedUserId).catch(() => null) : null;
+            hasRole = Boolean(member?.roles.cache.has(condition.roleId));
+          } else if (!event.roleIds) {
+            const guild = this.client?.guilds.cache.get(event.guildId);
+            const member = referencedUserId ? await guild?.members.fetch(referencedUserId).catch(() => null) : null;
+            hasRole = Boolean(member?.roles.cache.has(condition.roleId));
+          }
           if (condition.type === "has-role" ? !hasRole : hasRole) return false;
           break;
         }
@@ -997,8 +1009,12 @@ export class AutomationEngine implements PlatformModule {
           break;
         }
         case "has-permission": {
-          const guild = this.client?.guilds.cache.get(event.guildId);
           const userId = resolveUserReference(condition.userId, event.userId);
+          if (event.userId === userId && event.permissions) {
+            if (!event.permissions.includes(condition.permission)) return false;
+            break;
+          }
+          const guild = this.client?.guilds.cache.get(event.guildId);
           const member = userId ? await guild?.members.fetch(userId).catch(() => null) : null;
           const permission = PermissionFlagsBits[condition.permission];
           if (!member || permission === undefined || !member.permissions.has(permission)) return false;
