@@ -104,7 +104,7 @@ export function TemporaryVoicePanel(props: {
                   <div style={{ fontSize: 11, color: "#dce2ea" }}>🔊 #{room.channelName}</div>
                   <div style={{ marginTop: 3, color: "#667284", fontSize: 9 }}>{room.channelId}</div>
                 </div>
-                <span style={{ color: "#9aa5b5", fontSize: 10 }}>владелец <@{room.ownerId}></span>
+                <span style={{ color: "#9aa5b5", fontSize: 10 }}>владелец {"<@" + room.ownerId + ">"}</span>
                 <span style={{ color: "#8490a0", fontSize: 10, textAlign: "right" }}>{room.memberCount}/{room.userLimit || "∞"}</span>
               </div>
             ))}
