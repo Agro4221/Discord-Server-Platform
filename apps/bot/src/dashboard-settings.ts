@@ -114,7 +114,9 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
     fields: [
       { key: "categoryId", label: "Категория тикетов", type: "channel" },
       { key: "staffRoleId", label: "Staff role", type: "role" },
-      { key: "transcriptChannelId", label: "Канал transcript", type: "channel" }
+      { key: "transcriptChannelId", label: "Канал transcript", type: "channel" },
+      { key: "maxOpenPerUser", label: "Максимум открытых тикетов на пользователя", type: "number", min: 1, max: 10 },
+      { key: "autoCloseMinutes", label: "Автозакрытие по неактивности, мин. (0 = выкл.)", type: "number", min: 0, max: 43200 }
     ]
   },
   {
@@ -229,7 +231,9 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
     columns: {
       categoryId: "category_id",
       staffRoleId: "staff_role_id",
-      transcriptChannelId: "transcript_channel_id"
+      transcriptChannelId: "transcript_channel_id",
+      maxOpenPerUser: "max_open_per_user",
+      autoCloseMinutes: "auto_close_minutes"
     }
   },
   starboard: {
