@@ -142,6 +142,97 @@ export class Tickets implements PlatformModule {
       return;
     }
 
+    if (sub === "reopen") {
+      if (!await moduleEnabled(this.db, interaction.guild!.id, "tickets", false)) {
+        await interaction.reply({ content: "Tickets выключены.", ephemeral: true });
+        return;
+      }
+
+      const id = interaction.options.getInteger("id", true);
+      const result = await this.db.query<{
+        channel_id: string;
+        creator_id: string;
+        status: "open" | "closed" | "closing";
+      }>(
+        "SELECT channel_id,creator_id,status FROM tickets WHERE id=$1 AND guild_id=$2",
+        [id, interaction.guild!.id]
+      );
+      const row = result.rows[0];
+      if (!row) {
+        await interaction.reply({ content: "Тикет не найден.", ephemeral: true });
+        return;
+      }
+      const config = await this.config(interaction.guild!.id);
+      const canManage = interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels) ?? false;
+      if (!canManage && row.creator_id !== interaction.user.id) {
+        await interaction.reply({ content: "Переоткрыть тикет может его автор или staff.", ephemeral: true });
+        return;
+      }
+      if (row.status !== "closed") {
+        await interaction.reply({ content: "Этот тикет уже открыт или закрывается.", ephemeral: true });
+        return;
+      }
+
+      const active = await this.db.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM tickets WHERE guild_id=$1 AND creator_id=$2 AND status IN ('open','closing')",
+        [interaction.guild!.id, row.creator_id]
+      );
+      if (Number(active.rows[0]?.count ?? 0) >= config.maxOpenPerUser) {
+        await interaction.reply({
+          content: "Нельзя переоткрыть тикет: достигнут лимит открытых тикетов для этого пользователя.",
+          ephemeral: true
+        });
+        return;
+      }
+
+      const guild = interaction.guild!;
+      const me = guild.members.me;
+      if (!me?.permissions.has(PermissionFlagsBits.ManageChannels)) {
+        await interaction.reply({ content: "Боту не хватает Manage Channels.", ephemeral: true });
+        return;
+      }
+
+      const channel = await guild.channels.create({
+        name: "ticket-reopen-" + id,
+        type: ChannelType.GuildText,
+        parent: config.categoryId ?? undefined,
+        permissionOverwrites: [
+          { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+          { id: row.creator_id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+          ...(config.staffRoleId ? [{ id: config.staffRoleId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }] : [])
+        ]
+      });
+
+      try {
+        await this.db.query(
+          "UPDATE tickets SET status='open',channel_id=$1,closed_at=NULL,closing_at=NULL,last_activity_at=now() WHERE id=$2 AND guild_id=$3 AND status='closed'",
+          [channel.id,id,guild.id]
+        );
+        const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId("dsp:ticket:claim:" + id).setLabel("Забрать").setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("dsp:ticket:close:" + id).setLabel("Закрыть").setStyle(ButtonStyle.Danger)
+        );
+        await channel.send({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle("🎫 Тикет #" + id + " переоткрыт")
+              .setDescription("Тикет снова доступен. Предыдущая история сохранена в transcript.")
+          ],
+          components: [buttons]
+        });
+        await interaction.reply({ content: "Тикет #" + id + " переоткрыт: <#" + channel.id + ">.", ephemeral: true });
+      } catch (error) {
+        await channel.delete("Ticket reopen rollback").catch(() => undefined);
+        logger.warn("Ticket reopen failed", {
+          guildId: guild.id,
+          ticketId: id,
+          error: String(error)
+        });
+        await interaction.reply({ content: "Не удалось переоткрыть тикет.", ephemeral: true });
+      }
+      return;
+    }
+
     if (sub !== "create") return;
     if (!await moduleEnabled(this.db, interaction.guild!.id, "tickets", false)) {
       await interaction.reply({ content: "Tickets выключены. Сначала выполни `/ticket setup`.", ephemeral: true });
@@ -393,7 +484,10 @@ export class Tickets implements PlatformModule {
           const { AttachmentBuilder } = await import("discord.js");
           await transcriptChannel.send({
             content: `Transcript ticket #${ticketId}`,
-            files: [new AttachmentBuilder(Buffer.from(transcript,"utf8"), { name: `ticket-${ticketId}.txt` })]
+            files: [new AttachmentBuilder(Buffer.from(
+              channel?.type === ChannelType.GuildText ? await this.transcriptHtml(channel) : transcript,
+              "utf8"
+            ), { name: `ticket-${ticketId}.html` })]
           }).catch((error) => {
             logger.warn("Ticket transcript delivery failed", {
               guildId: interaction.guild!.id,
@@ -498,7 +592,10 @@ export class Tickets implements PlatformModule {
             const { AttachmentBuilder } = await import("discord.js");
             await target.send({
               content: `Transcript ticket #${row.id} (auto-closed)`,
-              files: [new AttachmentBuilder(Buffer.from(transcript,"utf8"), { name: `ticket-${row.id}.txt` })]
+              files: [new AttachmentBuilder(Buffer.from(
+                channel?.type === ChannelType.GuildText ? await this.transcriptHtml(channel) : transcript,
+                "utf8"
+              ), { name: `ticket-${row.id}.html` })]
             }).catch(() => undefined);
           }
         }
@@ -527,8 +624,8 @@ export class Tickets implements PlatformModule {
     return Array.isArray(roles) ? roles.includes(config.staffRoleId) : roles.cache.has(config.staffRoleId);
   }
 
-  private async transcript(channel: TextChannel): Promise<string> {
-    const messages = await channel.messages.fetch({ limit: 100 }).catch((error) => {
+  private async fetchTranscriptMessages(channel: TextChannel): Promise<import("discord.js").Collection<string, Message> | null> {
+    return channel.messages.fetch({ limit: 100 }).catch((error) => {
       logger.warn("Ticket transcript fetch failed", {
         guildId: channel.guild.id,
         channelId: channel.id,
@@ -536,8 +633,34 @@ export class Tickets implements PlatformModule {
       });
       return null;
     });
+  }
+
+  private async transcript(channel: TextChannel): Promise<string> {
+    const messages = await this.fetchTranscriptMessages(channel);
     if (!messages) return "Transcript unavailable.";
-    return [...messages.values()].sort((a,b) => a.createdTimestamp-b.createdTimestamp).map((message) => `[${new Date(message.createdTimestamp).toISOString()}] ${message.author.tag}: ${message.content}`).join("\n");
+    return [...messages.values()]
+      .sort((a,b) => a.createdTimestamp-b.createdTimestamp)
+      .map((message) => "[" + new Date(message.createdTimestamp).toISOString() + "] " + message.author.tag + ": " + message.content)
+      .join("\n");
+  }
+
+  private async transcriptHtml(channel: TextChannel): Promise<string> {
+    const messages = await this.fetchTranscriptMessages(channel);
+    if (!messages) return "<!doctype html><html><body><p>Transcript unavailable.</p></body></html>";
+    const escape = (value: string) => value
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+    const rows = [...messages.values()]
+      .sort((a,b) => a.createdTimestamp-b.createdTimestamp)
+      .map((message) =>
+        "<article><header><strong>" + escape(message.author.tag) + "</strong> · " +
+        escape(new Date(message.createdTimestamp).toISOString()) +
+        "</header><pre>" + escape(message.content) + "</pre></article>"
+      )
+      .join("\n");
+    return "<!doctype html><html><head><meta charset=\"utf-8\"><title>Ticket transcript</title><style>body{font-family:system-ui,sans-serif;background:#0f1115;color:#e7e9ee;padding:24px}article{padding:12px 0;border-bottom:1px solid #2a2f39}header{color:#9aa4b2;font-size:13px}pre{white-space:pre-wrap;word-break:break-word;font:inherit}</style></head><body>" + rows + "</body></html>";
   }
 }
 
