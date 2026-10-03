@@ -635,8 +635,145 @@ export class Moderation implements PlatformModule {
 
   private async applyWarn(guildId: string, moderatorUserId: string, target: User, reason: string): Promise<void> {
     await this.audit("moderation.warn.attempted", guildId, moderatorUserId, target.id, { reason });
-    await this.recordBestEffort(guildId, target.id, moderatorUserId, "warn", reason);
+    const caseId = await this.recordBestEffort(guildId, target.id, moderatorUserId, "warn", reason);
     await this.safeDm(target, `На сервере тебе выдано предупреждение. Причина: ${reason}`);
+    if (caseId) await this.applyEscalationIfNeeded(guildId, target.id, caseId);
+  }
+
+  private async applyEscalationIfNeeded(guildId: string, targetUserId: string, warnCaseId: number): Promise<void> {
+    try {
+      const countResult = await this.db.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM moderation_cases WHERE guild_id=$1 AND target_user_id=$2 AND action='warn'",
+        [guildId, targetUserId]
+      );
+      const warnCount = Number(countResult.rows[0]?.count ?? 0);
+      if (!Number.isInteger(warnCount) || warnCount < 1) return;
+
+      const ruleResult = await this.db.query<{
+        warn_count: number;
+        action: "timeout" | "ban";
+        duration_minutes: number;
+        reason: string;
+      }>(
+        "SELECT warn_count,action,duration_minutes,reason FROM moderation_escalations WHERE guild_id=$1 AND warn_count=$2 AND enabled=true",
+        [guildId, warnCount]
+      );
+      const rule = ruleResult.rows[0];
+      if (!rule) return;
+
+      const guild = this.client?.guilds.cache.get(guildId);
+      if (!guild) return;
+
+      if (rule.action === "timeout") {
+        const member = await guild.members.fetch(targetUserId).catch(() => null);
+        if (!member?.moderatable || rule.duration_minutes < 1) return;
+        const expiresAt = new Date(Date.now() + rule.duration_minutes * 60_000);
+        await member.timeout(rule.duration_minutes * 60_000, rule.reason);
+        const caseId = await this.recordBestEffort(
+          guildId,
+          targetUserId,
+          "system",
+          "timeout",
+          rule.reason,
+          expiresAt
+        );
+        await this.audit("moderation.escalation.timeout", guildId, "system", targetUserId, {
+          warnCount,
+          warnCaseId,
+          durationMinutes: rule.duration_minutes,
+          escalationCaseId: caseId
+        });
+        await this.safeDm(targetUser, `Автоматическая эскалация после ${warnCount} предупреждений: timeout на ${rule.duration_minutes} мин. Причина: ${rule.reason}`);
+        return;
+      }
+
+      const member = await guild.members.fetch(targetUserId).catch(() => null);
+      if (member && !member.bannable) return;
+      const durationMinutes = rule.duration_minutes > 0 ? rule.duration_minutes : undefined;
+      const expiresAt = durationMinutes ? new Date(Date.now() + durationMinutes * 60_000) : null;
+      if (member) {
+        await member.ban({ reason: rule.reason });
+      } else {
+        await guild.members.ban(targetUserId, { reason: rule.reason });
+      }
+      const caseId = await this.recordBestEffort(
+        guildId,
+        targetUserId,
+        "system",
+        "ban",
+        rule.reason,
+        expiresAt
+      );
+      await this.audit("moderation.escalation.ban", guildId, "system", targetUserId, {
+        warnCount,
+        warnCaseId,
+        durationMinutes: durationMinutes ?? null,
+        escalationCaseId: caseId
+      });
+      await this.safeDm(target, `Автоматическая эскалация после ${warnCount} предупреждений: бан. Причина: ${rule.reason}`);
+    } catch (error) {
+      logger.warn("Moderation escalation failed", { guildId, targetUserId, warnCaseId, error: String(error) });
+    }
+  }
+
+  async setEscalation(
+    guildId: string,
+    warnCount: number,
+    action: "timeout" | "ban",
+    durationMinutes: number,
+    reason: string
+  ): Promise<void> {
+    if (!Number.isInteger(warnCount) || warnCount < 1 || warnCount > 100) throw new Error("invalid_escalation_warn_count");
+    if (action === "timeout" && (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 40320)) {
+      throw new Error("invalid_escalation_duration");
+    }
+    if (action === "ban" && (!Number.isInteger(durationMinutes) || durationMinutes < 0 || durationMinutes > 40320)) {
+      throw new Error("invalid_escalation_duration");
+    }
+    const cleanReason = reason.trim().slice(0, 500);
+    if (!cleanReason) throw new Error("invalid_escalation_reason");
+
+    await this.db.query(
+      `INSERT INTO moderation_escalations(guild_id,warn_count,action,duration_minutes,reason,enabled)
+       VALUES($1,$2,$3,$4,$5,true)
+       ON CONFLICT(guild_id,warn_count)
+       DO UPDATE SET action=EXCLUDED.action,duration_minutes=EXCLUDED.duration_minutes,reason=EXCLUDED.reason,enabled=true,updated_at=now()`,
+      [guildId,warnCount,action,durationMinutes,cleanReason]
+    );
+  }
+
+  async listEscalations(guildId: string): Promise<Array<{
+    warnCount: number;
+    action: "timeout" | "ban";
+    durationMinutes: number;
+    reason: string;
+    enabled: boolean;
+  }>> {
+    const result = await this.db.query<{
+      warn_count: number;
+      action: "timeout" | "ban";
+      duration_minutes: number;
+      reason: string;
+      enabled: boolean;
+    }>(
+      "SELECT warn_count,action,duration_minutes,reason,enabled FROM moderation_escalations WHERE guild_id=$1 ORDER BY warn_count",
+      [guildId]
+    );
+    return result.rows.map((row) => ({
+      warnCount: row.warn_count,
+      action: row.action,
+      durationMinutes: row.duration_minutes,
+      reason: row.reason,
+      enabled: row.enabled
+    }));
+  }
+
+  async removeEscalation(guildId: string, warnCount: number): Promise<boolean> {
+    const result = await this.db.query(
+      "DELETE FROM moderation_escalations WHERE guild_id=$1 AND warn_count=$2",
+      [guildId,warnCount]
+    );
+    return result.rowCount === 1;
   }
 
   private async recordBestEffort(
