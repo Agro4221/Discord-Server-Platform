@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 type Resource = { id: string; name: string; type?: number; manageable?: boolean };
 type PanelRole = { roleId: string; label: string };
-type RolePanel = { id: number; guildId: string; channelId: string; messageId: string | null; title: string; roles: PanelRole[] };
+type RolePanel = { id: number; guildId: string; channelId: string; messageId: string | null; title: string; roles: PanelRole[]; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number };
 
 export function RolePanelsEditor({
   guildId,
@@ -22,6 +22,8 @@ export function RolePanelsEditor({
   const [title, setTitle] = useState("Выберите роли");
   const [channelId, setChannelId] = useState("");
   const [panelRoles, setPanelRoles] = useState<PanelRole[]>([{ roleId: "", label: "" }]);
+  const [selectionMode, setSelectionMode] = useState<"toggle" | "exclusive" | "max">("toggle");
+  const [maxSelections, setMaxSelections] = useState(1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -51,6 +53,8 @@ export function RolePanelsEditor({
     setTitle("Выберите роли");
     setChannelId("");
     setPanelRoles([{ roleId: "", label: "" }]);
+    setSelectionMode("toggle");
+    setMaxSelections(1);
     setError("");
   }
 
@@ -59,6 +63,8 @@ export function RolePanelsEditor({
     setTitle(panel.title);
     setChannelId(panel.channelId);
     setPanelRoles(panel.roles.length ? panel.roles : [{ roleId: "", label: "" }]);
+    setSelectionMode(panel.selectionMode ?? "toggle");
+    setMaxSelections(panel.maxSelections ?? 1);
     setError("");
   }
 
@@ -76,7 +82,7 @@ export function RolePanelsEditor({
         {
           method: editingId === null ? "POST" : "PUT",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ channelId, title, roles: cleanRoles })
+          body: JSON.stringify({ channelId, title, roles: cleanRoles, selectionMode, maxSelections })
         }
       );
       const body = await response.json().catch(() => ({}));
@@ -120,6 +126,23 @@ export function RolePanelsEditor({
         <option value="">Выбери текстовый канал</option>
         {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
       </select>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <select value={selectionMode} onChange={(event) => setSelectionMode(event.target.value as "toggle" | "exclusive" | "max")} style={inputStyle}>
+          <option value="toggle">Режим: Toggle</option>
+          <option value="exclusive">Режим: Exclusive — только одна роль</option>
+          <option value="max">Режим: Max selections</option>
+        </select>
+        <input
+          type="number"
+          min={1}
+          max={Math.max(1, cleanRolesPreview(panelRoles).length)}
+          value={maxSelections}
+          disabled={selectionMode !== "max"}
+          onChange={(event) => setMaxSelections(Math.min(5, Math.max(1, Number(event.target.value) || 1)))}
+          placeholder="Максимум ролей"
+          style={inputStyle}
+        />
+      </div>
       <div style={{ display: "grid", gap: 9 }}>
         {panelRoles.map((entry, index) => (
           <div key={index} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr) auto", gap: 8 }}>
@@ -170,4 +193,7 @@ function buttonStyle(kind: "primary" | "secondary" | "danger") {
   const background = kind === "primary" ? "#5865f2" : kind === "danger" ? "#4b2227" : "#171a21";
   const border = kind === "primary" ? "#5865f2" : kind === "danger" ? "#79343c" : "#303643";
   return { border: "1px solid " + border, background, color: "#fff", borderRadius: 10, padding: "10px 13px", cursor: "pointer" } as const;
+}
+function cleanRolesPreview(roles: PanelRole[]): PanelRole[] {
+  return roles.filter((role) => role.roleId && role.label.trim());
 }
