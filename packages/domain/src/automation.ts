@@ -70,7 +70,7 @@ export type AutomationAction =
   | { type: "giveaway-end"; giveawayId: number }
   | { type: "giveaway-reroll"; giveawayId: number }
   | { type: "notification-feed-toggle"; feedId: number; enabled: boolean }
-  | { type: "music-control"; action: AutomationMusicControl; value?: number; mode?: AutomationMusicRepeatMode }
+  | { type: "music-control"; action: AutomationMusicControl; value?: number; enabled?: boolean; mode?: AutomationMusicRepeatMode }
   | { type: "log"; message: string };
 
 export type AutomationMusicRepeatMode = "off" | "track" | "queue";
