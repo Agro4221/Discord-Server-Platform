@@ -7,6 +7,7 @@ import { AutoModRulesPanel } from "./automod-rules-panel";
 import { AutomationPanel } from "./automation-panel";
 import { BackupPanel } from "./backup-panel";
 import { CommandPolicyPanel } from "./command-policy-panel";
+import { CustomCommandsPanel } from "./custom-commands-panel";
 import { FleetPanel } from "./fleet-panel";
 import { EmbedBuilderPanel } from "./embed-builder-panel";
 import { GiveawaysPanel } from "./giveaways-panel";
@@ -1423,6 +1424,13 @@ function ModulePage(props: {
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Escalation rules" eyebrow="OPERATIONS" />
           <ModerationPanel guildId={props.guildId} onChanged={props.onAudit} />
+        </section>
+      )}
+
+      {props.module?.key === "custom-commands" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Custom Commands" eyebrow="COMMAND BUILDER" />
+          <CustomCommandsPanel guildId={props.guildId} roles={props.resources.roles} onChanged={props.onAudit} />
         </section>
       )}
 
