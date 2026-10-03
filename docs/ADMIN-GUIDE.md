@@ -106,6 +106,20 @@ Music:
 
 ### Специализированные панели
 
+Moderation — поиск участников, warn/timeout/kick/ban/unban и журнал moderation cases.
+
+Command Policies — включение/выключение команд, slash/prefix, cooldown, help visibility и role/channel scopes.
+
+Leveling — role rewards и исключения для ролей/каналов.
+
+Tickets — список тикетов и закрытие с сохранением transcript.
+
+Starboard — канал публикации, threshold и ignore-параметры.
+
+Economy — CRUD магазина.
+
+Music — playback control, queue, seek, volume, repeat и autoplay.
+
 Role Panels — CRUD и публикация role panels.
 
 Giveaways — история, завершение и reroll.
@@ -296,15 +310,14 @@ Dashboard является основным способом редактиро�
 
 ## 6. Что не является «пропущенным» в Dashboard
 
-Некоторые операции сознательно command-first:
+Часть операций остаётся command-first по своей природе:
 
-- обычные moderation actions;
-- Economy user actions;
-+ управление shop items через Control Center; команда `/shop create` остаётся доступной как Discord fallback;
-- Reminders;
-- часть первичной настройки slash workflows.
+- пользовательские Economy actions (`/daily`, `/pay`, `/buy` и т. п.);
+- пользовательские Reminders;
+- лёгкие Utility и Community Tools команды;
+- часть первичной настройки Discord workflows.
 
-Это функции бота, а не потерянная функциональность.
+Административные операции, которые уже имеют Core/Management API, по мере готовности выносятся в Control Center; Discord-команды остаются fallback-входом, а не единственным способом управления.
 
 ## 7. Что ещё требует живого окружения
 
