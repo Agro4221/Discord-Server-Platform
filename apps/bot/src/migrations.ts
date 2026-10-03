@@ -1060,6 +1060,14 @@ const migrations = [
     ])
   },
   {
+    version: 69,
+    name: "automation_delayed_retry_dead_letter",
+    sql: q([
+      "ALTER TABLE automation_delayed_jobs ADD COLUMN IF NOT EXISTS dead_lettered_at timestamptz;",
+      "CREATE INDEX IF NOT EXISTS idx_automation_delayed_retry_state ON automation_delayed_jobs(guild_id,completed_at,dead_lettered_at,available_at);"
+    ])
+  },
+  {
     version: 68,
     name: "ticket_customization",
     sql: q([
