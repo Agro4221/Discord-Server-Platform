@@ -147,7 +147,8 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "announceTrackStart", label: "Объявлять начало трека", type: "boolean" },
       { key: "autoplay", label: "Autoplay", type: "boolean", description: "После окончания очереди искать следующий трек автоматически." },
       { key: "autoLeaveSeconds", label: "Автовыход из voice после простоя, сек.", type: "number", min: 0, max: 86400 },
-      { key: "twentyFourSeven", label: "24/7 режим", type: "boolean", description: "Не выходить из voice при пустой очереди." }
+      { key: "twentyFourSeven", label: "24/7 режим", type: "boolean", description: "Не выходить из voice при пустой очереди." },
+      { key: "queueAccess", label: "Кто может добавлять треки", type: "text", description: "everyone или dj — режим DJ ограничивает добавление очереди DJ-ролью/Manage Server." }
     ]
   }
 ];
@@ -270,7 +271,8 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       announceTrackStart: "announce_track_start",
       autoplay: "autoplay",
       autoLeaveSeconds: "auto_leave_seconds",
-      twentyFourSeven: "twenty_four_seven"
+      twentyFourSeven: "twenty_four_seven",
+      queueAccess: "queue_access"
     }
   }
 };
