@@ -48,47 +48,148 @@ export function AutoModRulesPanel(props: {
   const [error, setError] = useState("");
 
   async function load() {
+    if (!props.guildId) return;
     const response = await fetch("/api/guilds/" + encodeURIComponent(props.guildId) + "/automod/rules", { cache: "no-store" });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(String(body.error ?? "rules_failed"));
     setRules((body.rules ?? []) as Rule[]);
   }
 
-  useEffect(() => { void load().catch(() => setError("Не удалось загрузить AutoMod rules.")); }, [props.guildId]);
+  useEffect(() => {
+    setError("");
+    void load().catch(() => setError("Не удалось загрузить AutoMod rules."));
+  }, [props.guildId]);
 
-  async function save() {
-    setBusy(true); setError("");
-    try {
-      const payload = {
-        detector, action,
-        threshold: threshold === "" ? null : Number(threshold),
-        windowSeconds: windowSeconds === "" ? null : Number(windowSeconds),
-        timeoutMinutes: Number(timeoutMinutes || 0),
-        affectedChannelIds, ignoredChannelIds, affectedRoleIds, ignoredRoleIds,
-        ignoreModerators, messageTemplate
-      };
-      const response = await fetch("/api/guilds/" + encodeURIComponent(props.guildId) + "/automod/rules", {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload)
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(String(body.error ?? "rule_save_failed"));
-      await load();
-      props.onChanged();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Не удалось сохранить rule.");
-    } finally { setBusy(false); }
+  function resetForm() {
+    setDetector("bad-words");
+    setAction("delete");
+    setEnabled(true);
+    setEditingId(null);
+    setThreshold("");
+    setWindowSeconds("");
+    setTimeoutMinutes("0");
+    setAffectedChannelIds([]);
+    setIgnoredChannelIds([]);
+    setAffectedRoleIds([]);
+    setIgnoredRoleIds([]);
+    setIgnoreModerators(true);
+    setMessageTemplate("");
   }
 
-  async function remove(id: number) {
-    setBusy(true); setError("");
+  function editRule(rule: Rule) {
+    setEditingId(rule.id);
+    setDetector(rule.detector);
+    setAction(rule.action);
+    setEnabled(rule.enabled);
+    setThreshold(rule.threshold === null ? "" : String(rule.threshold));
+    setWindowSeconds(rule.windowSeconds === null ? "" : String(rule.windowSeconds));
+    setTimeoutMinutes(String(rule.timeoutMinutes));
+    setAffectedChannelIds(rule.affectedChannelIds);
+    setIgnoredChannelIds(rule.ignoredChannelIds);
+    setAffectedRoleIds(rule.affectedRoleIds);
+    setIgnoredRoleIds(rule.ignoredRoleIds);
+    setIgnoreModerators(rule.ignoreModerators);
+    setMessageTemplate(rule.messageTemplate);
+    setError("");
+  }
+
+  async function persistRule(payload: Record<string, unknown>) {
+    const response = await fetch("/api/guilds/" + encodeURIComponent(props.guildId) + "/automod/rules", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(String(body.error ?? "rule_save_failed"));
+  }
+
+  async function save() {
+    const parsedThreshold = threshold === "" ? null : Number(threshold);
+    const parsedWindowSeconds = windowSeconds === "" ? null : Number(windowSeconds);
+    const parsedTimeoutMinutes = Number(timeoutMinutes || 0);
+
+    if (parsedThreshold !== null && (!Number.isFinite(parsedThreshold) || parsedThreshold < 0)) {
+      setError("Threshold должен быть конечным числом от 0.");
+      return;
+    }
+    if (parsedWindowSeconds !== null && (!Number.isFinite(parsedWindowSeconds) || parsedWindowSeconds < 1)) {
+      setError("Окно должно быть числом секунд от 1.");
+      return;
+    }
+    if (!Number.isFinite(parsedTimeoutMinutes) || parsedTimeoutMinutes < 0 || parsedTimeoutMinutes > 40320) {
+      setError("Timeout: 0–40320 минут.");
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+    try {
+      await persistRule({
+        detector,
+        enabled,
+        action,
+        threshold: parsedThreshold,
+        windowSeconds: parsedWindowSeconds === null ? null : Math.floor(parsedWindowSeconds),
+        timeoutMinutes: Math.floor(parsedTimeoutMinutes),
+        affectedChannelIds,
+        ignoredChannelIds,
+        affectedRoleIds,
+        ignoredRoleIds,
+        ignoreModerators,
+        messageTemplate
+      });
+      await load();
+      resetForm();
+      await props.onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось сохранить rule.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleRule(rule: Rule) {
+    setBusy(true);
+    setError("");
+    try {
+      await persistRule({
+        detector: rule.detector,
+        enabled: !rule.enabled,
+        action: rule.action,
+        threshold: rule.threshold,
+        windowSeconds: rule.windowSeconds,
+        timeoutMinutes: rule.timeoutMinutes,
+        affectedChannelIds: rule.affectedChannelIds,
+        ignoredChannelIds: rule.ignoredChannelIds,
+        affectedRoleIds: rule.affectedRoleIds,
+        ignoredRoleIds: rule.ignoredRoleIds,
+        ignoreModerators: rule.ignoreModerators,
+        messageTemplate: rule.messageTemplate
+      });
+      await load();
+      await props.onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось изменить состояние rule.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeRule(id: number) {
+    setBusy(true);
+    setError("");
     try {
       const response = await fetch("/api/guilds/" + encodeURIComponent(props.guildId) + "/automod/rules/" + id, { method: "DELETE" });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(String(body.error ?? "rule_delete_failed"));
-      await load(); props.onChanged();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Не удалось удалить rule.");
-    } finally { setBusy(false); }
+      if (editingId === id) resetForm();
+      await load();
+      await props.onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось удалить rule.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function toggleSelection(current: string[], id: string, setter: (value: string[]) => void) {
@@ -98,9 +199,10 @@ export function AutoModRulesPanel(props: {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       {error && <div style={{ padding: 9, borderRadius: 9, background: "#32191b", color: "#ffb1b1", fontSize: 10 }}>{error}</div>}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 10 }}>
         {editingId !== null && (
-          <div style={{ padding: 9, borderRadius: 9, background: "#161d28", border: "1px solid #2b3544", color: "#9eabc0", fontSize: 10 }}>
+          <div style={{ gridColumn: "1 / -1", padding: 9, borderRadius: 9, background: "#161d28", border: "1px solid #2b3544", color: "#9eabc0", fontSize: 10 }}>
             Редактирование правила #{editingId}
           </div>
         )}
@@ -110,8 +212,8 @@ export function AutoModRulesPanel(props: {
         <label style={boxStyle}><span>Action</span><select value={action} onChange={(e) => setAction(e.target.value as Rule["action"])} style={inputStyle}>
           {ACTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
-        <label style={boxStyle}><span>Threshold</span><input value={threshold} onChange={(e) => setThreshold(e.target.value)} type="number" style={inputStyle} placeholder="Авто по detector" /></label>
-        <label style={boxStyle}><span>Окно, сек.</span><input value={windowSeconds} onChange={(e) => setWindowSeconds(e.target.value)} type="number" style={inputStyle} placeholder="Необязательно" /></label>
+        <label style={boxStyle}><span>Threshold</span><input value={threshold} onChange={(e) => setThreshold(e.target.value)} type="number" min={0} style={inputStyle} placeholder="Авто по detector" /></label>
+        <label style={boxStyle}><span>Окно, сек.</span><input value={windowSeconds} onChange={(e) => setWindowSeconds(e.target.value)} type="number" min={1} style={inputStyle} placeholder="Необязательно" /></label>
         <label style={boxStyle}><span>Timeout, минут</span><input value={timeoutMinutes} onChange={(e) => setTimeoutMinutes(e.target.value)} type="number" min={0} max={40320} style={inputStyle} /></label>
         <label style={{ ...boxStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}><span>Rule enabled</span><input checked={enabled} onChange={(e) => setEnabled(e.target.checked)} type="checkbox" /></label>
         <label style={{ ...boxStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}><span>Игнорировать модераторов</span><input checked={ignoreModerators} onChange={(e) => setIgnoreModerators(e.target.checked)} type="checkbox" /></label>
@@ -120,7 +222,9 @@ export function AutoModRulesPanel(props: {
         <MultiSelect label="Затронутые роли" values={affectedRoleIds} resources={props.roles} onToggle={(id) => toggleSelection(affectedRoleIds, id, setAffectedRoleIds)} />
         <MultiSelect label="Игнорировать роли" values={ignoredRoleIds} resources={props.roles} onToggle={(id) => toggleSelection(ignoredRoleIds, id, setIgnoredRoleIds)} />
       </div>
+
       <label style={boxStyle}><span>Response / template</span><textarea value={messageTemplate} onChange={(e) => setMessageTemplate(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} placeholder="{mention} ..." /></label>
+
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button type="button" disabled={busy} onClick={() => void save()} style={buttonStyle}>{busy ? "Сохраняем…" : editingId !== null ? "Сохранить изменения" : "Создать rule"}</button>
         {editingId !== null && <button type="button" disabled={busy} onClick={resetForm} style={buttonStyleSecondary}>Отмена</button>}
@@ -130,12 +234,17 @@ export function AutoModRulesPanel(props: {
         {rules.map((rule) => (
           <div key={rule.id} style={ruleCard}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <strong style={{ fontSize: 11 }}>{rule.detector}</strong><span style={pill}>{rule.action}</span><span style={pill}>#{rule.id}</span><span style={pill}>{rule.enabled ? "enabled" : "disabled"}</span>
+              <strong style={{ fontSize: 11 }}>{rule.detector}</strong>
+              <span style={pill}>{rule.action}</span>
+              <span style={pill}>#{rule.id}</span>
+              <span style={pill}>{rule.enabled ? "enabled" : "disabled"}</span>
               {rule.threshold !== null && <span style={pill}>threshold {rule.threshold}</span>}
               {rule.timeoutMinutes > 0 && <span style={pill}>timeout {rule.timeoutMinutes}m</span>}
-              <button type="button" disabled={busy} onClick={() => editRule(rule)} style={buttonStyleSecondary}>Изменить</button>
-              <button type="button" disabled={busy} onClick={() => void toggleRule(rule)} style={buttonStyleSecondary}>{rule.enabled ? "Выключить" : "Включить"}</button>
-              <button type="button" disabled={busy} onClick={() => void removeRule(rule.id)} style={deleteButton}>Удалить</button>
+              <div style={{ display: "flex", gap: 6, marginLeft: "auto", flexWrap: "wrap" }}>
+                <button type="button" disabled={busy} onClick={() => editRule(rule)} style={buttonStyleSecondary}>Изменить</button>
+                <button type="button" disabled={busy} onClick={() => void toggleRule(rule)} style={buttonStyleSecondary}>{rule.enabled ? "Выключить" : "Включить"}</button>
+                <button type="button" disabled={busy} onClick={() => void removeRule(rule.id)} style={deleteButton}>Удалить</button>
+              </div>
             </div>
             <div style={{ marginTop: 6, color: "#6d7888", fontSize: 9 }}>
               Каналы: {rule.affectedChannelIds.length ? rule.affectedChannelIds.length : "все"} · роли: {rule.affectedRoleIds.length ? rule.affectedRoleIds.length : "все"} · {rule.ignoreModerators ? "mods ignored" : "mods included"}
