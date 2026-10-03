@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { AnalyticsPanel } from "./analytics-panel";
+import { AutoModRulesPanel } from "./automod-rules-panel";
 import { AutomationPanel } from "./automation-panel";
 import { BackupPanel } from "./backup-panel";
 import { CommandPolicyPanel } from "./command-policy-panel";
@@ -1422,6 +1423,18 @@ function ModulePage(props: {
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Escalation rules" eyebrow="OPERATIONS" />
           <ModerationPanel guildId={props.guildId} onChanged={props.onAudit} />
+        </section>
+      )}
+
+      {props.module?.key === "automod" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Правила AutoMod" eyebrow="RULE EDITOR" />
+          <AutoModRulesPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            roles={props.resources.roles.filter((item) => item.manageable !== false)}
+            onChanged={props.onAudit}
+          />
         </section>
       )}
 
