@@ -34,6 +34,7 @@ import { BotIdentityRepository } from "./bot-identity.js";
 import { ConfigTransferService } from "./config-transfer.js";
 import { BackupService } from "./backup.js";
 import { CustomCommandService } from "./custom-commands.js";
+import { AutoResponder } from "./modules/autoresponder.js";
 import { CommandPolicyService } from "./command-policy.js";
 import { Polls } from "./modules/polls.js";
 import { Reputation } from "./modules/reputation.js";
@@ -108,6 +109,7 @@ async function main(): Promise<void> {
   const analytics = new Analytics(database);
   const music = new Music(database, config, identities);
   const customCommands = new CustomCommandService(database, config);
+  const autoResponder = new AutoResponder(database);
   const commandPolicy = new CommandPolicyService(database);
   const polls = new Polls(database);
   const reputation = new Reputation(database);
@@ -180,6 +182,7 @@ async function main(): Promise<void> {
   modules.register(analytics);
   modules.register(music);
   modules.register(customCommands);
+  modules.register(autoResponder);
   modules.register(polls);
   modules.register(reputation);
   modules.register(birthdays);
@@ -237,6 +240,7 @@ async function main(): Promise<void> {
     transfer,
     backups,
     customCommands,
+    autoResponder,
     moderation,
     music,
     leveling,

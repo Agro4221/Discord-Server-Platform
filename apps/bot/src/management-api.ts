@@ -10,6 +10,7 @@ import { guildResources } from "./discord/resources.js";
 import { ConfigTransferService } from "./config-transfer.js";
 import { BackupService } from "./backup.js";
 import type { CustomCommandService } from "./custom-commands.js";
+import type { AutoResponder, AutoResponderInput } from "./modules/autoresponder.js";
 import type { Moderation } from "./modules/moderation.js";
 import type { Music } from "./modules/music.js";
 import type { Leveling } from "./modules/leveling.js";
@@ -93,6 +94,7 @@ type ApiOptions = {
     deleteTemplate: (guildId: string, name: string) => Promise<boolean>;
   };
   customCommands?: CustomCommandService;
+  autoResponder?: AutoResponder;
   moderation?: Moderation;
   music?: Music;
   leveling?: Leveling;
@@ -1410,6 +1412,86 @@ export class ManagementApiServer {
               userId,
               cases: await this.options.moderation.history(guildId, userId, 50)
             });
+            return;
+          }
+
+          const autoResponderMatch = path.match(/^\/api\/guilds\/([^/]+)\/autoresponder$/);
+          const autoResponderItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/autoresponder\/(\d+)$/);
+
+          if ((autoResponderMatch || autoResponderItemMatch) && !this.options.autoResponder) {
+            this.json(res, 500, { error: "autoresponder_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && autoResponderMatch) {
+            const guildId = autoResponderMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, rules: await this.options.autoResponder!.list(guildId) });
+            return;
+          }
+
+          if ((method === "POST" || method === "PUT") && (autoResponderMatch || autoResponderItemMatch)) {
+            const guildId = autoResponderMatch?.[1] ?? autoResponderItemMatch?.[1] ?? "";
+            const id = autoResponderItemMatch ? Number(autoResponderItemMatch[2]) : null;
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || (id !== null && !Number.isSafeInteger(id))) {
+              this.json(res, 404, { error: "guild_or_autoresponder_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const input: AutoResponderInput = {
+              trigger: typeof body.trigger === "string" ? body.trigger : "",
+              matchType: typeof body.matchType === "string" ? body.matchType as AutoResponderInput["matchType"] : "contains",
+              response: typeof body.response === "string" ? body.response : "",
+              enabled: typeof body.enabled === "boolean" ? body.enabled : true,
+              deleteTrigger: typeof body.deleteTrigger === "boolean" ? body.deleteTrigger : false,
+              cooldownSeconds: typeof body.cooldownSeconds === "number" ? body.cooldownSeconds : 0,
+              priority: typeof body.priority === "number" ? body.priority : 0,
+              allowedRoleIds: Array.isArray(body.allowedRoleIds) ? body.allowedRoleIds.filter((v: unknown): v is string => typeof v === "string") : [],
+              ignoredRoleIds: Array.isArray(body.ignoredRoleIds) ? body.ignoredRoleIds.filter((v: unknown): v is string => typeof v === "string") : [],
+              allowedChannelIds: Array.isArray(body.allowedChannelIds) ? body.allowedChannelIds.filter((v: unknown): v is string => typeof v === "string") : [],
+              ignoredChannelIds: Array.isArray(body.ignoredChannelIds) ? body.ignoredChannelIds.filter((v: unknown): v is string => typeof v === "string") : []
+            };
+            const result = id === null
+              ? await this.options.autoResponder!.create(guildId, input)
+              : await this.options.autoResponder!.update(guildId, id, input);
+            if (id !== null && !result) {
+              this.json(res, 404, { error: "autoresponder_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: id === null ? "autoresponder.created" : "autoresponder.updated",
+              targetType: "autoresponder",
+              targetId: String(id ?? (result as { id?: number })?.id ?? "unknown")
+            });
+            this.json(res, 200, { ok: true, rule: result });
+            return;
+          }
+
+          if (method === "DELETE" && autoResponderItemMatch) {
+            const guildId = autoResponderItemMatch[1] ?? "";
+            const id = Number(autoResponderItemMatch[2]);
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !Number.isSafeInteger(id)) {
+              this.json(res, 404, { error: "guild_or_autoresponder_not_found" });
+              return;
+            }
+            const deleted = await this.options.autoResponder!.delete(guildId, id);
+            if (!deleted) {
+              this.json(res, 404, { error: "autoresponder_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "autoresponder.deleted",
+              targetType: "autoresponder",
+              targetId: String(id)
+            });
+            this.json(res, 200, { ok: true });
             return;
           }
 

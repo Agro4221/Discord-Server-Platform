@@ -199,3 +199,6 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 
 
 - Control Center catalog now includes a dedicated Custom Commands module entry alongside its CRUD panel.
+
+
+- AutoResponder is now a first-class module with persistent rules, scoped matching, cooldown, template rendering and dedicated Dashboard CRUD.

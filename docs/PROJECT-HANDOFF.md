@@ -419,3 +419,9 @@ Live validation, требующая пользовательского окру�
 - Control Center now exposes Custom Commands as a first-class module entry.
 - The specialized builder remains API/audit backed and accepts async audit refresh callbacks.
 - Dashboard panel was simplified to match established panel patterns and avoid redundant client-side memoization.
+
+
+### 2026-10-03 — AutoResponder module
+- Added first-class `autoresponder` module with persistent keyword/phrase rules and Dashboard CRUD.
+- Matching supports exact, contains, starts-with and regex, with role/channel scopes, per-user cooldown and optional source-message deletion.
+- Runtime delivery and configuration changes are written to the durable audit log.

@@ -1018,6 +1018,30 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_afk_users_guild ON afk_users(guild_id);"
     ])
+  },
+  {
+    version: 65,
+    name: "autoresponder_rules",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS autoresponder_rules (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  trigger text NOT NULL CHECK(length(trigger) BETWEEN 1 AND 300),",
+      "  match_type text NOT NULL CHECK(match_type IN ('exact','contains','starts-with','regex')),",
+      "  response text NOT NULL CHECK(length(response) BETWEEN 1 AND 2000),",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  delete_trigger boolean NOT NULL DEFAULT false,",
+      "  cooldown_seconds integer NOT NULL DEFAULT 0 CHECK(cooldown_seconds BETWEEN 0 AND 86400),",
+      "  priority integer NOT NULL DEFAULT 0 CHECK(priority BETWEEN -1000 AND 1000),",
+      "  allowed_role_ids text[] NOT NULL DEFAULT '{}',",
+      "  ignored_role_ids text[] NOT NULL DEFAULT '{}',",
+      "  allowed_channel_ids text[] NOT NULL DEFAULT '{}',",
+      "  ignored_channel_ids text[] NOT NULL DEFAULT '{}',",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_autoresponder_rules_guild_priority ON autoresponder_rules(guild_id,enabled,priority DESC,id ASC);"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {

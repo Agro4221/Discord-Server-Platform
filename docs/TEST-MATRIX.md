@@ -117,3 +117,9 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-03 — Custom Commands / Dashboard builder
 - Verified backend/shared-module work remains covered by existing bot typecheck/test gates.
 - Dashboard-specific builder follows existing functional-panel patterns; live browser CRUD and Discord registration remain release-gate validation.
+
+
+### 2026-10-03 — AutoResponder / keyword triggers
+- Pure matcher coverage added for exact/contains/starts-with/regex semantics and template rendering.
+- PostgreSQL migration coverage now includes autoresponder_rules.
+- Live Discord trigger delivery, permissions and role/channel scoping remain release-gate validation.

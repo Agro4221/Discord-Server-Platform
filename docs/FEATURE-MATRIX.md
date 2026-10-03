@@ -77,6 +77,7 @@
 | Polls / suggestions | ✅ | Polls + Suggestions implemented
 | Birthdays / achievements | ✅ |
 | Invite tracking | ✅ |
+| AutoResponder / keyword triggers | ✅ | Dashboard CRUD, persistent rules, scopes, cooldown and template rendering |
 | Server statistics / counters | ✅ | Live `/stats` + persistent message/member/voice counters |
 | Embed builder | ✅ | `/embed` с title, description, URL, color, footer, image и thumbnail |
 | Sticky messages / scheduled messages | ✅ | `/schedule` + persistent `/sticky` messages with automatic refresh |

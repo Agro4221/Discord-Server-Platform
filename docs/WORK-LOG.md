@@ -300,3 +300,12 @@ Never write credentials, tokens or private user data here.
 - Added Custom Commands metadata to the Control Center catalog and included it in panel-aware rendering.
 - Updated Feature Matrix / Handoff / State / Test Matrix so the current UI contract is documented and resumable from a fresh chat.
 - Next engineering pass remains focused on platform breadth (not music-only), after restoring Dashboard CI.
+
+
+## 2026-10-03 — AutoResponder / keyword triggers
+- Implemented a dedicated `autoresponder` platform module on the shared PlatformEventBus.
+- Added migration 65 with persistent rules, scopes, priority, cooldown and delete-source policy.
+- Added Management API CRUD with audit events and Dashboard editor.
+- Added exact/contains/starts-with/regex matching plus `{user}`, `{mention}`, `{server}`, `{channel}` templates.
+- Added per-user cooldown and guild module lifecycle integration.
+- Updated migration integration checks and canonical project logs.

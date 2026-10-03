@@ -8,6 +8,7 @@ import { AutomationPanel } from "./automation-panel";
 import { BackupPanel } from "./backup-panel";
 import { CommandPolicyPanel } from "./command-policy-panel";
 import { CustomCommandsPanel } from "./custom-commands-panel";
+import { AutoResponderPanel } from "./autoresponder-panel";
 import { FleetPanel } from "./fleet-panel";
 import { EmbedBuilderPanel } from "./embed-builder-panel";
 import { GiveawaysPanel } from "./giveaways-panel";
@@ -406,6 +407,21 @@ const MODULE_META: Record<string, ModuleMeta> = {
     ],
     kind: "full"
   },
+  autoresponder: {
+    icon: "↻",
+    accent: "#79c7dd",
+    title: "AutoResponder",
+    summary: "Автоматические ответы на ключевые слова и фразы.",
+    category: "automation",
+    commands: ["Dashboard"],
+    functions: [
+      { title: "Triggers", description: "Точные, частичные, prefix и regex-сопоставления." },
+      { title: "Scopes", description: "Ограничения по ролям и каналам." },
+      { title: "Cooldown", description: "Per-user cooldown для защиты от зацикливания и спама." },
+      { title: "Templates", description: "Переменные user, mention, server и channel." }
+    ],
+    kind: "full"
+  },
   analytics: {
     icon: "▥",
     accent: "#7cc9b8",
@@ -421,7 +437,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "custom-commands", "automod", "embed", "roles", "giveaways", "analytics", "automation", "notifications", "stream-alerts"]);
+const PANEL_KEYS = new Set(["moderation", "custom-commands", "autoresponder", "automod", "embed", "roles", "giveaways", "analytics", "automation", "notifications", "stream-alerts"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1439,6 +1455,13 @@ function ModulePage(props: {
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Escalation rules" eyebrow="OPERATIONS" />
           <ModerationPanel guildId={props.guildId} onChanged={props.onAudit} />
+        </section>
+      )}
+
+      {props.module?.key === "autoresponder" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="AutoResponder" eyebrow="KEYWORD TRIGGERS" />
+          <AutoResponderPanel guildId={props.guildId} channels={props.resources.channels.filter((item) => item.type === 0)} roles={props.resources.roles} onChanged={props.onAudit} />
         </section>
       )}
 
