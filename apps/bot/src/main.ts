@@ -6,6 +6,7 @@ import { logger } from "./logger.js";
 import { ModuleRegistry } from "./module-registry.js";
 import { TemporaryVoice } from "./modules/temporary-voice.js";
 import { Moderation } from "./modules/moderation.js";
+import { ModerationPresets } from "./modules/moderation-presets.js";
 import { AutoMod } from "./modules/automod.js";
 import { Welcome } from "./modules/welcome.js";
 import { Leveling } from "./modules/leveling.js";
@@ -107,6 +108,7 @@ async function main(): Promise<void> {
   const verification = new Verification(database);
   const analytics = new Analytics(database);
   const music = new Music(database, config, identities);
+  const moderationPresets = new ModerationPresets(database, autoMod, security, moderation);
   const automation = new AutomationEngine(database, moderation, {
     tickets,
     giveaways,
@@ -255,6 +257,12 @@ async function main(): Promise<void> {
       updateTicketMetadata: async (guildId, ticketId, input) => tickets.updateTicketMetadata(guildId, ticketId, input)
     },
     moderation,
+    moderationPresets: {
+      list: async (guildId) => moderationPresets.list(guildId),
+      saveCurrent: async (guildId, name) => moderationPresets.saveCurrent(guildId, name),
+      apply: async (guildId, name) => moderationPresets.apply(guildId, name),
+      delete: async (guildId, name) => moderationPresets.delete(guildId, name)
+    },
     music,
     leveling,
     autoMod,
