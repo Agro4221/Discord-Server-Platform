@@ -557,6 +557,10 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
     new SlashCommandBuilder()
       .setName("analytics")
       .setDescription("Server analytics"),
+
+    new SlashCommandBuilder()
+      .setName("stats")
+      .setDescription("Show live server statistics"),
     new SlashCommandBuilder()
       .setName("automod")
       .setDescription("AutoMod")
