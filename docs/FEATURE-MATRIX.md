@@ -402,7 +402,7 @@ Music должен стремиться к функциональности си
 | Custom form fields / validation | 🟡 |
 | Custom ticket buttons/messages | ✅ | Dashboard-configurable panel title/description and create/claim/close button labels, used by ticket flows |
 | Linked/related panels | 🟡 |
-| Ticket tags / priorities / assignment state | 🟡 |
+| Ticket tags / priorities / assignment state | ✅ | Persistent priority/tags with staff queue, existing claim/status state and Dashboard editing |
 | Staff SLA / reminders / escalation | 🟡 |
 
 #### Community / Engagement
