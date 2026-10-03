@@ -199,4 +199,11 @@ Never write credentials, tokens or private user data here.
 - Added docs/NATIVE-SETUP.md, native environment documentation and ignored .native-runtime/ launcher state.
 - Docker local launcher now avoids image rebuilds on normal starts; -Rebuild performs an explicit no-cache image rebuild.
 - Recommended single-PC gaming/streaming path: native mode, one Lavalink, Dashboard off except during administration.
-- Live Windows runtime and actual Sea of Thieves + OBS + multi-RTMP load still require validation on the user's PC.
+- Live Windows runtime and actual Sea of Thieves + OBS + multi-RTMP load still require validation on the user's PC.## 2026-10-03 — Utility / AFK feature pass
+- Added the new `utility` module to the Core module registry and Dashboard catalog; it is enabled by default unless explicitly disabled for a guild.
+- Added `/serverinfo`, `/userinfo`, `/avatar`, `/membercount`, `/roleinfo`, `/channelinfo` plus `/afk set|clear|status`; matching prefix commands are wired through the existing command-policy router.
+- Added persistent AFK storage in migration 40, automatic AFK removal on the user's next normal message, and AFK mention notifications.
+- Added Utility metadata to Control Center so the module appears as a functional feature rather than an unclassified catalog item.
+- Added deterministic tests for AFK formatting/reason normalization and slash-command registration.
+- The container cannot resolve github.com, so local clone/build execution was unavailable. GitHub Actions CI for the immediately preceding test commit was observed in progress; the later cache-consistency fix requires a fresh green run before being called CI-verified.
+
