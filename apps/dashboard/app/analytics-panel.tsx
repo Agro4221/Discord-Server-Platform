@@ -162,10 +162,25 @@ export function AnalyticsPanel({ guildId }: { guildId: string }) {
           </section>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
-          <Metric label="Сообщений всего" value={formatNumber(report.counters.messageCount)} />
-          <Metric label="Входов / выходов" value={formatNumber(report.counters.memberJoins) + " / " + formatNumber(report.counters.memberLeaves)} />
-          <Metric label="Voice событий" value={formatNumber(report.counters.voiceJoins + report.counters.voiceLeaves + report.counters.voiceMoves)} />
-        </div>
+            {settings.visibleCounters.includes("message") && (
+              <Metric label="Сообщений всего" value={formatNumber(report.counters.messageCount)} />
+            )}
+            {settings.visibleCounters.includes("member_join") && (
+              <Metric label="Входов" value={formatNumber(report.counters.memberJoins)} />
+            )}
+            {settings.visibleCounters.includes("member_leave") && (
+              <Metric label="Выходов" value={formatNumber(report.counters.memberLeaves)} />
+            )}
+            {settings.visibleCounters.includes("voice_join") && (
+              <Metric label="Voice входы" value={formatNumber(report.counters.voiceJoins)} />
+            )}
+            {settings.visibleCounters.includes("voice_leave") && (
+              <Metric label="Voice выходы" value={formatNumber(report.counters.voiceLeaves)} />
+            )}
+            {settings.visibleCounters.includes("voice_move") && (
+              <Metric label="Voice перемещения" value={formatNumber(report.counters.voiceMoves)} />
+            )}
+          </div>
         </>
       )}
 
