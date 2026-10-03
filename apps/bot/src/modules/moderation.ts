@@ -194,35 +194,41 @@ export class Moderation implements PlatformModule {
     const botMember = guild.members.me;
     if (!botMember) throw new Error("bot_member_not_found");
 
+    const textChannel = channel.type === 0 || channel.type === 5 ? channel : null;
+    const manageableChannel = "permissionOverwrites" in channel ? channel : null;
+
     if (action === "clear") {
-      if (channel.type !== 0 && channel.type !== 5) throw new Error("text_channel_required");
-      if (!botMember.permissions.has(PermissionFlagsBits.ManageMessages) || !channel.permissionsFor(botMember)?.has(PermissionFlagsBits.ManageMessages)) {
+      if (!textChannel) throw new Error("text_channel_required");
+      const permissions = textChannel.permissionsFor(botMember);
+      if (!botMember.permissions.has(PermissionFlagsBits.ManageMessages) || !permissions?.has(PermissionFlagsBits.ManageMessages)) {
         throw new Error("bot_missing_manage_messages");
       }
       if (!Number.isInteger(value) || value < 1 || value > 100) throw new Error("invalid_clear_amount");
-      const deleted = await channel.bulkDelete(value, true);
+      const deleted = await textChannel.bulkDelete(value, true);
       return { action, channelId, affected: deleted.size };
     }
 
-    if (!botMember.permissions.has(PermissionFlagsBits.ManageChannels) || !channel.permissionsFor(botMember)?.has(PermissionFlagsBits.ManageChannels)) {
+    if (!botMember.permissions.has(PermissionFlagsBits.ManageChannels) || !manageableChannel?.permissionsFor(botMember)?.has(PermissionFlagsBits.ManageChannels)) {
       throw new Error("bot_missing_manage_channels");
     }
 
     if (action === "slowmode") {
-      if (channel.type !== 0 && channel.type !== 5) throw new Error("text_channel_required");
+      if (!textChannel) throw new Error("text_channel_required");
       if (!Number.isInteger(value) || value < 0 || value > 21600) throw new Error("invalid_slowmode");
-      await channel.setRateLimitPerUser(value, "Configured by Vexa Control Center");
+      await textChannel.setRateLimitPerUser(value, "Configured by Vexa Control Center");
       return { action, channelId, seconds: value };
     }
 
+    if (!manageableChannel) throw new Error("channel_not_manageable");
+
     const everyone = guild.roles.everyone;
     if (action === "lock") {
-      const current = channel.permissionsFor(everyone)?.has(PermissionFlagsBits.SendMessages) ?? null;
+      const current = manageableChannel.permissionsFor(everyone)?.has(PermissionFlagsBits.SendMessages) ?? null;
       await this.db.query(
         "INSERT INTO moderation_channel_locks(guild_id,channel_id,previous_send_messages) VALUES($1,$2,$3) ON CONFLICT(guild_id,channel_id) DO NOTHING",
         [guildId, channelId, current]
       );
-      await channel.permissionOverwrites.edit(everyone, { SendMessages: false }, { reason: "Vexa Control Center channel lock" });
+      await manageableChannel.permissionOverwrites.edit(everyone, { SendMessages: false }, { reason: "Vexa Control Center channel lock" });
       return { action, channelId };
     }
 
@@ -232,7 +238,7 @@ export class Moderation implements PlatformModule {
         [guildId, channelId]
       );
       const previous = stored.rows[0]?.previous_send_messages ?? null;
-      await channel.permissionOverwrites.edit(everyone, { SendMessages: previous }, { reason: "Vexa Control Center channel unlock" });
+      await manageableChannel.permissionOverwrites.edit(everyone, { SendMessages: previous }, { reason: "Vexa Control Center channel unlock" });
       return { action, channelId };
     }
 
