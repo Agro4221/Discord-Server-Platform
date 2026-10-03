@@ -300,7 +300,7 @@ Dashboard является основным способом редактиро�
 
 - обычные moderation actions;
 - Economy user actions;
-- создание shop items;
++ управление shop items через Control Center; команда `/shop create` остаётся доступной как Discord fallback;
 - Reminders;
 - часть первичной настройки slash workflows.
 
