@@ -56,6 +56,7 @@ type ApiOptions = {
       mentionRoleId?: string | null;
       intervalSeconds: number;
       enabled?: boolean;
+      messageTemplate?: string;
     }) => Promise<unknown>;
     update: (guildId: string, alertId: number, input: {
       target?: string;
@@ -63,6 +64,7 @@ type ApiOptions = {
       mentionRoleId?: string | null;
       intervalSeconds?: number;
       enabled?: boolean;
+      messageTemplate?: string;
     }) => Promise<boolean>;
     delete: (guildId: string, alertId: number) => Promise<boolean>;
   };
