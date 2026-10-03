@@ -246,6 +246,15 @@ export class Moderation implements PlatformModule {
     return result.rows[0] ? Number(result.rows[0].id) : null;
   }
 
+  async lockdownStatus(guildId: string): Promise<{ active: boolean; lockedChannels: number }> {
+    const result = await this.db.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM moderation_channel_locks WHERE guild_id=$1",
+      [guildId]
+    );
+    const lockedChannels = Number(result.rows[0]?.count ?? 0);
+    return { active: lockedChannels > 0, lockedChannels };
+  }
+
   async applyLockdown(guildId: string, actorUserId: string): Promise<{ locked: number; failed: number }> {
     if (!await this.enabled(guildId)) throw new Error("moderation_disabled");
     const guild = this.client?.guilds.cache.get(guildId);
