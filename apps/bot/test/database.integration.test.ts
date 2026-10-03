@@ -27,8 +27,12 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
     );
     assert.equal(tables.rows.length, 14);
     const version = (await db.query("SELECT max(version) AS version FROM schema_migrations")).rows[0]?.version;
-    assert.equal(Number(version), 68);
-    assert.equal(Number(first.rows[0]?.count), 68);
+    const retryColumn = await db.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='automation_delayed_jobs' AND column_name='dead_lettered_at'"
+    );
+    assert.equal(retryColumn.rows.length, 1);
+    assert.equal(Number(version), 69);
+    assert.equal(Number(first.rows[0]?.count), 69);
   } finally {
     await db.close();
   }
