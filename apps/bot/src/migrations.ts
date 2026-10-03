@@ -666,7 +666,41 @@ const migrations = [
       "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS request_channel_id text;"
     ])
   },
-] as const;
+,
+  {
+    version: 41,
+    name: "role_panel_selection_modes",
+    sql: q([
+      "ALTER TABLE role_panels ADD COLUMN IF NOT EXISTS selection_mode text NOT NULL DEFAULT 'toggle' CHECK(selection_mode IN ('toggle','exclusive','max'));",
+      "ALTER TABLE role_panels ADD COLUMN IF NOT EXISTS max_selections integer NOT NULL DEFAULT 1 CHECK(max_selections BETWEEN 1 AND 5);"
+    ])
+  },
+  {
+    version: 42,
+    name: "ticket_limits_and_activity",
+    sql: q([
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS max_open_per_user integer NOT NULL DEFAULT 1 CHECK(max_open_per_user BETWEEN 1 AND 10);",
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS auto_close_minutes integer NOT NULL DEFAULT 0 CHECK(auto_close_minutes BETWEEN 0 AND 43200);",
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS last_activity_at timestamptz NOT NULL DEFAULT now();",
+      "CREATE INDEX IF NOT EXISTS idx_tickets_auto_close ON tickets(status,last_activity_at);"
+    ])
+  },
+  {
+    version: 43,
+    name: "moderation_notes_and_timed_timeout_resolution",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS moderation_notes (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  target_user_id text NOT NULL,",
+      "  moderator_user_id text NOT NULL,",
+      "  note text NOT NULL,",
+      "  created_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_moderation_notes_guild_target ON moderation_notes(guild_id,target_user_id,created_at DESC);"
+    ])
+  }
+ ] as const;
 
 export async function migrate(db: Database): Promise<void> {
   await db.query(q([
