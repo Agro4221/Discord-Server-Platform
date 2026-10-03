@@ -1060,6 +1060,25 @@ const migrations = [
     ])
   },
   {
+    version: 70,
+    name: "automation_workflow_presets",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS automation_workflow_presets (",
+      "  guild_id text NOT NULL,",
+      "  name text NOT NULL,",
+      "  event text NOT NULL,",
+      "  conditions jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  any_conditions jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  actions jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  cooldown_seconds integer NOT NULL DEFAULT 0 CHECK(cooldown_seconds BETWEEN 0 AND 86400),",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,name)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_automation_workflow_presets_guild_updated ON automation_workflow_presets(guild_id,updated_at DESC);"
+    ])
+  },
+  {
     version: 69,
     name: "automation_delayed_retry_dead_letter",
     sql: q([
