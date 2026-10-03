@@ -284,6 +284,40 @@ export class Economy implements PlatformModule {
     }));
   }
 
+  async dashboardAccounts(guildId: string): Promise<Array<{ userId: string; balance: string; displayName: string }>> {
+    const result = await this.db.query<{ user_id: string; balance: string }>(
+      "SELECT user_id,balance::text AS balance FROM economy_accounts WHERE guild_id=$1 ORDER BY balance DESC,user_id LIMIT 100",
+      [guildId]
+    );
+    const guild = this.clientForDashboardGuild(guildId);
+    return result.rows.map((row) => ({
+      userId: row.user_id,
+      balance: row.balance,
+      displayName: guild?.members.cache.get(row.user_id)?.displayName ?? row.user_id
+    }));
+  }
+
+  async dashboardSetBalance(guildId: string, userId: string, balance: string): Promise<string> {
+    if (!/^\d{15,25}$/.test(userId)) throw new Error("invalid_economy_user");
+    if (!/^\d+$/.test(balance)) throw new Error("invalid_economy_balance");
+    let amount: bigint;
+    try {
+      amount = BigInt(balance);
+    } catch {
+      throw new Error("invalid_economy_balance");
+    }
+    const max = 9223372036854775807n;
+    if (amount < 0n || amount > max) throw new Error("invalid_economy_balance");
+
+    const result = await this.db.query<{ balance: string }>(
+      "INSERT INTO economy_accounts(guild_id,user_id,balance,last_daily,updated_at) VALUES($1,$2,$3,NULL,now()) " +
+      "ON CONFLICT(guild_id,user_id) DO UPDATE SET balance=EXCLUDED.balance,updated_at=now() " +
+      "RETURNING balance::text AS balance",
+      [guildId, userId, amount.toString()]
+    );
+    return result.rows[0]?.balance ?? amount.toString();
+  }
+
   async createDashboardItem(
     guildId: string,
     input: { name: string; description: string; price: number; roleId?: string | null; stock?: number | null }
