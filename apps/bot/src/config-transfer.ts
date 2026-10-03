@@ -37,6 +37,7 @@ const CONFIG_TABLES: ExportTable[] = [
 
 const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
   { table: "automation_rules", fields: ["name","enabled","event","conditions","any_conditions","actions","cooldown_seconds"] },
+  { table: "automation_workflow_presets", fields: ["name","event","conditions","any_conditions","actions","cooldown_seconds"] },
   { table: "role_panels", fields: ["channel_id","message_id","title","roles","selection_mode","max_selections","duration_minutes"] },
   { table: "stream_alerts", fields: ["platform","target","channel_id","mention_role_id","enabled","interval_seconds","message_template"] }
 ];
@@ -425,6 +426,14 @@ function validateExport(payload: unknown): asserts payload is ServerConfigExport
 }
 
 
+type NormalizedAutomationPreset = {
+  name: string;
+  event: AutomationEvent;
+  conditions: AutomationCondition[];
+  anyConditions: AutomationCondition[];
+  actions: AutomationAction[];
+  cooldownSeconds: number;
+};
 type NormalizedAutomationRule = {
   name: string;
   enabled: boolean;
@@ -435,6 +444,49 @@ type NormalizedAutomationRule = {
   cooldownSeconds: number;
 };
 
+function normalizeImportedAutomationPreset(value: unknown): NormalizedAutomationPreset {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("invalid_automation_workflow_preset");
+  }
+
+  const object = value as Record<string, unknown>;
+  if (
+    typeof object.name !== "string" ||
+    object.name.trim().length === 0 ||
+    object.name.length > 40 ||
+    typeof object.event !== "string" ||
+    !Array.isArray(object.conditions) ||
+    !Array.isArray(object.any_conditions) ||
+    !Array.isArray(object.actions)
+  ) {
+    throw new Error("invalid_automation_workflow_preset");
+  }
+
+  const cooldownSeconds = Number(object.cooldown_seconds ?? 0);
+  if (!Number.isInteger(cooldownSeconds) || cooldownSeconds < 0 || cooldownSeconds > 86400) {
+    throw new Error("invalid_automation_workflow_preset");
+  }
+
+  validateAutomationRule(
+    object.event as AutomationEvent,
+    [...(object.conditions as AutomationCondition[]), ...(object.any_conditions as AutomationCondition[])],
+    object.actions as AutomationAction[]
+  );
+
+  const normalizedName = object.name.trim().toLowerCase();
+  if (!/^[a-z0-9_-]{1,40}$/.test(normalizedName)) {
+    throw new Error("invalid_automation_workflow_preset_name");
+  }
+
+  return {
+    name: normalizedName,
+    event: object.event as AutomationEvent,
+    conditions: object.conditions as AutomationCondition[],
+    anyConditions: object.any_conditions as AutomationCondition[],
+    actions: object.actions as AutomationAction[],
+    cooldownSeconds
+  };
+}
 function normalizeImportedAutomationRule(value: unknown): NormalizedAutomationRule {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("invalid_automation_rule");
