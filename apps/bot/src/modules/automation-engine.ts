@@ -158,7 +158,11 @@ export class AutomationEngine implements PlatformModule {
         guildId: event.guildId,
         userId: event.userId,
         content: event.eventType,
-        numeric: { incidentId: event.incidentId, actionCount: event.actionCount, joinCount: event.joinCount }
+        numeric: {
+          incidentId: event.incidentId,
+          actionCount: event.actionCount ?? 0,
+          joinCount: event.joinCount ?? 0
+        }
       }))
     ];
 
