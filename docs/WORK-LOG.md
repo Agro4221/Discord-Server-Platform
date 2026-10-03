@@ -309,3 +309,9 @@ Never write credentials, tokens or private user data here.
 - Added exact/contains/starts-with/regex matching plus `{user}`, `{mention}`, `{server}`, `{channel}` templates.
 - Added per-user cooldown and guild module lifecycle integration.
 - Updated migration integration checks and canonical project logs.
+
+
+## 2026-10-03 — AutoResponder performance hardening
+- Added a short per-guild rule cache so message processing does not query PostgreSQL for the full rule list on every message.
+- Cache entries are invalidated by create/update/delete and cleared on module shutdown.
+- Added deterministic test coverage for cache reuse.

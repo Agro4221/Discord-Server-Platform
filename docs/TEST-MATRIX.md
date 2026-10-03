@@ -123,3 +123,5 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Pure matcher coverage added for exact/contains/starts-with/regex semantics and template rendering.
 - PostgreSQL migration coverage now includes autoresponder_rules.
 - Live Discord trigger delivery, permissions and role/channel scoping remain release-gate validation.
+
+- AutoResponder cache reuse is covered by deterministic bot tests; live message throughput remains a runtime validation target.

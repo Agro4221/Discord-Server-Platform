@@ -202,3 +202,5 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 
 
 - AutoResponder is now a first-class module with persistent rules, scoped matching, cooldown, template rendering and dedicated Dashboard CRUD.
+
+- AutoResponder rule cache limits PostgreSQL reads to a short per-guild TTL and is invalidated on rule mutations.

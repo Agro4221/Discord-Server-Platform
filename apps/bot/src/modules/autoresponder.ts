@@ -44,6 +44,8 @@ export class AutoResponder implements PlatformModule {
   readonly name = "autoresponder";
   private unsubscribe?: () => void;
   private readonly cooldowns = new Map<string, number>();
+  private readonly ruleCache = new Map<string, { expiresAt: number; rules: AutoResponderRecord[] }>();
+  private static readonly RULE_CACHE_TTL_MS = 5_000;
 
   constructor(private readonly db: Database) {}
 
@@ -56,9 +58,21 @@ export class AutoResponder implements PlatformModule {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.cooldowns.clear();
+    this.ruleCache.clear();
   }
 
   async list(guildId: string): Promise<AutoResponderRecord[]> {
+    const now = Date.now();
+    const cached = this.ruleCache.get(guildId);
+    if (cached && cached.expiresAt > now) {
+      return cached.rules.map((rule) => ({
+        ...rule,
+        allowedRoleIds: [...rule.allowedRoleIds],
+        ignoredRoleIds: [...rule.ignoredRoleIds],
+        allowedChannelIds: [...rule.allowedChannelIds],
+        ignoredChannelIds: [...rule.ignoredChannelIds]
+      }));
+    }
     const result = await this.db.query<Record<string, unknown>>(
       `SELECT id,guild_id,trigger,match_type,response,enabled,delete_trigger,
               cooldown_seconds,priority,allowed_role_ids,ignored_role_ids,
@@ -66,7 +80,15 @@ export class AutoResponder implements PlatformModule {
        FROM autoresponder_rules WHERE guild_id=$1 ORDER BY priority DESC,id ASC`,
       [guildId]
     );
-    return result.rows.map((row) => this.mapRow(row));
+    const rules = result.rows.map((row) => this.mapRow(row));
+    this.ruleCache.set(guildId, { expiresAt: now + AutoResponder.RULE_CACHE_TTL_MS, rules });
+    return rules.map((rule) => ({
+      ...rule,
+      allowedRoleIds: [...rule.allowedRoleIds],
+      ignoredRoleIds: [...rule.ignoredRoleIds],
+      allowedChannelIds: [...rule.allowedChannelIds],
+      ignoredChannelIds: [...rule.ignoredChannelIds]
+    }));
   }
 
   async create(guildId: string, input: AutoResponderInput): Promise<AutoResponderRecord> {
@@ -97,6 +119,7 @@ export class AutoResponder implements PlatformModule {
       "INSERT INTO guild_modules(guild_id,module_key,enabled) VALUES($1,'autoresponder',true) ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()",
       [guildId]
     );
+    this.ruleCache.delete(guildId);
     return (await this.get(guildId, id))!;
   }
 
@@ -125,6 +148,7 @@ export class AutoResponder implements PlatformModule {
         normalized.ignoredChannelIds
       ]
     );
+    this.ruleCache.delete(guildId);
     return this.get(guildId, id);
   }
 
@@ -133,6 +157,7 @@ export class AutoResponder implements PlatformModule {
       "DELETE FROM autoresponder_rules WHERE guild_id=$1 AND id=$2",
       [guildId, id]
     );
+    if (result.rowCount === 1) this.ruleCache.delete(guildId);
     return result.rowCount === 1;
   }
 
