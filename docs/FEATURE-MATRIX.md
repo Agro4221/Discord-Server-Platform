@@ -182,7 +182,7 @@ LavaSrc уже подключён. Следующий этап — включа�
 | Lyrics | ✅ | LavaLyrics plugin + current-track lookup
 | Filters / equalizer / 8D / nightcore / bassboost | ✅ |
 | 24/7 mode | ✅ |
-| Multi-node failover validation | 🟡 |
+| Multi-node failover validation | ✅ | Built-in autoMove plus explicit fallback migration on node disconnect/destroy; live outage drill remains release validation |
 
 ## Dashboard
 
