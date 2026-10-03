@@ -285,3 +285,9 @@ Never write credentials, tokens or private user data here.
 - Activated the `emotes` detector alias so it behaves consistently with emoji-count detection.
 - Added per-user/per-detector cooldown enforcement using the rule window so repeated matches do not spam sanctions.
 - CI is the release gate for this increment; live Discord/resource hierarchy remains environment-dependent.
+
+## 2026-10-03 — Custom Commands first-class module
+- Promoted Custom Commands into the shared Module Catalog with a persistent module toggle.
+- Existing execution now respects module state; creating a command enables the module for the guild.
+- Added dedicated Dashboard CRUD for Prefix/Slash mode, aliases, response/alias/role actions and cooldowns.
+- Reused the existing Management API and durable audit events instead of creating a parallel backend.
