@@ -280,10 +280,11 @@ const MODULE_META: Record<string, ModuleMeta> = {
     title: "Напоминания",
     summary: "Напоминания и utility-функции.",
     category: "community",
-    commands: ["/remind"],
+    commands: ["/remind", "/schedule"],
     functions: [
       { title: "Reminders", description: "Отложенное напоминание с повторяемой обработкой фонового worker." },
-      { title: "Retry / lease", description: "Фоновая доставка использует lease/retry semantics." }
+      { title: "Retry / lease", description: "Фоновая доставка использует lease/retry semantics." },
+      { title: "Scheduled messages", description: "Одноразовая публикация в выбранный текстовый канал по таймеру через тот же worker." }
     ],
     kind: "discord"
   },
