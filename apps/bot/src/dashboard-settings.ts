@@ -11,6 +11,7 @@ export type SettingField = {
   min?: number;
   max?: number;
   step?: number;
+  maxLength?: number;
 };
 
 export type ModuleAction = { id: string; label: string; kind?: "safe" | "danger"; confirmation?: string };
@@ -73,10 +74,12 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "message", label: "Сообщение", type: "textarea" },
       { key: "dm", label: "Дублировать в ЛС", type: "boolean" },
       { key: "embed", label: "Embed", type: "boolean" },
+      { key: "imageUrl", label: "Welcome image URL", type: "text", maxLength: 2048, description: "Только HTTPS. Используется как большая картинка embed." },
       { key: "goodbyeEnabled", label: "Goodbye", type: "boolean" },
       { key: "goodbyeChannelId", label: "Канал Goodbye", type: "channel" },
       { key: "goodbyeMessage", label: "Сообщение Goodbye", type: "textarea" },
       { key: "goodbyeEmbed", label: "Goodbye Embed", type: "boolean" },
+      { key: "goodbyeImageUrl", label: "Goodbye image URL", type: "text", maxLength: 2048, description: "Только HTTPS. Используется как большая картинка goodbye embed." },
       { key: "starterRoleIds", label: "Стартовые роли", type: "textarea", description: "ID ролей через пробел." },
       { key: "restoreRoles", label: "Восстанавливать роли вернувшимся", type: "boolean" }
     ]
@@ -207,10 +210,12 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       message: "message",
       dm: "dm",
       embed: "embed",
+      imageUrl: "image_url",
       goodbyeEnabled: "goodbye_enabled",
       goodbyeChannelId: "goodbye_channel_id",
       goodbyeMessage: "goodbye_message",
       goodbyeEmbed: "goodbye_embed",
+      goodbyeImageUrl: "goodbye_image_url",
       starterRoleIds: "starter_role_ids",
       restoreRoles: "restore_roles"
     }
@@ -464,8 +469,17 @@ function validateValues(
 
     if (field.type === "text" || field.type === "channel" || field.type === "role") {
       if (value !== null && typeof value !== "string") throw new Error(`invalid_${field.key}`);
-      if (typeof value === "string" && value.length > 200) throw new Error(`invalid_${field.key}`);
-      result[field.key] = value ?? null;
+      const maxLength = field.maxLength ?? 200;
+      if (typeof value === "string" && value.length > maxLength) throw new Error(`invalid_${field.key}`);
+      if ((field.key === "imageUrl" || field.key === "goodbyeImageUrl") && value) {
+        try {
+          const parsed = new URL(value.trim());
+          if (parsed.protocol !== "https:") throw new Error();
+        } catch {
+          throw new Error(`invalid_${field.key}`);
+        }
+      }
+      result[field.key] = typeof value === "string" ? value.trim() || null : value ?? null;
       continue;
     }
   }
