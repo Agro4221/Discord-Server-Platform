@@ -250,7 +250,9 @@ async function main(): Promise<void> {
       getFormFields: async (guildId) => tickets.getFormFields(guildId),
       setFormFields: async (guildId, fields) => tickets.setFormFields(guildId, fields),
       getCustomization: async (guildId) => tickets.getCustomization(guildId),
-      setCustomization: async (guildId, customization) => tickets.setCustomization(guildId, customization)
+      setCustomization: async (guildId, customization) => tickets.setCustomization(guildId, customization),
+      listTickets: async (guildId, status) => tickets.listTickets(guildId, status),
+      updateTicketMetadata: async (guildId, ticketId, input) => tickets.updateTicketMetadata(guildId, ticketId, input)
     },
     moderation,
     music,
