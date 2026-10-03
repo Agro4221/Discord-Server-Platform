@@ -209,3 +209,10 @@ Never write credentials, tokens or private user data here.
 - Added `/streamalert create` and Dashboard support for Kick alongside the existing Twitch/YouTube/VK alert flow.
 - Migration 62 extends the persistent stream-alert platform constraint to include Kick.
 - Added deterministic tests for Kick target normalization; live provider behavior still requires real Kick developer credentials and a live channel.
+
+
+## 2026-10-03 — Security response policy controls
+- Added persistent Security response policy flags for Anti-Raid quarantine, destructive role removal and destructive quarantine.
+- Exposed the same controls in Dashboard module settings and optional `/security setup` flags.
+- Existing defaults preserve the previous behavior (all three response actions enabled).
+- Added pure helper coverage for policy defaults; full live Discord response and lockdown behavior remain release-gate validation.
