@@ -5,6 +5,14 @@ import { useEffect, useState } from "react";
 type Resource = { id: string; name: string; type?: number; manageable?: boolean };
 type PanelRole = { roleId: string; label: string };
 type RolePanel = { id: number; guildId: string; channelId: string; messageId: string | null; title: string; roles: PanelRole[]; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number };
+type RoleAutomationRule = {
+  id: number;
+  trigger: "member.join" | "voice.join" | "voice.leave";
+  channelId: string;
+  roleId: string;
+  delaySeconds: number;
+  enabled: boolean;
+};
 
 export function RolePanelsEditor({
   guildId,
@@ -18,6 +26,11 @@ export function RolePanelsEditor({
   onChanged?: () => void | Promise<void>;
 }) {
   const [panels, setPanels] = useState<RolePanel[]>([]);
+  const [automationRules, setAutomationRules] = useState<RoleAutomationRule[]>([]);
+  const [automationTrigger, setAutomationTrigger] = useState<RoleAutomationRule["trigger"]>("member.join");
+  const [automationChannelId, setAutomationChannelId] = useState("");
+  const [automationRoleId, setAutomationRoleId] = useState("");
+  const [automationDelaySeconds, setAutomationDelaySeconds] = useState(0);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [title, setTitle] = useState("Выберите роли");
   const [channelId, setChannelId] = useState("");
@@ -30,10 +43,16 @@ export function RolePanelsEditor({
 
   async function load() {
     if (!guildId) return;
-    const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/role-panels", { cache: "no-store" });
+    const [response, automationResponse] = await Promise.all([
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/role-panels", { cache: "no-store" }),
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/role-automation", { cache: "no-store" })
+    ]);
     const body = await response.json().catch(() => ({}));
+    const automationBody = await automationResponse.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.error ?? "role_panels_failed");
+    if (!automationResponse.ok) throw new Error(automationBody.error ?? "role_automation_failed");
     setPanels(body.panels ?? []);
+    setAutomationRules(automationBody.rules ?? []);
   }
 
   useEffect(() => {
@@ -44,6 +63,59 @@ export function RolePanelsEditor({
     void load().catch(() => setError("Не удалось загрузить панели ролей."));
     // guildId is the resource boundary for this editor.
   }, [guildId]);
+
+  async function saveAutomation() {
+    if (!automationRoleId) {
+      setError("Выбери роль для автоматизации.");
+      return;
+    }
+    if (automationTrigger !== "member.join" && !automationChannelId) {
+      setError("Для voice automation нужен голосовой канал.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/role-automation", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          trigger: automationTrigger,
+          channelId: automationTrigger === "member.join" ? undefined : automationChannelId,
+          roleId: automationRoleId,
+          delaySeconds: automationDelaySeconds,
+          enabled: true
+        })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "role_automation_save_failed");
+      setAutomationRoleId("");
+      setAutomationChannelId("");
+      setAutomationDelaySeconds(0);
+      await load();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось сохранить role automation.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeAutomation(id: number) {
+    if (!window.confirm("Удалить это правило выдачи роли?")) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/role-automation/" + id, { method: "DELETE" });
+      if (!response.ok) throw new Error("role_automation_delete_failed");
+      await load();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось удалить role automation.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   function updateRole(index: number, patch: Partial<PanelRole>) {
     setPanelRoles((current) => current.map((role, i) => i === index ? { ...role, ...patch } : role));
@@ -172,6 +244,45 @@ export function RolePanelsEditor({
         <button type="button" disabled={saving} onClick={() => void save()} style={buttonStyle("primary")}>{editingId === null ? "Создать панель" : "Сохранить изменения"}</button>
         {editingId !== null && <button type="button" disabled={saving} onClick={reset} style={buttonStyle("secondary")}>Отмена</button>}
       </div>
+      <div style={{ borderTop: "1px solid #202530", paddingTop: 16, display: "grid", gap: 10 }}>
+        <h4 style={{ margin: 0 }}>Role automation</h4>
+        <div style={{ opacity: 0.48, fontSize: 11 }}>
+          Delayed autorole на входе и voice-role link на вход/выход из голосового канала.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          <select value={automationTrigger} onChange={(event) => setAutomationTrigger(event.target.value as RoleAutomationRule["trigger"])} style={inputStyle}>
+            <option value="member.join">Member join → role</option>
+            <option value="voice.join">Voice join → role</option>
+            <option value="voice.leave">Voice leave → remove role</option>
+          </select>
+          {automationTrigger !== "member.join" ? (
+            <select value={automationChannelId} onChange={(event) => setAutomationChannelId(event.target.value)} style={inputStyle}>
+              <option value="">Голосовой канал</option>
+              {channels.filter((channel) => channel.type === 2 || channel.type === 13).map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+            </select>
+          ) : <div />}
+          <select value={automationRoleId} onChange={(event) => setAutomationRoleId(event.target.value)} style={inputStyle}>
+            <option value="">Роль</option>
+            {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+          </select>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "160px auto", gap: 8 }}>
+          <input type="number" min={0} max={604800} value={automationDelaySeconds} onChange={(event) => setAutomationDelaySeconds(Math.min(604800, Math.max(0, Number(event.target.value) || 0)))} placeholder="Delay seconds" style={inputStyle} />
+          <button type="button" disabled={saving} onClick={() => void saveAutomation()} style={buttonStyle("primary")}>Сохранить правило</button>
+        </div>
+        {automationRules.length ? automationRules.map((rule) => (
+          <div key={rule.id} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center", padding: "8px 0", borderBottom: "1px solid #1d212b" }}>
+            <div>
+              <div>{rule.trigger} · {roles.find((role) => role.id === rule.roleId)?.name ?? rule.roleId}</div>
+              <div style={{ opacity: 0.42, fontSize: 10 }}>
+                {rule.channelId ? "channel " + (channels.find((channel) => channel.id === rule.channelId)?.name ?? rule.channelId) + " · " : ""}delay {rule.delaySeconds}s · {rule.enabled ? "ON" : "OFF"}
+              </div>
+            </div>
+            <button type="button" disabled={saving} onClick={() => void removeAutomation(rule.id)} style={buttonStyle("danger")}>Удалить</button>
+          </div>
+        )) : <div style={{ opacity: 0.42, fontSize: 11 }}>Правил role automation пока нет.</div>}
+      </div>
+
       <div style={{ borderTop: "1px solid #202530", paddingTop: 16, display: "grid", gap: 8 }}>
         <h4 style={{ margin: 0 }}>Опубликованные панели</h4>
         {panels.length === 0 ? <div style={{ opacity: 0.42 }}>Панелей пока нет.</div> : panels.map((panel) => (
