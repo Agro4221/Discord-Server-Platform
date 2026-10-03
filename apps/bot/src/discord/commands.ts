@@ -642,6 +642,33 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .setName("volume")
           .setDescription("Show/change volume")
           .addIntegerOption((o) => o.setName("value").setDescription("0-200").setMinValue(0).setMaxValue(200))
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName("favorite")
+          .setDescription("Manage personal favorites")
+          .addStringOption((o) =>
+            o.setName("action").setDescription("Action").addChoices(
+              { name: "Add current", value: "add" },
+              { name: "Remove current", value: "remove" },
+              { name: "List", value: "list" }
+            ).setRequired(true)
+          )
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName("playlist")
+          .setDescription("Manage saved playlists")
+          .addStringOption((o) =>
+            o.setName("action").setDescription("Action").addChoices(
+              { name: "Create", value: "create" },
+              { name: "Delete", value: "delete" },
+              { name: "List", value: "list" },
+              { name: "Add current", value: "add" },
+              { name: "Load", value: "load" }
+            ).setRequired(true)
+          )
+          .addStringOption((o) => o.setName("name").setDescription("Playlist name").setMaxLength(80))
       ),
     new SlashCommandBuilder()
       .setName("automation")
