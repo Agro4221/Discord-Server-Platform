@@ -1132,6 +1132,7 @@ const migrations = [
     sql: q([
       "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS priority text NOT NULL DEFAULT 'normal' CHECK(priority IN ('low','normal','high','urgent'));",
       "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tags text[] NOT NULL DEFAULT '{}';",
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();",
       "CREATE INDEX IF NOT EXISTS idx_tickets_guild_priority ON tickets(guild_id,status,priority,created_at DESC);"
     ])
   } ] as const;
