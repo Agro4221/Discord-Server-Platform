@@ -16,6 +16,8 @@ type Action =
   | { type: "dm-user"; userId: string; content: string }
   | { type: "add-role" | "remove-role"; userId: string; roleId: string }
   | { type: "timeout"; userId: string; durationSeconds: number; reason: string }
+  | { type: "warn" | "kick"; userId: string; reason: string }
+  | { type: "ban"; userId: string; durationMinutes?: number; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
   | { type: "log"; message: string }
   | { type: "delay"; seconds: number }
@@ -201,6 +203,8 @@ export function AutomationPanel({
       type === "dm-user" ? { type, userId: "@event", content: "" } :
       type === "add-role" || type === "remove-role" ? { type, userId: "@event", roleId: "" } :
       type === "timeout" ? { type, userId: "@event", durationSeconds: 60, reason: "" } :
+      type === "warn" || type === "kick" ? { type, userId: "@event", reason: "" } :
+      type === "ban" ? { type, userId: "@event", reason: "" } :
       type === "delete-message" ? { type, channelId: "@event", messageId: "@event" } :
       type === "delay" ? { type, seconds: 5 } :
       type === "webhook" ? { type, url: "", content: "" } :
@@ -415,6 +419,9 @@ export function AutomationPanel({
               <option value="add-role">add-role</option>
               <option value="remove-role">remove-role</option>
               <option value="timeout">timeout</option>
+              <option value="warn">warn</option>
+              <option value="kick">kick</option>
+              <option value="ban">ban</option>
               <option value="delete-message">delete-message</option>
               <option value="log">log</option>
               <option value="delay">delay</option>
@@ -453,6 +460,21 @@ export function AutomationPanel({
               <div style={actionGrid}>
                 <input value={action.userId} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event или user ID" style={inputStyle} />
                 <input type="number" min={1} max={2419200} value={action.durationSeconds} onChange={(e) => updateAction(index, { durationSeconds: Number(e.target.value) })} style={inputStyle} />
+                <input value={action.reason} maxLength={500} onChange={(e) => updateAction(index, { reason: e.target.value })} placeholder="Причина" style={inputStyle} />
+              </div>
+            )}
+
+            {(action.type === "warn" || action.type === "kick") && (
+              <div style={actionGrid}>
+                <input value={action.userId} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event или user ID" style={inputStyle} />
+                <input value={action.reason} maxLength={500} onChange={(e) => updateAction(index, { reason: e.target.value })} placeholder="Причина" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "ban" && (
+              <div style={actionGrid}>
+                <input value={action.userId} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event или user ID" style={inputStyle} />
+                <input type="number" min={1} max={40320} value={action.durationMinutes ?? ""} onChange={(e) => updateAction(index, { durationMinutes: e.target.value ? Number(e.target.value) : undefined })} placeholder="Срок (мин), пусто = навсегда" style={inputStyle} />
                 <input value={action.reason} maxLength={500} onChange={(e) => updateAction(index, { reason: e.target.value })} placeholder="Причина" style={inputStyle} />
               </div>
             )}
