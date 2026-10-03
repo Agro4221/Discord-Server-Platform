@@ -66,7 +66,24 @@ export type AutomationAction =
   | { type: "delete-message"; channelId: string; messageId: string }
   | { type: "set-nickname"; userId: string; nickname: string | null }
   | { type: "react-message"; channelId: string; messageId: string; emoji: string }
-  | { type: "log"; message: string }
+  | { type: "ticket-close"; ticketId: string }
+  | { type: "giveaway-end"; giveawayId: number }
+  | { type: "giveaway-reroll"; giveawayId: number }
+  | { type: "notification-feed-toggle"; feedId: number; enabled: boolean }
+  | { type: "music-control"; action: AutomationMusicControl; value?: number; mode?: AutomationMusicRepeatMode }
+  | { type: "log"; message: string };
+
+export type AutomationMusicRepeatMode = "off" | "track" | "queue";
+export type AutomationMusicControl =
+  | "pause"
+  | "resume"
+  | "skip"
+  | "stop"
+  | "shuffle"
+  | "repeat"
+  | "seek"
+  | "volume"
+  | "autoplay";
   | { type: "delay"; seconds: number }
   | { type: "webhook"; url: string; content: string }
   | { type: "branch"; condition: AutomationCondition; thenActions: AutomationAction[]; elseActions: AutomationAction[] };
