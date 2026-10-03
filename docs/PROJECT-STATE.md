@@ -177,3 +177,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - AFK mention output is bounded and uses explicit user-only allowed mentions so stored reasons cannot trigger @everyone/@here/role notifications.
 - Final feature-pass head: `c554a216bccd56a16ee9965a57031663ca877dd0`; automated CI on this final head remains the verification gate.
 
+## 2026-10-03 — Next.js security update
+- Dashboard dependency `next` was updated from `16.3.3` to `16.3.8` after CI's high-severity dependency audit rejected the previous version.
+- No lockfile is tracked in the repository, so CI's `npm install` will resolve the patched version from the updated workspace manifest.
+

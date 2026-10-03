@@ -213,3 +213,8 @@ Never write credentials, tokens or private user data here.
 - Final code head for this pass: `c554a216bccd56a16ee9965a57031663ca877dd0`.
 - Local execution remains unavailable in this container because DNS cannot resolve github.com. A fresh GitHub Actions run on the final head is the authoritative automated verification gate.
 
+## 2026-10-03 — Dashboard dependency security patch
+- GitHub Actions dependency audit identified a critical Next.js vulnerability affecting the previously pinned Dashboard version `16.3.3`.
+- Updated `apps/dashboard/package.json` to Next.js `16.3.8`, the patched version identified by the CI audit.
+- The security patch is independent of the Utility/AFK implementation; the final green CI run is required before treating this combined code state as verified.
+
