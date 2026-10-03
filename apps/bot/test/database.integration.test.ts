@@ -27,8 +27,8 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
     );
     assert.equal(tables.rows.length, 10);
     const version = (await db.query("SELECT max(version) AS version FROM schema_migrations")).rows[0]?.version;
-    assert.equal(Number(version), 62);
-    assert.equal(Number(first.rows[0]?.count), 62);
+    assert.equal(Number(version), 63);
+    assert.equal(Number(first.rows[0]?.count), 63);
   } finally {
     await db.close();
   }
