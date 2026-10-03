@@ -75,9 +75,9 @@ export class Security implements PlatformModule {
       quarantineRoleId: row?.quarantine_role_id ?? null,
       logChannelId: row?.log_channel_id ?? null,
       ...securityResponsePolicy({
-        raidQuarantine: row?.raid_quarantine_enabled,
+        raidQuarantineEnabled: row?.raid_quarantine_enabled,
         destructiveRoleRemoval: row?.destructive_role_removal,
-        destructiveQuarantine: row?.destructive_quarantine_enabled
+        destructiveQuarantineEnabled: row?.destructive_quarantine_enabled
       })
     };
   }
@@ -495,11 +495,11 @@ export function securityIncidentCooldownUntil(createdAt: number, windowSeconds: 
   return createdAt + Math.max(windowSeconds * 1000, 60_000);
 }
 
-export function securityResponsePolicy(input: Partial<{ raidQuarantine: boolean; destructiveRoleRemoval: boolean; destructiveQuarantine: boolean }>): { raidQuarantine: boolean; destructiveRoleRemoval: boolean; destructiveQuarantine: boolean } {
+export function securityResponsePolicy(input: Partial<{ raidQuarantineEnabled: boolean; destructiveRoleRemoval: boolean; destructiveQuarantineEnabled: boolean }>): { raidQuarantineEnabled: boolean; destructiveRoleRemoval: boolean; destructiveQuarantineEnabled: boolean } {
   return {
-    raidQuarantine: input.raidQuarantine ?? true,
+    raidQuarantineEnabled: input.raidQuarantineEnabled ?? true,
     destructiveRoleRemoval: input.destructiveRoleRemoval ?? true,
-    destructiveQuarantine: input.destructiveQuarantine ?? true
+    destructiveQuarantineEnabled: input.destructiveQuarantineEnabled ?? true
   };
 }
 
