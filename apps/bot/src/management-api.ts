@@ -1293,7 +1293,9 @@ export class ManagementApiServer {
               enabled: typeof body.enabled === "boolean" ? body.enabled : true,
               prefixEnabled: typeof body.prefixEnabled === "boolean" ? body.prefixEnabled : true,
               slashEnabled: typeof body.slashEnabled === "boolean" ? body.slashEnabled : false,
-              actionType: body.actionType === "alias" ? ("alias" as const) : ("response" as const),
+              actionType: ["response","alias","add_role","remove_role","toggle_role"].includes(String(body.actionType))
+                ? String(body.actionType) as "response" | "alias" | "add_role" | "remove_role" | "toggle_role"
+                : ("response" as const),
               response: typeof body.response === "string" ? body.response : "",
               aliasTarget: typeof body.aliasTarget === "string" ? body.aliasTarget : null,
               allowedRoleIds: Array.isArray(body.allowedRoleIds) ? body.allowedRoleIds.filter((v: unknown): v is string => typeof v === "string") : [],
