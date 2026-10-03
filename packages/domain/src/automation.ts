@@ -35,7 +35,8 @@ export type AutomationAction =
   | { type: "delete-message"; channelId: string; messageId: string }
   | { type: "log"; message: string }
   | { type: "delay"; seconds: number }
-  | { type: "webhook"; url: string; content: string };
+  | { type: "webhook"; url: string; content: string }
+  | { type: "branch"; condition: AutomationCondition; thenActions: AutomationAction[]; elseActions: AutomationAction[] };
 
 export type AutomationRule = {
   id: string;
