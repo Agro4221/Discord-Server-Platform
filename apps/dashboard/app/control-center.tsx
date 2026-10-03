@@ -280,11 +280,12 @@ const MODULE_META: Record<string, ModuleMeta> = {
     title: "Напоминания",
     summary: "Напоминания и utility-функции.",
     category: "community",
-    commands: ["/remind", "/schedule"],
+    commands: ["/remind", "/schedule", "/sticky setup", "/sticky remove", "/sticky list"],
     functions: [
       { title: "Reminders", description: "Отложенное напоминание с повторяемой обработкой фонового worker." },
       { title: "Retry / lease", description: "Фоновая доставка использует lease/retry semantics." },
-      { title: "Scheduled messages", description: "Одноразовая публикация в выбранный текстовый канал по таймеру через тот же worker." }
+      { title: "Scheduled messages", description: "Одноразовая публикация в выбранный текстовый канал по таймеру через тот же worker." },
+      { title: "Sticky messages", description: "Постоянное сообщение в канале, которое автоматически возвращается вниз после новых сообщений." }
     ],
     kind: "discord"
   },
