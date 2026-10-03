@@ -664,6 +664,8 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       )
       .addSubcommand((sub) => sub.setName("queue").setDescription("Show queue"))
       .addSubcommand((sub) => sub.setName("nowplaying").setDescription("Show current track"))
+      .addSubcommand((sub) => sub.setName("previous").setDescription("Play previous track"))
+      .addSubcommand((sub) => sub.setName("lyrics").setDescription("Show lyrics for the current track"))
       .addSubcommand((sub) =>
         sub
           .setName("volume")
