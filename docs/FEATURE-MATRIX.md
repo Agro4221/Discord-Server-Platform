@@ -344,7 +344,7 @@ Music должен стремиться к функциональности си
 | Escalation policies | ✅ |
 | Mod notes / history | ✅ |
 | Full action logging | 🟡 |
-| Rule-specific AutoMod punishments | 🟡 |
+| Rule-specific AutoMod punishments | ✅ |
 | Rate limits per rule | 🟡 |
 | Channel / role / user exemptions | ✅ / расширять |
 | Attachments / URL / invite / mention / emoji / caps / spam controls | ✅ / расширять |
