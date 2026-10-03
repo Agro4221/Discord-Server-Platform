@@ -285,7 +285,7 @@ export class RolePanels implements PlatformModule {
     return true;
   }
 
-  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
     if (!interaction.inGuild() || commandName !== "roles") return;
     const guildId = interaction.guild!.id;
     if (!await moduleEnabled(this.db, guildId, "roles", false)) {
