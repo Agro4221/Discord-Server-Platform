@@ -137,6 +137,27 @@ export class Notifications implements PlatformModule {
     }
 
     const sub = interaction.options.getSubcommand();
+    if (sub === "github") {
+      const repo = interaction.options.getString("repo", true).trim();
+      const type = interaction.options.getString("type", true);
+      const channelOption = interaction.options.getChannel("channel", true);
+      const channel = interaction.guild!.channels.cache.get(channelOption.id);
+      const minutes = interaction.options.getInteger("minutes") ?? 5;
+      if (!channel || channel.type !== ChannelType.GuildText) {
+        await interaction.reply({ content: "Channel должен быть текстовым.", ephemeral: true });
+        return;
+      }
+      if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) {
+        await interaction.reply({ content: "Repo должен быть в формате owner/repository.", ephemeral: true });
+        return;
+      }
+      const feedPath = type === "releases" ? "releases.atom" : "commits.atom";
+      const url = "https://github.com/" + repo + "/" + feedPath;
+      await this.addFeed(interaction.guild!.id, channel.id, url, minutes * 60);
+      await interaction.reply({ content: "GitHub feed добавлен: " + repo + " (" + type + ").", ephemeral: true });
+      return;
+    }
+
     if (sub === "add") {
       const url = interaction.options.getString("url", true);
       const channelOption = interaction.options.getChannel("channel", true);
