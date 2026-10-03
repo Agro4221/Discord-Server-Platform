@@ -31,6 +31,7 @@ type Field = {
   min?: number;
   max?: number;
   step?: number;
+  maxLength?: number;
 };
 type ModuleAction = { id: string; label: string; kind?: "safe" | "danger"; confirmation?: string };
 type Schema = { key: string; title: string; fields: Field[]; actions?: ModuleAction[] };
@@ -1857,6 +1858,7 @@ function SettingControl(props: {
       {props.field.type === "text" && (
         <input
           value={typeof props.value === "string" ? props.value : ""}
+          maxLength={props.field.maxLength}
           onChange={(event) => props.onChange(event.target.value)}
           style={common}
         />
