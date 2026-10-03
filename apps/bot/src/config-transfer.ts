@@ -39,7 +39,8 @@ const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
   { table: "automation_rules", fields: ["name","enabled","event","conditions","any_conditions","actions","cooldown_seconds"] },
   { table: "automation_workflow_presets", fields: ["name","event","conditions","any_conditions","actions","cooldown_seconds"] },
   { table: "role_panels", fields: ["channel_id","message_id","title","roles","selection_mode","max_selections","duration_minutes"] },
-  { table: "stream_alerts", fields: ["platform","target","channel_id","mention_role_id","enabled","interval_seconds","message_template"] }
+  { table: "stream_alerts", fields: ["platform","target","channel_id","mention_role_id","enabled","interval_seconds","message_template"] },
+  { table: "notification_feeds", fields: ["channel_id","url","enabled","interval_seconds","last_item_key","last_polled_at","message_template","include_keywords","exclude_keywords"] }
 ];
 
 export class ConfigTransferService {
@@ -92,6 +93,7 @@ export class ConfigTransferService {
       const moduleKey =
         table.table === "automation_rules" || table.table === "automation_workflow_presets" ? "automation" :
         table.table === "role_panels" ? "roles" :
+        table.table === "notification_feeds" ? "notifications" :
         "stream-alerts";
       const target = modules.find((module) => module.key === moduleKey);
       if (target) {
@@ -181,6 +183,33 @@ export class ConfigTransferService {
               JSON.stringify(rule.anyConditions),
               JSON.stringify(rule.actions),
               rule.cooldownSeconds
+            ]
+          );
+        }
+      }
+
+      const notificationsModule = data.modules.find((module) => module.key === "notifications");
+      const notificationFeeds = notificationsModule?.settings.notification_feeds;
+      if (notificationFeeds !== undefined && !Array.isArray(notificationFeeds)) {
+        throw new Error("invalid_notification_feeds");
+      }
+      if (Array.isArray(notificationFeeds)) {
+        const normalizedFeeds = notificationFeeds.map((feed) => normalizeImportedNotificationFeed(feed));
+        await client.query("DELETE FROM notification_feeds WHERE guild_id=$1", [targetGuildId]);
+        for (const feed of normalizedFeeds) {
+          await client.query(
+            "INSERT INTO notification_feeds(guild_id,channel_id,url,enabled,interval_seconds,last_item_key,last_polled_at,message_template,include_keywords,exclude_keywords) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+            [
+              targetGuildId,
+              feed.channelId,
+              feed.url,
+              feed.enabled,
+              feed.intervalSeconds,
+              feed.lastItemKey,
+              feed.lastPolledAt,
+              feed.messageTemplate,
+              feed.includeKeywords,
+              feed.excludeKeywords
             ]
           );
         }
@@ -628,6 +657,54 @@ type ImportedStreamAlert = {
   intervalSeconds: number;
   messageTemplate: string;
 };
+
+type NormalizedNotificationFeed = {
+  channelId: string;
+  url: string;
+  enabled: boolean;
+  intervalSeconds: number;
+  lastItemKey: string | null;
+  lastPolledAt: string | null;
+  messageTemplate: string;
+  includeKeywords: string[];
+  excludeKeywords: string[];
+};
+
+function normalizeImportedNotificationFeed(value: unknown): NormalizedNotificationFeed {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_notification_feed");
+  const object = value as Record<string, unknown>;
+  if (
+    typeof object.channel_id !== "string" || !/^\d{17,20}$/.test(object.channel_id) ||
+    typeof object.url !== "string" || object.url.length > 2000 ||
+    typeof object.enabled !== "boolean" ||
+    typeof object.interval_seconds !== "number" || !Number.isInteger(object.interval_seconds) ||
+    object.interval_seconds < 60 || object.interval_seconds > 86400 ||
+    (object.last_item_key !== null && object.last_item_key !== undefined && typeof object.last_item_key !== "string") ||
+    (object.last_polled_at !== null && object.last_polled_at !== undefined && typeof object.last_polled_at !== "string") ||
+    typeof object.message_template !== "string" || object.message_template.length > 1800 ||
+    !Array.isArray(object.include_keywords) || !Array.isArray(object.exclude_keywords)
+  ) throw new Error("invalid_notification_feed");
+
+  const normalize = (items: unknown[]) => [...new Set(
+    items.filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim().toLocaleLowerCase())
+      .filter(Boolean)
+      .slice(0,20)
+      .map((item) => item.slice(0,80))
+  )];
+
+  return {
+    channelId: object.channel_id,
+    url: object.url,
+    enabled: object.enabled,
+    intervalSeconds: object.interval_seconds,
+    lastItemKey: object.last_item_key === null || object.last_item_key === undefined ? null : object.last_item_key,
+    lastPolledAt: object.last_polled_at === null || object.last_polled_at === undefined ? null : object.last_polled_at,
+    messageTemplate: object.message_template.trim().slice(0,1800),
+    includeKeywords: normalize(object.include_keywords),
+    excludeKeywords: normalize(object.exclude_keywords)
+  };
+}
 
 function normalizeImportedStreamAlert(value: unknown): ImportedStreamAlert {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_stream_alert");
