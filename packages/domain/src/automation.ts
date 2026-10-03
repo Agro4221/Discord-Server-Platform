@@ -71,7 +71,10 @@ export type AutomationAction =
   | { type: "giveaway-reroll"; giveawayId: number }
   | { type: "notification-feed-toggle"; feedId: number; enabled: boolean }
   | { type: "music-control"; action: AutomationMusicControl; value?: number; enabled?: boolean; mode?: AutomationMusicRepeatMode }
-  | { type: "log"; message: string };
+  | { type: "log"; message: string }
+  | { type: "delay"; seconds: number }
+  | { type: "webhook"; url: string; content: string }
+  | { type: "branch"; condition: AutomationCondition; thenActions: AutomationAction[]; elseActions: AutomationAction[] };
 
 export type AutomationMusicRepeatMode = "off" | "track" | "queue";
 export type AutomationMusicControl =
@@ -84,9 +87,6 @@ export type AutomationMusicControl =
   | "seek"
   | "volume"
   | "autoplay";
-  | { type: "delay"; seconds: number }
-  | { type: "webhook"; url: string; content: string }
-  | { type: "branch"; condition: AutomationCondition; thenActions: AutomationAction[]; elseActions: AutomationAction[] };
 
 export type AutomationRule = {
   id: string;
