@@ -1081,8 +1081,7 @@ export async function handleCommand(
     const textChannels = guild.channels.cache.filter((channel) => channel.type === ChannelType.GuildText).size;
     const voiceChannels = guild.channels.cache.filter((channel) => channel.type === ChannelType.GuildVoice || channel.type === ChannelType.GuildStageVoice).size;
     const categories = guild.channels.cache.filter((channel) => channel.type === ChannelType.GuildCategory).size;
-    await interaction.reply({
-      embeds: [new EmbedBuilder().setTitle("🛡️ " + guild.name).setThumbnail(guild.iconURL({ size: 128 }) ?? "").addFields(
+    const embed = new EmbedBuilder().setTitle("🛡️ " + guild.name).addFields(
         { name: "ID", value: guild.id, inline: true },
         { name: "Участники", value: String(guild.memberCount), inline: true },
         { name: "Владелец", value: owner ? owner.user.toString() : guild.ownerId, inline: true },
@@ -1090,9 +1089,10 @@ export async function handleCommand(
         { name: "Роли", value: String(Math.max(0, guild.roles.cache.size - 1)), inline: true },
         { name: "Создан", value: "<t:" + Math.floor(guild.createdTimestamp / 1000) + ":F>", inline: true },
         { name: "Boost", value: guild.premiumTier + " · " + (guild.premiumSubscriptionCount ?? 0), inline: true }
-      ))],
-      ephemeral: true
-    });
+      );
+    const icon = guild.iconURL({ size: 128 });
+    if (icon) embed.setThumbnail(icon);
+    await interaction.reply({ embeds: [embed], ephemeral: true });
     return;
   }
 
@@ -1106,7 +1106,7 @@ export async function handleCommand(
         { name: "Создан", value: "<t:" + Math.floor(user.createdTimestamp / 1000) + ":F>", inline: true },
         { name: "На сервере", value: member?.joinedTimestamp ? "<t:" + Math.floor(member.joinedTimestamp / 1000) + ":F>" : "Не состоит", inline: true },
         { name: "Роли", value: (roles || "Нет").slice(0, 1000), inline: false }
-      ))],
+      )],
       ephemeral: true
     });
     return;
@@ -1124,7 +1124,7 @@ export async function handleCommand(
         { name: "Mentionable", value: role.mentionable ? "Да" : "Нет", inline: true },
         { name: "Managed", value: role.managed ? "Да" : "Нет", inline: true },
         { name: "Permissions", value: permissions, inline: false }
-      ))],
+      )],
       ephemeral: true
     });
     return;
@@ -1393,8 +1393,3 @@ function parseDurationMinutes(value: string): number | null {
   if (!match) return null;
   const amount = Number(match[1]);
   const unit = match[2];
-  if (!Number.isSafeInteger(amount) || amount <= 0) return null;
-  const multiplier = unit === "w" ? 7 * 24 * 60 : unit === "d" ? 24 * 60 : unit === "h" ? 60 : 1;
-  const minutes = amount * multiplier;
-  return Number.isSafeInteger(minutes) && minutes <= 40320 ? minutes : null;
-}
