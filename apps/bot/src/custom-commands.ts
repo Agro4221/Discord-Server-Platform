@@ -10,6 +10,7 @@ import type { Database } from "./database.js";
 import type { ModuleContext, PlatformModule } from "./module.js";
 import { buildCommands } from "./discord/commands.js";
 import { logger } from "./logger.js";
+import { moduleEnabled } from "./module-utils.js";
 
 export type CustomCommandAction = "response" | "alias" | "add_role" | "remove_role" | "toggle_role";
 
@@ -83,6 +84,7 @@ export class CustomCommandService implements PlatformModule {
   }
 
   async findPrefix(guildId: string, name: string): Promise<CustomCommandRecord | null> {
+    if (!await moduleEnabled(this.db, guildId, "custom-commands", false)) return null;
     const normalized = normalizeName(name);
     const result = await this.db.query<Record<string, unknown>>(
       `SELECT id,guild_id,name,aliases,description,enabled,prefix_enabled,slash_enabled,
@@ -138,6 +140,11 @@ export class CustomCommandService implements PlatformModule {
 
     const id = Number(result.rows[0]?.id);
     if (!Number.isSafeInteger(id) || id <= 0) throw new Error("custom_command_create_failed");
+
+    await this.db.query(
+      "INSERT INTO guild_modules(guild_id,module_key,enabled) VALUES($1,'custom-commands',true) ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()",
+      [guildId]
+    );
 
     try {
       await this.syncSlash(guildId, id);
@@ -288,6 +295,10 @@ export class CustomCommandService implements PlatformModule {
 
   private async handleSlash(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!interaction.inGuild()) return;
+    if (!await moduleEnabled(this.db, interaction.guild!.id, "custom-commands", false)) {
+      await interaction.reply({ content: "Модуль Custom Commands выключен.", ephemeral: true });
+      return;
+    }
     const command = await this.findSlash(interaction.guildId!, interaction.commandName);
     if (!command) return;
 
