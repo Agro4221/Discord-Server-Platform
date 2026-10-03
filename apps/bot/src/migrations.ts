@@ -891,6 +891,14 @@ const migrations = [
     sql: q([
       "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS queue_access text NOT NULL DEFAULT 'everyone' CHECK(queue_access IN ('everyone','dj'));"
     ])
+  },
+  {
+    version: 55,
+    name: "giveaway_requirements_and_templates",
+    sql: q([
+      "ALTER TABLE giveaways ADD COLUMN IF NOT EXISTS requirements jsonb NOT NULL DEFAULT '{}'::jsonb;",
+      "ALTER TABLE giveaways ADD COLUMN IF NOT EXISTS message_template text NOT NULL DEFAULT '🎉 **{prize}**\\n\\nПобедителей: **{winners}**\\nЗавершение: <t:{endsAt}:R>'"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
