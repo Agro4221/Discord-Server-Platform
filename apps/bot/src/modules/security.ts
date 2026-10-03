@@ -252,6 +252,12 @@ export class Security implements PlatformModule {
   }
 
   private async resolveIncident(incidentId: number, guildId: string): Promise<void> {
+    const guild = this.client?.guilds.cache.get(guildId);
+    if (!guild) {
+      logger.debug?.("Security incident resolution deferred until guild is available", { guildId, incidentId });
+      return;
+    }
+
     const assignments = await this.db.query<{
       user_id: string;
       role_id: string;
@@ -260,16 +266,38 @@ export class Security implements PlatformModule {
       [incidentId]
     );
 
-    const guild = this.client?.guilds.cache.get(guildId);
+    let cleanupFailed = false;
     for (const assignment of assignments.rows) {
-      const member = guild ? await guild.members.fetch(assignment.user_id).catch(() => null) : null;
-      const role = guild?.roles.cache.get(assignment.role_id);
+      let member: GuildMember | null = null;
+      try {
+        member = await guild.members.fetch(assignment.user_id);
+      } catch (error) {
+        const code = typeof error === "object" && error !== null && "code" in error
+          ? Number((error as { code?: unknown }).code)
+          : undefined;
+        if (code !== 10007) {
+          cleanupFailed = true;
+          logger.warn("Security quarantine member fetch failed", {
+            guildId,
+            incidentId,
+            userId: assignment.user_id,
+            error: String(error)
+          });
+          continue;
+        }
+      }
+
+      const role = guild.roles.cache.get(assignment.role_id);
       const otherAssignments = await this.db.query<{ incident_id: string }>(
         "SELECT incident_id FROM security_quarantine_assignments WHERE guild_id=$1 AND user_id=$2 AND role_id=$3 AND incident_id<>$4 AND restored_at IS NULL LIMIT 1",
         [guildId, assignment.user_id, assignment.role_id, incidentId]
       );
+
       if (!otherAssignments.rows.length && member && role && member.roles.cache.has(role.id)) {
-        await member.roles.remove(role, "Security incident ended").catch((error) => {
+        try {
+          await member.roles.remove(role, "Security incident ended");
+        } catch (error) {
+          cleanupFailed = true;
           logger.warn("Security quarantine role removal failed", {
             guildId,
             incidentId,
@@ -277,18 +305,23 @@ export class Security implements PlatformModule {
             roleId: assignment.role_id,
             error: String(error)
           });
-        });
+          continue;
+        }
       }
+
       await this.db.query(
         "UPDATE security_quarantine_assignments SET restored_at=now() WHERE incident_id=$1 AND user_id=$2 AND role_id=$3",
         [incidentId, assignment.user_id, assignment.role_id]
       );
     }
 
-    await this.db.query(
+    if (cleanupFailed) return;
+
+    const result = await this.db.query(
       "UPDATE security_incidents SET resolved_at=now() WHERE id=$1 AND guild_id=$2 AND resolved_at IS NULL",
       [incidentId, guildId]
     );
+    if (result.rowCount !== 1) return;
 
     if (this.raidIncidents.get(guildId)?.id === incidentId) this.raidIncidents.delete(guildId);
     if (this.destructiveIncidents.get(guildId)?.id === incidentId) this.destructiveIncidents.delete(guildId);
