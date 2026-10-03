@@ -167,3 +167,12 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Windows launcher `start-local.bat` closes automatically after a successful dashboard launch; failed startup still pauses to preserve diagnostics.
 - CI run #603 on this code state passed all stages: dependency install/audit, source/deployment/observability checks, bot typecheck/tests/build, domain build and Dashboard production build.
 - Live Windows launcher behavior (real browser open + terminal close) still requires validation on Windows; automated CI cannot validate desktop UX.
+
+
+## 2026-10-03 — Product direction: Music-first advanced backlog
+- Next product work is explicitly Music-first rather than expanding low-priority stream providers.
+- Mandatory controller UX: emoji-centric compact controls/labels, persistent player state, and a dedicated Loop One button for repeating exactly the current track.
+- Planned advanced Music capabilities include search result selection, full queue editing/history/export, granular DJ permissions, vote-skip, request fairness/anti-spam, shared playlists, save-queue, richer effects/custom EQ, improved autoplay/radio and richer lyrics UX.
+- Planned provider breadth includes Spotify, Apple Music, Deezer, Yandex Music, VK Music, Tidal, Qobuz, yt-dlp and JioSaavn in addition to the already working YouTube/SoundCloud path. Provider readiness requires real adapter/credential validation.
+- Kick stream alerts are implemented but explicitly de-prioritized; the existing Twitch/YouTube/VK stream-alert functionality remains the practical baseline.
+- See `docs/FEATURE-MATRIX.md` for the complete persistent roadmap and `docs/WORK-LOG.md` for the decision record.
