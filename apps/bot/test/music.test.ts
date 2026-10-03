@@ -1,7 +1,7 @@
 import { nextMusicRepeatMode, clampMusicVolume } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canControlMusic, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
+import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
 
 test("music controls require the same voice channel unless Manage Server is granted", () => {
   assert.equal(canControlMusic("voice-1", "voice-1", false), true);
@@ -41,6 +41,13 @@ test("Music node health is degraded only when every Lavalink node is unavailable
   assert.equal(musicNodeHealth(0), "degraded");
   assert.equal(musicNodeHealth(1), "ready");
   assert.equal(musicNodeHealth(2), "ready");
+});
+
+test("Music failover requires a different connected node", () => {
+  assert.equal(canFailoverMusicNode("local", []), false);
+  assert.equal(canFailoverMusicNode("local", ["local"]), false);
+  assert.equal(canFailoverMusicNode("local", ["local-2"]), true);
+  assert.equal(canFailoverMusicNode("local", ["local", "local-2"]), true);
 });
 
 
