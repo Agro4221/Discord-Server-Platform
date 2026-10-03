@@ -34,7 +34,8 @@ export type AutomationAction =
   | { type: "timeout"; userId: string; durationSeconds: number; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
   | { type: "log"; message: string }
-  | { type: "delay"; seconds: number };
+  | { type: "delay"; seconds: number }
+  | { type: "webhook"; url: string; content: string };
 
 export type AutomationRule = {
   id: string;
