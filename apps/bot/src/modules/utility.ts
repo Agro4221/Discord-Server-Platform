@@ -33,6 +33,7 @@ export class Utility implements PlatformModule {
   readonly name = "utility";
 
   private client?: Client;
+  private readonly activeAfk = new Set<string>();
   private unsubscribe?: () => void;
   private messageUnsubscribe?: () => void;
 
@@ -40,6 +41,12 @@ export class Utility implements PlatformModule {
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+    const existing = await this.db.query<{ guild_id: string; user_id: string }>(
+      "SELECT guild_id,user_id FROM afk_users"
+    );
+    for (const row of existing.rows) {
+      this.activeAfk.add(afkKey(row.guild_id, row.user_id));
+    }
     this.unsubscribe = context.events.on(
       "interaction.command",
       (interaction) => this.handleSlash(interaction)
@@ -55,6 +62,7 @@ export class Utility implements PlatformModule {
     this.messageUnsubscribe?.();
     this.unsubscribe = undefined;
     this.messageUnsubscribe = undefined;
+    this.activeAfk.clear();
     this.client = undefined;
   }
 
@@ -294,10 +302,13 @@ export class Utility implements PlatformModule {
       return;
     }
 
-    if (await this.isAfkPrefixCommand(message)) return;
+    if (
+      isPotentialAfkPrefixCommand(message.content)
+    ) return;
 
-    const ownAfk = await this.getAfk(message.guild.id, message.author.id);
-    if (ownAfk) {
+    const ownKey = afkKey(message.guild.id, message.author.id);
+    if (this.activeAfk.has(ownKey)) {
+      this.activeAfk.delete(ownKey);
       await this.clearAfk(message.guild.id, message.author.id);
       await message.reply(
         "👋 Ты снова активен — AFK-состояние снято."
@@ -330,23 +341,6 @@ export class Utility implements PlatformModule {
     await message.reply(lines.join("\n")).catch(() => undefined);
   }
 
-  private async isAfkPrefixCommand(message: Message): Promise<boolean> {
-    const result = await this.db.query<{ command_prefix: string }>(
-      "SELECT command_prefix FROM guild_settings WHERE guild_id=$1",
-      [message.guild!.id]
-    );
-    const prefix = result.rows[0]?.command_prefix || "!";
-    if (!message.content.startsWith(prefix)) return false;
-
-    const command = message.content
-      .slice(prefix.length)
-      .trim()
-      .split(/\s+/, 1)[0]
-      ?.toLowerCase();
-
-    return command === "afk";
-  }
-
   private async setAfk(
     guildId: string,
     userId: string,
@@ -359,6 +353,7 @@ export class Utility implements PlatformModule {
        DO UPDATE SET reason=EXCLUDED.reason,created_at=now()`,
       [guildId, userId, normalizeAfkReason(reason)]
     );
+    this.activeAfk.add(afkKey(guildId, userId));
   }
 
   private async clearAfk(guildId: string, userId: string): Promise<boolean> {
@@ -366,6 +361,7 @@ export class Utility implements PlatformModule {
       "DELETE FROM afk_users WHERE guild_id=$1 AND user_id=$2",
       [guildId, userId]
     );
+    this.activeAfk.delete(afkKey(guildId, userId));
     return result.rowCount === 1;
   }
 
@@ -602,4 +598,13 @@ export function formatAfkDuration(
   if (hours < 24) return `${hours}ч`;
 
   return `${Math.floor(hours / 24)}д`;
+}
+
+
+function afkKey(guildId: string, userId: string): string {
+  return guildId + ":" + userId;
+}
+
+function isPotentialAfkPrefixCommand(content: string): boolean {
+  return /^.{1,5}afk(?:\s|$)/i.test(content.trim());
 }
