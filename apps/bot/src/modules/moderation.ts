@@ -851,7 +851,8 @@ export class Moderation implements PlatformModule {
     warnCount: number,
     action: "timeout" | "ban",
     durationMinutes: number,
-    reason: string
+    reason: string,
+    enabled = true
   ): Promise<void> {
     if (!Number.isInteger(warnCount) || warnCount < 1 || warnCount > 100) throw new Error("invalid_escalation_warn_count");
     if (action === "timeout" && (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 40320)) {
