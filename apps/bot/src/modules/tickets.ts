@@ -62,7 +62,15 @@ export class Tickets implements PlatformModule {
   }
 
   private async config(guildId: string): Promise<TicketConfig> {
-    const result = await this.db.query<{ enabled: boolean; category_id: string | null; staff_role_id: string | null; transcript_channel_id: string | null; max_open_per_user: number; auto_close_minutes: number }>(
+    const result = await this.db.query<{
+      enabled: boolean;
+      category_id: string | null;
+      staff_role_id: string | null;
+      transcript_channel_id: string | null;
+      max_open_per_user: number;
+      auto_close_minutes: number;
+      form_fields: unknown;
+    }>(
       "SELECT enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes,form_fields FROM ticket_settings WHERE guild_id=$1",
       [guildId]
     );
@@ -85,7 +93,7 @@ export class Tickets implements PlatformModule {
       `INSERT INTO ticket_settings(guild_id,enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes,form_fields)
        VALUES($1,$2,$3,$4,$5,$6,$7,$8)
        ON CONFLICT(guild_id) DO UPDATE SET enabled=EXCLUDED.enabled,category_id=EXCLUDED.category_id,staff_role_id=EXCLUDED.staff_role_id,transcript_channel_id=EXCLUDED.transcript_channel_id,max_open_per_user=EXCLUDED.max_open_per_user,auto_close_minutes=EXCLUDED.auto_close_minutes,form_fields=EXCLUDED.form_fields,updated_at=now()`,
-      [guildId,next.enabled,next.categoryId,next.staffRoleId,next.transcriptChannelId,Math.min(Math.max(Math.trunc(next.maxOpenPerUser),1),10),Math.min(Math.max(Math.trunc(next.autoCloseMinutes),0),43200),normalizeFormFields(next.formFields)]
+      [guildId,next.enabled,next.categoryId,next.staffRoleId,next.transcriptChannelId,Math.min(Math.max(Math.trunc(next.maxOpenPerUser),1),10),Math.min(Math.max(Math.trunc(next.autoCloseMinutes),0),43200),JSON.stringify(normalizeFormFields(next.formFields))]
     );
     await this.db.query(
       `INSERT INTO guild_modules(guild_id,module_key,enabled)
@@ -282,7 +290,7 @@ export class Tickets implements PlatformModule {
          guild_id,enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes,form_fields
        ) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
        ON CONFLICT(guild_id) DO UPDATE SET form_fields=EXCLUDED.form_fields,updated_at=now()`,
-      [guildId,current.enabled,current.categoryId,current.staffRoleId,current.transcriptChannelId,current.maxOpenPerUser,current.autoCloseMinutes,normalized]
+      [guildId,current.enabled,current.categoryId,current.staffRoleId,current.transcriptChannelId,current.maxOpenPerUser,current.autoCloseMinutes,JSON.stringify(normalized)]
     );
     return normalized;
   }
