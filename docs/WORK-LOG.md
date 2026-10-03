@@ -341,3 +341,8 @@ Never write credentials, tokens or private user data here.
 - Routed AutoMod bans through `Moderation.applyAutomodBan()` for shared hierarchy validation, `moderation.ban.applied` audit and moderation-case persistence.
 - Added migration 67 for the `automod_rules.action` constraint and Dashboard action selection.
 - Added deterministic unit coverage and updated the canonical project logs.
+
+
+## 2026-10-04 — Help policy defaults
+- Fixed `/help` to merge persisted command policies over the shared `COMMAND_DEFINITIONS` defaults instead of showing only commands with existing DB rows.
+- This makes newly introduced commands visible by default and keeps function-level help visibility consistent with the policy editor.

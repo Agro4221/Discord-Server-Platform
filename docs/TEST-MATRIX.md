@@ -146,3 +146,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Added deterministic unit coverage that the rule builder persists `ban` as a valid action.
 - Migration 67 updates the database check constraint for persisted AutoMod actions.
 - Live ban execution, role hierarchy and notification/resource behavior remain release-gate validation.
+
+
+### 2026-10-04 — Help policy defaults
+- Help command now honors persisted `enabled`, `slash_enabled` and `help_visible` overrides while using command-definition defaults for commands without a stored row.
+- Live Discord rendering remains release-gate validation.

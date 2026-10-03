@@ -13,6 +13,7 @@ import { logger } from "../logger.js";
 import { PermissionChecker } from "./permissions.js";
 import { TemporaryVoice } from "../modules/temporary-voice.js";
 import { Moderation } from "../modules/moderation.js";
+import { COMMAND_DEFINITIONS } from "../command-policy.js";
 
 export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder | SlashCommandOptionsOnlyBuilder> {
   return [
@@ -1001,15 +1002,23 @@ export async function handleCommand(
   moderation: Moderation
 ): Promise<void> {
   if (interaction.commandName === "help") {
-    const rows = await db.query<{ command_name: string; help_visible: boolean }>(
-      "SELECT command_name,help_visible FROM command_policies WHERE guild_id=$1 AND enabled=true AND slash_enabled=true AND help_visible=true ORDER BY command_name",
+    const rows = await db.query<{ command_name: string; enabled: boolean; slash_enabled: boolean; help_visible: boolean }>(
+      "SELECT command_name,enabled,slash_enabled,help_visible FROM command_policies WHERE guild_id=$1",
       [interaction.guild!.id]
     );
+    const storedPolicies = new Map(rows.rows.map((row) => [row.command_name, row]));
+
     const custom = await db.query<{ name: string; description: string }>(
       "SELECT name,description FROM custom_commands WHERE guild_id=$1 AND enabled=true AND slash_enabled=true ORDER BY name",
       [interaction.guild!.id]
     );
-    const builtIn = [...new Set(rows.rows.map((row) => row.command_name).filter((name) => name !== "help"))];
+    const builtIn = COMMAND_DEFINITIONS
+      .filter((definition) => definition.slash && definition.name !== "help")
+      .filter((definition) => {
+        const policy = storedPolicies.get(definition.name);
+        return (policy?.enabled ?? true) && (policy?.slash_enabled ?? definition.slash) && (policy?.help_visible ?? true);
+      })
+      .map((definition) => `/${definition.name}`);
     const text = [
       "**Vexa — команды**",
       builtIn.length ? builtIn.map((name) => `/${name}`).join(", ") : "Нет доступных slash-команд.",

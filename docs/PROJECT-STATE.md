@@ -221,3 +221,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - AutoMod bans are routed through Moderation so the action receives the common Discord role-hierarchy check, audit event and moderation case persistence.
 - Migration 67 widens the persistent AutoMod action constraint to include `ban`.
 - Dashboard exposes the ban action; unit coverage verifies rule persistence. Live Discord hierarchy/ban behavior remains release-gate validation.
+
+
+## 2026-10-04 — Help policy defaults
+- `/help` now derives its built-in command list from `COMMAND_DEFINITIONS` and overlays any persisted per-guild policy.
+- Commands without a stored policy therefore retain their declared defaults, while explicit enabled/slash/help visibility overrides are respected.
