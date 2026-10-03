@@ -12,6 +12,11 @@ type Giveaway = {
   endsAt: string;
   status: string;
   selectedWinners: string[];
+  requirements: {
+    requiredRoleIds: string[];
+    minLevel: number;
+  };
+  messageTemplate: string;
   createdAt: string;
   finishedAt: string | null;
 };
@@ -84,11 +89,20 @@ export function GiveawaysPanel({ guildId, onChanged }: { guildId: string; onChan
                   <div style={{ marginTop: 4, fontSize: 11, opacity: 0.42 }}>
                     {item.status === "running" ? "Заканчивается: " + new Date(item.endsAt).toLocaleString() : "Завершён: " + (item.finishedAt ? new Date(item.finishedAt).toLocaleString() : "—")}
                   </div>
+                  {(item.requirements.requiredRoleIds.length > 0 || item.requirements.minLevel > 0) && (
+                    <div style={{ marginTop: 5, fontSize: 12, opacity: 0.62 }}>
+                      Требования: {item.requirements.requiredRoleIds.length > 0 ? "роль " + item.requirements.requiredRoleIds.map((id) => "<@&" + id + ">").join(", ") : ""}
+                      {item.requirements.minLevel > 0 ? (item.requirements.requiredRoleIds.length > 0 ? " · " : "") + "уровень " + item.requirements.minLevel : ""}
+                    </div>
+                  )}
                   {item.selectedWinners.length > 0 && (
                     <div style={{ marginTop: 5, fontSize: 12, opacity: 0.62 }}>
                       Победители: {item.selectedWinners.map((id) => "<@" + id + ">").join(", ")}
                     </div>
                   )}
+                  <div style={{ marginTop: 5, fontSize: 11, opacity: 0.38 }}>
+                    Шаблон: {item.messageTemplate}
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
