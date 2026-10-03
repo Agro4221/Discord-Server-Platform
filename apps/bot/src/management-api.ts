@@ -98,7 +98,7 @@ type ApiOptions = {
     list: (guildId: string) => Promise<unknown[]>;
     create: (
       guildId: string,
-      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }> },
+      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number },
       callbacks: {
         deleteMessage: (channelId: string, messageId: string) => Promise<void>;
         sendMessage: (channelId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => Promise<string>;
@@ -1466,11 +1466,17 @@ export class ManagementApiServer {
             const channelId = body.channelId;
             const title = body.title;
             const rawRoles = body.roles;
+            const selectionMode = body.selectionMode ?? "toggle";
+            const maxSelections = body.maxSelections ?? 1;
 
             if (
               typeof channelId !== "string" ||
               channelId.length > 64 ||
               (title !== undefined && (typeof title !== "string" || title.length > 100)) ||
+              !["toggle","exclusive","max"].includes(selectionMode) ||
+              !Number.isInteger(maxSelections) ||
+              maxSelections < 1 ||
+              maxSelections > 5 ||
               !Array.isArray(rawRoles) ||
               rawRoles.length < 1 ||
               rawRoles.length > 5
@@ -1505,7 +1511,9 @@ export class ManagementApiServer {
             const input = {
               channelId,
               title: typeof title === "string" ? title : undefined,
-              roles
+              roles,
+              selectionMode,
+              maxSelections
             };
 
             const helpers = {
