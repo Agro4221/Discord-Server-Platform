@@ -32,9 +32,33 @@ export class Reminders implements PlatformModule {
   }
 
   async handlePrefixCommand(message: Message, commandName: string, args: string[]): Promise<boolean> {
-    if (!message.guild || message.author.bot || commandName !== "remind") return false;
+    if (!message.guild || message.author.bot || (commandName !== "remind" && commandName !== "schedule")) return false;
     if (!await moduleEnabled(this.db, message.guild.id, "reminders", false)) {
       await message.reply("Модуль Reminders выключен.");
+      return true;
+    }
+
+    if (commandName === "schedule") {
+      if (!message.member?.permissions.has("ManageGuild")) {
+        await message.reply("Для публикации по расписанию нужны права Manage Server.");
+        return true;
+      }
+      const duration = parseReminderMinutes(args.shift() ?? "");
+      const channelMention = args.shift() ?? "";
+      const channelId = channelMention.replace(/[<#>]/g, "");
+      const content = args.join(" ").trim();
+      const channel = message.guild.channels.cache.get(channelId);
+      if (!duration || !/^\d{17,20}$/.test(channelId) || channel?.type !== 0 || !content) {
+        await message.reply("Использование: !schedule 30m #канал <текст>.");
+        return true;
+      }
+      const dueAt = new Date(Date.now() + duration * 60_000);
+      const result = await this.db.query<{ id: string }>(
+        `INSERT INTO reminders(guild_id,user_id,channel_id,target_channel_id,content,due_at)
+         VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,
+        [message.guild.id,message.author.id,message.channelId,channelId,content,dueAt]
+      );
+      await message.reply(`📅 Сообщение #${result.rows[0]?.id ?? "?"} будет отправлено в <#${channelId}> <t:${Math.floor(dueAt.getTime()/1000)}:R>.`);
       return true;
     }
 
@@ -73,7 +97,7 @@ export class Reminders implements PlatformModule {
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "remind") return;
+    if (!interaction.inGuild() || (interaction.commandName !== "remind" && interaction.commandName !== "schedule")) return;
     if (!await moduleEnabled(this.db, interaction.guild!.id, "reminders", false)) {
       await interaction.reply({ content: "Модуль Reminders выключен.", ephemeral: true });
       return;
@@ -81,6 +105,30 @@ export class Reminders implements PlatformModule {
 
     const minutes = interaction.options.getInteger("minutes", true);
     const text = interaction.options.getString("text", true);
+
+    if (interaction.commandName === "schedule") {
+      if (!interaction.memberPermissions?.has("ManageGuild")) {
+        await interaction.reply({ content: "Для публикации по расписанию нужны права Manage Server.", ephemeral: true });
+        return;
+      }
+      const channel = interaction.options.getChannel("channel", true);
+      if (channel.type !== 0) {
+        await interaction.reply({ content: "Нужен текстовый канал.", ephemeral: true });
+        return;
+      }
+      const dueAt = new Date(Date.now() + minutes * 60_000);
+      const result = await this.db.query<{ id: string }>(
+        `INSERT INTO reminders(guild_id,user_id,channel_id,target_channel_id,content,due_at)
+         VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,
+        [interaction.guild!.id,interaction.user.id,interaction.channelId,channel.id,text,dueAt]
+      );
+      await interaction.reply({
+        content: `📅 Сообщение #${result.rows[0]?.id ?? "?"} будет отправлено в <#${channel.id}> <t:${Math.floor(dueAt.getTime()/1000)}:R>.`,
+        ephemeral: true
+      });
+      return;
+    }
+
     const dueAt = new Date(Date.now() + minutes * 60_000);
 
     const result = await this.db.query<{ id: string }>(
@@ -104,6 +152,7 @@ export class Reminders implements PlatformModule {
         id: string;
         guild_id: string;
         user_id: string;
+        target_channel_id: string | null;
         content: string;
       }>(
         `UPDATE reminders
@@ -133,13 +182,19 @@ export class Reminders implements PlatformModule {
            FOR UPDATE SKIP LOCKED
            LIMIT 50
          )
-         RETURNING id,guild_id,user_id,content`
+         RETURNING id,guild_id,user_id,target_channel_id,content`
       , [this.identityId]);
 
       for (const reminder of due.rows) {
         try {
-          const user = await this.client.users.fetch(reminder.user_id);
-          await user.send(`⏰ Напоминание: ${reminder.content}`);
+          if (reminder.target_channel_id) {
+            const channel = this.client.channels.cache.get(reminder.target_channel_id);
+            if (!channel?.isTextBased() || !("send" in channel)) throw new Error("scheduled_channel_unavailable");
+            await channel.send(reminder.content);
+          } else {
+            const user = await this.client.users.fetch(reminder.user_id);
+            await user.send(`⏰ Напоминание: ${reminder.content}`);
+          }
 
           await this.db.query(
             "UPDATE reminders SET delivered_at=now(),processing_until=NULL,last_error=NULL WHERE id=$1 AND delivered_at IS NULL",
