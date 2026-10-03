@@ -823,10 +823,10 @@ export function validateAutomationRule(
         if (String(condition.left).length > 64 || !Number.isFinite(condition.right)) throw new Error("invalid_numeric_condition");
         break;
       case "has-role":
-        if (!/^\\d{17,20}$/.test(condition.userId) || !/^\\d{17,20}$/.test(condition.roleId)) throw new Error("invalid_role_condition");
+        if (!/^\d{17,20}$/.test(condition.userId) || !/^\d{17,20}$/.test(condition.roleId)) throw new Error("invalid_role_condition");
         break;
       case "channel-is":
-        if (!/^\\d{17,20}$/.test(condition.channelId)) throw new Error("invalid_condition_channel");
+        if (!/^\d{17,20}$/.test(condition.channelId)) throw new Error("invalid_condition_channel");
         break;
       case "cooldown-clear":
         if (!condition.key || condition.key.length > 100) throw new Error("invalid_cooldown_key");
@@ -843,24 +843,24 @@ export function validateAutomationRule(
     for (const action of items) {
     switch (action.type) {
       case "send-message":
-        if (!/^\\d{17,20}$/.test(action.channelId) || !action.content || action.content.length > 2000) throw new Error("invalid_send_message_action");
+        if (!/^\d{17,20}$/.test(action.channelId) || !action.content || action.content.length > 2000) throw new Error("invalid_send_message_action");
         break;
       case "dm-user":
-        if (!/^\\d{17,20}$/.test(action.userId) && action.userId !== "@event") throw new Error("invalid_dm_user");
+        if (!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") throw new Error("invalid_dm_user");
         if (!action.content || action.content.length > 2000) throw new Error("invalid_dm_content");
         break;
       case "add-role":
       case "remove-role":
-        if ((!/^\\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !/^\\d{17,20}$/.test(action.roleId)) throw new Error("invalid_role_action");
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !/^\d{17,20}$/.test(action.roleId)) throw new Error("invalid_role_action");
         break;
       case "timeout":
-        if ((!/^\\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !Number.isInteger(action.durationSeconds) || action.durationSeconds < 1 || action.durationSeconds > 2419200 || !action.reason || action.reason.length > 500) {
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !Number.isInteger(action.durationSeconds) || action.durationSeconds < 1 || action.durationSeconds > 2419200 || !action.reason || action.reason.length > 500) {
           throw new Error("invalid_timeout_action");
         }
         break;
       case "delete-message":
-        if (action.channelId !== "@event" && !/^\\d{17,20}$/.test(action.channelId)) throw new Error("invalid_delete_channel");
-        if (action.messageId !== "@event" && !/^\\d{17,20}$/.test(action.messageId)) throw new Error("invalid_delete_message");
+        if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_delete_channel");
+        if (action.messageId !== "@event" && !/^\d{17,20}$/.test(action.messageId)) throw new Error("invalid_delete_message");
         break;
       case "log":
         if (!action.message || action.message.length > 1000) throw new Error("invalid_log_action");
@@ -898,10 +898,10 @@ export function validateAutomationRule(
         if (String(condition.left).length > 64 || !Number.isFinite(condition.right)) throw new Error("invalid_numeric_condition");
         break;
       case "has-role":
-        if (!/^\\d{17,20}$/.test(condition.userId) || !/^\\d{17,20}$/.test(condition.roleId)) throw new Error("invalid_role_condition");
+        if (!/^\d{17,20}$/.test(condition.userId) || !/^\d{17,20}$/.test(condition.roleId)) throw new Error("invalid_role_condition");
         break;
       case "channel-is":
-        if (!/^\\d{17,20}$/.test(condition.channelId)) throw new Error("invalid_condition_channel");
+        if (!/^\d{17,20}$/.test(condition.channelId)) throw new Error("invalid_condition_channel");
         break;
       case "cooldown-clear":
         if (!condition.key || condition.key.length > 100) throw new Error("invalid_cooldown_key");
