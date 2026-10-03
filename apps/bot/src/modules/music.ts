@@ -451,7 +451,24 @@ export class Music implements PlatformModule {
 
     if (!player) throw new Error("music_player_not_started");
 
-    if (action === "pause") {
+    if (action === "previous") {
+      const previous = player.queue.previous;
+      if (!Array.isArray(previous) || previous.length === 0) {
+        await message.reply("⏮️ Предыдущего трека нет.");
+        return true;
+      }
+      try {
+        await player.queue.shiftPrevious();
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await message.reply("⏮️ Вернулся к предыдущему треку.");
+      } catch (error) {
+        logger.warn("Music prefix previous track failed", { guildId: message.guild.id, error: String(error) });
+        await message.reply("Не удалось вернуть предыдущий трек.");
+      }
+    } else if (action === "lyrics") {
+      await message.reply("Используй /music lyrics или кнопку 📜 в контроллере.");
+    } else if (action === "pause") {
       await player.pause();
     } else if (action === "resume") {
       await player.resume();
@@ -1352,8 +1369,8 @@ export class Music implements PlatformModule {
     const aliases: Record<string, string> = { playlist: "queue" };
     const action = aliases[commandName] ?? commandName;
     const supported = new Set([
-      "play", "pause", "resume", "skip", "stop", "shuffle",
-      "queue", "nowplaying", "repeat", "seek", "volume", "autoplay"
+      "play", "pause", "resume", "previous", "skip", "stop", "shuffle",
+      "queue", "nowplaying", "lyrics", "repeat", "seek", "volume", "autoplay"
     ]);
     if (!supported.has(action)) return false;
 
