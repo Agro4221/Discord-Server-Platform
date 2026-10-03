@@ -203,8 +203,9 @@ export class Moderation implements PlatformModule {
       if (!botMember.permissions.has(PermissionFlagsBits.ManageMessages) || !permissions?.has(PermissionFlagsBits.ManageMessages)) {
         throw new Error("bot_missing_manage_messages");
       }
-      if (!Number.isInteger(value) || value < 1 || value > 100) throw new Error("invalid_clear_amount");
-      const deleted = await textChannel.bulkDelete(value, true);
+      const clearAmount = Number(value);
+      if (!Number.isInteger(clearAmount) || clearAmount < 1 || clearAmount > 100) throw new Error("invalid_clear_amount");
+      const deleted = await textChannel.bulkDelete(clearAmount, true);
       return { action, channelId, affected: deleted.size };
     }
 
@@ -214,9 +215,10 @@ export class Moderation implements PlatformModule {
 
     if (action === "slowmode") {
       if (!textChannel) throw new Error("text_channel_required");
-      if (!Number.isInteger(value) || value < 0 || value > 21600) throw new Error("invalid_slowmode");
-      await textChannel.setRateLimitPerUser(value, "Configured by Vexa Control Center");
-      return { action, channelId, seconds: value };
+      const slowmodeSeconds = Number(value);
+      if (!Number.isInteger(slowmodeSeconds) || slowmodeSeconds < 0 || slowmodeSeconds > 21600) throw new Error("invalid_slowmode");
+      await textChannel.setRateLimitPerUser(slowmodeSeconds, "Configured by Vexa Control Center");
+      return { action, channelId, seconds: slowmodeSeconds };
     }
 
     if (!manageableChannel) throw new Error("channel_not_manageable");
