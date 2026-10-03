@@ -326,4 +326,10 @@ Dashboard является основным способом редактиро�
 
 При этом это ещё не буквальная feature-parity со всеми зрелыми ботами. Отдельно остаются более глубокие custom commands, расширенный logging, richer AutoMod policies, расширенный Automation catalog, более широкий Music provider/failover слой и fleet failover automation.
 
-Главная архитектурная цель уже соблюдена: локальный self-hosted Core + PostgreSQL + Dashboard + Lavalink, без необходимости покупать premium-функции у внешнего bot provider. Сравнение с другими ботами нужно понимать как набор заимствованных продуктовых идей и UX-паттернов, а не как обещание полной копии каждого сервиса.
+Главная архитектурная цель уже соблюдена: локальный self-hosted Core + PostgreSQL + Dashboard + Lavalink, без необходимости покупать premium-функции у внешнего bot provider. Сравнение с другими ботами нужно понимать как набор заимствованных продуктовых идей и UX-паттернов, а не как обещание полной копии каждого сервиса.## 2026-10-03 — Utility commands / AFK
+- The Community area now includes a Utility module for lightweight everyday server operations:
+  - Server/member information: `/serverinfo`, `/userinfo`, `/membercount`.
+  - Media/structure inspection: `/avatar`, `/roleinfo`, `/channelinfo`.
+  - AFK: `/afk set`, `/afk clear`, `/afk status`; prefix equivalents are also available.
+- AFK is persistent across bot restarts and reports an AFK user's reason when they are mentioned.
+
