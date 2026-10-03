@@ -4,7 +4,7 @@
 Self-hosted Discord Server Platform: local-first, resilient, modular, no artificial premium wall, simple UX, optional VPS deployment, optional multi-bot scaling for multiple voice channels.
 
 ## Current branch
-development
+feature/music-v2
 
 ## Current phase
 Release candidate — code/CI verified, ready for live Discord validation.
@@ -28,6 +28,7 @@ Release candidate — code/CI verified, ready for live Discord validation.
 - Automation engine with persisted rules/cooldowns and a constrained Dashboard builder.
 - Security/Anti-Raid and destructive burst detection.
 - Notifications with HTTPS feed validation and SSRF protections.
+- Stream alerts for Twitch, YouTube, VK Видео Live and Kick with persistent schedules and templates.
 - Analytics minute buckets with Dashboard reporting.
 - Music/Lavalink foundation with persistent queue store and bot identity namespace.
 - Multi-bot identity persistence for separate-process fleet deployment, per-voice Music routing and identity-scoped background workers.
