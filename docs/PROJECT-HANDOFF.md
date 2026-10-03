@@ -190,6 +190,7 @@ Premium parity = **совокупность сильных функций раз
 - broader detectors.
 
 ### Server utilities
+- Custom Commands now have a first-class module toggle plus Dashboard CRUD for prefix/Slash commands, aliases, role actions and cooldowns.
 - Custom Commands;
 - Autoresponder/keyword triggers;
 - richer tags/templates;
