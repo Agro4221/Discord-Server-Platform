@@ -106,11 +106,11 @@ export class Tickets implements PlatformModule {
       autoCloseMinutes: Math.min(Math.max(Number(row?.auto_close_minutes ?? 0), 0), 43200),
       formFields: normalizeFormFields(row?.form_fields),
       customization: normalizeTicketCustomization({
-        panelTitle: row?.panel_title,
-        panelDescription: row?.panel_description,
-        createButtonLabel: row?.create_button_label,
-        claimButtonLabel: row?.claim_button_label,
-        closeButtonLabel: row?.close_button_label
+        panelTitle: row?.panel_title ?? undefined,
+        panelDescription: row?.panel_description ?? undefined,
+        createButtonLabel: row?.create_button_label ?? undefined,
+        claimButtonLabel: row?.claim_button_label ?? undefined,
+        closeButtonLabel: row?.close_button_label ?? undefined
       })
     };
   }
