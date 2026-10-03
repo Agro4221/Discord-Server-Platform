@@ -1015,6 +1015,29 @@ export class ManagementApiServer {
             const rawAction = body.action;
             const action = typeof rawAction === "string" ? rawAction : "";
 
+            if (action === "poll.create") {
+              const channelId = typeof body.channelId === "string" ? body.channelId.trim() : "";
+              const question = typeof body.question === "string" ? body.question : "";
+              const options = Array.isArray(body.options) ? body.options.filter((value: unknown): value is string => typeof value === "string") : [];
+              const durationMinutes = Number(body.durationMinutes ?? 60);
+              if (!/^\d{15,25}$/.test(channelId) || !question.trim() || options.length < 2 || options.length > 5 || !Number.isSafeInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 10080) {
+                throw new RequestInputError("invalid_poll_create", 400);
+              }
+              const result = await this.options.communityTools!.dashboardCreatePoll(
+                guildId, channelId, question, options, durationMinutes
+              );
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "poll.created",
+                targetType: "poll",
+                targetId: String(result.id),
+                metadata: { channelId: result.channelId }
+              });
+              this.json(res, 201, { ok: true, result });
+              return;
+            }
+
             if (action === "poll.close") {
               const pollId = Number(body.id);
               if (!Number.isSafeInteger(pollId) || pollId < 1) throw new RequestInputError("invalid_poll", 400);
