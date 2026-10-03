@@ -41,7 +41,7 @@ export class Moderation implements PlatformModule {
     this.identityId = context.identityId;
 
     this.expiryTimer = setInterval(() => {
-      void this.processExpiredBans();
+      void this.processExpiredTimedPunishments();
     }, 30_000);
     this.expiryTimer.unref();
   }
@@ -109,6 +109,47 @@ export class Moderation implements PlatformModule {
       action: row.action,
       reason: row.reason,
       expiresAt: row.expires_at,
+      createdAt: row.created_at
+    }));
+  }
+
+  async addNote(guildId: string, targetUserId: string, moderatorUserId: string, note: string): Promise<number> {
+    const clean = note.trim().slice(0, 1000);
+    if (!clean) throw new Error("moderation_note_empty");
+    const result = await this.db.query<{ id: string }>(
+      "INSERT INTO moderation_notes(guild_id,target_user_id,moderator_user_id,note) VALUES($1,$2,$3,$4) RETURNING id",
+      [guildId,targetUserId,moderatorUserId,clean]
+    );
+    return Number(result.rows[0]?.id ?? 0);
+  }
+
+  async notes(guildId: string, targetUserId: string, limit = 10): Promise<Array<{
+    id: number;
+    targetUserId: string;
+    moderatorUserId: string;
+    note: string;
+    createdAt: Date;
+  }>> {
+    const safeLimit = Math.min(Math.max(limit, 1), 50);
+    const result = await this.db.query<{
+      id: string;
+      target_user_id: string;
+      moderator_user_id: string;
+      note: string;
+      created_at: Date;
+    }>(
+      `SELECT id,target_user_id,moderator_user_id,note,created_at
+       FROM moderation_notes
+       WHERE guild_id=$1 AND target_user_id=$2
+       ORDER BY created_at DESC
+       LIMIT $3`,
+      [guildId,targetUserId,safeLimit]
+    );
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      targetUserId: row.target_user_id,
+      moderatorUserId: row.moderator_user_id,
+      note: row.note,
       createdAt: row.created_at
     }));
   }
@@ -620,7 +661,7 @@ export class Moderation implements PlatformModule {
     });
   }
 
-  private async processExpiredBans(): Promise<void> {
+  private async processExpiredTimedPunishments(): Promise<void> {
     if (!this.client) return;
 
     try {
@@ -628,12 +669,13 @@ export class Moderation implements PlatformModule {
         id: string;
         guild_id: string;
         target_user_id: string;
+        action: "ban" | "timeout";
       }>(
-        `SELECT mc.id,mc.guild_id,mc.target_user_id
+        `SELECT mc.id,mc.guild_id,mc.target_user_id,mc.action
          FROM moderation_cases mc
          INNER JOIN guild_bot_assignments ga ON ga.guild_id=mc.guild_id
          LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id
-         WHERE mc.action='ban'
+         WHERE mc.action IN ('ban','timeout')
            AND mc.expires_at IS NOT NULL
            AND mc.expires_at <= now()
            AND mc.resolved_at IS NULL
@@ -660,15 +702,34 @@ export class Moderation implements PlatformModule {
         try {
           const guild = this.client.guilds.cache.get(row.guild_id);
           if (!guild) throw new Error("guild_not_cached");
-          await guild.members.unban(row.target_user_id, "Timed ban expired");
-          await this.audit("moderation.ban.expired", row.guild_id, "system", row.target_user_id, { caseId: Number(row.id) });
+
+          if (row.action === "ban") {
+            await guild.members.unban(row.target_user_id, "Timed ban expired");
+          } else {
+            const member = await guild.members.fetch(row.target_user_id).catch(() => null);
+            if (member) await member.timeout(null, "Timed timeout expired");
+          }
+
+          await this.audit(
+            row.action === "ban" ? "moderation.ban.expired" : "moderation.timeout.expired",
+            row.guild_id,
+            "system",
+            row.target_user_id,
+            { caseId: Number(row.id) }
+          );
         } catch (error) {
           await this.db.query("UPDATE moderation_cases SET resolved_at=NULL WHERE id=$1", [row.id]);
-          logger.warn("Timed ban expiry failed", { guildId: row.guild_id, userId: row.target_user_id, caseId: row.id, error: String(error) });
+          logger.warn("Timed punishment expiry failed", {
+            guildId: row.guild_id,
+            userId: row.target_user_id,
+            action: row.action,
+            caseId: row.id,
+            error: String(error)
+          });
         }
       }
     } catch (error) {
-      logger.warn("Timed ban worker cycle failed", { identityId: this.identityId, error: String(error) });
+      logger.warn("Timed punishment worker cycle failed", { identityId: this.identityId, error: String(error) });
     }
   }
 
