@@ -223,3 +223,18 @@ Never write credentials, tokens or private user data here.
 - Players still bound to a failed node are moved to another connected node with an active session; player state is persisted afterwards.
 - Added a pure failover availability predicate test.
 - Live two-node outage/recovery remains a release-gate drill because it requires real Lavalink + Discord voice traffic.
+
+
+## 2026-10-03 — Product backlog reset: Music-first advanced feature roadmap
+- Product direction clarified: Kick stream alerts are not a current priority. Existing Twitch, YouTube and VK Live notifications already cover the stream-alert use case used by the project; Kick remains optional/deferred rather than a reason to divert development effort.
+- The persistent backlog in `docs/FEATURE-MATRIX.md` now explicitly captures the requested advanced Discord/music functionality and is the source of truth for the next implementation passes.
+- Mandatory Music controller requirements recorded: persistent player message, compact emoji-based player controls/labels, clear state refresh after actions, and a **separate Loop One / зацикливание одного трека button** distinct from queue repeat.
+- Advanced Music search/queue roadmap recorded: multi-result search picker, remove/range removal, reorder/move, insert-to-front, skip-to-track, queue clear, history/recent tracks, requester display, queue export/share, save queue as playlist and playlist shuffle loading.
+- Advanced Music permissions/anti-abuse roadmap recorded: per-action DJ permissions, queue add/remove/move permissions, vote-skip, request cooldowns, per-user queue limits, fair requester rotation, max queue size and optional request approval/moderation mode.
+- Advanced playlist/state roadmap recorded: shared/server playlists, individual track management, imports where supported, save queue, playlist/favorites shortcuts and richer pagination/management UI.
+- Advanced audio roadmap recorded: Karaoke, pitch/speed, tremolo/other Lavalink effects, custom EQ editor, named effect profiles and persistence/restoration of effect state.
+- Advanced autoplay/radio roadmap recorded: recent-track avoidance, artist/similarity-aware autoplay, radio mode, playlist continuation, and richer Dashboard controls.
+- Advanced lyrics roadmap recorded: pagination, navigation buttons, synced lyrics where timing data exists and provider/status diagnostics.
+- Provider expansion is explicitly a product requirement: Spotify, Apple Music, Deezer, **Yandex Music**, VK Music, Tidal, Qobuz, yt-dlp and JioSaavn are tracked as Music work, with the existing YouTube/SoundCloud path preserved. Provider readiness must be based on actual source-adapter/credential validation, not merely configuration presence.
+- Product principle recorded: bring premium-like Music capabilities into the common self-hosted product without an artificial Premium wall; do not divert the roadmap into provider-count vanity work or unrelated integrations.
+- Documentation update commit: `7dd1faaa3cb5b9c812a77acfe29e931f0f451c6b`.
