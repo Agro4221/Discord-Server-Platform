@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 type Resource = { id: string; name: string; type?: number; manageable?: boolean };
 type PanelRole = { roleId: string; label: string };
-type RolePanel = { id: number; guildId: string; channelId: string; messageId: string | null; title: string; roles: PanelRole[]; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number };
+type RolePanel = { id: number; guildId: string; channelId: string; messageId: string | null; title: string; roles: PanelRole[]; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number };
 
 export function RolePanelsEditor({
   guildId,
@@ -24,6 +24,7 @@ export function RolePanelsEditor({
   const [panelRoles, setPanelRoles] = useState<PanelRole[]>([{ roleId: "", label: "" }]);
   const [selectionMode, setSelectionMode] = useState<"toggle" | "exclusive" | "max">("toggle");
   const [maxSelections, setMaxSelections] = useState(1);
+  const [durationMinutes, setDurationMinutes] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -55,6 +56,7 @@ export function RolePanelsEditor({
     setPanelRoles([{ roleId: "", label: "" }]);
     setSelectionMode("toggle");
     setMaxSelections(1);
+    setDurationMinutes(0);
     setError("");
   }
 
@@ -65,6 +67,7 @@ export function RolePanelsEditor({
     setPanelRoles(panel.roles.length ? panel.roles : [{ roleId: "", label: "" }]);
     setSelectionMode(panel.selectionMode ?? "toggle");
     setMaxSelections(panel.maxSelections ?? 1);
+    setDurationMinutes(panel.durationMinutes ?? 0);
     setError("");
   }
 
@@ -82,7 +85,7 @@ export function RolePanelsEditor({
         {
           method: editingId === null ? "POST" : "PUT",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ channelId, title, roles: cleanRoles, selectionMode, maxSelections })
+          body: JSON.stringify({ channelId, title, roles: cleanRoles, selectionMode, maxSelections, durationMinutes })
         }
       );
       const body = await response.json().catch(() => ({}));
@@ -140,6 +143,15 @@ export function RolePanelsEditor({
           disabled={selectionMode !== "max"}
           onChange={(event) => setMaxSelections(Math.min(5, Math.max(1, Number(event.target.value) || 1)))}
           placeholder="Максимум ролей"
+          style={inputStyle}
+        />
+        <input
+          type="number"
+          min={0}
+          max={43200}
+          value={durationMinutes}
+          onChange={(event) => setDurationMinutes(Math.min(43200, Math.max(0, Number(event.target.value) || 0)))}
+          placeholder="Срок в минутах; 0 = навсегда"
           style={inputStyle}
         />
       </div>
