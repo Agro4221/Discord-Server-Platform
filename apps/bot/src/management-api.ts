@@ -16,6 +16,7 @@ import type { Leveling } from "./modules/leveling.js";
 import type { Economy } from "./modules/economy.js";
 import type { AutoMod } from "./modules/automod.js";
 import type { Tickets } from "./modules/tickets.js";
+import type { Starboard } from "./modules/starboard.js";
 import { CommandPolicyService, COMMAND_DEFINITIONS } from "./command-policy.js";
 import type { StreamAlertPlatform } from "./modules/stream-alerts.js";
 import { BotIdentityRepository } from "./bot-identity.js";
@@ -95,6 +96,7 @@ type ApiOptions = {
   economy?: Economy;
   autoMod?: AutoMod;
   tickets?: Tickets;
+  starboard?: Starboard;
   commandPolicy?: CommandPolicyService;
   rolePanels?: {
     list: (guildId: string) => Promise<unknown[]>;
@@ -891,6 +893,55 @@ export class ManagementApiServer {
               targetId: ruleId
             });
             this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const starboardMatch = path.match(/^\/api\/guilds\/([^/]+)\/starboard$/);
+
+          if (starboardMatch && !this.options.starboard) {
+            this.json(res, 500, { error: "starboard_unavailable" });
+            return;
+          }
+
+          if ((method === "GET" || method === "PUT") && starboardMatch) {
+            const guildId = starboardMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+
+            if (method === "GET") {
+              this.json(res, 200, { guildId, config: await this.options.starboard!.dashboardConfig(guildId) });
+              return;
+            }
+
+            const body = await readJson(req);
+            const channelId = body.channelId === null ? null : typeof body.channelId === "string" ? body.channelId : undefined;
+            if (channelId !== null && channelId !== undefined && !/^\d{15,25}$/.test(channelId)) {
+              throw new RequestInputError("invalid_starboard_channel", 400);
+            }
+            if (body.threshold !== undefined && (!Number.isFinite(Number(body.threshold)) || Number(body.threshold) < 1 || Number(body.threshold) > 100)) {
+              throw new RequestInputError("invalid_starboard_threshold", 400);
+            }
+            if (channelId) {
+              const channel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(channelId);
+              if (!channel || channel.type !== 0) throw new RequestInputError("text_channel_required", 400);
+            }
+            const current = await this.options.starboard!.dashboardConfig(guildId);
+            await this.options.starboard!.dashboardConfigure(guildId, {
+              channelId: channelId === undefined ? current.channelId : channelId,
+              threshold: body.threshold === undefined ? current.threshold : Number(body.threshold),
+              ignoreSelfReaction: typeof body.ignoreSelfReaction === "boolean" ? body.ignoreSelfReaction : current.ignoreSelfReaction,
+              ignoreBots: typeof body.ignoreBots === "boolean" ? body.ignoreBots : current.ignoreBots
+            });
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "starboard.updated",
+              targetType: "starboard",
+              targetId: channelId ?? current.channelId ?? "unconfigured"
+            });
+            this.json(res, 200, { ok: true, config: await this.options.starboard!.dashboardConfig(guildId) });
             return;
           }
 

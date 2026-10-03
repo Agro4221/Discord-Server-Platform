@@ -232,6 +232,38 @@ export class Starboard implements PlatformModule {
     });
   }
 
+  async dashboardConfig(guildId: string): Promise<{ channelId: string | null; threshold: number; ignoreSelfReaction: boolean; ignoreBots: boolean }> {
+    const config = await this.getConfig(guildId);
+    return config
+      ? config
+      : { channelId: null, threshold: 3, ignoreSelfReaction: true, ignoreBots: true };
+  }
+
+  async dashboardConfigure(guildId: string, patch: Partial<Omit<StarboardConfig, "channelId">> & { channelId?: string | null }): Promise<void> {
+    const current = await this.dashboardConfig(guildId);
+    const channelId = patch.channelId === undefined ? current.channelId : patch.channelId;
+    if (!channelId || !/^\d{15,25}$/.test(channelId)) throw new Error("starboard_channel_required");
+
+    const threshold = Math.min(Math.max(Math.floor(Number(patch.threshold ?? current.threshold)), 1), 100);
+    await this.db.query(
+      `INSERT INTO starboard_settings(guild_id,channel_id,threshold,ignore_self_reaction,ignore_bots)
+       VALUES($1,$2,$3,$4,$5)
+       ON CONFLICT(guild_id) DO UPDATE SET
+         channel_id=EXCLUDED.channel_id,
+         threshold=EXCLUDED.threshold,
+         ignore_self_reaction=EXCLUDED.ignore_self_reaction,
+         ignore_bots=EXCLUDED.ignore_bots,
+         updated_at=now()`,
+      [guildId, channelId, threshold, patch.ignoreSelfReaction ?? current.ignoreSelfReaction, patch.ignoreBots ?? current.ignoreBots]
+    );
+    await this.db.query(
+      `INSERT INTO guild_modules(guild_id,module_key,enabled)
+       VALUES($1,'starboard',true)
+       ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()`,
+      [guildId]
+    );
+  }
+
   async configure(
     guildId: string,
     channelId: string,
