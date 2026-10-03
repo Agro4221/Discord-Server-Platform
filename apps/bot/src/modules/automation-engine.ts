@@ -692,12 +692,10 @@ export function validateAutomationRule(
         if (!Number.isInteger(action.seconds) || action.seconds < 1 || action.seconds > 3600) throw new Error("invalid_delay_action");
         break;
       case "webhook":
-        if (!action.content || action.content.length > 2000) throw new Error("invalid_webhook_content");
-        try {
-          await assertSafeFeedUrl(action.url);
-        } catch {
+        if (!/^https:\/\/[^\s<>]+$/i.test(action.url) || action.url.length > 2000) {
           throw new Error("invalid_webhook_url");
         }
+        if (!action.content || action.content.length > 2000) throw new Error("invalid_webhook_content");
         break;
     }
   }
