@@ -1466,18 +1466,6 @@ function ModulePage(props: {
         </section>
       )}
 
-      {props.module?.key === "command-policies" && (
-        <section style={{ ...panel, padding: 20 }}>
-          <SectionHeader title="Command Policies" eyebrow="ACCESS CONTROL" />
-          <CommandPoliciesPanel
-            guildId={props.guildId}
-            roles={props.resources.roles}
-            channels={props.resources.channels.filter((item) => item.type === 0)}
-            onChanged={props.onAudit}
-          />
-        </section>
-      )}
-
       {props.module?.key === "starboard" && (
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Starboard Center" eyebrow="OPERATIONS" />
@@ -1711,7 +1699,20 @@ function ModulePage(props: {
 function SystemPage(props: { guildId: string; health: Health; audit: AuditEvent[]; resources: { channels: Resource[]; roles: Resource[]; bot: { id: string; tag: string; highestRole: { id: string; name: string; position: number }; permissions: Record<string, boolean> } | null }; onAudit: () => void }) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <PageHeader eyebrow="SYSTEM" title="Система" description="Операционные инструменты экземпляра: fleet, здоровье Core, backups и аудит." />
+      <PageHeader eyebrow="SYSTEM" title="Система" description="Операционные инструменты экземпляра: fleet, здоровье Core, backups, permissions и аудит." />
+      <section style={{ ...panel, padding: 20 }}>
+        <SectionHeader title="Discord Diagnostics" eyebrow="PERMISSIONS & HIERARCHY" />
+        <DiscordDiagnosticsPanel bot={props.resources.bot} />
+      </section>
+      <section style={{ ...panel, padding: 20 }}>
+        <SectionHeader title="Command Policies" eyebrow="ACCESS CONTROL" />
+        <CommandPoliciesPanel
+          guildId={props.guildId}
+          roles={props.resources.roles}
+          channels={props.resources.channels.filter((item) => item.type === 0)}
+          onChanged={props.onAudit}
+        />
+      </section>
       <section style={{ ...panel, padding: 20 }}>
         <SectionHeader title="Bot Fleet" eyebrow="IDENTITIES" />
         <FleetPanel guildId={props.guildId} onChanged={props.onAudit} />
