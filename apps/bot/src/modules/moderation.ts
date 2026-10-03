@@ -683,7 +683,8 @@ export class Moderation implements PlatformModule {
           durationMinutes: rule.duration_minutes,
           escalationCaseId: caseId
         });
-        await this.safeDm(targetUser, `Автоматическая эскалация после ${warnCount} предупреждений: timeout на ${rule.duration_minutes} мин. Причина: ${rule.reason}`);
+        const targetUser = await this.client?.users.fetch(targetUserId).catch(() => null);
+        if (targetUser) await this.safeDm(targetUser, `Автоматическая эскалация после ${warnCount} предупреждений: timeout на ${rule.duration_minutes} мин. Причина: ${rule.reason}`);
         return;
       }
 
@@ -710,7 +711,8 @@ export class Moderation implements PlatformModule {
         durationMinutes: durationMinutes ?? null,
         escalationCaseId: caseId
       });
-      await this.safeDm(target, `Автоматическая эскалация после ${warnCount} предупреждений: бан. Причина: ${rule.reason}`);
+      const targetUser = await this.client?.users.fetch(targetUserId).catch(() => null);
+      if (targetUser) await this.safeDm(targetUser, `Автоматическая эскалация после ${warnCount} предупреждений: бан. Причина: ${rule.reason}`);
     } catch (error) {
       logger.warn("Moderation escalation failed", { guildId, targetUserId, warnCaseId, error: String(error) });
     }
