@@ -1251,6 +1251,16 @@ const migrations = [
     ])
   },
   {
+    version: 81,
+    name: "verification_panel_customization",
+    sql: q([
+      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS panel_title text NOT NULL DEFAULT '✅ Проверка участника';",
+      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS panel_description text NOT NULL DEFAULT 'Нажми кнопку, получи одноразовый код и подтверди его через кнопку ниже.';",
+      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS issue_button_label text NOT NULL DEFAULT 'Получить код';",
+      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS confirm_button_label text NOT NULL DEFAULT 'Подтвердить';"
+    ])
+  },
+  {
     version: 80,
     name: "welcome_embed_images",
     sql: q([
