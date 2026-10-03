@@ -509,6 +509,29 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       ),
 
     new SlashCommandBuilder()
+      .setName("suggestion")
+      .setDescription("Community suggestions")
+      .addSubcommand((sub) =>
+        sub
+          .setName("create")
+          .setDescription("Publish a suggestion")
+          .addStringOption((o) => o.setName("text").setDescription("Suggestion text").setMaxLength(2000).setRequired(true))
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName("review")
+          .setDescription("Approve or reject a suggestion")
+          .addIntegerOption((o) => o.setName("id").setDescription("Suggestion id").setMinValue(1).setRequired(true))
+          .addStringOption((o) =>
+            o.setName("action").setDescription("Decision").addChoices(
+              { name: "Approve", value: "approve" },
+              { name: "Reject", value: "reject" }
+            ).setRequired(true)
+          )
+          .addStringOption((o) => o.setName("reason").setDescription("Optional staff comment").setMaxLength(500))
+      ),
+
+    new SlashCommandBuilder()
       .setName("analytics")
       .setDescription("Server analytics"),
     new SlashCommandBuilder()
