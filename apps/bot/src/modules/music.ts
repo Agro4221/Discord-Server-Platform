@@ -406,6 +406,7 @@ export class Music implements PlatformModule {
       nodeCount: this.connectedNodes.size,
       providers: [
         { name: "YouTube", enabled: true, mode: "direct" },
+        { name: "SoundCloud", enabled: true, mode: "direct" },
         { name: "Spotify", enabled: process.env.LAVASRC_SPOTIFY_ENABLED === "true", mode: "mirror" },
         { name: "Apple Music", enabled: process.env.LAVASRC_APPLEMUSIC_ENABLED === "true", mode: "mirror" },
         { name: "Deezer", enabled: process.env.LAVASRC_DEEZER_ENABLED === "true", mode: "direct" },
@@ -1197,6 +1198,7 @@ export class Music implements PlatformModule {
   private async providers(interaction: ChatInputCommandInteraction): Promise<void> {
     const providers: Array<[string,string,boolean]> = [
       ["YouTube","yt",true],
+      ["SoundCloud","Lavalink",true],
       ["Spotify","LavaSrc",process.env.LAVASRC_SPOTIFY_ENABLED === "true"],
       ["Apple Music","LavaSrc",process.env.LAVASRC_APPLEMUSIC_ENABLED === "true"],
       ["Deezer","LavaSrc",process.env.LAVASRC_DEEZER_ENABLED === "true"],
