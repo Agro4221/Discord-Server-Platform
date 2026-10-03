@@ -108,9 +108,10 @@ export class Birthdays implements PlatformModule {
         const timezoneResult = await this.db.query<{ timezone:string }>("SELECT timezone FROM guild_settings WHERE guild_id=$1",[guild.id]);
         const timezone = timezoneResult.rows[0]?.timezone || "UTC";
         const parts = new Intl.DateTimeFormat("en-CA",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+        const year = Number(parts.find((part) => part.type === "year")?.value);
         const month = Number(parts.find((part) => part.type === "month")?.value);
         const day = Number(parts.find((part) => part.type === "day")?.value);
-        const todayKey = String(new Date().getUTCFullYear()) + "-" + String(month).padStart(2,"0") + "-" + String(day).padStart(2,"0");
+        const todayKey = String(year) + "-" + String(month).padStart(2,"0") + "-" + String(day).padStart(2,"0");
         if (!Number.isInteger(month) || !Number.isInteger(day) || setting.last_run_date === todayKey) continue;
 
         const birthdays = await this.db.query<{ user_id:string }>(
