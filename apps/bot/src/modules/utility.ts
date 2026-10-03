@@ -142,8 +142,13 @@ export class Utility implements PlatformModule {
       }
 
       case "channelinfo": {
+        const channel = message.guild.channels.cache.get(message.channelId);
+        if (!channel) {
+          await message.reply("Канал не найден.");
+          return true;
+        }
         await message.reply({
-          embeds: [this.buildChannelInfo(message.channel)]
+          embeds: [this.buildChannelInfo(channel)]
         });
         return true;
       }
