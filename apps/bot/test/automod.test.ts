@@ -133,6 +133,7 @@ test("AutoMod records a durable audit event for a handled violation", async () =
           }]
         } as { rows: T[] };
       }
+      if (text.startsWith("SELECT detector,enabled,threshold,window_seconds")) return { rows: [] } as { rows: T[] };
       if (text.startsWith("INSERT INTO automod_events")) return { rows: [], rowCount: 1 } as { rows: T[] };
       throw new Error("unexpected query: " + text);
     }
