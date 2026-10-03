@@ -285,7 +285,7 @@ export class RolePanels implements PlatformModule {
       }
     }
 
-    await this.createPanel(message.guild.id, message.channelId, roles, args.join(" ").trim() || "Выберите роли", {
+    await this.createPanel(message.guild.id, message.channelId, roles, args.join(" ").trim() || "Выберите роли", "toggle", 1, {
       deleteMessage: async (channelId, messageId) => {
         const channel = message.guild!.channels.cache.get(channelId);
         if (channel && channel.type === 0) await channel.messages.delete(messageId).catch(() => undefined);
@@ -406,7 +406,8 @@ export class RolePanels implements PlatformModule {
     if (row.selection_mode === "exclusive") {
       const removable = (row.roles ?? [])
         .map((entry) => interaction.guild!.roles.cache.get(entry.roleId))
-        .filter((item): item is NonNullable<typeof item> => Boolean(item) && member.roles.cache.has(item.id) && item.id !== role.id);
+        .filter((item): item is import("discord.js").Role => Boolean(item))
+        .filter((item) => member.roles.cache.has(item.id) && item.id !== role.id);
       for (const current of removable) {
         if (current.position < bot.roles.highest.position) {
           await member.roles.remove(current,"Role panel exclusive selection");
