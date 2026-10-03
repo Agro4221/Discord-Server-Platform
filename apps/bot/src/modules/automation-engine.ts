@@ -619,6 +619,10 @@ export class AutomationEngine implements PlatformModule {
   }
 
   private async processDelayedJobs(): Promise<void> {
+    await this.db.query(
+      "DELETE FROM automation_delayed_jobs WHERE completed_at IS NOT NULL AND completed_at < now()-interval '7 days'"
+    ).catch((error) => logger.warn("Automation delayed job cleanup failed", { error: String(error) }));
+
     const result = await this.db.query<{
       id: string;
       guild_id: string;
