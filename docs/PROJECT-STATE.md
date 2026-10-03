@@ -15,7 +15,7 @@ Release candidate — code/CI verified, ready for live Discord validation.
 - Health/readiness endpoint and Discord connection supervision.
 - Durable audit log.
 - Local protected Management API.
-- Schema-driven Next.js Control Center with session auth, functional-area navigation, capability/function index, module toggles, Discord channel/role selectors, grouped settings forms, import/export, backup management, module actions and specialized admin panels.
+- Schema-driven Next.js Control Center with session auth, functional-area navigation, capability/function index, module toggles, Discord channel/role selectors, grouped settings forms, import/export, backup management, module actions and specialized admin panels. Custom Commands and AutoMod have dedicated CRUD editors.
 - Moderation with case history.
 - Temporary Voice with idempotency, ownership and reconciliation.
 - AutoMod with persistent baseline settings plus Dashboard-managed detector rules, per-rule actions/scopes and audit logging. Per-rule cooldown windows and warning escalation are included.
