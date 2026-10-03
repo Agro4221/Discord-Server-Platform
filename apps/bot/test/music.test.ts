@@ -1,4 +1,4 @@
-import { nextMusicRepeatMode, clampMusicVolume } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -63,4 +63,20 @@ test("Music volume controller clamps values to the Discord player range", () => 
   assert.equal(clampMusicVolume(-10), 0);
   assert.equal(clampMusicVolume(105), 105);
   assert.equal(clampMusicVolume(999), 200);
+});
+
+test("Music controller separates queue loop from Loop One", () => {
+  assert.equal(nextMusicQueueRepeatMode("off"), "queue");
+  assert.equal(nextMusicQueueRepeatMode("queue"), "off");
+  assert.equal(nextMusicQueueRepeatMode("track"), "queue");
+});
+
+test("Music progress formatter handles paused and live tracks", () => {
+  const track = { info: { duration: 125000 } } as never;
+  const pausedPlayer = { paused: true, lastPosition: 65000, lastPositionChange: Date.now() - 5000 } as never;
+  assert.equal(formatTrackProgress(pausedPlayer, track), "`1:05 / 2:05`");
+
+  const liveTrack = { info: { duration: 0 } } as never;
+  const livePlayer = { paused: true, lastPosition: 5000 } as never;
+  assert.equal(formatTrackProgress(livePlayer, liveTrack), "`0:05 / live`");
 });
