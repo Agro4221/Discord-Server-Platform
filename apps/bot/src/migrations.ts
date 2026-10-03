@@ -1203,6 +1203,7 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_ticket_sla_open_activity ON tickets(guild_id,status,last_activity_at,created_at) WHERE status='open';"
     ])
   }
+  },
   {
     version: 77,
     name: "help_pages",
@@ -1218,6 +1219,18 @@ const migrations = [
       "  PRIMARY KEY(guild_id,slug)",
       ");",
       "CREATE INDEX IF NOT EXISTS idx_help_pages_guild_updated ON help_pages(guild_id,updated_at DESC);"
+    ])
+  },
+  {
+    version: 78,
+    name: "analytics_settings",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS analytics_settings (",
+      "  guild_id text PRIMARY KEY,",
+      "  retention_days integer NOT NULL DEFAULT 30 CHECK(retention_days BETWEEN 1 AND 3650),",
+      "  visible_counters jsonb NOT NULL DEFAULT '[\"message\",\"member_join\",\"member_leave\",\"voice_join\",\"voice_leave\",\"voice_move\"]'::jsonb,",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");"
     ])
   },
 ] as const;
