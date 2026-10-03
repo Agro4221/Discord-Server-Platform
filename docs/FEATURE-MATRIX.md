@@ -10,7 +10,7 @@
 |---|---|
 | Slash commands | ✅ |
 | Prefix commands | ✅ |
-| Unified permissions / cooldowns | 🟡 |
+| Unified permissions / cooldowns | ✅ | Central command policy guard + Dashboard editor |
 | Module lifecycle / health | ✅ |
 | PostgreSQL + migrations | ✅ |
 | Audit log | ✅ |
@@ -105,7 +105,7 @@
 | DM / webhook actions | ✅ | DM + hardened webhook action
 | Conditional branches | ✅ | Nested if/else action branches up to 2 levels |
 | Delay / queue semantics | 🟡 | Delay implemented; durable queue semantics remain
-| Template variables / reusable snippets | 🟡 |
+| Template variables / reusable snippets | ✅ | Event variables + persistent named templates via `{template:name}` |
 | Visual automation builder | ✅ |
 
 ## Notifications / Integrations
