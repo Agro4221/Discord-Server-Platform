@@ -1060,6 +1060,14 @@ const migrations = [
     ])
   },
   {
+    version: 69,
+    name: "automation_delayed_retry_dead_letter",
+    sql: q([
+      "ALTER TABLE automation_delayed_jobs ADD COLUMN IF NOT EXISTS dead_lettered_at timestamptz;",
+      "CREATE INDEX IF NOT EXISTS idx_automation_delayed_retry_state ON automation_delayed_jobs(guild_id,completed_at,dead_lettered_at,available_at);"
+    ])
+  },
+  {
     version: 70,
     name: "automation_workflow_presets",
     sql: q([
@@ -1076,14 +1084,6 @@ const migrations = [
       "  PRIMARY KEY(guild_id,name)",
       ");",
       "CREATE INDEX IF NOT EXISTS idx_automation_workflow_presets_guild_updated ON automation_workflow_presets(guild_id,updated_at DESC);"
-    ])
-  },
-  {
-    version: 69,
-    name: "automation_delayed_retry_dead_letter",
-    sql: q([
-      "ALTER TABLE automation_delayed_jobs ADD COLUMN IF NOT EXISTS dead_lettered_at timestamptz;",
-      "CREATE INDEX IF NOT EXISTS idx_automation_delayed_retry_state ON automation_delayed_jobs(guild_id,completed_at,dead_lettered_at,available_at);"
     ])
   },
   {
