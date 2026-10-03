@@ -24,6 +24,18 @@ import { logger } from "../logger.js";
 
 type MusicRepeatMode = "off" | "track" | "queue";
 
+const MAX_PLAYLIST_TRACKS = 500;
+
+export function nextMusicRepeatMode(mode: MusicRepeatMode): MusicRepeatMode {
+  if (mode === "off") return "track";
+  if (mode === "track") return "queue";
+  return "off";
+}
+
+export function clampMusicVolume(value: number): number {
+  return Math.min(200, Math.max(0, Math.round(value)));
+}
+
 class PostgresQueueStore implements QueueStoreManager {
   constructor(
     private readonly db: Database,
@@ -87,6 +99,7 @@ export class Music implements PlatformModule {
   private readonly lastPlayedTracks = new Map<string, Track>();
   private readonly autoplayInFlight = new Set<string>();
   private readonly autoLeaveTimers = new Map<string, NodeJS.Timeout>();
+  private readonly requestInFlight = new Set<string>();
 
   constructor(
     private readonly db: Database,
@@ -100,6 +113,7 @@ export class Music implements PlatformModule {
     this.connectedNodes.clear();
     this.lastPlayedTracks.clear();
     this.autoplayInFlight.clear();
+    this.requestInFlight.clear();
     for (const timer of this.autoLeaveTimers.values()) clearTimeout(timer);
     this.autoLeaveTimers.clear();
 
@@ -308,9 +322,11 @@ export class Music implements PlatformModule {
 
     const a = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const b = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
+    const d = context.events.on("message.create", (message) => this.onRequestMessage(message));
     this.unsubscribe = () => {
       a();
       b();
+      d();
     };
 
     this.healthTimer = setTimeout(() => this.publishNodeHealth(), 0);
@@ -558,34 +574,145 @@ export class Music implements PlatformModule {
       return;
     }
 
-    const player = await this.getOrCreatePlayer(interaction, voiceChannelId);
-    if (player.voiceChannelId !== voiceChannelId) {
-      await interaction.reply({ content: "Музыкальный бот уже находится в другом голосовом канале этого сервера.", ephemeral: true });
-      return;
-    }
-
-    if (!player.connected) {
-      await player.connect();
-    }
-
-    const source = /^https?:\/\//i.test(query) ? undefined : "ytsearch";
-    const result = await player.search(
-      source ? { query, source } : { query },
+    const queued = await this.queueQuery(
+      interaction.guildId!,
+      voiceChannelId,
+      interaction.channelId,
+      query,
       interaction.user
     );
 
-    if (!result.tracks.length) {
+    if (!queued.added) {
       await interaction.reply({ content: "Ничего не найдено.", ephemeral: true });
       return;
     }
 
-    player.queue.add(result.tracks[0]!);
-    if (!player.playing) await player.play();
-
+    const suffix = queued.truncated
+      ? ` (добавлены первые ${MAX_PLAYLIST_TRACKS} треков)`
+      : "";
     await interaction.reply({
-      content: `Добавлено в очередь: **${result.tracks[0]!.info.title}** — ${result.tracks[0]!.info.author}`,
+      content: `Добавлено в очередь: **${queued.added}** трек(ов)${suffix}. Первый: **${queued.firstTitle}** — ${queued.firstAuthor}`,
       ephemeral: true
     });
+  }
+
+  private async queueQuery(
+    guildId: string,
+    voiceChannelId: string,
+    textChannelId: string,
+    query: string,
+    requester: import("discord.js").User
+  ): Promise<{ added: number; truncated: boolean; firstTitle: string; firstAuthor: string }> {
+    if (!this.manager) throw new Error("music_manager_unavailable");
+
+    const existing = this.manager.players.get(guildId);
+    const player = existing ?? await this.manager.createPlayer({
+      guildId,
+      voiceChannelId,
+      textChannelId: await this.preferredTextChannelId(guildId, textChannelId),
+      volume: await this.defaultVolume(guildId),
+      selfDeaf: true
+    });
+
+    if (player.voiceChannelId !== voiceChannelId) {
+      throw new Error("music_player_in_other_voice");
+    }
+    if (!player.connected) await player.connect();
+
+    const source = /^https?:\/\//i.test(query) ? undefined : "ytsearch";
+    const result = await player.search(
+      source ? { query, source } : { query },
+      requester
+    );
+
+    if (!result.tracks.length) {
+      return { added: 0, truncated: false, firstTitle: "", firstAuthor: "" };
+    }
+
+    const tracks = result.tracks.slice(0, MAX_PLAYLIST_TRACKS);
+    for (const track of tracks) player.queue.add(track);
+    if (!player.playing) await player.play();
+
+    await this.persistPlayer(player);
+    await this.syncController(player);
+
+    const first = tracks[0]!;
+    return {
+      added: tracks.length,
+      truncated: result.tracks.length > tracks.length,
+      firstTitle: first.info.title,
+      firstAuthor: first.info.author ?? "Unknown artist"
+    };
+  }
+
+  private async onRequestMessage(message: Message): Promise<void> {
+    if (!message.guild || message.author.bot || message.webhookId) return;
+    if (!await moduleEnabled(this.db, message.guild.id, "music", false)) return;
+
+    const requestChannelId = await this.requestChannelId(message.guild.id);
+    if (!requestChannelId || message.channelId !== requestChannelId) return;
+
+    const query = message.content.trim();
+    if (!query) return;
+
+    const key = `${message.guild.id}:${message.author.id}`;
+    if (this.requestInFlight.has(key)) {
+      await message.reply("⏳ Твой предыдущий запрос ещё обрабатывается.").catch(() => undefined);
+      return;
+    }
+
+    const member = message.member ?? await message.guild.members.fetch(message.author.id).catch(() => null);
+    const voiceChannelId = member?.voice.channelId ?? null;
+    if (!voiceChannelId) {
+      await message.reply("🎧 Сначала зайди в голосовой канал.").catch(() => undefined);
+      return;
+    }
+
+    const owner = await this.identities.musicVoiceOwner(message.guild.id, voiceChannelId);
+    if (owner && owner !== this.config.botIdentityId) {
+      await message.reply(`🎧 Этот голосовой канал закреплён за bot identity **${owner}**.`).catch(() => undefined);
+      return;
+    }
+    if (!owner && this.config.botIdentityId !== "primary") {
+      await message.reply("🎧 Эта voice channel не назначена данной bot identity.").catch(() => undefined);
+      return;
+    }
+
+    this.requestInFlight.add(key);
+    try {
+      const queued = await this.queueQuery(
+        message.guild.id,
+        voiceChannelId,
+        message.channelId,
+        query,
+        message.author
+      );
+      if (!queued.added) {
+        await message.reply("🔎 Ничего не найдено.").catch(() => undefined);
+        return;
+      }
+
+      const suffix = queued.truncated
+        ? ` — добавлены первые ${MAX_PLAYLIST_TRACKS} треков`
+        : "";
+      await message.reply(
+        `✅ В очередь добавлено: **${queued.added}**. Первый: **${queued.firstTitle}** — ${queued.firstAuthor}${suffix}`
+      ).catch(() => undefined);
+    } catch (error) {
+      const messageText = String(error);
+      await message.reply(
+        messageText.includes("music_player_in_other_voice")
+          ? "🎧 Музыкальный бот уже занят другим voice-каналом этого сервера."
+          : "❌ Не удалось добавить запрос в очередь."
+      ).catch(() => undefined);
+      logger.warn("Music channel request failed", {
+        guildId: message.guild.id,
+        userId: message.author.id,
+        error: messageText
+      });
+    } finally {
+      this.requestInFlight.delete(key);
+    }
   }
 
   private async getOrCreatePlayer(
@@ -823,11 +950,7 @@ export class Music implements PlatformModule {
       return;
     }
 
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId("dsp:music:pause").setLabel("Пауза").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId("dsp:music:skip").setLabel("Следующий").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId("dsp:music:stop").setLabel("Стоп").setStyle(ButtonStyle.Danger)
-    );
+    const components = this.buildControllerComponents(player);
 
     const autoplay = await this.autoplayEnabled(interaction.guildId!);
     const embed = new EmbedBuilder()
@@ -851,7 +974,7 @@ export class Music implements PlatformModule {
         }
       );
 
-    await interaction.reply({ embeds: [embed], components: [row] });
+    await interaction.reply({ embeds: [embed], components });
   }
 
   async handlePrefixCommand(message: Message, commandName: string, args: string[]): Promise<boolean> {
@@ -1059,30 +1182,52 @@ export class Music implements PlatformModule {
     }
 
     const action = interaction.customId.slice("dsp:music:".length);
+    let response = "";
+
     if (action === "pause") {
       if (player.paused) await player.resume();
       else await player.pause();
-    }
-    else if (action === "skip") await player.skip();
-    else if (action === "stop") await player.stopPlaying();
-    else if (action === "shuffle") {
+      response = player.paused ? "⏸️ Пауза." : "▶️ Продолжаю.";
+    } else if (action === "skip") {
+      await player.skip();
+      response = "⏭️ Следующий трек.";
+    } else if (action === "stop") {
+      await player.stopPlaying();
+      response = "⏹️ Стоп.";
+    } else if (action === "shuffle") {
       if (player.queue.tracks.length < 2) {
         await interaction.reply({ content: "В очереди недостаточно треков для shuffle.", ephemeral: true });
         return;
       }
       await Promise.resolve(player.queue.shuffle());
       await this.persistPlayer(player);
+      response = "🔀 Очередь перемешана.";
+    } else if (action === "repeat") {
+      const mode = nextMusicRepeatMode(player.repeatMode);
+      await player.setRepeatMode(mode);
+      await this.persistPlayer(player);
+      response = `🔁 Repeat: **${mode}**`;
+    } else if (action === "volume-down" || action === "volume-up") {
+      const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+      if (!await this.canManageMusicMember(interaction.guild.id, member)) {
+        await interaction.reply({ content: "Громкость изменяют пользователи с DJ-ролью или Manage Server.", ephemeral: true });
+        return;
+      }
+      const delta = action === "volume-up" ? 10 : -10;
+      const next = clampMusicVolume(player.volume + delta);
+      await player.setVolume(next);
+      await this.persistPlayer(player);
+      response = `🔊 Громкость: **${next}**`;
+    } else if (action === "queue") {
+      const tracks = player.queue.tracks.slice(0, 15);
+      const lines = tracks.map((track, index) => `${index + 1}. **${track.info.title}** — ${track.info.author ?? "Unknown artist"}`);
+      response = lines.length ? `📋 Очередь\\n${lines.join("\\n")}` : "📋 Очередь пуста.";
+    } else {
+      return;
     }
 
     await this.syncController(player);
-
-    await interaction.reply({
-      content:
-        action === "pause" ? (player.paused ? "⏸️ Пауза." : "▶️ Продолжаю.") :
-        action === "skip" ? "⏭️ Следующий трек." :
-        "⏹️ Стоп.",
-      ephemeral: true
-    });
+    await interaction.reply({ content: response, ephemeral: true });
   }
 
   private async restoreResumedPlayers(nodeId: string, fetchedPlayers: unknown[]): Promise<void> {
@@ -1204,14 +1349,15 @@ export class Music implements PlatformModule {
     return result.rows[0]?.autoplay ?? false;
   }
 
-  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number }> {
-    const result = await this.db.query<{ preferred_text_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number }>(
-      "SELECT preferred_text_channel_id,default_volume,announce_track_start,auto_leave_seconds FROM music_settings WHERE guild_id=$1",
+  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number }> {
+    const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number }>(
+      "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds FROM music_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
     return {
       preferredTextChannelId: row?.preferred_text_channel_id ?? null,
+      requestChannelId: row?.request_channel_id ?? null,
       defaultVolume: Math.min(Math.max(Number(row?.default_volume ?? 100), 0), 200),
       announceTrackStart: row?.announce_track_start ?? true,
       autoLeaveSeconds: Math.min(Math.max(Number(row?.auto_leave_seconds ?? 30), 0), 86400)
@@ -1220,12 +1366,20 @@ export class Music implements PlatformModule {
 
   private async preferredTextChannelId(guildId: string, fallback: string | null | undefined): Promise<string | undefined> {
     const settings = await this.musicSettings(guildId);
-    const preferred = settings.preferredTextChannelId;
+    const preferred = settings.requestChannelId ?? settings.preferredTextChannelId;
     if (preferred) {
       const channel = this.client?.guilds.cache.get(guildId)?.channels.cache.get(preferred);
       if (channel?.isTextBased() && "send" in channel) return preferred;
     }
     return fallback ?? undefined;
+  }
+
+  private async requestChannelId(guildId: string): Promise<string | null> {
+    const settings = await this.musicSettings(guildId);
+    const channelId = settings.requestChannelId;
+    if (!channelId) return null;
+    const channel = this.client?.guilds.cache.get(guildId)?.channels.cache.get(channelId);
+    return channel?.isTextBased() && "send" in channel ? channelId : null;
   }
 
   private async defaultVolume(guildId: string): Promise<number> {
@@ -1317,6 +1471,24 @@ export class Music implements PlatformModule {
     ).catch((error) => logger.warn("Failed to persist music player", { error: String(error) }));
   }
 
+  private buildControllerComponents(player: Player): ActionRowBuilder<ButtonBuilder>[] {
+    const repeat = player.repeatMode === "off" ? "🔁" : player.repeatMode === "track" ? "🔂" : "🔁";
+    return [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("dsp:music:pause").setEmoji(player.paused ? "▶️" : "⏸️").setLabel(player.paused ? "Продолжить" : "Пауза").setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId("dsp:music:skip").setEmoji("⏭️").setLabel("Следующий").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:shuffle").setEmoji("🔀").setLabel("Shuffle").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:repeat").setEmoji(repeat).setLabel("Repeat").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:stop").setEmoji("⏹️").setLabel("Стоп").setStyle(ButtonStyle.Danger)
+      ),
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("dsp:music:volume-down").setEmoji("🔉").setLabel("-10").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:volume-up").setEmoji("🔊").setLabel("+10").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:queue").setEmoji("📋").setLabel("Очередь").setStyle(ButtonStyle.Secondary)
+      )
+    ];
+  }
+
   private async syncController(player: Player): Promise<void> {
     if (!this.client || !player.textChannelId) return;
 
@@ -1351,14 +1523,7 @@ export class Music implements PlatformModule {
       )
       .setTimestamp();
 
-    const components = [
-      new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId("dsp:music:pause").setLabel(player.paused ? "Resume" : "Pause").setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId("dsp:music:skip").setLabel("Skip").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("dsp:music:shuffle").setLabel("Shuffle").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("dsp:music:stop").setLabel("Stop").setStyle(ButtonStyle.Danger)
-      )
-    ];
+    const components = this.buildControllerComponents(player);
 
     if (storedId) {
       const existing = await channel.messages.fetch(storedId).catch(() => null);
