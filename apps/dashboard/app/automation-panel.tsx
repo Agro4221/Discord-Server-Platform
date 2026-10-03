@@ -22,7 +22,9 @@ type Action =
   | { type: "webhook"; url: string; content: string }
   | { type: "branch"; condition: Condition; thenActions: Action[]; elseActions: Action[] };
 
-type Template = { name: string; content: string };\n\ntype Rule = {
+type Template = { name: string; content: string };
+
+type Rule = {
   id: string;
   name: string;
   enabled: boolean;
