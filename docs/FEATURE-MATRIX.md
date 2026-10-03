@@ -119,7 +119,7 @@
 | Stream alert templates | ✅ |
 | Multiple provider credentials per guild | 🟡 |
 | Reddit / TikTok / Kick adapters | 🟡 |
-| GitHub notifications | 🟡 |
+| GitHub notifications | ✅ | `/feed github` для releases и commits через существующий RSS/Atom worker |
 | Secure feed validation / SSRF protection | ✅ |
 
 ## Music
