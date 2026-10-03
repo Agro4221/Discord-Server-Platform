@@ -296,6 +296,40 @@ export class AutomationEngine implements PlatformModule {
     }
   }
 
+  async listTemplates(guildId: string): Promise<Array<{ name: string; content: string }>> {
+    const result = await this.db.query<{ name: string; content: string }>(
+      "SELECT name,content FROM automation_templates WHERE guild_id=$1 ORDER BY name",
+      [guildId]
+    );
+    return result.rows.map((row) => ({ name: row.name, content: row.content }));
+  }
+
+  async setTemplate(guildId: string, name: string, content: string): Promise<void> {
+    const normalizedName = normalizeTemplateName(name);
+    const normalizedContent = content.trim().slice(0, 2000);
+    if (!normalizedName) throw new Error("invalid_automation_template_name");
+    if (!normalizedContent) throw new Error("invalid_automation_template_content");
+    await this.db.query(
+      "INSERT INTO automation_templates(guild_id,name,content) VALUES($1,$2,$3) ON CONFLICT(guild_id,name) DO UPDATE SET content=EXCLUDED.content,updated_at=now()",
+      [guildId, normalizedName, normalizedContent]
+    );
+    const guildTemplates = this.templates.get(guildId) ?? new Map<string, string>();
+    guildTemplates.set(normalizedName, normalizedContent);
+    this.templates.set(guildId, guildTemplates);
+  }
+
+  async deleteTemplate(guildId: string, name: string): Promise<boolean> {
+    const normalizedName = normalizeTemplateName(name);
+    if (!normalizedName) throw new Error("invalid_automation_template_name");
+    const result = await this.db.query(
+      "DELETE FROM automation_templates WHERE guild_id=$1 AND name=$2",
+      [guildId, normalizedName]
+    );
+    const guildTemplates = this.templates.get(guildId);
+    guildTemplates?.delete(normalizedName);
+    return result.rowCount === 1;
+  }
+
   async createRule(
     guildId: string,
     name: string,
@@ -795,10 +829,16 @@ async function renderTemplate(value: string, event: RuntimeEvent): Promise<strin
     .replaceAll("{content}", event.content ?? "{content}")
     .replaceAll("{guildId}", event.guildId)
     .replaceAll("{event}", event.type)
-    .replaceAll("{timestamp}", event.content ?? new Date().toISOString());
+    .replaceAll("{timestamp}", event.numeric?.timestamp ? new Date(event.numeric.timestamp).toISOString() : new Date().toISOString());
 }
 
 
 export function shouldEmitSchedule(minute: number, lastMinute: number | null): boolean {
   return lastMinute !== minute;
+}
+
+
+function normalizeTemplateName(value: string): string {
+  const name = value.trim().toLowerCase();
+  return /^[a-z0-9_-]{1,40}$/.test(name) ? name : "";
 }
