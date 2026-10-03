@@ -749,6 +749,8 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
         .addStringOption((o) => o.setName("message").setDescription("Welcome message").setMaxLength(2000))
         .addBooleanOption((o) => o.setName("dm").setDescription("Send DM"))
         .addBooleanOption((o) => o.setName("embed").setDescription("Use embed"))
+        .addStringOption((o) => o.setName("image").setDescription("Welcome image HTTPS URL").setMaxLength(2000))
+        .addStringOption((o) => o.setName("goodbye-image").setDescription("Goodbye image HTTPS URL").setMaxLength(2000))
       ),
 
     new SlashCommandBuilder()
