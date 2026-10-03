@@ -1122,7 +1122,12 @@ export async function handleCommand(
   }
 
   if (interaction.commandName === "roleinfo") {
-    const role = interaction.options.getRole("role", true);
+    const roleOption = interaction.options.getRole("role", true);
+    const role = interaction.guild!.roles.cache.get(roleOption.id);
+    if (!role) {
+      await interaction.reply({ content: "Роль не найдена.", ephemeral: true });
+      return;
+    }
     const permissions = role.permissions.toArray().slice(0, 18).join(", ") || "Нет";
     await interaction.reply({
       embeds: [new EmbedBuilder().setTitle("🏷️ " + role.name).addFields(
@@ -1140,7 +1145,8 @@ export async function handleCommand(
   }
 
   if (interaction.commandName === "channelinfo") {
-    const channel = interaction.options.getChannel("channel") ?? interaction.channel;
+    const selectedChannel = interaction.options.getChannel("channel");
+    const channel = interaction.guild!.channels.cache.get(selectedChannel?.id ?? interaction.channelId);
     if (!channel) {
       await interaction.reply({ content: "Канал не найден.", ephemeral: true });
       return;
@@ -1398,12 +1404,3 @@ export async function handleCommand(
 }
 
 function parseDurationMinutes(value: string): number | null {
-  const match = value.trim().toLowerCase().match(/^(\\d+)\\s*(m|min|h|d|w)$/);
-  if (!match) return null;
-  const amount = Number(match[1]);
-  const unit = match[2];
-  if (!Number.isSafeInteger(amount) || amount <= 0) return null;
-  const multiplier = unit === "w" ? 7 * 24 * 60 : unit === "d" ? 24 * 60 : unit === "h" ? 60 : 1;
-  const minutes = amount * multiplier;
-  return Number.isSafeInteger(minutes) && minutes <= 40320 ? minutes : null;
-}

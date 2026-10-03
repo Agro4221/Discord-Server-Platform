@@ -117,7 +117,7 @@ export class PrefixCommandRouter {
 
         if (commandName === "channelinfo") {
           const channelId = message.mentions.channels.first()?.id ?? (args[0] ?? "").match(/^<#(\d+)>$/)?.[1] ?? args[0];
-          const channel = channelId ? message.guild.channels.cache.get(channelId) : message.channel;
+          const channel = message.guild.channels.cache.get(channelId || message.channelId);
           if (!channel) {
             await message.reply("Канал не найден.");
             return;
