@@ -824,6 +824,13 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_role_panel_assignments_expiry ON role_panel_assignments(expires_at);"
     ])
+  } ,
+  {
+    version: 50,
+    name: "timed_role_panels",
+    sql: q([
+      "ALTER TABLE role_panels ADD COLUMN IF NOT EXISTS duration_minutes integer NOT NULL DEFAULT 0 CHECK(duration_minutes BETWEEN 0 AND 43200);"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
