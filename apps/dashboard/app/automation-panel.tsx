@@ -27,6 +27,10 @@ type Action =
   | { type: "delete-message"; channelId: string; messageId: string }
   | { type: "set-nickname"; userId: string; nickname: string | null }
   | { type: "react-message"; channelId: string; messageId: string; emoji: string }
+  | { type: "ticket-close"; ticketId: string }
+  | { type: "giveaway-end" | "giveaway-reroll"; giveawayId: number }
+  | { type: "notification-feed-toggle"; feedId: number; enabled: boolean }
+  | { type: "music-control"; action: "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay"; value?: number; enabled?: boolean; mode?: "off" | "track" | "queue" }
   | { type: "log"; message: string }
   | { type: "delay"; seconds: number }
   | { type: "webhook"; url: string; content: string }
@@ -350,6 +354,10 @@ export function AutomationPanel({
       type === "delete-message" ? { type, channelId: "@event", messageId: "@event" } :
       type === "set-nickname" ? { type, userId: "@event", nickname: "" } :
       type === "react-message" ? { type, channelId: "@event", messageId: "@event", emoji: "👍" } :
+      type === "ticket-close" ? { type, ticketId: "@event" } :
+      type === "giveaway-end" || type === "giveaway-reroll" ? { type, giveawayId: 1 } :
+      type === "notification-feed-toggle" ? { type, feedId: 1, enabled: true } :
+      type === "music-control" ? { type, action: "stop" } :
       type === "delay" ? { type, seconds: 5 } :
       type === "webhook" ? { type, url: "", content: "" } :
       type === "branch" ? {
@@ -636,6 +644,11 @@ export function AutomationPanel({
               <option value="delete-message">delete-message</option>
               <option value="set-nickname">set-nickname</option>
               <option value="react-message">react-message</option>
+              <option value="ticket-close">ticket-close</option>
+              <option value="giveaway-end">giveaway-end</option>
+              <option value="giveaway-reroll">giveaway-reroll</option>
+              <option value="notification-feed-toggle">notification-feed-toggle</option>
+              <option value="music-control">music-control</option>
               <option value="log">log</option>
               <option value="delay">delay</option>
               <option value="webhook">webhook</option>
@@ -696,6 +709,50 @@ export function AutomationPanel({
               <div style={actionGrid}>
                 <input value={action.userId} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event или user ID" style={inputStyle} />
                 <input value={action.nickname ?? ""} maxLength={32} onChange={(e) => updateAction(index, { nickname: e.target.value || null })} placeholder="Никнейм; пусто = сброс" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "ticket-close" && (
+              <input value={action.ticketId} onChange={(e) => updateAction(index, { ticketId: e.target.value })} placeholder="@event или ticket ID" style={inputStyle} />
+            )}
+
+            {(action.type === "giveaway-end" || action.type === "giveaway-reroll") && (
+              <input type="number" min={1} value={action.giveawayId} onChange={(e) => updateAction(index, { giveawayId: Number(e.target.value) })} placeholder="Giveaway ID" style={inputStyle} />
+            )}
+
+            {action.type === "notification-feed-toggle" && (
+              <div style={actionGrid}>
+                <input type="number" min={1} value={action.feedId} onChange={(e) => updateAction(index, { feedId: Number(e.target.value) })} placeholder="Feed ID" style={inputStyle} />
+                <select value={String(action.enabled)} onChange={(e) => updateAction(index, { enabled: e.target.value === "true" })} style={inputStyle}>
+                  <option value="true">enabled</option>
+                  <option value="false">disabled</option>
+                </select>
+              </div>
+            )}
+
+            {action.type === "music-control" && (
+              <div style={actionGrid}>
+                <select value={action.action} onChange={(e) => updateAction(index, { action: e.target.value as Action["action"] })} style={inputStyle}>
+                  {["pause","resume","skip","stop","shuffle","repeat","seek","volume","autoplay"].map((control) => (
+                    <option key={control} value={control}>{control}</option>
+                  ))}
+                </select>
+                {action.action === "repeat" && (
+                  <select value={action.mode ?? "off"} onChange={(e) => updateAction(index, { mode: e.target.value as Action["mode"] })} style={inputStyle}>
+                    <option value="off">off</option>
+                    <option value="track">track</option>
+                    <option value="queue">queue</option>
+                  </select>
+                )}
+                {(action.action === "seek" || action.action === "volume") && (
+                  <input type="number" min={0} max={action.action === "volume" ? 200 : 86400} value={action.value ?? 0} onChange={(e) => updateAction(index, { value: Number(e.target.value) })} style={inputStyle} />
+                )}
+                {action.action === "autoplay" && (
+                  <select value={String(action.enabled)} onChange={(e) => updateAction(index, { enabled: e.target.value === "true" })} style={inputStyle}>
+                    <option value="true">enable autoplay</option>
+                    <option value="false">disable autoplay</option>
+                  </select>
+                )}
               </div>
             )}
 
