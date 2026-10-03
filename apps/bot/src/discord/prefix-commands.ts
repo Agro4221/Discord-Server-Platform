@@ -17,7 +17,7 @@ const BUILTIN_PREFIX_COMMANDS = new Set([
   "ban", "unban", "kick", "timeout", "warn", "history", "clear", "slowmode", "lock", "unlock",
   "play", "pause", "resume", "skip", "stop", "shuffle",
   "playlist", "queue", "nowplaying", "repeat", "seek", "volume", "autoplay",
-  "balance", "daily", "leaderboard", "pay", "shop", "buy", "remind", "ticket", "roles", "giveaway"
+  "balance", "daily", "leaderboard", "pay", "shop", "buy", "remind", "afk", "ticket", "roles", "giveaway"
 ]);
 
 export class PrefixCommandRouter {
