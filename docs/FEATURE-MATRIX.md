@@ -27,11 +27,11 @@
 |---|---|
 | Warn / timeout / kick / ban / unban | ✅ |
 | Case history | ✅ |
-| Timed punishments | 🟡 |
+| Timed punishments | ✅ |
 | Purge | ✅ |
 | Slowmode | ✅ |
 | Lock / unlock | ✅ |
-| Mod notes | 🟡 |
+| Mod notes | ✅ |
 | Escalation rules | 🟡 |
 | Permission / role hierarchy diagnostics | ✅ |
 | Moderation dashboard | 🟡 |
@@ -48,8 +48,8 @@
 | Auto timeout / delete | ✅ |
 | Anti-raid | ✅ |
 | Anti-nuke / destructive burst | ✅ |
-| Quarantine / lockdown workflow | 🟡 |
-| Scam / phishing heuristics | 🟡 |
+| Quarantine / lockdown workflow | ✅ |
+| Scam / phishing heuristics | ✅ |
 | Security incident dashboard | 🟡 |
 | Honeypot / advanced detectors | 🟡 |
 
@@ -63,7 +63,7 @@
 | Restore roles on return | ✅ |
 | Reaction roles | ✅ |
 | Button / select-menu role panels | ✅ |
-| Timed / exclusive / max-selection role modes | 🟡 |
+| Timed / exclusive / max-selection role modes | 🟡 | Exclusive/max implemented; timed roles remain
 | Leveling / XP | ✅ |
 | Text + voice XP | ✅ |
 | XP exclusions / anti-abuse | ✅ |
@@ -89,8 +89,8 @@
 | Claim / close / reopen | ✅ |
 | Staff roles / category routing | ✅ |
 | HTML transcripts | ✅ |
-| Auto-close | 🟡 |
-| Per-user limits | 🟡 |
+| Auto-close | ✅ |
+| Per-user limits | ✅ |
 | Dashboard ticket operations | ✅ |
 
 ## Automation
@@ -102,9 +102,9 @@
 | Cooldowns | ✅ |
 | Message / role / moderation actions | ✅ |
 | Schedule trigger | ✅ |
-| DM / webhook actions | 🟡 |
+| DM / webhook actions | 🟡 | DM implemented; webhook remains
 | Conditional branches | 🟡 |
-| Delay / queue semantics | 🟡 |
+| Delay / queue semantics | 🟡 | Delay implemented; durable queue semantics remain
 | Template variables / reusable snippets | 🟡 |
 | Visual automation builder | ✅ |
 
@@ -230,13 +230,12 @@ LavaSrc уже подключён. Следующий этап — включа�
 ## Release order
 
 1. **Music v2 foundation** — текущий инкремент.
-2. **Music provider validation** — Spotify/Apple/Deezer/Yandex/VK/Tidal/Qobuz, затем остальные.
-3. **Music saved state** — favorites/playlists/queue pagination/lyrics/filters.
-4. **Moderation + AutoMod + Security depth**.
-5. **Roles / Welcome / Verification depth**.
-6. **Tickets / Leveling / Economy / Giveaways polish**.
-7. **Automation / notifications / analytics expansion**.
-8. **Full E2E / chaos / soak / clean-host validation**.
-9. **Stable release**.
+2. **Moderation / roles / tickets / automation depth** — текущий рабочий инкремент.
+3. **Music provider validation** — Spotify/Apple/Deezer/Yandex/VK/Tidal/Qobuz, затем остальные.
+4. **Music saved state** — favorites/playlists/queue pagination/lyrics/filters.
+5. **Community expansion** — polls/suggestions, birthdays, invites, counters, richer embeds.
+6. **Notifications / analytics expansion**.
+7. **Full E2E / chaos / soak / clean-host validation**.
+8. **Stable release**.
 
 Основное правило: уже работающие функции не переписываем ради красивой архитектуры. Новая функциональность должна проходить через общие permissions, persistence, audit и Dashboard contract.
