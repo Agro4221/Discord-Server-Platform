@@ -397,7 +397,7 @@ Music должен стремиться к функциональности си
 | HTML transcripts | ✅ |
 | Auto-close | ✅ |
 | Per-user limits | ✅ |
-| Intake forms | 🟡 |
+| Intake forms | ✅ | Up to 5 Discord modal fields with persistent answers and Dashboard editor | |
 | Custom form fields / validation | 🟡 |
 | Custom ticket buttons/messages | 🟡 |
 | Linked/related panels | 🟡 |

@@ -125,3 +125,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Live Discord trigger delivery, permissions and role/channel scoping remain release-gate validation.
 
 - AutoResponder cache reuse is covered by deterministic bot tests; live message throughput remains a runtime validation target.
+
+### 2026-10-03 — Ticket Intake Forms
+- Migration coverage now checks the ticket form/data schema additions.
+- Ticket unit coverage verifies form-field normalization and Discord limits.
+- Live modal submission, permissions and transcript delivery remain release-gate validation.

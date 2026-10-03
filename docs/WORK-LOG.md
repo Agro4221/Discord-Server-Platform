@@ -315,3 +315,10 @@ Never write credentials, tokens or private user data here.
 - Added a short per-guild rule cache so message processing does not query PostgreSQL for the full rule list on every message.
 - Cache entries are invalidated by create/update/delete and cleared on module shutdown.
 - Added deterministic test coverage for cache reuse.
+
+## 2026-10-03 — Ticket Intake Forms
+- Added migration 66 for persistent ticket form definitions and per-ticket form data.
+- Added TicketFormField normalization and dynamic Discord Modal generation with a maximum of five fields.
+- Added Management API GET/PUT /api/guilds/:guildId/tickets/form with durable audit events.
+- Added Dashboard Ticket Intake Form editor.
+- Kept automatic legacy fallback to subject + description when no custom form exists.

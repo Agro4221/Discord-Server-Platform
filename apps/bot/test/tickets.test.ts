@@ -114,3 +114,36 @@ test("Tickets removes a persisted open row when Discord channel publication fail
 
   await module.shutdown();
 });
+
+
+test("Tickets sanitize custom intake form fields to Discord modal limits", async () => {
+  const db = {
+    async query<T>(text: string) {
+      if (text.startsWith("SELECT enabled,category_id")) {
+        return { rows: [{
+          enabled: true,
+          category_id: null,
+          staff_role_id: null,
+          transcript_channel_id: null,
+          max_open_per_user: 1,
+          auto_close_minutes: 0,
+          form_fields: [
+            { id: "subject", label: "Тема", type: "short", required: true, placeholder: "", maxLength: 100 }
+          ]
+        }] as T[], rowCount: 1 };
+      }
+      if (text.startsWith("INSERT INTO ticket_settings(")) return { rows: [], rowCount: 1 } as unknown as { rows: T[] };
+      throw new Error("unexpected query: " + text);
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const module = new Tickets(db);
+  const fields = await module.setFormFields("123456789012345678", [
+    { id: "subject", label: "Тема", type: "short", required: true, placeholder: "", maxLength: 100 },
+    { id: "details", label: "Описание", type: "paragraph", required: true, placeholder: "", maxLength: 9000 },
+    { id: "details", label: "Дубликат", type: "short", required: false, placeholder: "", maxLength: 10 }
+  ]);
+  assert.equal(fields.length, 2);
+  assert.equal(fields[1]?.maxLength, 4000);
+  await module.shutdown();
+});

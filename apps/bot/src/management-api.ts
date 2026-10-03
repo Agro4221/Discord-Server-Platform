@@ -11,6 +11,7 @@ import { ConfigTransferService } from "./config-transfer.js";
 import { BackupService } from "./backup.js";
 import type { CustomCommandService } from "./custom-commands.js";
 import type { AutoResponder, AutoResponderInput } from "./modules/autoresponder.js";
+import type { TicketFormField } from "./modules/tickets.js";
 import type { Moderation } from "./modules/moderation.js";
 import type { Music } from "./modules/music.js";
 import type { Leveling } from "./modules/leveling.js";
@@ -95,6 +96,10 @@ type ApiOptions = {
   };
   customCommands?: CustomCommandService;
   autoResponder?: AutoResponder;
+  tickets?: {
+    getFormFields: (guildId: string) => Promise<TicketFormField[]>;
+    setFormFields: (guildId: string, fields: TicketFormField[]) => Promise<TicketFormField[]>;
+  };
   moderation?: Moderation;
   music?: Music;
   leveling?: Leveling;
@@ -1412,6 +1417,38 @@ export class ManagementApiServer {
               userId,
               cases: await this.options.moderation.history(guildId, userId, 50)
             });
+            return;
+          }
+
+          const ticketFormMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/form$/);
+          if (ticketFormMatch && !this.options.tickets) {
+            this.json(res, 500, { error: "tickets_unavailable" });
+            return;
+          }
+          if (method === "GET" && ticketFormMatch) {
+            const guildId = ticketFormMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, fields: await this.options.tickets!.getFormFields(guildId) });
+            return;
+          }
+          if (method === "PUT" && ticketFormMatch) {
+            const guildId = ticketFormMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            if (!Array.isArray(body.fields)) throw new RequestInputError("invalid_ticket_form", 400);
+            const fields = await this.options.tickets!.setFormFields(guildId, body.fields as TicketFormField[]);
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "tickets.form.updated",
+              targetType: "ticket-form", targetId: guildId,
+              metadata: { fieldCount: fields.length, fieldIds: fields.map((field) => field.id) }
+            });
+            this.json(res, 200, { ok: true, guildId, fields });
             return;
           }
 

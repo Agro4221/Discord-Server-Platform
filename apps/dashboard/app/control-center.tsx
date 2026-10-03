@@ -15,6 +15,7 @@ import { GiveawaysPanel } from "./giveaways-panel";
 import { ModerationPanel } from "./moderation-panel";
 import { NotificationsPanel } from "./notifications-panel";
 import { StreamAlertsPanel } from "./stream-alerts-panel";
+import { TicketFormPanel } from "./ticket-form-panel";
 import { RolePanelsEditor } from "./role-panels-editor";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
@@ -211,16 +212,16 @@ const MODULE_META: Record<string, ModuleMeta> = {
     icon: "▤",
     accent: "#d3a4f0",
     title: "Тикеты",
-    summary: "Поддержка, staff claim, закрытие и transcript.",
+    summary: "Поддержка, staff workflow и настраиваемая intake-форма.",
     category: "server",
     commands: ["/ticket create", "/ticket setup"],
     functions: [
-      { title: "Intake", description: "Создание пользовательского тикета." },
-      { title: "Staff workflow", description: "Категория, staff role и управление обслуживанием." },
-      { title: "Close / archive", description: "Закрытие тикета с обработкой stale-состояний." },
-      { title: "Transcripts", description: "Публикация transcript в выделенный канал." }
+      { title: "Intake form", description: "До 5 полей Discord Modal: short/paragraph, required, placeholder и лимит длины." },
+      { title: "Persistent answers", description: "Ответы формы сохраняются вместе с тикетом и попадают в transcript." },
+      { title: "Staff workflow", description: "Claim, close/reopen, category routing и ограничения на открытые тикеты." },
+      { title: "Transcripts", description: "HTML transcript сохраняется и может быть опубликован в transcript channel." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   leveling: {
     icon: "↗",
@@ -437,7 +438,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "custom-commands", "autoresponder", "automod", "embed", "roles", "giveaways", "analytics", "automation", "notifications", "stream-alerts"]);
+const PANEL_KEYS = new Set(["moderation", "custom-commands", "autoresponder", "automod", "tickets", "embed", "roles", "giveaways", "analytics", "automation", "notifications", "stream-alerts"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1455,6 +1456,13 @@ function ModulePage(props: {
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Escalation rules" eyebrow="OPERATIONS" />
           <ModerationPanel guildId={props.guildId} onChanged={props.onAudit} />
+        </section>
+      )}
+
+      {props.module?.key === "tickets" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Ticket Intake Form" eyebrow="SUPPORT FORM" />
+          <TicketFormPanel guildId={props.guildId} onChanged={props.onAudit} />
         </section>
       )}
 

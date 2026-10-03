@@ -4,14 +4,28 @@ import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 
-type TicketConfig = {
+export type TicketFormFieldType = "short" | "paragraph";
+export type TicketFormField = {
+  id: string;
+  label: string;
+  type: TicketFormFieldType;
+  required: boolean;
+  placeholder: string;
+  maxLength: number;
+};
+export type TicketConfig = {
   enabled: boolean;
   categoryId: string | null;
   staffRoleId: string | null;
   transcriptChannelId: string | null;
   maxOpenPerUser: number;
   autoCloseMinutes: number;
+  formFields: TicketFormField[];
 };
+export const DEFAULT_TICKET_FORM_FIELDS: readonly TicketFormField[] = [
+  { id: "subject", label: "Тема", type: "short", required: true, placeholder: "Кратко опиши вопрос", maxLength: 100 },
+  { id: "details", label: "Описание", type: "paragraph", required: true, placeholder: "Что произошло?", maxLength: 2000 }
+];
 
 export class Tickets implements PlatformModule {
   readonly name = "tickets";
@@ -49,7 +63,7 @@ export class Tickets implements PlatformModule {
 
   private async config(guildId: string): Promise<TicketConfig> {
     const result = await this.db.query<{ enabled: boolean; category_id: string | null; staff_role_id: string | null; transcript_channel_id: string | null; max_open_per_user: number; auto_close_minutes: number }>(
-      "SELECT enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes FROM ticket_settings WHERE guild_id=$1",
+      "SELECT enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes,form_fields FROM ticket_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -59,7 +73,8 @@ export class Tickets implements PlatformModule {
       staffRoleId: row?.staff_role_id ?? null,
       transcriptChannelId: row?.transcript_channel_id ?? null,
       maxOpenPerUser: Math.min(Math.max(Number(row?.max_open_per_user ?? 1), 1), 10),
-      autoCloseMinutes: Math.min(Math.max(Number(row?.auto_close_minutes ?? 0), 0), 43200)
+      autoCloseMinutes: Math.min(Math.max(Number(row?.auto_close_minutes ?? 0), 0), 43200),
+      formFields: normalizeFormFields(row?.form_fields)
     };
   }
 
@@ -67,10 +82,10 @@ export class Tickets implements PlatformModule {
     const current = await this.config(guildId);
     const next = { ...current, ...patch };
     await this.db.query(
-      `INSERT INTO ticket_settings(guild_id,enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes)
-       VALUES($1,$2,$3,$4,$5,$6,$7)
-       ON CONFLICT(guild_id) DO UPDATE SET enabled=EXCLUDED.enabled,category_id=EXCLUDED.category_id,staff_role_id=EXCLUDED.staff_role_id,transcript_channel_id=EXCLUDED.transcript_channel_id,max_open_per_user=EXCLUDED.max_open_per_user,auto_close_minutes=EXCLUDED.auto_close_minutes,updated_at=now()`,
-      [guildId,next.enabled,next.categoryId,next.staffRoleId,next.transcriptChannelId,Math.min(Math.max(Math.trunc(next.maxOpenPerUser),1),10),Math.min(Math.max(Math.trunc(next.autoCloseMinutes),0),43200)]
+      `INSERT INTO ticket_settings(guild_id,enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes,form_fields)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+       ON CONFLICT(guild_id) DO UPDATE SET enabled=EXCLUDED.enabled,category_id=EXCLUDED.category_id,staff_role_id=EXCLUDED.staff_role_id,transcript_channel_id=EXCLUDED.transcript_channel_id,max_open_per_user=EXCLUDED.max_open_per_user,auto_close_minutes=EXCLUDED.auto_close_minutes,form_fields=EXCLUDED.form_fields,updated_at=now()`,
+      [guildId,next.enabled,next.categoryId,next.staffRoleId,next.transcriptChannelId,Math.min(Math.max(Math.trunc(next.maxOpenPerUser),1),10),Math.min(Math.max(Math.trunc(next.autoCloseMinutes),0),43200),normalizeFormFields(next.formFields)]
     );
     await this.db.query(
       `INSERT INTO guild_modules(guild_id,module_key,enabled)
@@ -252,17 +267,39 @@ export class Tickets implements PlatformModule {
       return;
     }
 
-    const modal = new ModalBuilder()
-      .setCustomId("dsp:ticket:create")
-      .setTitle("Создать тикет")
-      .addComponents(
-        new ActionRowBuilder<TextInputBuilder>().addComponents(
-          new TextInputBuilder().setCustomId("subject").setLabel("Тема").setStyle(TextInputStyle.Short).setMaxLength(100).setRequired(true)
-        ),
-        new ActionRowBuilder<TextInputBuilder>().addComponents(
-          new TextInputBuilder().setCustomId("details").setLabel("Описание").setStyle(TextInputStyle.Paragraph).setMaxLength(2000).setRequired(true)
-        )
-      );
+    await this.showCreateModal(interaction);
+  }
+
+  async getFormFields(guildId: string): Promise<TicketFormField[]> {
+    return (await this.config(guildId)).formFields;
+  }
+
+  async setFormFields(guildId: string, fields: TicketFormField[]): Promise<TicketFormField[]> {
+    const normalized = normalizeFormFields(fields);
+    const current = await this.config(guildId);
+    await this.db.query(
+      `INSERT INTO ticket_settings(
+         guild_id,enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes,form_fields
+       ) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+       ON CONFLICT(guild_id) DO UPDATE SET form_fields=EXCLUDED.form_fields,updated_at=now()`,
+      [guildId,current.enabled,current.categoryId,current.staffRoleId,current.transcriptChannelId,current.maxOpenPerUser,current.autoCloseMinutes,normalized]
+    );
+    return normalized;
+  }
+
+  private async showCreateModal(interaction: ChatInputCommandInteraction | ButtonInteraction): Promise<void> {
+    const fields = (await this.config(interaction.guild!.id)).formFields;
+    const modal = new ModalBuilder().setCustomId("dsp:ticket:create").setTitle("Создать тикет");
+    for (const field of fields) {
+      const input = new TextInputBuilder()
+        .setCustomId("ticket:" + field.id)
+        .setLabel(field.label.slice(0, 45))
+        .setStyle(field.type === "paragraph" ? TextInputStyle.Paragraph : TextInputStyle.Short)
+        .setRequired(field.required)
+        .setMaxLength(field.maxLength);
+      if (field.placeholder) input.setPlaceholder(field.placeholder.slice(0, 100));
+      modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+    }
     await interaction.showModal(modal);
   }
 
@@ -274,8 +311,15 @@ export class Tickets implements PlatformModule {
       return;
     }
 
-    const subject = interaction.fields.getTextInputValue("subject");
-    const details = interaction.fields.getTextInputValue("details");
+    const fields = config.formFields.length ? config.formFields : [...DEFAULT_TICKET_FORM_FIELDS];
+    const formData: Record<string, string> = {};
+    for (const field of fields) {
+      formData[field.id] = interaction.fields.getTextInputValue("ticket:" + field.id);
+    }
+    const subject = formData.subject?.trim() || formData[fields[0]?.id ?? ""]?.trim() || "Тикет";
+    const details = formData.details?.trim() || Object.entries(formData)
+      .map(([id, value]) => "**" + (fields.find((field) => field.id === id)?.label ?? id) + ":**\n" + value)
+      .join("\n\n").slice(0, 3900) || "Без описания";
 
     const channel = await interaction.guild!.channels.create({
       name: `ticket-${interaction.user.username}`.toLowerCase().slice(0, 90),
@@ -291,9 +335,9 @@ export class Tickets implements PlatformModule {
     let ticketId: string | undefined;
     try {
       const inserted = await this.db.query<{ id: string }>(
-        `INSERT INTO tickets(guild_id,channel_id,creator_id,status)
-         VALUES($1,$2,$3,'open') RETURNING id`,
-        [interaction.guild!.id,channel.id,interaction.user.id]
+        `INSERT INTO tickets(guild_id,channel_id,creator_id,status,form_data)
+         VALUES($1,$2,$3,'open',$4) RETURNING id`,
+        [interaction.guild!.id,channel.id,interaction.user.id,JSON.stringify(formData)]
       );
       ticketId = inserted.rows[0]?.id;
       if (!ticketId) throw new Error("ticket_id_missing");
@@ -381,18 +425,7 @@ export class Tickets implements PlatformModule {
         await interaction.reply({ content: "Tickets выключены.", ephemeral: true });
         return;
       }
-      const modal = new ModalBuilder()
-        .setCustomId("dsp:ticket:create")
-        .setTitle("Создать тикет")
-        .addComponents(
-          new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder().setCustomId("subject").setLabel("Тема").setStyle(TextInputStyle.Short).setMaxLength(100).setRequired(true)
-          ),
-          new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder().setCustomId("details").setLabel("Описание").setStyle(TextInputStyle.Paragraph).setMaxLength(2000).setRequired(true)
-          )
-        );
-      await interaction.showModal(modal);
+      await this.showCreateModal(interaction);
       return;
     }
 
@@ -669,4 +702,25 @@ export function isOpenTicketConflict(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const value = error as { code?: unknown; constraint?: unknown };
   return value.code === "23505" && value.constraint === "uq_open_ticket_per_creator";
+}
+
+function normalizeFormFields(value: unknown): TicketFormField[] {
+  const raw = Array.isArray(value) ? value : [];
+  const normalized: TicketFormField[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const source = item as Record<string, unknown>;
+    const id = typeof source.id === "string" ? source.id.trim().toLowerCase() : "";
+    const label = typeof source.label === "string" ? source.label.trim().slice(0, 45) : "";
+    const type: TicketFormFieldType = source.type === "paragraph" ? "paragraph" : "short";
+    const placeholder = typeof source.placeholder === "string" ? source.placeholder.trim().slice(0, 100) : "";
+    const rawMax = typeof source.maxLength === "number" ? Math.trunc(source.maxLength) : type === "paragraph" ? 2000 : 100;
+    const maxLength = Math.min(Math.max(rawMax, 1), type === "paragraph" ? 4000 : 400);
+    if (!/^[a-z0-9_-]{1,30}$/.test(id) || !label || seen.has(id)) continue;
+    seen.add(id);
+    normalized.push({ id,label,type,required:source.required !== false,placeholder,maxLength });
+    if (normalized.length >= 5) break;
+  }
+  return normalized.length ? normalized : [...DEFAULT_TICKET_FORM_FIELDS];
 }

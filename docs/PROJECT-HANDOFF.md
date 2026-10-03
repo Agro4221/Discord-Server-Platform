@@ -425,3 +425,10 @@ Live validation, требующая пользовательского окру�
 - Added first-class `autoresponder` module with persistent keyword/phrase rules and Dashboard CRUD.
 - Matching supports exact, contains, starts-with and regex, with role/channel scopes, per-user cooldown and optional source-message deletion.
 - Runtime delivery and configuration changes are written to the durable audit log.
+
+
+### 2026-10-03 — Ticket Intake Forms
+- Tickets now support persistent custom intake fields (up to five Discord modal inputs).
+- Dashboard configures field ID, label, input type, required state, placeholder and max length.
+- Submitted answers are persisted with the ticket and included in ticket presentation/transcript.
+- Legacy servers without custom fields automatically use the existing subject + description form.

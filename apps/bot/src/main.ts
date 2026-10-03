@@ -241,6 +241,10 @@ async function main(): Promise<void> {
     backups,
     customCommands,
     autoResponder,
+    tickets: {
+      getFormFields: async (guildId) => tickets.getFormFields(guildId),
+      setFormFields: async (guildId, fields) => tickets.setFormFields(guildId, fields)
+    },
     moderation,
     music,
     leveling,

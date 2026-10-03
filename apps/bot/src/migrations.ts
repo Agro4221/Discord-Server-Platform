@@ -1042,6 +1042,14 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_autoresponder_rules_guild_priority ON autoresponder_rules(guild_id,enabled,priority DESC,id ASC);"
     ])
+  },
+  {
+    version: 66,
+    name: "ticket_intake_forms",
+    sql: q([
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS form_fields jsonb NOT NULL DEFAULT '[]'::jsonb;",
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS form_data jsonb NOT NULL DEFAULT '{}'::jsonb;"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
