@@ -312,7 +312,19 @@ async function main(): Promise<void> {
       delete: async (guildId, ruleId) => automation.deleteRule(guildId, ruleId),
       listTemplates: async (guildId) => automation.listTemplates(guildId),
       setTemplate: async (guildId, name, content) => automation.setTemplate(guildId, name, content),
-      deleteTemplate: async (guildId, name) => automation.deleteTemplate(guildId, name)
+      deleteTemplate: async (guildId, name) => automation.deleteTemplate(guildId, name),
+      listPresets: async (guildId) => automation.listPresets(guildId),
+      savePreset: async (guildId, name, event, conditions, anyConditions, actions, cooldownSeconds) =>
+        automation.savePreset(
+          guildId,
+          name,
+          event as import("@dsp/domain").AutomationEvent,
+          conditions as import("@dsp/domain").AutomationCondition[],
+          anyConditions as import("@dsp/domain").AutomationCondition[],
+          actions as import("@dsp/domain").AutomationAction[],
+          cooldownSeconds
+        ),
+      deletePreset: async (guildId, name) => automation.deletePreset(guildId, name)
     },
     rolePanels: {
       list: async (guildId) => rolePanels.list(guildId),
