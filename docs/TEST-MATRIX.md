@@ -171,3 +171,10 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-04 — Automation dry-run
 - Added unit coverage for matching + rendered previews and non-matching rules.
 - Dry-run remains intentionally side-effect-free; live execution is covered by existing runtime pathways and remains part of release-gate validation.
+
+
+## 2026-10-04 — Automation diagnostics gate
+- Unit: rule/event aggregation and delayed-job status mapping.
+- API contract: diagnostics endpoint returns bounded operational metadata without event/action payloads.
+- Dashboard: diagnostics section loads beside Automation rules/templates and supports refresh.
+- Release gate still requires live Discord execution checks for Automation actions and delayed-job behavior; CI does not replace that validation.
