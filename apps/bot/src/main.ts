@@ -271,6 +271,7 @@ async function main(): Promise<void> {
     tickets,
     communityTools,
     verification,
+    security,
     autoMod,
     commandPolicy,
     giveaways: {

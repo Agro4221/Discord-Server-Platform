@@ -23,6 +23,7 @@ import { ServerSettingsPanel } from "./server-settings-panel";
 import { DiscordDiagnosticsPanel } from "./discord-diagnostics-panel";
 import { CommunityToolsPanel } from "./community-tools-panel";
 import { VerificationPanel } from "./verification-panel";
+import { SecurityPanel } from "./security-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -153,7 +154,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Quarantine", description: "Поддержка quarantine-роли как защитного контура." },
       { title: "Hierarchy check", description: "Диагностика и проверка роли бота перед защитными действиями." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   "temporary-voice": {
     icon: "◌",
@@ -441,7 +442,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "starboard", "community-tools", "verification"]);
+const PANEL_KEYS = new Set(["moderation", "security", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "starboard", "community-tools", "verification"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1497,6 +1498,13 @@ function ModulePage(props: {
             channels={props.resources.channels.filter((item) => item.type === 0 || item.type === 5)}
             onChanged={props.onAudit}
           />
+        </section>
+      )}
+
+      {props.module?.key === "security" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Security Center" eyebrow="OPERATIONS" />
+          <SecurityPanel guildId={props.guildId} onChanged={props.onAudit} />
         </section>
       )}
 

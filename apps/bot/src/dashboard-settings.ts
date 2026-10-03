@@ -95,10 +95,7 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "quarantineRoleId", label: "Quarantine role", type: "role" },
       { key: "logChannelId", label: "Security log channel", type: "channel" }
     ],
-    actions: [
-      { id: "check-hierarchy", label: "Проверить role hierarchy", kind: "safe" },
-      { id: "clear-incidents", label: "Сбросить активные инциденты", kind: "danger", confirmation: "Закрыть активные Security-инциденты и снять выданные Security quarantine-роли?" }
-    ]
+    actions: []
   },
   {
     key: "leveling",

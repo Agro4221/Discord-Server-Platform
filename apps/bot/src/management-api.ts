@@ -19,6 +19,7 @@ import type { Tickets } from "./modules/tickets.js";
 import type { Starboard } from "./modules/starboard.js";
 import type { CommunityTools } from "./modules/community-tools.js";
 import type { Verification } from "./modules/verification.js";
+import type { Security } from "./modules/security.js";
 import { CommandPolicyService, COMMAND_DEFINITIONS } from "./command-policy.js";
 import type { StreamAlertPlatform } from "./modules/stream-alerts.js";
 import { BotIdentityRepository } from "./bot-identity.js";
@@ -108,6 +109,7 @@ type ApiOptions = {
   starboard?: Starboard;
   communityTools?: CommunityTools;
   verification?: Verification;
+  security?: Security;
   commandPolicy?: CommandPolicyService;
   rolePanels?: {
     list: (guildId: string) => Promise<unknown[]>;
@@ -376,6 +378,21 @@ export class ManagementApiServer {
 
             const modules = await this.options.moduleSettings.list(guildId);
             this.json(res, 200, { guildId, catalog: MODULE_CATALOG, modules });
+            return;
+          }
+
+          const securityMatch = path.match(/^\/api\/guilds\/([^/]+)\/security$/);
+          if (method === "GET" && securityMatch) {
+            const guildId = securityMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (!this.options.security) {
+              this.json(res, 500, { error: "security_unavailable" });
+              return;
+            }
+            this.json(res, 200, { guildId, ...(await this.options.security.dashboardSnapshot(guildId)) });
             return;
           }
 

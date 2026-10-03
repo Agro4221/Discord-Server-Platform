@@ -326,6 +326,16 @@ export class Security implements PlatformModule {
     await this.audit(guildId, "security.incident-resolved", { incidentId });
   }
 
+  async dashboardSnapshot(guildId: string): Promise<{
+    incidents: Array<{ id: number; eventType: string; expiresAt: string }>;
+    hierarchy: Awaited<ReturnType<Security["checkHierarchy"]>>;
+  }> {
+    return {
+      incidents: await this.getActiveIncidents(guildId),
+      hierarchy: await this.checkHierarchy(guildId)
+    };
+  }
+
   async clearIncidents(guildId: string): Promise<number> {
     const result = await this.db.query<{ id: string }>(
       "SELECT id FROM security_incidents WHERE guild_id=$1 AND resolved_at IS NULL ORDER BY id",
