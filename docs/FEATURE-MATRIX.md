@@ -469,14 +469,15 @@ Premium-функции коммерческих ботов используем 
 
 ## Release order
 
-1. **Music v2 foundation** — текущий инкремент.
-2. **Moderation / roles / tickets / automation depth** — текущий рабочий инкремент.
-3. **Music advanced UX** — search picker, queue management, detailed DJ permissions, vote-skip/fair queue, controller overhaul и loop-one.
-4. **Music provider expansion** — Spotify/Apple/Deezer/**Yandex Music**/VK/Tidal/Qobuz, затем остальные.
-5. **Music saved state / effects / autoplay 2.0** — shared playlists, save queue, custom effects, radio, improved autoplay and lyrics.
-6. **Community expansion** — polls/suggestions, birthdays, invites, counters, richer embeds.
-7. **Notifications / analytics expansion**.
-8. **Full E2E / chaos / soak / clean-host validation**.
-9. **Stable release**.
+1. **All-in-one foundation** — command/permission contracts, persistence, Dashboard, audit, module lifecycle and reusable configuration.
+2. **Moderation / AutoMod / Security parity** — richer rule actions, logging, exemptions, autoban, cleanup and incident workflows.
+3. **Server utilities + Roles + Onboarding** — custom commands, autoresponders, forms, role systems, welcome/verification and utility coverage.
+4. **Tickets / Support + Automation parity** — forms, ticket customization, workflow depth, reusable automation and cross-module actions.
+5. **Community / Engagement parity** — leveling, rewards, reputation, giveaways, suggestions, statistics, counters and engagement tooling.
+6. **Notifications / Integrations + Analytics** — broader feeds, filters/templates, provider diagnostics and richer analytics.
+7. **Music advanced UX** — search picker, queue management, detailed DJ permissions, vote-skip/fair queue, controller overhaul, emoji controls and **Loop One**.
+8. **Music provider expansion + saved state** — Spotify/Apple/Deezer/**Yandex Music**/VK/Tidal/Qobuz/yt-dlp/JioSaavn, shared playlists, save queue, effects, radio, improved autoplay and lyrics.
+9. **Full E2E / chaos / soak / clean-host validation** across the whole platform.
+10. **Stable release**.
 
 Основное правило: уже работающие функции не переписываем ради красивой архитектуры. Новая функциональность должна проходить через общие permissions, persistence, audit и Dashboard contract.
