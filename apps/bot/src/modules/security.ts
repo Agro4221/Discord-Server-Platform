@@ -60,6 +60,39 @@ export class Security implements PlatformModule {
     this.client = undefined;
   }
 
+  private async config(guildId: string): Promise<SecurityConfig> {
+    const result = await this.db.query<{
+      enabled: boolean;
+      max_joins: number;
+      window_seconds: number;
+      max_destructive_actions: number;
+      destructive_window_seconds: number;
+      quarantine_role_id: string | null;
+      log_channel_id: string | null;
+      raid_quarantine_enabled: boolean;
+      destructive_role_removal: boolean;
+      destructive_quarantine_enabled: boolean;
+    }>(
+      "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id,raid_quarantine_enabled,destructive_role_removal,destructive_quarantine_enabled FROM security_settings WHERE guild_id=$1",
+      [guildId]
+    );
+    const row = result.rows[0];
+    return {
+      enabled: row?.enabled ?? true,
+      maxJoins: row?.max_joins ?? 8,
+      windowSeconds: row?.window_seconds ?? 20,
+      maxDestructiveActions: row?.max_destructive_actions ?? 3,
+      destructiveWindowSeconds: row?.destructive_window_seconds ?? 30,
+      quarantineRoleId: row?.quarantine_role_id ?? null,
+      logChannelId: row?.log_channel_id ?? null,
+      ...securityResponsePolicy({
+        raidQuarantineEnabled: row?.raid_quarantine_enabled,
+        destructiveRoleRemoval: row?.destructive_role_removal,
+        destructiveQuarantineEnabled: row?.destructive_quarantine_enabled
+      })
+    };
+  }
+
   async getConfig(guildId: string): Promise<SecurityConfig> {
     const result = await this.db.query<{ enabled: boolean; max_joins: number; window_seconds: number; max_destructive_actions: number; destructive_window_seconds: number; quarantine_role_id: string | null; log_channel_id: string | null; raid_quarantine_enabled: boolean; destructive_role_removal: boolean; destructive_quarantine_enabled: boolean }>(
       "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id,raid_quarantine_enabled,destructive_role_removal,destructive_quarantine_enabled FROM security_settings WHERE guild_id=$1",
