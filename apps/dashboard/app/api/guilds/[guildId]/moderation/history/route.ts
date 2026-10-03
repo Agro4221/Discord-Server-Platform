@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertSameOrigin, currentSession } from "../../../../../../lib/auth";
+import { currentSession } from "../../../../../../lib/auth";
 
 export async function GET(
   request: Request,
