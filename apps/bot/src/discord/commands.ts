@@ -660,6 +660,12 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       )
       .addSubcommand((sub) =>
         sub
+          .setName("247")
+          .setDescription("Keep the music bot in voice 24/7")
+          .addBooleanOption((o) => o.setName("enabled").setDescription("24/7 state"))
+      )
+      .addSubcommand((sub) =>
+        sub
           .setName("seek")
           .setDescription("Seek within the current track")
           .addIntegerOption((o) => o.setName("seconds").setDescription("Position in seconds").setMinValue(0).setMaxValue(86400).setRequired(true))
