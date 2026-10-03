@@ -152,7 +152,7 @@ sequenceDiagram
 
 **Security / Anti-Raid** — защитные сценарии вокруг подозрительной активности и ограничений действий.
 
-**Notifications** — внешние feed/webhook-сценарии с HTTPS/SSRF-проверками.
+**Notifications** — внешние feed/webhook-сценарии с HTTPS/SSRF-проверками. Stream alerts поддерживают Twitch, YouTube, VK Видео Live и Kick; Twitch/YouTube/Kick используют внешние API credentials, а настройки хранятся в PostgreSQL.
 
 **Music** — интеграция через Lavalink. Модуль умеет persistent queue/player state, request channel, playlist loading до 500 треков, repeat/autoplay, previous/seek, pagination, emoji-controller, favorites, saved playlists и EQ/effects. Для текстов подключён LavaLyrics. Для дополнительных источников подключён LavaSrc: Spotify, Apple Music, Deezer, Yandex Music, VK Music, Tidal, Qobuz, yt-dlp и JioSaavn доступны как opt-in источники после настройки credentials.
 
