@@ -67,9 +67,9 @@ export class Tickets implements PlatformModule {
     const current = await this.config(guildId);
     const next = { ...current, ...patch };
     await this.db.query(
-      `INSERT INTO ticket_settings(guild_id,enabled,category_id,staff_role_id,transcript_channel_id)
-       VALUES($1,$2,$3,$4,$5)
-       ON CONFLICT(guild_id) DO UPDATE SET enabled=EXCLUDED.enabled,category_id=EXCLUDED.category_id,staff_role_id=EXCLUDED.staff_role_id,transcript_channel_id=EXCLUDED.transcript_channel_id,updated_at=now()`,
+      `INSERT INTO ticket_settings(guild_id,enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes)
+       VALUES($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT(guild_id) DO UPDATE SET enabled=EXCLUDED.enabled,category_id=EXCLUDED.category_id,staff_role_id=EXCLUDED.staff_role_id,transcript_channel_id=EXCLUDED.transcript_channel_id,max_open_per_user=EXCLUDED.max_open_per_user,auto_close_minutes=EXCLUDED.auto_close_minutes,updated_at=now()`,
       [guildId,next.enabled,next.categoryId,next.staffRoleId,next.transcriptChannelId,Math.min(Math.max(Math.trunc(next.maxOpenPerUser),1),10),Math.min(Math.max(Math.trunc(next.autoCloseMinutes),0),43200)]
     );
     await this.db.query(
@@ -148,12 +148,16 @@ export class Tickets implements PlatformModule {
       return;
     }
 
-    const existing = await this.db.query<{ channel_id: string }>(
-      "SELECT channel_id FROM tickets WHERE guild_id=$1 AND creator_id=$2 AND status IN ('open','closing') ORDER BY created_at DESC LIMIT 1",
+    const config = await this.config(interaction.guild!.id);
+    const existing = await this.db.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM tickets WHERE guild_id=$1 AND creator_id=$2 AND status IN ('open','closing')",
       [interaction.guild!.id,interaction.user.id]
     );
-    if (existing.rows[0]?.channel_id) {
-      await interaction.reply({ content: `У тебя уже есть открытый тикет: <#${existing.rows[0].channel_id}>.`, ephemeral: true });
+    if (Number(existing.rows[0]?.count ?? 0) >= config.maxOpenPerUser) {
+      await interaction.reply({
+        content: `Достигнут лимит открытых тикетов: **${config.maxOpenPerUser}**.`,
+        ephemeral: true
+      });
       return;
     }
 
@@ -421,12 +425,98 @@ export class Tickets implements PlatformModule {
     }
   }
 
+  private async onMessage(message: Message): Promise<void> {
+    if (!message.guild || message.author.bot || message.webhookId) return;
+    await this.db.query(
+      "UPDATE tickets SET last_activity_at=now() WHERE guild_id=$1 AND channel_id=$2 AND status='open'",
+      [message.guild.id,message.channelId]
+    ).catch((error) => {
+      logger.warn("Ticket activity update failed", {
+        guildId: message.guild!.id,
+        channelId: message.channelId,
+        error: String(error)
+      });
+    });
+  }
+
   private async recoverStaleClosures(): Promise<void> {
     const result = await this.db.query(
       "UPDATE tickets SET status='open',closing_at=NULL WHERE status='closing' AND closing_at IS NOT NULL AND closing_at < now()-interval '10 minutes'"
     );
     if (result.rowCount) {
       logger.warn("Recovered stale Ticket closures", { recovered: result.rowCount });
+    }
+    await this.autoCloseStaleTickets();
+  }
+
+  private async autoCloseStaleTickets(): Promise<void> {
+    if (!this.client) return;
+    const stale = await this.db.query<{
+      id: string;
+      guild_id: string;
+      channel_id: string;
+      transcript_channel_id: string | null;
+    }>(
+      `SELECT t.id,t.guild_id,t.channel_id,ts.transcript_channel_id
+       FROM tickets t
+       INNER JOIN ticket_settings ts ON ts.guild_id=t.guild_id
+       WHERE t.status='open'
+         AND ts.auto_close_minutes > 0
+         AND t.last_activity_at < now() - make_interval(mins => ts.auto_close_minutes)
+       ORDER BY t.last_activity_at ASC
+       LIMIT 25`
+    );
+
+    for (const row of stale.rows) {
+      const claimed = await this.db.query<{ channel_id: string }>(
+        "UPDATE tickets SET status='closing',closing_at=now() WHERE id=$1 AND status='open' RETURNING channel_id",
+        [row.id]
+      );
+      if (!claimed.rows[0]) continue;
+
+      const guild = this.client.guilds.cache.get(row.guild_id);
+      const channel = guild?.channels.cache.get(row.channel_id);
+      try {
+        const transcript = channel?.type === ChannelType.GuildText
+          ? await this.transcript(channel)
+          : "Transcript unavailable.";
+
+        await this.db.transaction(async (client) => {
+          await client.query(
+            "INSERT INTO ticket_transcripts(ticket_id,guild_id,content) VALUES($1,$2,$3) ON CONFLICT(ticket_id) DO UPDATE SET content=EXCLUDED.content",
+            [row.id,row.guild_id,transcript]
+          );
+          await client.query(
+            "UPDATE tickets SET status='closed',closed_at=now(),closing_at=NULL WHERE id=$1 AND status='closing'",
+            [row.id]
+          );
+        });
+
+        if (row.transcript_channel_id) {
+          const target = guild?.channels.cache.get(row.transcript_channel_id);
+          if (target?.isTextBased() && "send" in target) {
+            const { AttachmentBuilder } = await import("discord.js");
+            await target.send({
+              content: `Transcript ticket #${row.id} (auto-closed)`,
+              files: [new AttachmentBuilder(Buffer.from(transcript,"utf8"), { name: `ticket-${row.id}.txt` })]
+            }).catch(() => undefined);
+          }
+        }
+
+        if (channel?.type === ChannelType.GuildText) {
+          await channel.delete("Ticket auto-closed after inactivity").catch(() => undefined);
+        }
+      } catch (error) {
+        await this.db.query(
+          "UPDATE tickets SET status='open',closing_at=NULL WHERE id=$1 AND status='closing'",
+          [row.id]
+        ).catch(() => undefined);
+        logger.warn("Ticket auto-close failed", {
+          guildId: row.guild_id,
+          ticketId: row.id,
+          error: String(error)
+        });
+      }
     }
   }
 
