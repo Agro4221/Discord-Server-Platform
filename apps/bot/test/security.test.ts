@@ -39,20 +39,20 @@ test("Security executor audit lookback honors configured destructive window", ()
 
 test("Security response policy defaults preserve quarantine and role removal", () => {
   assert.equal(securityResponsePolicy({}), {
-    raidQuarantine: true,
+    raidQuarantineEnabled: true,
     destructiveRoleRemoval: true,
-    destructiveQuarantine: true
+    destructiveQuarantineEnabled: true
   });
 });
 
 test("Security response policy preserves explicit disabled actions", () => {
   assert.deepEqual(securityResponsePolicy({
-    raidQuarantine: false,
+    raidQuarantineEnabled: false,
     destructiveRoleRemoval: false,
-    destructiveQuarantine: false
+    destructiveQuarantineEnabled: false
   }), {
-    raidQuarantine: false,
+    raidQuarantineEnabled: false,
     destructiveRoleRemoval: false,
-    destructiveQuarantine: false
+    destructiveQuarantineEnabled: false
   });
 });
