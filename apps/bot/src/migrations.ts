@@ -1125,6 +1125,15 @@ const migrations = [
       "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS include_keywords text[] NOT NULL DEFAULT '{}';",
       "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS exclude_keywords text[] NOT NULL DEFAULT '{}';"
     ])
+  },
+  {
+    version: 73,
+    name: "ticket_priority_and_tags",
+    sql: q([
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS priority text NOT NULL DEFAULT 'normal' CHECK(priority IN ('low','normal','high','urgent'));",
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tags text[] NOT NULL DEFAULT '{}';",
+      "CREATE INDEX IF NOT EXISTS idx_tickets_guild_priority ON tickets(guild_id,status,priority,created_at DESC);"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
