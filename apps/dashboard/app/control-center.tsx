@@ -1716,7 +1716,10 @@ function settingGroup(field: Field, moduleKey: string): string {
       maxDestructiveActions: "Destructive burst",
       destructiveWindowSeconds: "Destructive burst",
       quarantineRoleId: "Quarantine",
-      logChannelId: "Логи"
+      logChannelId: "Логи",
+      raidQuarantineEnabled: "Anti-Raid",
+      destructiveRoleRemoval: "Destructive burst",
+      destructiveQuarantineEnabled: "Destructive burst"
     },
     leveling: {
       xpPerMessage: "XP",
