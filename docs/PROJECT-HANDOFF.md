@@ -413,3 +413,9 @@ Live validation, требующая пользовательского окру�
 7. При существенной разработке сразу дописывать сюда/в Work Log: что сделано, что проверено, какие решения приняты, что осталось.
 
 Цель следующего чата: **продолжать разработку, а не заново выяснять, что именно мы строим.**
+
+
+### 2026-10-03 — Custom Commands / Dashboard follow-up
+- Control Center now exposes Custom Commands as a first-class module entry.
+- The specialized builder remains API/audit backed and accepts async audit refresh callbacks.
+- Dashboard panel was simplified to match established panel patterns and avoid redundant client-side memoization.

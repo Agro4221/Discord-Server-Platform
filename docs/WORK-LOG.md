@@ -291,3 +291,12 @@ Never write credentials, tokens or private user data here.
 - Existing execution now respects module state; creating a command enables the module for the guild.
 - Added dedicated Dashboard CRUD for Prefix/Slash mode, aliases, response/alias/role actions and cooldowns.
 - Reused the existing Management API and durable audit events instead of creating a parallel backend.
+
+
+## 2026-10-03 — Continue platform expansion after Custom Commands CI regression
+- Rechecked branch feature/music-v2 and PR #3.
+- Current CI run 37141114378 has bot typecheck/tests and domain/bot builds green; only Dashboard build fails.
+- Refactored the new Custom Commands Dashboard panel toward the established panel implementation pattern: optional async audit callback, no redundant client-side memoization, and hierarchy-safe role display.
+- Added Custom Commands metadata to the Control Center catalog and included it in panel-aware rendering.
+- Updated Feature Matrix / Handoff / State / Test Matrix so the current UI contract is documented and resumable from a fresh chat.
+- Next engineering pass remains focused on platform breadth (not music-only), after restoring Dashboard CI.

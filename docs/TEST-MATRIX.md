@@ -112,3 +112,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Dashboard CRUD covers response, alias and role actions, Prefix/Slash flags and cooldowns.
 - Existing API audit events remain the durable change trail.
 - Live Discord registration/execution and role hierarchy remain release-gate validation.
+
+
+### 2026-10-03 — Custom Commands / Dashboard builder
+- Verified backend/shared-module work remains covered by existing bot typecheck/test gates.
+- Dashboard-specific builder follows existing functional-panel patterns; live browser CRUD and Discord registration remain release-gate validation.

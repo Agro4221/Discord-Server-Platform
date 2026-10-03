@@ -391,6 +391,21 @@ const MODULE_META: Record<string, ModuleMeta> = {
     ],
     kind: "discord"
   },
+  "custom-commands": {
+    icon: "⌘",
+    accent: "#82b8f2",
+    title: "Custom Commands",
+    summary: "Пользовательские Prefix/Slash-команды, aliases и role actions.",
+    category: "automation",
+    commands: ["Prefix + Slash"],
+    functions: [
+      { title: "Response", description: "Текстовые ответы с переменными user, mention, server, channel и args." },
+      { title: "Aliases", description: "Короткие имена для существующих команд." },
+      { title: "Role actions", description: "Выдача, снятие и toggle ролей с учётом hierarchy." },
+      { title: "Cooldown", description: "Ограничение частоты выполнения пользовательской команды." }
+    ],
+    kind: "full"
+  },
   analytics: {
     icon: "▥",
     accent: "#7cc9b8",
@@ -406,7 +421,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "embed", "roles", "giveaways", "analytics", "automation", "notifications", "stream-alerts"]);
+const PANEL_KEYS = new Set(["moderation", "custom-commands", "automod", "embed", "roles", "giveaways", "analytics", "automation", "notifications", "stream-alerts"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",

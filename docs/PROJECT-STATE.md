@@ -196,3 +196,6 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - `docs/PROJECT-HANDOFF.md` is now the first-read continuity source for new chats.
 - It exists specifically so development can continue without repeatedly re-explaining the project's all-in-one goal, benchmark set, completed capabilities, backlog, Music requirements, priorities and accepted architectural/product decisions.
 - `docs/WORK-LOG.md` remains the chronological engineering record; `docs/PROJECT-STATE.md` remains the current-state summary; `docs/TEST-MATRIX.md` remains the validation gate reference.
+
+
+- Control Center catalog now includes a dedicated Custom Commands module entry alongside its CRUD panel.

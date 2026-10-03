@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type Resource = { id: string; name: string; manageable?: boolean };
 type Command = {
@@ -47,7 +47,7 @@ const EMPTY: Omit<Command, "id"> = {
 export function CustomCommandsPanel(props: {
   guildId: string;
   roles: Resource[];
-  onChanged: () => void;
+  onChanged?: () => void | Promise<void>;
 }) {
   const [items, setItems] = useState<Command[]>([]);
   const [draft, setDraft] = useState<Command | null>(null);
@@ -66,9 +66,7 @@ export function CustomCommandsPanel(props: {
     void load().catch((error) => setStatus(error instanceof Error ? error.message : "Не удалось загрузить команды."));
   }, [props.guildId]);
 
-  const roleMap = useMemo(() => new Map(props.roles.map((role) => [role.id, role.name])), [props.roles]);
-
-  function edit(item: Command) {
+"  function edit(item: Command) {
     setDraft({
       ...item,
       aliases: [...item.aliases],
@@ -111,7 +109,7 @@ export function CustomCommandsPanel(props: {
       setItems((body.commands ?? []) as Command[]);
       setDraft(null);
       setStatus("Команда сохранена.");
-      props.onChanged();
+      await props.onChanged?.();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Не удалось сохранить команду.");
     } finally {
@@ -133,7 +131,7 @@ export function CustomCommandsPanel(props: {
       setItems((current) => current.filter((entry) => entry.id !== item.id));
       if (draft?.id === item.id) setDraft(null);
       setStatus("Команда удалена.");
-      props.onChanged();
+      await props.onChanged?.();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Не удалось удалить команду.");
     } finally {
@@ -208,7 +206,7 @@ export function CustomCommandsPanel(props: {
                 <option value="">Выбери роль…</option>
                 {props.roles.filter((role) => role.manageable !== false).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
               </select>
-              {draft.roleId && <small style={{ color: "#5f6978", fontSize: 8 }}>Выбрано: {roleMap.get(draft.roleId) ?? draft.roleId}</small>}
+              {draft.roleId && <small style={{ color: "#5f6978", fontSize: 8 }}>Выбрано: {props.roles.find((role) => role.id === draft.roleId)?.name ?? draft.roleId}</small>}
             </label>
           )}
 
