@@ -30,7 +30,7 @@ if (!envExample.includes("DISCORD_TOKEN_MUSIC2") || !envExample.includes("DISCOR
 
 const localLauncher = await readFile("scripts/start-local.ps1", "utf8");
 for (const contract of [
-  "docker @upArgs",
+  "docker compose up -d",
   '"compose", "up", "-d"',
   "DASHBOARD_ADMIN_PASSWORD",
   "MANAGEMENT_API_KEY",
