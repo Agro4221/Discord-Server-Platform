@@ -129,8 +129,7 @@ export function CustomCommandsPanel({
     try {
       const payload = {
         name: form.name.trim(),
-        aliases: form.aliases.split(/[,
-]/).map((item) => item.trim()).filter(Boolean),
+        aliases: form.aliases.split(/[,\n]/).map((item) => item.trim()).filter(Boolean),
         description: form.description.trim(),
         enabled: form.enabled,
         prefixEnabled: form.prefixEnabled,
