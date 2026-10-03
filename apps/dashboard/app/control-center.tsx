@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { AnalyticsPanel } from "./analytics-panel";
 import { AutomationPanel } from "./automation-panel";
 import { BackupPanel } from "./backup-panel";
+import { CommandPolicyPanel } from "./command-policy-panel";
 import { FleetPanel } from "./fleet-panel";
 import { GiveawaysPanel } from "./giveaways-panel";
 import { ModerationPanel } from "./moderation-panel";
@@ -1579,6 +1580,11 @@ function SystemPage(props: { guildId: string; health: Health; audit: AuditEvent[
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <PageHeader eyebrow="SYSTEM" title="Система" description="Операционные инструменты экземпляра: fleet, здоровье Core, backups и аудит." />
+      <section style={{ ...panel, padding: 20 }}>
+        <SectionHeader title="Command Policies" eyebrow="PERMISSIONS · COOLDOWNS" />
+        <CommandPolicyPanel guildId={props.guildId} />
+      </section>
+
       <section style={{ ...panel, padding: 20 }}>
         <SectionHeader title="Bot Fleet" eyebrow="IDENTITIES" />
         <FleetPanel guildId={props.guildId} onChanged={props.onAudit} />
