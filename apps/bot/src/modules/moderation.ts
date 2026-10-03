@@ -31,6 +31,7 @@ export class Moderation implements PlatformModule {
   private client?: ModuleContext["client"];
   private identityId = "primary";
   private expiryTimer?: NodeJS.Timeout;
+  private cleanupTimer?: NodeJS.Timeout;
 
   constructor(private readonly db: Database) {}
 
@@ -44,11 +45,17 @@ export class Moderation implements PlatformModule {
       void this.processExpiredTimedPunishments();
     }, 30_000);
     this.expiryTimer.unref();
+    this.cleanupTimer = setInterval(() => {
+      void this.processScheduledCleanup();
+    }, 60_000);
+    this.cleanupTimer.unref();
   }
 
   async shutdown(): Promise<void> {
     if (this.expiryTimer) clearInterval(this.expiryTimer);
     this.expiryTimer = undefined;
+    if (this.cleanupTimer) clearInterval(this.cleanupTimer);
+    this.cleanupTimer = undefined;
     this.events = undefined;
     this.auditLog = undefined;
     this.client = undefined;
@@ -239,6 +246,47 @@ export class Moderation implements PlatformModule {
     return result.rows[0] ? Number(result.rows[0].id) : null;
   }
 
+  async listCleanupRules(guildId: string): Promise<Array<{
+    id: number;
+    channelId: string;
+    intervalSeconds: number;
+    maxMessages: number;
+    enabled: boolean;
+    lastRunAt: string | null;
+  }>> {
+    const result = await this.db.query<{
+      id: string;
+      channel_id: string;
+      interval_seconds: number;
+      max_messages: number;
+      enabled: boolean;
+      last_run_at: string | null;
+    }>("SELECT id,channel_id,interval_seconds,max_messages,enabled,last_run_at FROM moderation_cleanup_rules WHERE guild_id=$1 ORDER BY id DESC",[guildId]);
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      channelId: row.channel_id,
+      intervalSeconds: row.interval_seconds,
+      maxMessages: row.max_messages,
+      enabled: row.enabled,
+      lastRunAt: row.last_run_at
+    }));
+  }
+
+  async saveCleanupRule(guildId: string, channelId: string, intervalSeconds: number, maxMessages: number, enabled = true): Promise<void> {
+    if (!/^\d{17,20}$/.test(channelId)) throw new Error("invalid_cleanup_channel");
+    if (!Number.isInteger(intervalSeconds) || intervalSeconds < 60 || intervalSeconds > 604800) throw new Error("invalid_cleanup_interval");
+    if (!Number.isInteger(maxMessages) || maxMessages < 1 || maxMessages > 100) throw new Error("invalid_cleanup_amount");
+    if (!await this.enabled(guildId)) throw new Error("moderation_disabled");
+    const guild = this.client?.guilds.cache.get(guildId);
+    const channel = guild?.channels.cache.get(channelId);
+    if (!channel || !channel.isTextBased() || !("bulkDelete" in channel)) throw new Error("invalid_cleanup_channel");
+    await this.db.query("INSERT INTO moderation_cleanup_rules(guild_id,channel_id,interval_seconds,max_messages,enabled) VALUES($1,$2,$3,$4,$5) ON CONFLICT(guild_id,channel_id) DO UPDATE SET interval_seconds=EXCLUDED.interval_seconds,max_messages=EXCLUDED.max_messages,enabled=EXCLUDED.enabled,updated_at=now()",[guildId,channelId,intervalSeconds,maxMessages,enabled]);
+  }
+
+  async deleteCleanupRule(guildId: string, id: number): Promise<boolean> {
+    const result = await this.db.query("DELETE FROM moderation_cleanup_rules WHERE id=$1 AND guild_id=$2",[id,guildId]);
+    return result.rowCount === 1;
+  }
   async purge(interaction: ChatInputCommandInteraction, amount: number): Promise<void> {
     if (!interaction.guild || !interaction.channel || !("bulkDelete" in interaction.channel)) {
       await interaction.reply({ content: "Эта команда доступна только в текстовом канале.", ephemeral: true });
@@ -822,6 +870,35 @@ export class Moderation implements PlatformModule {
     });
   }
 
+  private async processScheduledCleanup(): Promise<void> {
+    if (!this.client || this.client.readyAt === null) return;
+    try {
+      const claimed = await this.db.query<{ id: string; guild_id: string; channel_id: string; max_messages: number }>(
+        "UPDATE moderation_cleanup_rules mcr SET processing_until=now()+interval '2 minutes',last_run_at=now() FROM (SELECT m.id FROM moderation_cleanup_rules m INNER JOIN guild_bot_assignments ga ON ga.guild_id=m.guild_id LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id WHERE m.enabled=true AND (m.last_run_at IS NULL OR m.last_run_at <= now()-make_interval(secs => m.interval_seconds)) AND (m.processing_until IS NULL OR m.processing_until < now()) AND (ga.bot_identity_id=$1 OR ($1='primary' AND ga.bot_identity_id <> 'primary' AND (bh.last_seen_at IS NULL OR bh.last_seen_at < now()-interval '90 seconds'))) ORDER BY m.last_run_at NULLS FIRST LIMIT 20 FOR UPDATE SKIP LOCKED) claim WHERE mcr.id=claim.id RETURNING mcr.id,mcr.guild_id,mcr.channel_id,mcr.max_messages",
+        [this.identityId]
+      );
+
+      for (const rule of claimed.rows) {
+        try {
+          if (!await this.enabled(rule.guild_id)) {
+            await this.db.query("UPDATE moderation_cleanup_rules SET processing_until=NULL WHERE id=$1",[rule.id]);
+            continue;
+          }
+          const guild = this.client.guilds.cache.get(rule.guild_id);
+          const channel = guild?.channels.cache.get(rule.channel_id);
+          if (!channel || !channel.isTextBased() || !("bulkDelete" in channel)) throw new Error("cleanup_channel_unavailable");
+          const deleted = await channel.bulkDelete(rule.max_messages, true);
+          await this.audit("moderation.autopurge",rule.guild_id,"system",rule.channel_id,{cleanupRuleId:Number(rule.id),requested:rule.max_messages,deleted:deleted.size});
+          await this.db.query("UPDATE moderation_cleanup_rules SET processing_until=NULL WHERE id=$1",[rule.id]);
+        } catch (error) {
+          await this.db.query("UPDATE moderation_cleanup_rules SET processing_until=NULL WHERE id=$1",[rule.id]).catch(() => undefined);
+          logger.warn("Scheduled moderation cleanup failed",{cleanupRuleId:rule.id,guildId:rule.guild_id,channelId:rule.channel_id,error:String(error)});
+        }
+      }
+    } catch (error) {
+      logger.warn("Scheduled moderation cleanup worker failed",{identityId:this.identityId,error:String(error)});
+    }
+  }
   private async processExpiredTimedPunishments(): Promise<void> {
     if (!this.client) return;
 
