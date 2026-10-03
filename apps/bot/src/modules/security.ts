@@ -134,7 +134,30 @@ export class Security implements PlatformModule {
       await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
       return;
     }
-    if (interaction.options.getSubcommand() !== "setup") return;
+
+    const sub = interaction.options.getSubcommand();
+    if (sub === "status") {
+      const config = await this.config(interaction.guild!.id);
+      const now = Date.now();
+      const raidUntil = this.raidActiveUntil.get(interaction.guild!.id) ?? 0;
+      const destructiveUntil = this.destructiveActiveUntil.get(interaction.guild!.id) ?? 0;
+      const joins = this.joins.get(interaction.guild!.id) ?? [];
+      const destructive = this.destructive.get(interaction.guild!.id) ?? [];
+      await interaction.reply({
+        content: [
+          "🛡️ **Security status**",
+          `Модуль: **${config.enabled ? "включён" : "выключен"}**`,
+          `Anti-Raid: **${joins.length}/${config.maxJoins}** за ${config.windowSeconds} сек. · ${raidUntil > now ? "🚨 активен" : "✅ не активен"}`,
+          `Destructive: **${destructive.length}/${config.maxDestructiveActions}** за ${config.destructiveWindowSeconds} сек. · ${destructiveUntil > now ? "🚨 активен" : "✅ не активен"}`,
+          `Quarantine role: ${config.quarantineRoleId ? "<@&" + config.quarantineRoleId + ">" : "не настроена"}`,
+          `Log channel: ${config.logChannelId ? "<#" + config.logChannelId + ">" : "не настроен"}`
+        ].join("\n"),
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (sub !== "setup") return;
     const logChannelOption = interaction.options.getChannel("log-channel");
     const logChannel = logChannelOption ? interaction.guild!.channels.cache.get(logChannelOption.id) : null;
     if (logChannelOption && (!logChannel || logChannel.type !== 0)) {
