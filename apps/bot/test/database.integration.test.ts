@@ -453,3 +453,23 @@ test("moderation scheduled cleanup persists and enforces the expected bounds", {
     await db.close();
   }
 });
+
+test("moderation channel locks preserve original send-message state for lockdown restoration", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345746";
+  try {
+    await migrate(db);
+    await db.query(
+      "INSERT INTO moderation_channel_locks(guild_id,channel_id,previous_send_messages) VALUES($1,$2,true) ON CONFLICT(guild_id,channel_id) DO UPDATE SET previous_send_messages=EXCLUDED.previous_send_messages",
+      [guildId,"123456789012345745"]
+    );
+    const rows = await db.query<{ previous_send_messages: boolean | null }>(
+      "SELECT previous_send_messages FROM moderation_channel_locks WHERE guild_id=$1 AND channel_id=$2",
+      [guildId,"123456789012345745"]
+    );
+    assert.deepEqual(rows.rows, [{ previous_send_messages: true }]);
+  } finally {
+    await db.query("DELETE FROM moderation_channel_locks WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.close();
+  }
+});
