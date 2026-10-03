@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 type Resource = { id: string; name: string };
-type Platform = "twitch" | "youtube" | "vk";
+type Platform = "twitch" | "youtube" | "vk" | "kick";
 type Alert = {
   id: number;
   platform: Platform;
@@ -29,7 +29,7 @@ export function StreamAlertsPanel({
   onChanged?: () => void | Promise<void>;
 }) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [providers, setProviders] = useState<Record<Platform, boolean>>({ twitch: false, youtube: false, vk: true });
+  const [providers, setProviders] = useState<Record<Platform, boolean>>({ twitch: false, youtube: false, vk: true, kick: false });
   const [platform, setPlatform] = useState<Platform>("twitch");
   const [target, setTarget] = useState("");
   const [channelId, setChannelId] = useState(channels[0]?.id ?? "");
@@ -44,7 +44,7 @@ export function StreamAlertsPanel({
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.error ?? "stream_alerts_failed");
     setAlerts(body.alerts ?? []);
-    setProviders(body.providers ?? { twitch: false, youtube: false, vk: true });
+    setProviders(body.providers ?? { twitch: false, youtube: false, vk: true, kick: false });
   }
 
   useEffect(() => {
@@ -122,12 +122,14 @@ export function StreamAlertsPanel({
     ? "логин Twitch"
     : platform === "youtube"
       ? "ID канала или @handle YouTube"
-      : "slug канала VK Видео Live";
+      : platform === "vk"
+      ? "slug канала VK Видео Live"
+      : "slug или broadcaster ID Kick";
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ fontSize: 12, opacity: 0.55 }}>
-        Для каждой подписки можно выбрать отдельный Discord-канал и роль для упоминания. Twitch и YouTube используют API-учётные данные бота.
+        Для каждой подписки можно выбрать отдельный Discord-канал и роль для упоминания. Twitch, YouTube и Kick используют API-учётные данные бота.
       </div>
       {error && <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d" }}>{error}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "120px minmax(150px,1fr) minmax(140px,1fr) minmax(130px,1fr) 100px auto", gap: 8 }}>
@@ -135,6 +137,7 @@ export function StreamAlertsPanel({
           <option value="twitch">Twitch</option>
           <option value="youtube">YouTube</option>
           <option value="vk">VK Live</option>
+          <option value="kick">Kick</option>
         </select>
         <input value={target} onChange={(event) => setTarget(event.target.value)} placeholder={hint} style={inputStyle} />
         <select value={channelId} onChange={(event) => setChannelId(event.target.value)} style={inputStyle}>
@@ -154,7 +157,7 @@ export function StreamAlertsPanel({
 
       {alerts.map((alert) => (
         <div key={alert.id} style={{ display: "grid", gridTemplateColumns: "90px minmax(150px,1fr) minmax(140px,1fr) minmax(130px,1fr) 100px auto", gap: 8, alignItems: "center", padding: "10px 0", borderBottom: "1px solid #1d212b" }}>
-          <strong>{alert.platform === "twitch" ? "Twitch" : alert.platform === "youtube" ? "YouTube" : "VK Live"}</strong>
+          <strong>{alert.platform === "twitch" ? "Twitch" : alert.platform === "youtube" ? "YouTube" : alert.platform === "vk" ? "VK Live" : "Kick"}</strong>
           <div>
             <div style={{ fontWeight: 600 }}>{alert.target}</div>
             <div style={{ fontSize: 11, opacity: 0.45 }}>{alert.lastOnline ? "🟢 LIVE" : "⚫ offline"}{alert.lastError ? " · " + alert.lastError : ""}</div>
