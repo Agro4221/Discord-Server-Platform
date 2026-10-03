@@ -473,7 +473,7 @@ export class Music implements PlatformModule {
     this.setModuleHealth?.(this.name, musicNodeHealth(this.connectedNodes.size));
   }
 
-  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
     if (!interaction.inGuild()) return;
     const directAliases = new Set([
       "play", "pause", "resume", "skip", "stop", "shuffle",
