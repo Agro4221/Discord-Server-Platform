@@ -522,8 +522,8 @@ export class Music implements PlatformModule {
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!interaction.inGuild()) return;
     const directAliases = new Set([
-      "play", "pause", "resume", "skip", "stop", "shuffle",
-      "playlist", "queue", "repeat", "seek", "volume", "autoplay", "nowplaying"
+      "play", "pause", "resume", "previous", "skip", "stop", "shuffle",
+      "playlist", "favorite", "filter", "queue-policy", "queue", "repeat", "seek", "volume", "autoplay", "247", "providers", "nowplaying", "lyrics"
     ]);
     if (interaction.commandName !== "music" && !directAliases.has(interaction.commandName)) return;
 
