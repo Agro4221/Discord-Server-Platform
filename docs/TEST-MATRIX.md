@@ -152,3 +152,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-04 — Control Center contract audit verification
 - CI run **#1262** passed the full automated matrix after correcting the AutoMod `PANEL_KEYS` contract.
 - Static consistency check found zero `full` modules without a panel branch, zero panel branches without `PANEL_KEYS`, and zero extra panel keys.
+
+## 2026-10-04 — Economy Admin verification
+- CI run **#1268** passed the full automated matrix after adding Economy account management.
+- Dashboard production build validates the account editor and route contracts; live authorization remains dependent on the protected local Control Center environment.

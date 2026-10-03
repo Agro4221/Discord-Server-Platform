@@ -304,3 +304,8 @@ Never write credentials, tokens or private user data here.
 - CI run **#1262** (`37152334156`) passed on development head `c9fd897e4a5574119480e4dfc6fd7d434a20cae3` after adding `automod` to `PANEL_KEYS`.
 - Cross-module audit confirmed every `full` module has both a rendered operational branch and a `PANEL_KEYS` entry; there are no extra panel keys and no missing panel branches.
 - Community Tools poll creation remains CI-verified by run **#1260** (`37152201261`) on its feature head.
+
+## 2026-10-04 — Economy Admin verified
+- CI run **#1268** (`37153371438`) passed on development head `c8188f61840235c784560f7507d8276dee5acf59`.
+- Economy Control Center now exposes the top 100 persisted economy accounts and a protected admin balance editor.
+- Core validates Discord user IDs and PostgreSQL bigint-compatible non-negative balances before upserting; Dashboard writes are audited as `economy.balance.updated`.
