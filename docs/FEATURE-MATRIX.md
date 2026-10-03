@@ -442,7 +442,7 @@ Music должен стремиться к функциональности си
 | Richer action catalog | ✅ | Added nickname management and message reaction actions |
 | Workflow retries / dead-letter diagnostics | ✅ | Durable delayed jobs retry with bounded exponential backoff and move to a persistent dead-letter state after five failed attempts; Dashboard diagnostics exposes the state |
 | Reusable workflow presets | ✅ | Per-guild workflow presets can be saved/loaded/deleted in Dashboard and are included in Config Export/Import |
-| Cross-module actions (tickets, roles, giveaway, moderation, music, notifications) | 🟡 |
+| Cross-module actions (tickets, roles, giveaway, moderation, music, notifications) | ✅ | Automation can invoke Tickets close, Giveaway end/reroll, Notification feed toggle and Music controls through module services; roles/moderation already use shared services |
 
 #### Notifications / integrations
 | Функция | План |
