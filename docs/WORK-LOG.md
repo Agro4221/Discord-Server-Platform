@@ -373,6 +373,12 @@ Never write credentials, tokens or private user data here.
 - No Discord mutation, webhook call or database write is performed by dry-run.
 
 
+## 2026-10-04 — Music history / skip-to
+- Persistent music_history stores the latest 200 played tracks per guild/bot identity.
+- Added /music history and prefix !history.
+- Added /music skip-to position and prefix !skip-to position, preserving the selected queued track at the front before skipping the current track.
+- Migration/test gate advanced to schema version 79.
+
 ## 2026-10-04 — Automation richer conditions/actions
 - Expanded Automation condition catalog with not-has-role, user-is-bot, channel-type-is and has-permission.
 - Expanded action catalog with set-nickname and react-message.
