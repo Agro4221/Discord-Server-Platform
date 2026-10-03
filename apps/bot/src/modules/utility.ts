@@ -185,7 +185,7 @@ export class Utility implements PlatformModule {
 
   async executeSlashCommand(
     interaction: ChatInputCommandInteraction
-  , commandName = commandName): Promise<void> {
+  , commandName = interaction.commandName): Promise<void> {
     if (!interaction.inGuild() || !INFO_COMMANDS.has(commandName)) {
       return;
     }
