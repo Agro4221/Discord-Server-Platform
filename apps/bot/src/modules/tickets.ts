@@ -261,8 +261,8 @@ export class Tickets implements PlatformModule {
           [channel.id,id,guild.id]
         );
         const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder().setCustomId("dsp:ticket:claim:" + id).setLabel("Забрать").setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId("dsp:ticket:close:" + id).setLabel("Закрыть").setStyle(ButtonStyle.Danger)
+          new ButtonBuilder().setCustomId("dsp:ticket:claim:" + id).setLabel(config.customization.claimButtonLabel).setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("dsp:ticket:close:" + id).setLabel(config.customization.closeButtonLabel).setStyle(ButtonStyle.Danger)
         );
         await channel.send({
           embeds: [
