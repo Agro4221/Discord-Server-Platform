@@ -42,7 +42,7 @@ export const MODULE_CATALOG: readonly {
   { key: "economy", title: "Economy", description: "Server economy and shop", defaultEnabled: false },
   { key: "reminders", title: "Reminders", description: "Reminders, AFK and utilities", defaultEnabled: false },
   { key: "notifications", title: "Notifications", description: "External feed notifications", defaultEnabled: false },
-  { key: "stream-alerts", title: "Stream Alerts", description: "Twitch, YouTube and VK Video Live start notifications", defaultEnabled: false },
+  { key: "stream-alerts", title: "Stream Alerts", description: "Twitch, YouTube, VK Video Live and Kick start notifications", defaultEnabled: false },
   { key: "automation", title: "Automation", description: "Event / condition / action workflows", defaultEnabled: false },
   { key: "music", title: "Music", description: "Lavalink music platform", defaultEnabled: false },
   { key: "analytics", title: "Analytics", description: "Server and module analytics", defaultEnabled: false },
