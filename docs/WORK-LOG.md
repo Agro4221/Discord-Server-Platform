@@ -414,3 +414,8 @@ Never write credentials, tokens or private user data here.
 - The Dashboard exposes both image URLs with bounded length and HTTPS-only validation; slash `/welcome setup` accepts the same two options.
 - Config export/import carries the new fields, and migration 80 adds the persistent columns.
 - Added regression coverage for accepted, empty, malformed, non-HTTPS and oversized image URLs.
+
+
+### 2026-10-04 — Welcome/Verification operational preview
+- Welcome now exposes a Dashboard-safe preview action that renders the current configured welcome message/embed without assigning roles or touching a real member.
+- Verification panel copy (title, description and both button labels) is now persisted and configurable from the generic Dashboard settings and `/verify setup`.
