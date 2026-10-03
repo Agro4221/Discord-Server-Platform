@@ -8,7 +8,7 @@ import {
   type ButtonInteraction,
   type ChatInputCommandInteraction,
   type Client,
-  type Message
+  Message
 } from "discord.js";
 import type { AuditLog } from "../audit.js";
 import type { Database } from "../database.js";
