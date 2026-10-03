@@ -359,3 +359,9 @@ Never write credentials, tokens or private user data here.
 - Added warn/kick/ban Automation actions through the shared Moderation service with `automation` as actor.
 - Fixed Management API validation mismatch for Dashboard-supported delay/webhook/branch actions; validation is now recursive.
 - Added regression tests for moderation action validation.
+
+
+## 2026-10-04 — Automation event context
+- Expanded runtime event context so moderation/role/ticket workflows expose useful fields to conditions and templates.
+- Added action/reason/moderator/role/case/ticket context without introducing a second event system.
+- Kept existing event names and persistence contracts stable.

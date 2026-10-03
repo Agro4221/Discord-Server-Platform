@@ -161,3 +161,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-04 — Automation moderation actions
 - Added regression coverage for warn/kick/ban action validation and invalid ban duration.
 - Management API validation is aligned with delay/webhook/branch actions and nested branch depth.
+
+
+### 2026-10-04 — Automation event context
+- Added regression coverage for moderation event conditions using `action` and `caseId` fields.
+- Expanded field catalog alignment between engine, Management API and Dashboard.

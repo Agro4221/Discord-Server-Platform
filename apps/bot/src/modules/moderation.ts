@@ -75,7 +75,9 @@ export class Moderation implements PlatformModule {
         guildId,
         userId: targetUserId,
         action,
-        caseId
+        caseId,
+        moderatorUserId,
+        reason: reason ?? undefined
       });
     }
     return caseId;

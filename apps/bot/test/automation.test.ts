@@ -53,3 +53,11 @@ test("Automation supports moderation punishments", () => {
 test("Automation rejects malformed moderation punishment durations", () => {
   assert.throws(() => validateAutomationRule("member.join", [], [{ type: "ban", userId: "@event", reason: "automatic ban", durationMinutes: 0 }]), /invalid_ban_action/);
 });
+
+
+test("Automation supports expanded moderation context fields", () => {
+  assert.doesNotThrow(() => validateAutomationRule("moderation.case", [
+    { type: "equals", left: "action", right: "ban" },
+    { type: "number-gte", left: "caseId", right: 1 }
+  ], [{ type: "log", message: "automation moderation context" }]));
+});

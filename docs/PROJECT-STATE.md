@@ -239,3 +239,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Automation now supports warn/kick/ban through the existing Moderation service, preserving case history, hierarchy checks and audit behavior.
 - Management API validation now accepts and recursively validates the existing Dashboard delay, webhook and branch action catalog.
 - Added `@event` user references and bounded ban durations.
+
+
+## 2026-10-04 — Automation event context
+- Expanded Automation runtime context with moderation action/reason/caseId, moderator user, roleId and ticketId fields.
+- Dashboard/API condition field catalog now exposes the additional string/numeric fields.
+- Template rendering supports expanded moderation, role, ticket and giveaway variables.

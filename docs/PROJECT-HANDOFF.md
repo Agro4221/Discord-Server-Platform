@@ -455,3 +455,8 @@ Live validation, требующая пользовательского окру�
 - Automation supports warn/kick/ban through the shared Moderation pipeline.
 - Management API validation now covers the full existing Dashboard action catalog, including nested branches.
 - Next automation focus: richer event context/variables and dry-run/test execution.
+
+
+### 2026-10-04 — Automation event context
+- Automation now exposes richer moderation/role/ticket context to conditions and templates while preserving the current event model.
+- Next automation priority: operational dry-run/test execution and diagnostics before further action expansion.

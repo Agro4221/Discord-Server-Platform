@@ -26,7 +26,7 @@ export type PlatformEventMap = {
   "member.update": { oldMember: GuildMember; newMember: GuildMember };
   "member.role.add": { guildId: string; userId: string; roleId: string };
   "member.role.remove": { guildId: string; userId: string; roleId: string };
-  "moderation.case": { guildId: string; userId: string; action: string; caseId: number };
+  "moderation.case": { guildId: string; userId: string; action: string; caseId: number; moderatorUserId?: string; reason?: string };
   "ticket.create": { guildId: string; userId: string; ticketId: number; channelId: string };
   "ticket.close": { guildId: string; userId: string; ticketId: number; channelId: string };
   "giveaway.end": { guildId: string; giveawayId: number; winners: string[] };

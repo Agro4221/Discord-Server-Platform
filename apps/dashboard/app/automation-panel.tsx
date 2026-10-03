@@ -44,8 +44,8 @@ const EVENTS = [
   "ticket.create","ticket.close","giveaway.end","schedule"
 ] as const;
 
-const TEXT_FIELDS = ["content","userId","channelId","messageId","guildId"] as const;
-const NUMBER_FIELDS = ["memberCount","messageLength","mentionCount","previousLength","giveawayId","winnerCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"] as const;
+const TEXT_FIELDS = ["content","userId","moderatorUserId","channelId","roleId","action","reason","messageId","guildId"] as const;
+const NUMBER_FIELDS = ["memberCount","messageLength","mentionCount","previousLength","caseId","ticketId","giveawayId","winnerCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"] as const;
 
 export function AutomationPanel({
   guildId,

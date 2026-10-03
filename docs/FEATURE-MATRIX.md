@@ -106,7 +106,7 @@
 | DM / webhook actions | ✅ | DM + hardened webhook action
 | Conditional branches | ✅ | Nested if/else action branches up to 2 levels |
 | Delay / queue semantics | ✅ | Durable delayed-action queue with lease/retry and restart recovery
-| Template variables / reusable snippets | ✅ | Event variables + persistent named templates via `{template:name}` |
+| Template variables / reusable snippets | ✅ | Event + case/ticket/role/moderation context variables plus persistent named templates via `{template:name}` |
 | Visual automation builder | ✅ |
 
 ## Notifications / Integrations

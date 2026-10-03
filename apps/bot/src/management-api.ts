@@ -2150,8 +2150,8 @@ function validateAutomationPayload(
   const guild = client.guilds.cache.get(guildId);
   if (!guild) throw new RequestInputError("guild_not_found", 404);
 
-  const stringFields = new Set(["content","userId","channelId","messageId","guildId"]);
-  const numericFields = new Set(["memberCount","messageLength","mentionCount","previousLength","giveawayId","winnerCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"]);
+  const stringFields = new Set(["content","userId","moderatorUserId","channelId","roleId","action","reason","messageId","guildId"]);
+  const numericFields = new Set(["memberCount","messageLength","mentionCount","previousLength","caseId","ticketId","giveawayId","winnerCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"]);
 
   for (const condition of conditions) validateAutomationCondition(condition, guild, stringFields, numericFields);
 

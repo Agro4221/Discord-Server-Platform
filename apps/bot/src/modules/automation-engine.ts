@@ -21,7 +21,11 @@ type RuntimeEvent = {
   type: AutomationEvent;
   guildId: string;
   userId?: string;
+  moderatorUserId?: string;
   channelId?: string;
+  roleId?: string;
+  action?: string;
+  reason?: string;
   content?: string;
   messageId?: string;
   numeric?: Record<string, number>;
@@ -102,9 +106,23 @@ export class AutomationEngine implements PlatformModule {
         });
       }),
       context.events.on("voice.state", ({ oldState, newState }) => this.executeFromVoice(oldState, newState)),
-      context.events.on("moderation.case", (event) => this.execute({ type: "moderation.case", ...event })),
-      context.events.on("ticket.create", (event) => this.execute({ type: "ticket.create", ...event })),
-      context.events.on("ticket.close", (event) => this.execute({ type: "ticket.close", ...event })),
+      context.events.on("moderation.case", (event) => this.execute({
+        type: "moderation.case",
+        guildId: event.guildId,
+        userId: event.userId,
+        moderatorUserId: event.moderatorUserId,
+        action: event.action,
+        reason: event.reason,
+        numeric: { caseId: event.caseId }
+      })),
+      context.events.on("ticket.create", (event) => this.execute({
+        type: "ticket.create", guildId: event.guildId, userId: event.userId, channelId: event.channelId,
+        numeric: { ticketId: event.ticketId }
+      })),
+      context.events.on("ticket.close", (event) => this.execute({
+        type: "ticket.close", guildId: event.guildId, userId: event.userId, channelId: event.channelId,
+        numeric: { ticketId: event.ticketId }
+      })),
       context.events.on("giveaway.end", (event) => this.execute({
         type: "giveaway.end", guildId: event.guildId,
         numeric: { giveawayId: event.giveawayId, winnerCount: event.winners.length },
@@ -431,12 +449,12 @@ export class AutomationEngine implements PlatformModule {
     const after = new Set(newMember.roles.cache.keys());
     for (const roleId of after) {
       if (!before.has(roleId)) {
-        await this.execute({ type: "member.role.add", guildId: newMember.guild.id, userId: newMember.id, content: roleId });
+        await this.execute({ type: "member.role.add", guildId: newMember.guild.id, userId: newMember.id, roleId, content: roleId });
       }
     }
     for (const roleId of before) {
       if (!after.has(roleId)) {
-        await this.execute({ type: "member.role.remove", guildId: newMember.guild.id, userId: newMember.id, content: roleId });
+        await this.execute({ type: "member.role.remove", guildId: newMember.guild.id, userId: newMember.id, roleId, content: roleId });
       }
     }
   }
@@ -931,7 +949,11 @@ export function validateAutomationRule(
 function resolveTextField(event: RuntimeEvent, field: string): string | undefined {
   if (field === "content") return event.content;
   if (field === "userId") return event.userId;
+  if (field === "moderatorUserId") return event.moderatorUserId;
   if (field === "channelId") return event.channelId;
+  if (field === "roleId") return event.roleId;
+  if (field === "action") return event.action;
+  if (field === "reason") return event.reason;
   if (field === "messageId") return event.messageId;
   if (field === "guildId") return event.guildId;
   return undefined;
@@ -945,12 +967,20 @@ async function renderTemplate(value: string, event: RuntimeEvent): Promise<strin
   return value
     .replaceAll("{user}", event.userId ? "<@" + event.userId + ">" : "{user}")
     .replaceAll("{userId}", event.userId ?? "{userId}")
+    .replaceAll("{moderatorUserId}", event.moderatorUserId ?? "{moderatorUserId}")
+    .replaceAll("{roleId}", event.roleId ?? "{roleId}")
+    .replaceAll("{action}", event.action ?? "{action}")
+    .replaceAll("{reason}", event.reason ?? "{reason}")
     .replaceAll("{channel}", event.channelId ? "<#" + event.channelId + ">" : "{channel}")
     .replaceAll("{channelId}", event.channelId ?? "{channelId}")
     .replaceAll("{messageId}", event.messageId ?? "{messageId}")
     .replaceAll("{content}", event.content ?? "{content}")
     .replaceAll("{guildId}", event.guildId)
     .replaceAll("{event}", event.type)
+    .replaceAll("{caseId}", event.numeric?.caseId !== undefined ? String(event.numeric.caseId) : "{caseId}")
+    .replaceAll("{ticketId}", event.numeric?.ticketId !== undefined ? String(event.numeric.ticketId) : "{ticketId}")
+    .replaceAll("{giveawayId}", event.numeric?.giveawayId !== undefined ? String(event.numeric.giveawayId) : "{giveawayId}")
+    .replaceAll("{winnerCount}", event.numeric?.winnerCount !== undefined ? String(event.numeric.winnerCount) : "{winnerCount}")
     .replaceAll("{timestamp}", event.numeric?.timestamp ? new Date(event.numeric.timestamp).toISOString() : new Date().toISOString());
 }
 
