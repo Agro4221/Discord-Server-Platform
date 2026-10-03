@@ -869,7 +869,9 @@ export class AutomationEngine implements PlatformModule {
 
   private async processDelayedJobs(): Promise<void> {
     await this.db.query(
-      "DELETE FROM automation_delayed_jobs WHERE completed_at IS NOT NULL AND completed_at < now()-interval '7 days'"
+      "DELETE FROM automation_delayed_jobs WHERE " +
+      "(completed_at IS NOT NULL OR dead_lettered_at IS NOT NULL) AND " +
+      "COALESCE(completed_at,dead_lettered_at) < now()-interval '7 days'"
     ).catch((error) => logger.warn("Automation delayed job cleanup failed", { error: String(error) }));
 
     const result = await this.db.query<{
@@ -912,7 +914,7 @@ export class AutomationEngine implements PlatformModule {
     for (const job of result.rows) {
       try {
         if (!job.event || !Array.isArray(job.actions) || job.actions.length === 0) {
-          await this.db.query("UPDATE automation_delayed_jobs SET completed_at=now(),processing_until=NULL,last_error='invalid queued job' WHERE id=$1", [job.id]);
+          await this.db.query("UPDATE automation_delayed_jobs SET processing_until=NULL,last_error='invalid queued job',dead_lettered_at=now() WHERE id=$1 AND completed_at IS NULL", [job.id]);
           continue;
         }
         await this.perform(job.actions, job.event, { failFast: true, ruleId: job.rule_id ?? undefined });
