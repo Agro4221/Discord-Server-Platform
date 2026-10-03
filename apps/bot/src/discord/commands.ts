@@ -509,6 +509,29 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       ),
 
     new SlashCommandBuilder()
+      .setName("rep")
+      .setDescription("Community reputation")
+      .addSubcommand((sub) =>
+        sub
+          .setName("give")
+          .setDescription("Give +1 rep")
+          .addUserOption((o) => o.setName("user").setDescription("Recipient").setRequired(true))
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName("check")
+          .setDescription("Check reputation")
+          .addUserOption((o) => o.setName("user").setDescription("User"))
+      )
+      .addSubcommand((sub) => sub.setName("leaderboard").setDescription("Top reputation scores")),
+
+    new SlashCommandBuilder()
+      .setName("profile")
+      .setDescription("Community social profile")
+      .addUserOption((o) => o.setName("user").setDescription("User"))
+      .addStringOption((o) => o.setName("bio").setDescription("Set bio").setMaxLength(500)),
+
+    new SlashCommandBuilder()
       .setName("suggestion")
       .setDescription("Community suggestions")
       .addSubcommand((sub) =>
