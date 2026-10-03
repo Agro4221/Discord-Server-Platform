@@ -253,6 +253,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Supports synthetic content/channel/user/role and bounded numeric event context for reproducible testing.
 
 
+## 2026-10-04 — Automation retries and dead-letter
+- Durable delayed Automation jobs now have bounded exponential retry with a five-attempt limit and a persistent dead-letter state.
+- Delayed execution propagates action errors instead of swallowing them, while non-delayed event execution retains its existing per-action best-effort behavior.
+- Rule IDs are preserved on delayed jobs and diagnostics distinguish pending, processing, completed and dead-lettered jobs.
+
 ## 2026-10-04 — Automation diagnostics
 - Automation now has an operational diagnostics surface backed by the existing delayed-job queue and rule/template state.
 - Management API: GET /api/guilds/:guildId/automation/diagnostics.
