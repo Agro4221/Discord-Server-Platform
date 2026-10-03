@@ -106,3 +106,9 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Deterministic coverage confirms per-rule cooldown activation boundaries.
 - Backend validation rejects unsupported actions and non-finite/out-of-range per-rule numeric values.
 - Live Discord behavior, role hierarchy and provider/resource failure paths remain release-gate validation.
+
+### 2026-10-03 — Custom Commands module snapshot
+- Custom Commands now participates in the shared module toggle contract.
+- Dashboard CRUD covers response, alias and role actions, Prefix/Slash flags and cooldowns.
+- Existing API audit events remain the durable change trail.
+- Live Discord registration/execution and role hierarchy remain release-gate validation.
