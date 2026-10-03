@@ -535,10 +535,20 @@ export class AutoMod implements PlatformModule {
     ).catch(() => undefined);
 
     if (rule.action === "warn") {
-      await this.db.query(
-        "INSERT INTO moderation_cases(guild_id,target_user_id,moderator_user_id,action,reason,created_at) VALUES($1,$2,'system','warn',$3,now())",
+      const warnResult = await this.db.query<{ id: string }>(
+        "INSERT INTO moderation_cases(guild_id,target_user_id,moderator_user_id,action,reason,created_at) VALUES($1,$2,'system','warn',$3,now()) RETURNING id",
         [message.guild!.id, message.author.id, "AutoMod: " + rule.detector]
-      ).catch(() => undefined);
+      ).catch(() => null);
+
+      const caseId = warnResult?.rows[0]?.id;
+      if (caseId) {
+        await this.events?.emit("moderation.case", {
+          guildId: message.guild!.id,
+          userId: message.author.id,
+          action: "warn",
+          caseId: Number(caseId)
+        }).catch(() => undefined);
+      }
     }
 
     await this.auditLog?.record({
