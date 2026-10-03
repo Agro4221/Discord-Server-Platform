@@ -101,6 +101,7 @@ export class Music implements PlatformModule {
   private readonly autoplayInFlight = new Set<string>();
   private readonly autoLeaveTimers = new Map<string, NodeJS.Timeout>();
   private readonly requestInFlight = new Set<string>();
+  private readonly failoverInFlight = new Set<string>();
 
   constructor(
     private readonly db: Database,
@@ -115,6 +116,7 @@ export class Music implements PlatformModule {
     this.lastPlayedTracks.clear();
     this.autoplayInFlight.clear();
     this.requestInFlight.clear();
+    this.failoverInFlight.clear();
     for (const timer of this.autoLeaveTimers.values()) clearTimeout(timer);
     this.autoLeaveTimers.clear();
 
@@ -303,6 +305,7 @@ export class Music implements PlatformModule {
         node: node.id,
         reason: String(reason)
       });
+      void this.failoverPlayersFromNode(node.id);
     });
 
     this.manager.nodeManager.on("destroy", (node) => {
@@ -311,6 +314,7 @@ export class Music implements PlatformModule {
       logger.warn("Lavalink node destroyed", {
         node: node.id
       });
+      void this.failoverPlayersFromNode(node.id);
     });
 
     this.manager.nodeManager.on("error", (node, error) => {
@@ -351,6 +355,7 @@ export class Music implements PlatformModule {
     this.connectedNodes.clear();
     this.lastPlayedTracks.clear();
     this.autoplayInFlight.clear();
+    this.failoverInFlight.clear();
     for (const timer of this.autoLeaveTimers.values()) clearTimeout(timer);
     this.autoLeaveTimers.clear();
 
@@ -502,6 +507,56 @@ export class Music implements PlatformModule {
 
   private publishNodeHealth(): void {
     this.setModuleHealth?.(this.name, musicNodeHealth(this.connectedNodes.size));
+  }
+
+  private async failoverPlayersFromNode(failedNodeId: string): Promise<void> {
+    if (!this.manager || !this.initialized) return;
+
+    const available = this.manager.nodeManager.leastUsedNodes("playingPlayers")
+      .filter((node) => node.id !== failedNodeId && node.connected && Boolean(node.sessionId));
+    if (!available.length) {
+      logger.warn("Music node failover unavailable", {
+        identity: this.config.botIdentityId,
+        failedNode: failedNodeId
+      });
+      return;
+    }
+
+    const players = [...this.manager.players.values()].filter(
+      (player) => player.node.id === failedNodeId
+    );
+
+    for (const player of players) {
+      if (this.failoverInFlight.has(player.guildId)) continue;
+      this.failoverInFlight.add(player.guildId);
+      try {
+        const current = this.manager?.players.get(player.guildId);
+        if (!current || current.node.id !== failedNodeId) continue;
+
+        const target = this.manager?.nodeManager
+          .leastUsedNodes("playingPlayers")
+          .find((node) => node.id !== failedNodeId && node.connected && Boolean(node.sessionId));
+        if (!target) continue;
+
+        await current.moveNode(target.id);
+        await this.persistPlayer(current);
+        logger.warn("Music player failed over to another Lavalink node", {
+          identity: this.config.botIdentityId,
+          guildId: current.guildId,
+          fromNode: failedNodeId,
+          toNode: current.node.id
+        });
+      } catch (error) {
+        logger.warn("Music player failover failed", {
+          identity: this.config.botIdentityId,
+          guildId: player.guildId,
+          failedNode: failedNodeId,
+          error: String(error)
+        });
+      } finally {
+        this.failoverInFlight.delete(player.guildId);
+      }
+    }
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
