@@ -7,6 +7,10 @@ export function CommunityToolsPanel({ guildId, channels, onChanged }: { guildId:
   const [snapshot, setSnapshot] = useState<Snapshot>(EMPTY);
   const [stickyChannelId, setStickyChannelId] = useState("");
   const [stickyMessage, setStickyMessage] = useState("");
+  const [pollChannelId, setPollChannelId] = useState("");
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptions, setPollOptions] = useState(["", ""]);
+  const [pollMinutes, setPollMinutes] = useState("60");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function load() {
@@ -15,7 +19,14 @@ export function CommunityToolsPanel({ guildId, channels, onChanged }: { guildId:
     if (!response.ok) throw new Error(String(body.error ?? "community_tools_failed"));
     setSnapshot((body.snapshot ?? EMPTY) as Snapshot);
   }
-  useEffect(() => { setError(""); void load().catch((reason) => setError(reason instanceof Error ? reason.message : "Не удалось загрузить Community Tools.")); }, [guildId]);
+  useEffect(() => {
+    setError("");
+    void load().catch((reason) => setError(reason instanceof Error ? reason.message : "Не удалось загрузить Community Tools."));
+  }, [guildId]);
+
+  useEffect(() => {
+    if (!pollChannelId && channels[0]) setPollChannelId(channels[0].id);
+  }, [channels, pollChannelId]);
   async function mutate(action: string, input: Record<string, unknown> = {}) {
     setBusy(true); setError("");
     try {
@@ -28,6 +39,62 @@ export function CommunityToolsPanel({ guildId, channels, onChanged }: { guildId:
   return (
     <div style={{ display: "grid", gap: 14 }}>
       {error && <div style={errorBox}>{error}</div>}
+      <section style={panel}>
+        <div style={label}>CREATE POLL</div>
+        <div style={{ display: "grid", gap: 8, marginTop: 9 }}>
+          <select value={pollChannelId} onChange={(e) => setPollChannelId(e.target.value)} style={inputStyle}>
+            <option value="">Канал…</option>
+            {channels.map((c) => <option key={c.id} value={c.id}>#{c.name}</option>)}
+          </select>
+          <input
+            value={pollQuestion}
+            onChange={(e) => setPollQuestion(e.target.value)}
+            maxLength={300}
+            placeholder="Вопрос"
+            style={inputStyle}
+          />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 8 }}>
+            {pollOptions.map((value, index) => (
+              <input
+                key={index}
+                value={value}
+                onChange={(e) => setPollOptions((current) => current.map((item, itemIndex) => itemIndex === index ? e.target.value : item))}
+                maxLength={100}
+                placeholder={"Вариант " + (index + 1)}
+                style={inputStyle}
+              />
+            ))}
+          </div>
+          {pollOptions.length < 5 && (
+            <button type="button" disabled={!!busy} onClick={() => setPollOptions((current) => [...current, ""])} style={button("secondary")}>
+              + Добавить вариант
+            </button>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "130px auto", gap: 8, alignItems: "center" }}>
+            <input type="number" min={1} max={10080} value={pollMinutes} onChange={(e) => setPollMinutes(e.target.value)} style={inputStyle} />
+            <span style={muted}>длительность в минутах</span>
+          </div>
+          <button
+            type="button"
+            disabled={!!busy}
+            onClick={() => {
+              const options = pollOptions.map((item) => item.trim()).filter(Boolean);
+              const durationMinutes = Number(pollMinutes);
+              if (!pollChannelId || !pollQuestion.trim() || options.length < 2 || !Number.isSafeInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 10080) {
+                setError("Для poll нужны канал, вопрос, 2–5 вариантов и длительность 1–10080 минут.");
+                return;
+              }
+              void mutate("poll.create", { channelId: pollChannelId, question: pollQuestion.trim(), options, durationMinutes }).then(() => {
+                setPollQuestion("");
+                setPollOptions(["", ""]);
+              });
+            }}
+            style={button("primary")}
+          >
+            Создать опрос
+          </button>
+        </div>
+      </section>
       <section style={panel}><div style={label}>STICKY MESSAGE</div>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(180px,1fr) minmax(220px,1.4fr) auto", gap: 8, marginTop: 9 }}>
           <select value={stickyChannelId} onChange={(e) => setStickyChannelId(e.target.value)} style={inputStyle}><option value="">Канал…</option>{channels.map((c) => <option key={c.id} value={c.id}>#{c.name}</option>)}</select>
