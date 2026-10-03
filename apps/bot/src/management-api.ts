@@ -1268,6 +1268,46 @@ export class ManagementApiServer {
             return;
           }
 
+          const economyAccountsMatch = path.match(/^\/api\/guilds\/([^/]+)\/economy\/accounts$/);
+          const economyAccountMatch = path.match(/^\/api\/guilds\/([^/]+)\/economy\/accounts\/([^/]+)$/);
+
+          if ((economyAccountsMatch || economyAccountMatch) && !this.options.economy) {
+            this.json(res, 500, { error: "economy_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && economyAccountsMatch) {
+            const guildId = economyAccountsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, accounts: await this.options.economy!.dashboardAccounts(guildId) });
+            return;
+          }
+
+          if (method === "PUT" && economyAccountMatch) {
+            const guildId = economyAccountMatch[1] ?? "";
+            const userId = economyAccountMatch[2] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !/^\d{15,25}$/.test(userId)) {
+              this.json(res, 404, { error: "guild_or_user_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const balance = typeof body.balance === "string" ? body.balance.trim() : String(body.balance ?? "");
+            const nextBalance = await this.options.economy!.dashboardSetBalance(guildId, userId, balance);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "economy.balance.updated",
+              targetType: "economy-account",
+              targetId: userId,
+              metadata: { balance: nextBalance }
+            });
+            this.json(res, 200, { ok: true, balance: nextBalance });
+            return;
+          }
+
           const economyItemsMatch = path.match(/^\/api\/guilds\/([^/]+)\/economy\/items$/);
           const economyItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/economy\/items\/(\d+)$/);
 
