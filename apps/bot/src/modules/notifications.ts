@@ -64,6 +64,7 @@ export class Notifications implements PlatformModule {
   }
 
   async addFeed(guildId: string, channelId: string, url: string, intervalSeconds: number): Promise<NotificationFeedRecord> {
+    await assertSafeFeedTarget(this.client, guildId, channelId);
     await assertSafeFeedUrl(url);
     const safeInterval = Math.min(Math.max(Math.trunc(intervalSeconds), 60), 86_400);
     const result = await this.db.query<{ id: string }>(
@@ -84,8 +85,9 @@ export class Notifications implements PlatformModule {
   }
 
   async updateFeed(guildId: string, id: number, patch: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean }): Promise<boolean> {
-    if (patch.url !== undefined) await assertSafeFeedUrl(patch.url);
     const current = (await this.listFeeds(guildId)).find((item) => item.id === id);
+    if (patch.channelId !== undefined) await assertSafeFeedTarget(this.client, guildId, patch.channelId);
+    if (patch.url !== undefined) await assertSafeFeedUrl(patch.url);
     if (!current) return false;
     await this.db.query(
       `UPDATE notification_feeds
@@ -427,4 +429,21 @@ function ipv4FromMappedHex(value: string): string {
     (second >> 8) & 255,
     second & 255
   ].join(".");
+}
+
+
+async function assertSafeFeedTarget(
+  client: Client | undefined,
+  guildId: string,
+  channelId: string
+): Promise<void> {
+  if (!/^\d{15,25}$/.test(channelId)) throw new Error("invalid_feed_channel");
+  const guild = client?.guilds.cache.get(guildId);
+  const channel = guild?.channels.cache.get(channelId);
+  const me = guild?.members.me;
+  if (!guild || !channel || (channel.type !== 0 && channel.type !== 5)) throw new Error("feed_channel_invalid");
+  const permissions = channel.permissionsFor(me ?? guild.roles.everyone);
+  if (!me || !permissions?.has("ViewChannel") || !permissions.has("SendMessages")) {
+    throw new Error("feed_channel_forbidden");
+  }
 }
