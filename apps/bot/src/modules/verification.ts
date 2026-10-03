@@ -12,6 +12,10 @@ type VerificationConfig = {
   quarantineRoleId: string | null;
   logChannelId: string | null;
   codeTtlMinutes: number;
+  panelTitle: string;
+  panelDescription: string;
+  issueButtonLabel: string;
+  confirmButtonLabel: string;
 };
 
 export class Verification implements PlatformModule {
@@ -42,8 +46,12 @@ export class Verification implements PlatformModule {
       quarantine_role_id: string | null;
       log_channel_id: string | null;
       code_ttl_minutes: number;
+      panel_title: string | null;
+      panel_description: string | null;
+      issue_button_label: string | null;
+      confirm_button_label: string | null;
     }>(
-      "SELECT enabled,channel_id,verified_role_id,quarantine_role_id,log_channel_id,code_ttl_minutes FROM verification_settings WHERE guild_id=$1",
+      "SELECT enabled,channel_id,verified_role_id,quarantine_role_id,log_channel_id,code_ttl_minutes,panel_title,panel_description,issue_button_label,confirm_button_label FROM verification_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -53,21 +61,37 @@ export class Verification implements PlatformModule {
       verifiedRoleId: row?.verified_role_id ?? null,
       quarantineRoleId: row?.quarantine_role_id ?? null,
       logChannelId: row?.log_channel_id ?? null,
-      codeTtlMinutes: row?.code_ttl_minutes ?? 10
+      codeTtlMinutes: row?.code_ttl_minutes ?? 10,
+      panelTitle: row?.panel_title || defaultConfig.panelTitle,
+      panelDescription: row?.panel_description || defaultConfig.panelDescription,
+      issueButtonLabel: row?.issue_button_label || defaultConfig.issueButtonLabel,
+      confirmButtonLabel: row?.confirm_button_label || defaultConfig.confirmButtonLabel
     };
   }
 
   async configure(guildId: string, patch: Partial<VerificationConfig>): Promise<void> {
     const current = await this.config(guildId);
     const next = { ...current, ...patch };
+    const panelTitle = normalizeVerificationText(next.panelTitle, 256);
+    const panelDescription = normalizeVerificationText(next.panelDescription, 4096);
+    const issueButtonLabel = normalizeVerificationText(next.issueButtonLabel, 80);
+    const confirmButtonLabel = normalizeVerificationText(next.confirmButtonLabel, 80);
     await this.db.query(
-      `INSERT INTO verification_settings(guild_id,enabled,channel_id,verified_role_id,quarantine_role_id,log_channel_id,code_ttl_minutes)
-       VALUES($1,$2,$3,$4,$5,$6,$7)
+      `INSERT INTO verification_settings(
+         guild_id,enabled,channel_id,verified_role_id,quarantine_role_id,log_channel_id,code_ttl_minutes,
+         panel_title,panel_description,issue_button_label,confirm_button_label
+       )
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        ON CONFLICT(guild_id) DO UPDATE SET
          enabled=EXCLUDED.enabled,channel_id=EXCLUDED.channel_id,verified_role_id=EXCLUDED.verified_role_id,
          quarantine_role_id=EXCLUDED.quarantine_role_id,log_channel_id=EXCLUDED.log_channel_id,
-         code_ttl_minutes=EXCLUDED.code_ttl_minutes,updated_at=now()`,
-      [guildId,next.enabled,next.channelId,next.verifiedRoleId,next.quarantineRoleId,next.logChannelId,Math.min(Math.max(next.codeTtlMinutes,2),60)]
+         code_ttl_minutes=EXCLUDED.code_ttl_minutes,panel_title=EXCLUDED.panel_title,
+         panel_description=EXCLUDED.panel_description,issue_button_label=EXCLUDED.issue_button_label,
+         confirm_button_label=EXCLUDED.confirm_button_label,updated_at=now()`,
+      [
+        guildId,next.enabled,next.channelId,next.verifiedRoleId,next.quarantineRoleId,next.logChannelId,
+        Math.min(Math.max(next.codeTtlMinutes,2),60),panelTitle,panelDescription,issueButtonLabel,confirmButtonLabel
+      ]
     );
     await this.db.query(
       `INSERT INTO guild_modules(guild_id,module_key,enabled)
@@ -127,12 +151,12 @@ export class Verification implements PlatformModule {
       await channel.send({
         embeds: [
           new EmbedBuilder()
-            .setTitle("✅ Проверка участника")
-            .setDescription("Нажми кнопку, получи одноразовый код и подтверди его через кнопку ниже.")
+            .setTitle(config.panelTitle)
+            .setDescription(config.panelDescription)
         ],
         components: [
           new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder().setCustomId("dsp:verify:issue").setLabel("Получить код").setStyle(ButtonStyle.Primary)
+            new ButtonBuilder().setCustomId("dsp:verify:issue").setLabel(config.issueButtonLabel).setStyle(ButtonStyle.Primary)
           )
         ]
       });
@@ -210,7 +234,7 @@ export class Verification implements PlatformModule {
       content: `Твой одноразовый код: **${code}**`,
       ephemeral: true,
       components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId(`dsp:verify:confirm:${code}`).setLabel("Подтвердить").setStyle(ButtonStyle.Success)
+        new ButtonBuilder().setCustomId(`dsp:verify:confirm:${code}`).setLabel(config.confirmButtonLabel).setStyle(ButtonStyle.Success)
       )]
       });
     } catch (error) {
@@ -304,4 +328,12 @@ export class Verification implements PlatformModule {
       }
     }
   }
+}
+
+
+export function normalizeVerificationText(value: unknown, maxLength: number): string {
+  if (typeof value !== "string") throw new Error("invalid_verification_text");
+  const normalized = value.trim();
+  if (!normalized || normalized.length > maxLength) throw new Error("invalid_verification_text");
+  return normalized;
 }
