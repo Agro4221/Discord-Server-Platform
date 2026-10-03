@@ -160,7 +160,7 @@ export class Giveaways implements PlatformModule {
     await this.recoverStaleStates();
     this.identityId = context.identityId;
     this.events = context.events;
-    const commandUnsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const commandUnsubscribe = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     const interactionUnsubscribe = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
     this.unsubscribe = () => { commandUnsubscribe(); interactionUnsubscribe(); };
     this.timer = setInterval(() => void this.sweep(), 5_000);
@@ -228,8 +228,8 @@ export class Giveaways implements PlatformModule {
     return true;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "giveaway") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "giveaway") return;
     if (!await moduleEnabled(this.db, interaction.guild!.id, "giveaways", false)) {
       await interaction.reply({ content: "Модуль Giveaways выключен.", ephemeral: true });
       return;

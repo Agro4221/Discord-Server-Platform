@@ -77,7 +77,7 @@ export class Logging implements PlatformModule {
       context.events.on("role.update", ({ oldRole, newRole }) => { void this.onRoleUpdate(oldRole, newRole); }),
       context.events.on("member.ban", ({ guildId, userId }) => { void this.onBan(guildId, userId); }),
       context.events.on("member.unban", ({ guildId, userId }) => { void this.onUnban(guildId, userId); }),
-      context.events.on("interaction.command", (interaction) => { void this.onCommand(interaction); })
+      context.events.on("interaction.command", (interaction) => { void this.executeSlashCommand(interaction); })
     ];
 
     this.unsubscribe = () => unsubs.forEach((unsubscribe) => unsubscribe());
@@ -199,8 +199,8 @@ export class Logging implements PlatformModule {
     return true;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "logging") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "logging") return;
 
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
       await interaction.reply({

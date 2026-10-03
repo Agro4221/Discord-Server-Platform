@@ -50,7 +50,7 @@ export class Analytics implements PlatformModule {
       const event = newState.channelId ? (oldState.channelId ? "voice_move" : "voice_join") : "voice_leave";
       void this.count(newState.guild.id, event);
     });
-    const e = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const e = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     this.unsubscribe = () => { a(); b(); c(); d(); e(); };
   }
 
@@ -70,8 +70,8 @@ export class Analytics implements PlatformModule {
     );
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "analytics") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "analytics") return;
     if (!await moduleEnabled(this.db, interaction.guild!.id, "analytics", false)) {
       await interaction.reply({ content: "Модуль Analytics выключен.", ephemeral: true });
       return;

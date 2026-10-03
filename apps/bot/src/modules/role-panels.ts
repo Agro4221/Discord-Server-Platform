@@ -26,7 +26,7 @@ export class RolePanels implements PlatformModule {
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
-    const a = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const a = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     const b = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
     this.unsubscribe = () => { a(); b(); };
   }
@@ -285,8 +285,8 @@ export class RolePanels implements PlatformModule {
     return true;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "roles") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "roles") return;
     const guildId = interaction.guild!.id;
     if (!await moduleEnabled(this.db, guildId, "roles", false)) {
       await interaction.reply({ content: "Модуль Role Panels выключен.", ephemeral: true });

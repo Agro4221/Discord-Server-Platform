@@ -22,7 +22,7 @@ export class Tickets implements PlatformModule {
   async init(context: ModuleContext): Promise<void> {
     this.events = context.events;
     await this.recoverStaleClosures();
-    const a = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const a = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     const b = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
     this.unsubscribe = () => { a(); b(); };
     this.recoveryTimer = setInterval(() => {
@@ -100,8 +100,8 @@ export class Tickets implements PlatformModule {
     return true;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "ticket") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "ticket") return;
     const sub = interaction.options.getSubcommand();
 
     if (sub === "setup") {

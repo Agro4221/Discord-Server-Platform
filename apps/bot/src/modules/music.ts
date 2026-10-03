@@ -306,7 +306,7 @@ export class Music implements PlatformModule {
       });
     });
 
-    const a = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const a = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     const b = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
     this.unsubscribe = () => {
       a();
@@ -473,13 +473,13 @@ export class Music implements PlatformModule {
     this.setModuleHealth?.(this.name, musicNodeHealth(this.connectedNodes.size));
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
     if (!interaction.inGuild()) return;
     const directAliases = new Set([
       "play", "pause", "resume", "skip", "stop", "shuffle",
       "playlist", "queue", "repeat", "seek", "volume", "autoplay", "nowplaying"
     ]);
-    if (interaction.commandName !== "music" && !directAliases.has(interaction.commandName)) return;
+    if (commandName !== "music" && !directAliases.has(commandName)) return;
 
     const guild = interaction.guild;
     if (!guild) return;
@@ -501,9 +501,9 @@ export class Music implements PlatformModule {
 
     if (!await this.ensureMusicOwnership(interaction, ownershipChannelId)) return;
 
-    const action = interaction.commandName === "music"
+    const action = commandName === "music"
       ? interaction.options.getSubcommand()
-      : interaction.commandName;
+      : commandName;
 
     switch (action) {
       case "play":
