@@ -1407,7 +1407,7 @@ export class ManagementApiServer {
             }
             const body = await readJson(req);
             const rawAction = body.action;
-            if (!["clear","slowmode","lock","unlock"].includes(rawAction)) {
+            if (typeof rawAction !== "string" || !["clear","slowmode","lock","unlock"].includes(rawAction)) {
               throw new RequestInputError("invalid_channel_action", 400);
             }
             const action = rawAction as "clear" | "slowmode" | "lock" | "unlock";
