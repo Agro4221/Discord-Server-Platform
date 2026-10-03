@@ -17,7 +17,8 @@ export type ModuleKey =
   | "automation"
   | "music"
   | "analytics"
-  | "polls";
+  | "polls"
+  | "reputation";
 
 export const MODULE_CATALOG: readonly {
   key: ModuleKey;
@@ -43,5 +44,6 @@ export const MODULE_CATALOG: readonly {
   { key: "automation", title: "Automation", description: "Event / condition / action workflows", defaultEnabled: false },
   { key: "music", title: "Music", description: "Lavalink music platform", defaultEnabled: false },
   { key: "analytics", title: "Analytics", description: "Server and module analytics", defaultEnabled: false },
-  { key: "polls", title: "Polls & Suggestions", description: "Interactive polls and community suggestions", defaultEnabled: false }
+  { key: "polls", title: "Polls & Suggestions", description: "Interactive polls and community suggestions", defaultEnabled: false },
+  { key: "reputation", title: "Reputation", description: "Community reputation and social profiles", defaultEnabled: false }
 ];
