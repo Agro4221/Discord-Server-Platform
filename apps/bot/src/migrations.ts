@@ -1233,14 +1233,6 @@ const migrations = [
     ])
   },
   {
-    version: 80,
-    name: "welcome_embed_images",
-    sql: q([
-      "ALTER TABLE welcome_settings ADD COLUMN IF NOT EXISTS image_url text;",
-      "ALTER TABLE welcome_settings ADD COLUMN IF NOT EXISTS goodbye_image_url text;"
-    ])
-  },
-  {
     version: 79,
     name: "music_history",
     sql: q([
@@ -1257,6 +1249,14 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_music_history_guild_recent ON music_history(guild_id,bot_identity_id,played_at DESC,id DESC);"
     ])
+  {
+    version: 80,
+    name: "welcome_embed_images",
+    sql: q([
+      "ALTER TABLE welcome_settings ADD COLUMN IF NOT EXISTS image_url text;",
+      "ALTER TABLE welcome_settings ADD COLUMN IF NOT EXISTS goodbye_image_url text;"
+    ])
+  },
   },
 ] as const;
 
