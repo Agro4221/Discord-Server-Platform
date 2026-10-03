@@ -484,6 +484,25 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addChannelOption((o) => o.setName("channel").setDescription("Panel channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
       ),
     new SlashCommandBuilder()
+      .setName("poll")
+      .setDescription("Interactive polls")
+      .addSubcommand((sub) =>
+        sub
+          .setName("create")
+          .setDescription("Create a poll")
+          .addStringOption((o) => o.setName("question").setDescription("Question").setMaxLength(300).setRequired(true))
+          .addStringOption((o) => o.setName("options").setDescription("Options separated by |").setMaxLength(500).setRequired(true))
+          .addBooleanOption((o) => o.setName("multiple").setDescription("Allow multiple selections"))
+          .addIntegerOption((o) => o.setName("minutes").setDescription("Close automatically after N minutes; 0 = no limit").setMinValue(0).setMaxValue(43200))
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName("close")
+          .setDescription("Close a poll")
+          .addIntegerOption((o) => o.setName("id").setDescription("Poll id").setMinValue(1).setRequired(true))
+      ),
+
+    new SlashCommandBuilder()
       .setName("analytics")
       .setDescription("Server analytics"),
     new SlashCommandBuilder()
