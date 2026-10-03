@@ -43,6 +43,18 @@ export type AutomationRuleRecord = AutomationRule & {
   cooldownSeconds: number;
 };
 
+const AUTOMATION_MAX_ATTEMPTS = 5;
+const AUTOMATION_RETRY_BASE_SECONDS = 5;
+const AUTOMATION_RETRY_MAX_SECONDS = 300;
+
+export function automationRetryDelaySeconds(attempts: number): number {
+  const safeAttempts = Math.max(1, Math.trunc(attempts));
+  return Math.min(
+    AUTOMATION_RETRY_MAX_SECONDS,
+    AUTOMATION_RETRY_BASE_SECONDS * 2 ** Math.max(0, safeAttempts - 1)
+  );
+}
+
 export class AutomationEngine implements PlatformModule {
   readonly name = "automation";
   private unsubscribe?: () => void;
@@ -324,6 +336,7 @@ export class AutomationEngine implements PlatformModule {
       pending: number;
       processing: number;
       withErrors: number;
+      deadLettered: number;
       completed24h: number;
       oldestPendingAt: string | null;
       recent: Array<{
@@ -353,15 +366,17 @@ export class AutomationEngine implements PlatformModule {
         pending: string;
         processing: string;
         with_errors: string;
+        dead_lettered: string;
         completed_24h: string;
         oldest_pending_at: string | null;
       }>(
         "SELECT " +
         "COUNT(*) FILTER (WHERE completed_at IS NULL) AS pending, " +
         "COUNT(*) FILTER (WHERE completed_at IS NULL AND processing_until IS NOT NULL AND processing_until >= now()) AS processing, " +
-        "COUNT(*) FILTER (WHERE completed_at IS NULL AND last_error IS NOT NULL) AS with_errors, " +
+        "COUNT(*) FILTER (WHERE completed_at IS NULL AND dead_lettered_at IS NULL AND last_error IS NOT NULL) AS with_errors, " +
+        "COUNT(*) FILTER (WHERE completed_at IS NULL AND dead_lettered_at IS NOT NULL) AS dead_lettered, " +
         "COUNT(*) FILTER (WHERE completed_at IS NOT NULL AND completed_at >= now()-interval '24 hours') AS completed_24h, " +
-        "MIN(available_at) FILTER (WHERE completed_at IS NULL) AS oldest_pending_at " +
+        "MIN(available_at) FILTER (WHERE completed_at IS NULL AND dead_lettered_at IS NULL) AS oldest_pending_at " +
         "FROM automation_delayed_jobs WHERE guild_id=$1",
         [guildId]
       )
@@ -374,10 +389,11 @@ export class AutomationEngine implements PlatformModule {
       available_at: string;
       processing_until: string | null;
       last_error: string | null;
+      dead_lettered_at: string | null;
       completed_at: string | null;
       created_at: string;
     }>(
-      "SELECT id::text,rule_id,attempts,available_at,processing_until,last_error,completed_at,created_at " +
+      "SELECT id::text,rule_id,attempts,available_at,processing_until,last_error,dead_lettered_at,completed_at,created_at " +
       "FROM automation_delayed_jobs WHERE guild_id=$1 ORDER BY created_at DESC LIMIT 25",
       [guildId]
     );
@@ -393,11 +409,13 @@ export class AutomationEngine implements PlatformModule {
     const now = Date.now();
     const recent = recentResult.rows.map((job) => {
       const processingUntilMs = job.processing_until ? Date.parse(job.processing_until) : Number.NaN;
-      const status: "pending" | "processing" | "completed" = job.completed_at
-        ? "completed"
-        : Number.isFinite(processingUntilMs) && processingUntilMs >= now
-          ? "processing"
-          : "pending";
+      const status: "pending" | "processing" | "completed" | "dead-lettered" = job.dead_lettered_at
+        ? "dead-lettered"
+        : job.completed_at
+          ? "completed"
+          : Number.isFinite(processingUntilMs) && processingUntilMs >= now
+            ? "processing"
+            : "pending";
       return {
         id: job.id,
         status,
@@ -419,6 +437,7 @@ export class AutomationEngine implements PlatformModule {
         pending: Number(row?.pending) || 0,
         processing: Number(row?.processing) || 0,
         withErrors: Number(row?.with_errors) || 0,
+        deadLettered: Number(row?.dead_lettered) || 0,
         completed24h: Number(row?.completed_24h) || 0,
         oldestPendingAt: row?.oldest_pending_at ?? null,
         recent
@@ -736,7 +755,7 @@ export class AutomationEngine implements PlatformModule {
           this.keyedCooldowns.set(`${event.guildId}:${condition.key}`, Date.now() + cooldownSeconds * 1000);
         }
       }
-      await this.perform(rule.actions, event);
+      await this.perform(rule.actions, event, { ruleId: rule.id });
     }
   }
 
@@ -835,11 +854,16 @@ export class AutomationEngine implements PlatformModule {
     }
     return true;
   }
-  private async enqueueDelayedJob(event: RuntimeEvent, actions: AutomationAction[], seconds: number): Promise<void> {
+  private async enqueueDelayedJob(
+    event: RuntimeEvent,
+    actions: AutomationAction[],
+    seconds: number,
+    ruleId?: string
+  ): Promise<void> {
     const safeSeconds = Math.min(Math.max(Math.trunc(seconds), 1), 3600);
     await this.db.query(
-      "INSERT INTO automation_delayed_jobs(guild_id,event,actions,available_at) VALUES($1,$2::jsonb,$3::jsonb,now()+make_interval(secs => $4))",
-      [event.guildId, JSON.stringify(event), JSON.stringify(actions), safeSeconds]
+      "INSERT INTO automation_delayed_jobs(guild_id,rule_id,event,actions,available_at) VALUES($1,$2,$3::jsonb,$4::jsonb,now()+make_interval(secs => $5))",
+      [event.guildId, ruleId ?? null, JSON.stringify(event), JSON.stringify(actions), safeSeconds]
     );
   }
 
@@ -852,6 +876,8 @@ export class AutomationEngine implements PlatformModule {
       id: string;
       guild_id: string;
       event: RuntimeEvent;
+      rule_id: string | null;
+      attempts: number;
       actions: AutomationAction[];
     }>(
       `UPDATE automation_delayed_jobs aj
@@ -863,6 +889,7 @@ export class AutomationEngine implements PlatformModule {
          INNER JOIN guild_bot_assignments ga ON ga.guild_id=aj2.guild_id
          LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id
          WHERE aj2.completed_at IS NULL
+           AND aj2.dead_lettered_at IS NULL
            AND aj2.available_at <= now()
            AND (aj2.processing_until IS NULL OR aj2.processing_until < now())
            AND (
@@ -878,7 +905,7 @@ export class AutomationEngine implements PlatformModule {
          FOR UPDATE SKIP LOCKED
        ) claimed
        WHERE aj.id=claimed.id
-       RETURNING aj.id,aj.guild_id,aj.event,aj.actions`,
+       RETURNING aj.id,aj.guild_id,aj.rule_id,aj.attempts,aj.event,aj.actions`,
       [this.identityId]
     );
 
@@ -894,11 +921,35 @@ export class AutomationEngine implements PlatformModule {
           [job.id]
         );
       } catch (error) {
-        await this.db.query(
-          "UPDATE automation_delayed_jobs SET processing_until=NULL,last_error=$1 WHERE id=$2",
-          [String(error).slice(0, 1000), job.id]
-        );
-        logger.warn("Automation delayed job failed", { jobId: job.id, guildId: job.guild_id, error: String(error) });
+        const message = String(error).slice(0, 1000);
+        const attempts = Number(job.attempts) || 0;
+        if (attempts >= AUTOMATION_MAX_ATTEMPTS) {
+          await this.db.query(
+            "UPDATE automation_delayed_jobs SET processing_until=NULL,last_error=$1,dead_lettered_at=now() WHERE id=$2 AND completed_at IS NULL",
+            [message, job.id]
+          );
+          logger.error("Automation delayed job moved to dead letter", {
+            jobId: job.id,
+            guildId: job.guild_id,
+            ruleId: job.rule_id,
+            attempts,
+            error: message
+          });
+        } else {
+          const retryDelay = automationRetryDelaySeconds(attempts);
+          await this.db.query(
+            "UPDATE automation_delayed_jobs SET processing_until=NULL,last_error=$1,available_at=now()+make_interval(secs => $2) WHERE id=$3 AND completed_at IS NULL AND dead_lettered_at IS NULL",
+            [message, retryDelay, job.id]
+          );
+          logger.warn("Automation delayed job scheduled for retry", {
+            jobId: job.id,
+            guildId: job.guild_id,
+            ruleId: job.rule_id,
+            attempts,
+            retryDelay,
+            error: message
+          });
+        }
       }
     }
   }
@@ -917,7 +968,11 @@ export class AutomationEngine implements PlatformModule {
     return output.slice(0, 2000);
   }
 
-  private async perform(actions: AutomationAction[], event: RuntimeEvent): Promise<void> {
+  private async perform(
+    actions: AutomationAction[],
+    event: RuntimeEvent,
+    options: { failFast?: boolean; ruleId?: string } = {}
+  ): Promise<void> {
     const client = this.client;
 
     for (let index = 0; index < actions.length; index += 1) {
@@ -926,14 +981,14 @@ export class AutomationEngine implements PlatformModule {
         if (action.type === "delay") {
           const remaining = actions.slice(index + 1);
           if (remaining.length > 0) {
-            await this.enqueueDelayedJob(event, remaining, action.seconds);
+            await this.enqueueDelayedJob(event, remaining, action.seconds, options.ruleId);
           }
           return;
         }
 
         if (action.type === "branch") {
           const matched = await this.conditionsMatch([action.condition], event);
-          await this.perform(matched ? action.thenActions : action.elseActions, event);
+          await this.perform(matched ? action.thenActions : action.elseActions, event, options);
           continue;
         }
 
@@ -1033,8 +1088,10 @@ export class AutomationEngine implements PlatformModule {
         logger.warn("Automation action failed", {
           guildId: event.guildId,
           action: action.type,
-          error: String(error)
+          error: String(error),
+          retryable: options.failFast === true
         });
+        if (options.failFast) throw error;
       }
     }
   }
