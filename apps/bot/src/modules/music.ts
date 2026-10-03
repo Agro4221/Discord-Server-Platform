@@ -1863,6 +1863,7 @@ export class Music implements PlatformModule {
       "INSERT INTO music_settings(guild_id,twenty_four_seven) VALUES($1,$2) ON CONFLICT(guild_id) DO UPDATE SET twenty_four_seven=EXCLUDED.twenty_four_seven,updated_at=now()",
       [guildId, enabled]
     );
+    if (enabled) this.cancelAutoLeave(guildId);
   }
 
   private async setAutoplay(guildId: string, enabled: boolean): Promise<void> {
