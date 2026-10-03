@@ -115,7 +115,7 @@ export class StreamAlerts implements PlatformModule {
     }
   }
 
-  private async pollOne(alert:{id:string;guild_id:string;platform:StreamAlertPlatform;target:string;target_id:string|null;channel_id:string;mention_role_id:string|null;last_stream_key:string|null;last_online:boolean}):Promise<void>{
+  private async pollOne(alert:{id:string;guild_id:string;platform:StreamAlertPlatform;target:string;target_id:string|null;channel_id:string;mention_role_id:string|null;message_template:string;last_stream_key:string|null;last_online:boolean}):Promise<void>{
     if(!await moduleEnabled(this.db,alert.guild_id,this.name,false))return;
     try{
       const live=await this.fetchLive(alert.platform,alert.target,alert.target_id);
