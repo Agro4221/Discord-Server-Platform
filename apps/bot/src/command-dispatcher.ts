@@ -72,34 +72,45 @@ export class CommandDispatcher {
       return true;
     }
 
-    const handled =
-      await this.leveling.executeSlashCommand(interaction, target) ||
-      await this.economy.executeSlashCommand(interaction, target) ||
-      await this.reminders.executeSlashCommand(interaction, target) ||
-      await this.utility.executeSlashCommand(interaction, target) ||
-      await this.communityTools.executeSlashCommand(interaction, target) ||
-      await this.logging.executeSlashCommand(interaction, target) ||
-      await this.welcome.executeSlashCommand(interaction, target) ||
-      await this.verification.executeSlashCommand(interaction, target) ||
-      await this.security.executeSlashCommand(interaction, target) ||
-      await this.autoMod.executeSlashCommand(interaction, target) ||
-      await this.starboard.executeSlashCommand(interaction, target) ||
-      await this.notifications.executeSlashCommand(interaction, target) ||
-      await this.automation.executeSlashCommand(interaction, target) ||
-      await this.tickets.executeSlashCommand(interaction, target) ||
-      await this.rolePanels.executeSlashCommand(interaction, target) ||
-      await this.giveaways.executeSlashCommand(interaction, target) ||
-      await this.music.executeSlashCommand(interaction, target) ||
-      await this.analytics.executeSlashCommand(interaction, target);
-
-    if (!handled && !interaction.replied && !interaction.deferred) {
-      await interaction.reply({
-        content: "Целевая команда alias пока недоступна.",
-        ephemeral: true
-      });
+    const executor = this.executorFor(target);
+    if (!executor) {
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: "Целевая команда alias пока недоступна.",
+          ephemeral: true
+        });
+      }
+      return false;
     }
 
-    return handled;
+    await executor(interaction, target);
+    return true;
+  }
+
+  private executorFor(
+    target: string
+  ): ((interaction: ChatInputCommandInteraction, commandName: string) => Promise<void>) | null {
+    if (["level","rank","top"].includes(target)) return (interaction, commandName) => this.leveling.executeSlashCommand(interaction, commandName);
+    if (["economy","shop","balance","daily","leaderboard","pay","buy"].includes(target)) return (interaction, commandName) => this.economy.executeSlashCommand(interaction, commandName);
+    if (target === "remind") return (interaction, commandName) => this.reminders.executeSlashCommand(interaction, commandName);
+    if (["serverinfo","userinfo","avatar","membercount","roleinfo","channelinfo","afk"].includes(target)) return (interaction, commandName) => this.utility.executeSlashCommand(interaction, commandName);
+    if (["poll","suggest","sticky","8ball","choose","roll"].includes(target)) return (interaction, commandName) => this.communityTools.executeSlashCommand(interaction, commandName);
+    if (target === "logging") return (interaction, commandName) => this.logging.executeSlashCommand(interaction, commandName);
+    if (target === "welcome") return (interaction, commandName) => this.welcome.executeSlashCommand(interaction, commandName);
+    if (target === "verify") return (interaction, commandName) => this.verification.executeSlashCommand(interaction, commandName);
+    if (target === "security") return (interaction, commandName) => this.security.executeSlashCommand(interaction, commandName);
+    if (target === "automod") return (interaction, commandName) => this.autoMod.executeSlashCommand(interaction, commandName);
+    if (target === "starboard") return (interaction, commandName) => this.starboard.executeSlashCommand(interaction, commandName);
+    if (target === "feed") return (interaction, commandName) => this.notifications.executeSlashCommand(interaction, commandName);
+    if (target === "automation") return (interaction, commandName) => this.automation.executeSlashCommand(interaction, commandName);
+    if (target === "ticket") return (interaction, commandName) => this.tickets.executeSlashCommand(interaction, commandName);
+    if (target === "roles") return (interaction, commandName) => this.rolePanels.executeSlashCommand(interaction, commandName);
+    if (target === "giveaway") return (interaction, commandName) => this.giveaways.executeSlashCommand(interaction, commandName);
+    if (["music","play","pause","resume","skip","stop","shuffle","playlist","queue","nowplaying","repeat","seek","volume","autoplay"].includes(target)) {
+      return (interaction, commandName) => this.music.executeSlashCommand(interaction, commandName);
+    }
+    if (target === "analytics") return (interaction, commandName) => this.analytics.executeSlashCommand(interaction, commandName);
+    return null;
   }
 
   private isCore(commandName: string): boolean {
