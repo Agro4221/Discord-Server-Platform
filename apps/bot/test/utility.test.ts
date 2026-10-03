@@ -25,3 +25,26 @@ test("utility module is catalogued and enabled by default", () => {
   assert.ok(utility);
   assert.equal(utility.defaultEnabled, true);
 });
+
+
+import {
+  chooseFromOptions,
+  formatDiceRoll,
+  random8BallAnswer
+} from "../src/modules/community-tools.js";
+
+test("community fun helpers produce deterministic bounded results", () => {
+  assert.equal(chooseFromOptions("one|two", () => 0), "🎲 Выпало: **one**");
+  assert.equal(chooseFromOptions("one|two", () => 0.999), "🎲 Выпало: **two**");
+  assert.match(formatDiceRoll("2d6", () => 0), /\*\*2\*\*/);
+  assert.match(formatDiceRoll("2d6", () => 0.999), /\*\*12\*\*/);
+  assert.equal(
+    random8BallAnswer(() => 0),
+    "🎱 Да."
+  );
+  assert.equal(
+    random8BallAnswer(() => 0.999),
+    "🎱 Нет."
+  );
+  assert.match(formatDiceRoll("wat"), /Формат/);
+});
