@@ -166,13 +166,16 @@ export class ConfigTransferService {
         await client.query("DELETE FROM role_panels WHERE guild_id=$1", [targetGuildId]);
         for (const panel of normalizedPanels) {
           await client.query(
-            "INSERT INTO role_panels(guild_id,channel_id,message_id,title,roles) VALUES($1,$2,$3,$4,$5::jsonb)",
+            "INSERT INTO role_panels(guild_id,channel_id,message_id,title,roles,selection_mode,max_selections,duration_minutes) VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8)",
             [
               targetGuildId,
               panel.channelId,
               panel.messageId,
               panel.title,
-              JSON.stringify(panel.roles)
+              JSON.stringify(panel.roles),
+              panel.selectionMode,
+              panel.maxSelections,
+              panel.durationMinutes
             ]
           );
         }
@@ -254,12 +257,14 @@ export class ConfigTransferService {
     });
 
     await execute("ticket_settings", "tickets", [
-      "enabled","category_id","staff_role_id","transcript_channel_id"
+      "enabled","category_id","staff_role_id","transcript_channel_id","max_open_per_user","auto_close_minutes"
     ], {
       enabled: false,
       category_id: null,
       staff_role_id: null,
-      transcript_channel_id: null
+      transcript_channel_id: null,
+      max_open_per_user: 1,
+      auto_close_minutes: 0
     });
 
     await execute("security_settings", "security", [
@@ -305,14 +310,22 @@ export class ConfigTransferService {
     });
 
     await execute("music_settings", "music", [
-      "enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay"
+      "enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven"
     ], {
       enabled: false,
       preferred_text_channel_id: null,
       request_channel_id: null,
       default_volume: 100,
       announce_track_start: true,
-      autoplay: false
+      autoplay: false,
+      twenty_four_seven: false
+    });
+
+    await execute("birthday_settings", "birthdays", [
+      "channel_id","announcement_template"
+    ], {
+      channel_id: null,
+      announcement_template: "🎂 С днём рождения, {user}!"
     });
   }
 }
@@ -328,6 +341,7 @@ function tableToModule(table: string): ServerModuleConfig["key"] | null {
     case "leveling_settings": return "leveling";
     case "starboard_settings": return "starboard";
     case "music_settings": return "music";
+    case "birthday_settings": return "birthdays";
     default: return null;
   }
 }
