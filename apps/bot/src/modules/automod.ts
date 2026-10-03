@@ -498,7 +498,7 @@ export class AutoMod implements PlatformModule {
   ): boolean {
     const key = this.ruleCooldownKey(guildId, userId, detector);
     const until = this.ruleCooldowns.get(key) ?? 0;
-    if (until <= now) {
+    if (!isAutoModRuleCooldownActive(now, until)) {
       this.ruleCooldowns.delete(key);
       return true;
     }
@@ -665,6 +665,10 @@ function detectorMatches(
     default:
       return normalized.length > 0 && rule.detector === "content";
   }
+}
+
+export function isAutoModRuleCooldownActive(now: number, cooldownUntil: number): boolean {
+  return Number.isFinite(cooldownUntil) && cooldownUntil > now;
 }
 
 export function parseAutoModIdList(value: string): Set<string> {
