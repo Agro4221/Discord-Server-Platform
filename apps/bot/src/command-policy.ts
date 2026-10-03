@@ -65,6 +65,7 @@ export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
   { name: "giveaway", label: "Giveaways", module: "giveaways", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true },
   { name: "economy", label: "Economy", module: "economy", prefix: true, slash: true },
   { name: "shop", label: "Economy shop", module: "economy", prefix: true, slash: true },
+  { name: "afk", label: "AFK / Away", module: "reminders", prefix: true, slash: true },
   { name: "remind", label: "Reminder", module: "reminders", prefix: true, slash: true },
   { name: "schedule", label: "Scheduled message", module: "reminders", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true },
   { name: "sticky", label: "Sticky message", module: "reminders", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true },
