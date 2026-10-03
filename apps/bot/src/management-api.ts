@@ -42,6 +42,8 @@ type ApiOptions = {
   };
   analytics?: {
     report: (guildId: string, hours?: number) => Promise<unknown>;
+    getSettings: (guildId: string) => Promise<unknown>;
+    setSettings: (guildId: string, input: Record<string, unknown>) => Promise<unknown>;
   };
   notifications?: {
     list: (guildId: string) => Promise<unknown[]>;
@@ -842,6 +844,40 @@ export class ManagementApiServer {
             return;
           }
 
+          const analyticsSettingsMatch = path.match(/^\/api\/guilds\/([^/]+)\/analytics\/settings$/);
+          if (analyticsSettingsMatch && !this.options.analytics) {
+            this.json(res, 500, { error: "analytics_unavailable" });
+            return;
+          }
+          if (analyticsSettingsMatch) {
+            const guildId = analyticsSettingsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (method === "GET") {
+              this.json(res, 200, { guildId, settings: await this.options.analytics!.getSettings(guildId) });
+              return;
+            }
+            if (method === "PUT") {
+              const body = await readJson(req);
+              if (
+                body.retentionDays !== undefined && (typeof body.retentionDays !== "number" || !Number.isFinite(body.retentionDays)) ||
+                body.visibleCounters !== undefined && (!Array.isArray(body.visibleCounters) || body.visibleCounters.some((item: unknown) => typeof item !== "string"))
+              ) {
+                throw new RequestInputError("invalid_analytics_settings", 400);
+              }
+              const settings = await this.options.analytics!.setSettings(guildId, {
+                retentionDays: body.retentionDays as number | undefined,
+                visibleCounters: body.visibleCounters as string[] | undefined
+              });
+              await this.options.auditLog.record({
+                guildId, source: "dashboard", action: "analytics.settings.updated", targetType: "analytics-settings", targetId: guildId
+              });
+              this.json(res, 200, { guildId, settings });
+              return;
+            }
+          }
           const analyticsActivityMatch = path.match(/^\/api\/guilds\/([^/]+)\/analytics\/activity$/);
           const analyticsExportMatch = path.match(/^\/api\/guilds\/([^/]+)\/analytics\/export$/);
 
