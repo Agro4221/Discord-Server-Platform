@@ -38,7 +38,7 @@ Release candidate — code/CI verified, ready for live Discord validation.
 
 ## Still under development
 - Full AutoMod rule editor and richer response policies beyond the current persisted rule set.
-- Full Security response workflow beyond the current anti-raid/quarantine/destructive-burst response.
+- Full Security response workflow beyond the current anti-raid/quarantine/destructive-burst response; core response actions are now individually configurable and persisted.
 - Full Automation condition/action catalog beyond the currently supported safe builder.
 - Music provider breadth and multi-node failover validation beyond the current Lavalink foundation.
 - Full multi-bot fleet orchestration/failover automation beyond persisted assignments and health UI.
