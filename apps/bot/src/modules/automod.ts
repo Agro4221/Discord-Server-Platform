@@ -360,6 +360,7 @@ export class AutoMod implements PlatformModule {
 
     for (const rule of rules.rows) {
       if (rule.ignored_channel_ids?.includes(message.channelId)) continue;
+      if (rule.detector === "honeypot" && !rule.affected_channel_ids?.includes(message.channelId)) continue;
       if (rule.affected_channel_ids?.length && !rule.affected_channel_ids.includes(message.channelId)) continue;
       if (rule.ignored_role_ids?.some((id) => roleIds.includes(id))) continue;
       if (rule.affected_role_ids?.length && !rule.affected_role_ids.some((id) => roleIds.includes(id))) continue;
