@@ -371,7 +371,7 @@ async function main(): Promise<void> {
     },
     actions: {
       "temporary-voice.reconcile": async (guildId) => { await temporaryVoice.reconcileGuild(guildId); return { guildId, ok: true }; },
-      "welcome.preview": async (guildId) => { if (!welcome) throw new Error("welcome_unavailable"); return welcome.sendPreview(guildId); },
+      "welcome.preview": async (guildId) => welcome.sendPreview(guildId),
       "automation.reload": async (guildId) => { await automation.reload(); return { guildId, ok: true }; },
       "security.check-hierarchy": async (guildId) => security.checkHierarchy(guildId)
     }
