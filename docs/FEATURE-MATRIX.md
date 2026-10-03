@@ -70,7 +70,7 @@
 | Rank / leaderboard | ✅ |
 | Rank cards | ✅ |
 | Giveaways | ✅ |
-| Giveaway requirements / templates | 🟡 |
+| Giveaway requirements / templates | ✅ | Required role, minimum level, announcement template |
 | Starboard | ✅ |
 | Economy / shop / ledger | ✅ |
 | Reputation / social profiles | ✅ |
