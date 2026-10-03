@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { AnalyticsPanel } from "./analytics-panel";
+import { AutoModRulesPanel } from "./automod-rules-panel";
 import { AutomationPanel } from "./automation-panel";
 import { BackupPanel } from "./backup-panel";
 import { FleetPanel } from "./fleet-panel";
@@ -1407,6 +1408,18 @@ function ModulePage(props: {
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {props.module?.key === "automod" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="AutoMod rule builder" eyebrow="OPERATIONS" />
+          <AutoModRulesPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            roles={props.resources.roles.filter((item) => item.manageable !== false)}
+            onChanged={props.onAudit}
+          />
         </section>
       )}
 
