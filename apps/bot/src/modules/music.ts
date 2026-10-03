@@ -464,24 +464,7 @@ export class Music implements PlatformModule {
 
     if (!player) throw new Error("music_player_not_started");
 
-    if (action === "previous") {
-      const previous = player.queue.previous;
-      if (!Array.isArray(previous) || previous.length === 0) {
-        await message.reply("⏮️ Предыдущего трека нет.");
-        return true;
-      }
-      try {
-        await player.queue.shiftPrevious();
-        await this.persistPlayer(player);
-        await this.syncController(player);
-        await message.reply("⏮️ Вернулся к предыдущему треку.");
-      } catch (error) {
-        logger.warn("Music prefix previous track failed", { guildId: message.guild.id, error: String(error) });
-        await message.reply("Не удалось вернуть предыдущий трек.");
-      }
-    } else if (action === "lyrics") {
-      await message.reply("Используй /music lyrics или кнопку 📜 в контроллере.");
-    } else if (action === "pause") {
+    if (action === "pause") {
       await player.pause();
     } else if (action === "resume") {
       await player.resume();
@@ -925,7 +908,7 @@ export class Music implements PlatformModule {
     await this.previousInteraction(player, interaction);
   }
 
-  private async previousInteraction(player: Player, interaction: ChatInputCommandInteraction | Interaction): Promise<void> {
+  private async previousInteraction(player: Player, interaction: ChatInputCommandInteraction | import("discord.js").ButtonInteraction): Promise<void> {
     const previous = player.queue.previous;
     if (!Array.isArray(previous) || previous.length === 0) {
       await interaction.reply({ content: "⏮️ Предыдущего трека нет.", ephemeral: true });
@@ -954,7 +937,7 @@ export class Music implements PlatformModule {
     if (!await this.canControl(interaction, player.voiceChannelId)) return;
 
     try {
-      const result = await player.getLyrics();
+      const result = await player.getLyrics(player.queue.current!);
       if (!result) {
         await interaction.reply({ content: "📜 Для этого трека текст не найден.", ephemeral: true });
         return;
@@ -1564,11 +1547,24 @@ export class Music implements PlatformModule {
       await this.persistPlayer(player);
       await message.reply("🔀 Очередь перемешана.");
     } else if (action === "previous") {
-      await this.previousInteraction(player, interaction);
-      return;
+      const previous = player.queue.previous;
+      if (!Array.isArray(previous) || previous.length === 0) {
+        await message.reply("⏮️ Предыдущего трека нет.");
+        return true;
+      }
+      try {
+        await player.queue.shiftPrevious();
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await message.reply("⏮️ Вернулся к предыдущему треку.");
+      } catch (error) {
+        logger.warn("Music prefix previous track failed", { guildId: message.guild.id, error: String(error) });
+        await message.reply("Не удалось вернуть предыдущий трек.");
+      }
+      return true;
     } else if (action === "lyrics") {
-      await this.lyrics(interaction);
-      return;
+      await message.reply("Используй /music lyrics или кнопку 📜 в контроллере.");
+      return true;
     } else if (action === "queue") {
       const page = this.buildQueuePage(player, 0);
       await message.reply({ content: page.content, components: page.components });
