@@ -893,6 +893,19 @@ export function validateAutomationRule(
           throw new Error("invalid_timeout_action");
         }
         break;
+      case "warn":
+      case "kick":
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !action.reason || action.reason.length > 500) {
+          throw new Error("invalid_" + action.type + "_action");
+        }
+        break;
+      case "ban":
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") ||
+            !action.reason || action.reason.length > 500 ||
+            (action.durationMinutes !== undefined && (!Number.isInteger(action.durationMinutes) || action.durationMinutes < 1 || action.durationMinutes > 40320))) {
+          throw new Error("invalid_ban_action");
+        }
+        break;
       case "delete-message":
         if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_delete_channel");
         if (action.messageId !== "@event" && !/^\d{17,20}$/.test(action.messageId)) throw new Error("invalid_delete_message");
