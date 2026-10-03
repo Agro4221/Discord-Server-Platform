@@ -206,3 +206,5 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - AutoResponder rule cache limits PostgreSQL reads to a short per-guild TTL and is invalidated on rule mutations.
 
 - Tickets now have a dedicated Dashboard Intake Form editor with persistent form fields and ticket answer storage.
+
+- Utility info suite (`serverinfo/userinfo/roleinfo/channelinfo`) is available through Prefix/Slash and the shared command policy.

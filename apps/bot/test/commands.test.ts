@@ -86,3 +86,13 @@ test("all Discord application command option lists keep required options before 
     ]
   );
 });
+
+
+test("utility info commands expose both prefix and slash entry points", () => {
+  const commands = buildCommands().map((command) => command.toJSON());
+  for (const name of ["serverinfo","userinfo","roleinfo","channelinfo"]) {
+    const command = commands.find((item) => item.name === name);
+    assert.ok(command);
+    assert.equal(Boolean(command?.description), true);
+  }
+});

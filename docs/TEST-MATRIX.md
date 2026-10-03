@@ -130,3 +130,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Migration coverage now checks the ticket form/data schema additions.
 - Ticket unit coverage verifies form-field normalization and Discord limits.
 - Live modal submission, permissions and transcript delivery remain release-gate validation.
+
+### 2026-10-03 — Utility info suite
+- Command schema coverage verifies all four utility commands.
+- Live Discord rendering/resource resolution remains release-gate validation.

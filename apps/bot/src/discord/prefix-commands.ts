@@ -15,6 +15,7 @@ const BUILTIN_PREFIX_COMMANDS = new Set([
   "help",
   "level", "rank", "top",
   "ban", "unban", "kick", "timeout", "warn", "history", "clear", "slowmode", "lock", "unlock",
+  "serverinfo", "userinfo", "roleinfo", "channelinfo",
   "play", "pause", "resume", "skip", "stop", "shuffle",
   "playlist", "queue", "nowplaying", "repeat", "seek", "volume", "autoplay",
   "balance", "daily", "leaderboard", "pay", "shop", "buy", "remind", "afk", "ticket", "roles", "giveaway"
@@ -86,6 +87,46 @@ export class PrefixCommandRouter {
         if (await this.tickets.handlePrefixCommand(message, commandName)) return;
         if (await this.rolePanels.handlePrefixCommand(message, commandName, args)) return;
         if (await this.giveaways.handlePrefixCommand(message, commandName, args)) return;
+
+        if (commandName === "serverinfo") {
+          const guild = message.guild;
+          const textChannels = guild.channels.cache.filter((channel) => channel.type === 0).size;
+          const voiceChannels = guild.channels.cache.filter((channel) => channel.type === 2 || channel.type === 13).size;
+          const categories = guild.channels.cache.filter((channel) => channel.type === 4).size;
+          await message.reply("🛡️ **" + guild.name + "** · ID " + guild.id + "\nУчастники: " + guild.memberCount + " · Роли: " + Math.max(0, guild.roles.cache.size - 1) + "\nКаналы: текст " + textChannels + ", voice " + voiceChannels + ", категории " + categories + "\nСоздан: <t:" + Math.floor(guild.createdTimestamp / 1000) + ":F>");
+          return;
+        }
+
+        if (commandName === "userinfo") {
+          const user = message.mentions.users.first() ?? message.author;
+          const member = await message.guild.members.fetch(user.id).catch(() => null);
+          const roles = member?.roles.cache.filter((role) => role.id !== message.guild!.roles.everyone.id).sort((a,b) => b.position - a.position).map((role) => role.toString()).join(", ") || "Нет";
+          await message.reply("👤 **" + (user.globalName ?? user.username) + "** · " + user.id + "\nСоздан: <t:" + Math.floor(user.createdTimestamp / 1000) + ":F>\nНа сервере: " + (member?.joinedTimestamp ? "<t:" + Math.floor(member.joinedTimestamp / 1000) + ":F>" : "Не состоит") + "\nРоли: " + roles.slice(0, 1500));
+          return;
+        }
+
+        if (commandName === "roleinfo") {
+          const role = message.mentions.roles.first() ?? message.guild.roles.cache.get((args[0] ?? "").match(/^<@&(\d+)>$/)?.[1] ?? args[0] ?? "") ?? message.guild.roles.cache.find((candidate) => candidate.name.toLowerCase() === args.join(" ").toLowerCase());
+          if (!role) {
+            await message.reply("Укажи роль: @role, ID или точное имя.");
+            return;
+          }
+          await message.reply("🏷️ **" + role.name + "** · " + role.id + "\nПозиция: " + role.position + " · Участники: " + role.members.size + " · Цвет: " + role.hexColor + "\nMentionable: " + (role.mentionable ? "да" : "нет") + " · Managed: " + (role.managed ? "да" : "нет"));
+          return;
+        }
+
+        if (commandName === "channelinfo") {
+          const channelId = message.mentions.channels.first()?.id ?? (args[0] ?? "").match(/^<#(\d+)>$/)?.[1] ?? args[0];
+          const channel = channelId ? message.guild.channels.cache.get(channelId) : message.channel;
+          if (!channel) {
+            await message.reply("Канал не найден.");
+            return;
+          }
+          const topic = "topic" in channel && typeof channel.topic === "string" ? channel.topic : null;
+          const slowmode = "rateLimitPerUser" in channel && typeof channel.rateLimitPerUser === "number" ? channel.rateLimitPerUser : null;
+          await message.reply("📺 **#" + channel.name + "** · " + channel.id + "\nТип: " + channel.type + " · Категория: " + (channel.parent?.name ?? "—") + (topic ? "\nТопик: " + topic : "") + (slowmode !== null ? "\nSlowmode: " + slowmode + "s" : ""));
+          return;
+        }
 
         if (commandName === "history") {
           const target = message.mentions.users.first() ?? message.author;

@@ -32,6 +32,10 @@ export type CommandDefinition = {
 export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
   { name: "help", label: "Help", module: "system", prefix: true, slash: true },
   { name: "ping", label: "Ping", module: "system", prefix: false, slash: true },
+  { name: "serverinfo", label: "Server info", module: "system", prefix: true, slash: true },
+  { name: "userinfo", label: "User info", module: "system", prefix: true, slash: true },
+  { name: "roleinfo", label: "Role info", module: "system", prefix: true, slash: true },
+  { name: "channelinfo", label: "Channel info", module: "system", prefix: true, slash: true },
   { name: "embed", label: "Embed Builder", module: "system", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: false, slash: true },
   { name: "level", label: "Level", module: "leveling", prefix: true, slash: true },
   { name: "rank", label: "Rank", module: "leveling", prefix: true, slash: true },

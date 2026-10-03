@@ -25,6 +25,25 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .setDescription("Check platform health"),
 
     new SlashCommandBuilder()
+      .setName("serverinfo")
+      .setDescription("Show server information"),
+
+    new SlashCommandBuilder()
+      .setName("userinfo")
+      .setDescription("Show user information")
+      .addUserOption((o) => o.setName("user").setDescription("User")),
+
+    new SlashCommandBuilder()
+      .setName("roleinfo")
+      .setDescription("Show role information")
+      .addRoleOption((o) => o.setName("role").setDescription("Role").setRequired(true)),
+
+    new SlashCommandBuilder()
+      .setName("channelinfo")
+      .setDescription("Show channel information")
+      .addChannelOption((o) => o.setName("channel").setDescription("Channel")),
+
+    new SlashCommandBuilder()
       .setName("embed")
       .setDescription("Create an embed message")
       .addStringOption((o) => o.setName("title").setDescription("Embed title").setMaxLength(256))
@@ -1053,6 +1072,74 @@ export async function handleCommand(
 
     await interaction.channel.send({ embeds: [embed] });
     await interaction.reply({ content: "✅ Embed опубликован.", ephemeral: true });
+    return;
+  }
+
+  if (interaction.commandName === "serverinfo") {
+    const guild = interaction.guild!;
+    const owner = await guild.fetchOwner().catch(() => null);
+    const textChannels = guild.channels.cache.filter((channel) => channel.type === ChannelType.GuildText).size;
+    const voiceChannels = guild.channels.cache.filter((channel) => channel.type === ChannelType.GuildVoice || channel.type === ChannelType.GuildStageVoice).size;
+    const categories = guild.channels.cache.filter((channel) => channel.type === ChannelType.GuildCategory).size;
+    await interaction.reply({
+      embeds: [new EmbedBuilder().setTitle("🛡️ " + guild.name).setThumbnail(guild.iconURL({ size: 128 }) ?? "").addFields(
+        { name: "ID", value: guild.id, inline: true },
+        { name: "Участники", value: String(guild.memberCount), inline: true },
+        { name: "Владелец", value: owner ? owner.user.toString() : guild.ownerId, inline: true },
+        { name: "Каналы", value: "Текст: " + textChannels + " · Voice: " + voiceChannels + " · Категории: " + categories, inline: false },
+        { name: "Роли", value: String(Math.max(0, guild.roles.cache.size - 1)), inline: true },
+        { name: "Создан", value: "<t:" + Math.floor(guild.createdTimestamp / 1000) + ":F>", inline: true },
+        { name: "Boost", value: guild.premiumTier + " · " + (guild.premiumSubscriptionCount ?? 0), inline: true }
+      ))],
+      ephemeral: true
+    });
+    return;
+  }
+
+  if (interaction.commandName === "userinfo") {
+    const user = interaction.options.getUser("user") ?? interaction.user;
+    const member = await interaction.guild!.members.fetch(user.id).catch(() => null);
+    const roles = member ? member.roles.cache.filter((role) => role.id !== interaction.guild!.roles.everyone.id).sort((a,b) => b.position - a.position).map((role) => role.toString()).join(", ") : "";
+    await interaction.reply({
+      embeds: [new EmbedBuilder().setTitle("👤 " + (user.globalName ?? user.username)).setThumbnail(user.displayAvatarURL({ size: 128 })).addFields(
+        { name: "ID", value: user.id, inline: true },
+        { name: "Создан", value: "<t:" + Math.floor(user.createdTimestamp / 1000) + ":F>", inline: true },
+        { name: "На сервере", value: member?.joinedTimestamp ? "<t:" + Math.floor(member.joinedTimestamp / 1000) + ":F>" : "Не состоит", inline: true },
+        { name: "Роли", value: (roles || "Нет").slice(0, 1000), inline: false }
+      ))],
+      ephemeral: true
+    });
+    return;
+  }
+
+  if (interaction.commandName === "roleinfo") {
+    const role = interaction.options.getRole("role", true);
+    const permissions = role.permissions.toArray().slice(0, 18).join(", ") || "Нет";
+    await interaction.reply({
+      embeds: [new EmbedBuilder().setTitle("🏷️ " + role.name).addFields(
+        { name: "ID", value: role.id, inline: true },
+        { name: "Позиция", value: String(role.position), inline: true },
+        { name: "Участники", value: String(role.members.size), inline: true },
+        { name: "Цвет", value: role.hexColor, inline: true },
+        { name: "Mentionable", value: role.mentionable ? "Да" : "Нет", inline: true },
+        { name: "Managed", value: role.managed ? "Да" : "Нет", inline: true },
+        { name: "Permissions", value: permissions, inline: false }
+      ))],
+      ephemeral: true
+    });
+    return;
+  }
+
+  if (interaction.commandName === "channelinfo") {
+    const channel = interaction.options.getChannel("channel") ?? interaction.channel;
+    if (!channel) {
+      await interaction.reply({ content: "Канал не найден.", ephemeral: true });
+      return;
+    }
+    const topic = "topic" in channel && typeof channel.topic === "string" ? channel.topic : null;
+    const slowmode = "rateLimitPerUser" in channel && typeof channel.rateLimitPerUser === "number" ? channel.rateLimitPerUser : null;
+    const details = ["ID: " + channel.id, "Тип: " + channel.type, "Категория: " + (channel.parent?.name ?? "—"), topic ? "Топик: " + topic : null, slowmode !== null ? "Slowmode: " + slowmode + "s" : null].filter(Boolean).join("\n");
+    await interaction.reply({ embeds: [new EmbedBuilder().setTitle("📺 #" + channel.name).setDescription(details.slice(0, 3900))], ephemeral: true });
     return;
   }
 

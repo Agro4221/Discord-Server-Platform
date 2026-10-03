@@ -322,3 +322,8 @@ Never write credentials, tokens or private user data here.
 - Added Management API GET/PUT /api/guilds/:guildId/tickets/form with durable audit events.
 - Added Dashboard Ticket Intake Form editor.
 - Kept automatic legacy fallback to subject + description when no custom form exists.
+
+## 2026-10-03 — Utility info suite
+- Added `serverinfo`, `userinfo`, `roleinfo` and `channelinfo` to the shared command policy.
+- Added Slash and Prefix implementations using Discord-native member, role and channel resolution.
+- Added command-schema coverage and updated the product matrix.
