@@ -155,6 +155,14 @@ export class Tickets implements PlatformModule {
        ON CONFLICT(guild_id) DO UPDATE SET enabled=EXCLUDED.enabled,category_id=EXCLUDED.category_id,staff_role_id=EXCLUDED.staff_role_id,transcript_channel_id=EXCLUDED.transcript_channel_id,max_open_per_user=EXCLUDED.max_open_per_user,auto_close_minutes=EXCLUDED.auto_close_minutes,form_fields=EXCLUDED.form_fields,panel_title=EXCLUDED.panel_title,panel_description=EXCLUDED.panel_description,create_button_label=EXCLUDED.create_button_label,claim_button_label=EXCLUDED.claim_button_label,close_button_label=EXCLUDED.close_button_label,updated_at=now()`,
       [guildId,next.enabled,next.categoryId,next.staffRoleId,next.transcriptChannelId,Math.min(Math.max(Math.trunc(next.maxOpenPerUser),1),10),Math.min(Math.max(Math.trunc(next.autoCloseMinutes),0),43200),JSON.stringify(normalizeFormFields(next.formFields)),normalizeTicketCustomization(next.customization).panelTitle,normalizeTicketCustomization(next.customization).panelDescription,normalizeTicketCustomization(next.customization).createButtonLabel,normalizeTicketCustomization(next.customization).claimButtonLabel,normalizeTicketCustomization(next.customization).closeButtonLabel]
     );
+    await this.db.query(
+      `INSERT INTO guild_modules(guild_id,module_key,enabled)
+       VALUES($1,'tickets',$2)
+       ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=now()`,
+      [guildId,next.enabled]
+    );
+  }
+
   async getSlaConfig(guildId: string): Promise<TicketSlaConfig> {
     return (await this.config(guildId)).sla;
   }
@@ -173,14 +181,6 @@ export class Tickets implements PlatformModule {
       [guildId,next.enabled,next.firstResponseMinutes,next.reminderMinutes,next.escalationMinutes,next.escalationRoleId]
     );
     return next;
-  }
-
-    await this.db.query(
-      `INSERT INTO guild_modules(guild_id,module_key,enabled)
-       VALUES($1,'tickets',$2)
-       ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=now()`,
-      [guildId,next.enabled]
-    );
   }
 
   async listTickets(guildId: string, status?: "open" | "closed" | "closing"): Promise<Array<{
