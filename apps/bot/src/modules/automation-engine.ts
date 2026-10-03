@@ -353,6 +353,12 @@ export class AutomationEngine implements PlatformModule {
         case "delete-message":
           output.push({ type: action.type, preview: "delete-message → " + action.channelId + "/" + action.messageId });
           break;
+        case "set-nickname":
+          output.push({ type: action.type, preview: "set-nickname → " + action.userId + ": " + (action.nickname ?? "(reset)") });
+          break;
+        case "react-message":
+          output.push({ type: action.type, preview: "react-message → " + action.channelId + "/" + action.messageId + " with " + action.emoji });
+          break;
         case "log":
           output.push({ type: action.type, preview: "log → " + await this.renderTemplate(event.guildId, action.message, event) });
           break;
@@ -964,10 +970,34 @@ export class AutomationEngine implements PlatformModule {
           if (value === undefined || value > condition.right) return false;
           break;
         }
-        case "has-role": {
+        case "has-role":
+        case "not-has-role": {
           const guild = this.client?.guilds.cache.get(event.guildId);
-          const member = event.userId ? await guild?.members.fetch(event.userId).catch(() => null) : null;
-          if (!member?.roles.cache.has(condition.roleId)) return false;
+          const userId = resolveUserReference(condition.userId, event.userId);
+          const member = userId ? await guild?.members.fetch(userId).catch(() => null) : null;
+          const hasRole = Boolean(member?.roles.cache.has(condition.roleId));
+          if (condition.type === "has-role" ? !hasRole : hasRole) return false;
+          break;
+        }
+        case "channel-type-is":
+          if (event.channelType !== condition.channelType) return false;
+          break;
+        case "user-is-bot": {
+          const userId = resolveUserReference(condition.userId, event.userId);
+          let isBot = event.userId === userId ? event.userIsBot : undefined;
+          if (isBot === undefined && userId) {
+            const user = await this.client?.users.fetch(userId).catch(() => null);
+            isBot = user?.bot;
+          }
+          if (isBot === undefined || isBot !== condition.value) return false;
+          break;
+        }
+        case "has-permission": {
+          const guild = this.client?.guilds.cache.get(event.guildId);
+          const userId = resolveUserReference(condition.userId, event.userId);
+          const member = userId ? await guild?.members.fetch(userId).catch(() => null) : null;
+          const permission = PermissionFlagsBits[condition.permission];
+          if (!member || permission === undefined || !member.permissions.has(permission)) return false;
           break;
         }
         case "cooldown-clear":
@@ -1209,6 +1239,29 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
+        if (action.type === "set-nickname") {
+          const guild = client?.guilds.cache.get(event.guildId);
+          const userId = resolveUserReference(action.userId, event.userId);
+          const member = userId ? await guild?.members.fetch(userId).catch(() => null) : null;
+          if (member?.manageable) {
+            await member.setNickname(
+              action.nickname === null ? null : await this.renderTemplate(event.guildId, action.nickname, event)
+            );
+          }
+          continue;
+        }
+
+        if (action.type === "react-message") {
+          const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
+          const messageId = action.messageId === "@event" ? event.messageId : action.messageId;
+          const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
+          if (channel?.isTextBased() && "messages" in channel && messageId) {
+            const message = await channel.messages.fetch(messageId).catch(() => null);
+            await message?.react(action.emoji);
+          }
+          continue;
+        }
+
       } catch (error) {
         logger.warn("Automation action failed", {
           guildId: event.guildId,
@@ -1246,10 +1299,23 @@ export function validateAutomationRule(
         if (String(condition.left).length > 64 || !Number.isFinite(condition.right)) throw new Error("invalid_numeric_condition");
         break;
       case "has-role":
-        if (!/^\d{17,20}$/.test(condition.userId) || !/^\d{17,20}$/.test(condition.roleId)) throw new Error("invalid_role_condition");
+      case "not-has-role":
+        if ((!/^\d{17,20}$/.test(condition.userId) && condition.userId !== "@event") || !/^\d{17,20}$/.test(condition.roleId)) throw new Error("invalid_role_condition");
         break;
       case "channel-is":
         if (!/^\d{17,20}$/.test(condition.channelId)) throw new Error("invalid_condition_channel");
+        break;
+      case "channel-type-is":
+        if (!["text","announcement","forum","voice","stage","category","thread","other"].includes(condition.channelType)) throw new Error("invalid_channel_type_condition");
+        break;
+      case "user-is-bot":
+        if ((!/^\d{17,20}$/.test(condition.userId) && condition.userId !== "@event") || typeof condition.value !== "boolean") throw new Error("invalid_user_bot_condition");
+        break;
+      case "has-permission":
+        if ((!/^\d{17,20}$/.test(condition.userId) && condition.userId !== "@event") ||
+            !["Administrator","ManageGuild","ManageChannels","ManageRoles","ManageMessages","KickMembers","BanMembers","ModerateMembers"].includes(condition.permission)) {
+          throw new Error("invalid_permission_condition");
+        }
         break;
       case "cooldown-clear":
         if (!condition.key || condition.key.length > 100) throw new Error("invalid_cooldown_key");
@@ -1298,6 +1364,19 @@ export function validateAutomationRule(
         if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_delete_channel");
         if (action.messageId !== "@event" && !/^\d{17,20}$/.test(action.messageId)) throw new Error("invalid_delete_message");
         break;
+      case "set-nickname":
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") ||
+            (action.nickname !== null && (typeof action.nickname !== "string" || action.nickname.length > 32))) {
+          throw new Error("invalid_set_nickname_action");
+        }
+        break;
+      case "react-message":
+        if ((action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) ||
+            (action.messageId !== "@event" && !/^\d{17,20}$/.test(action.messageId)) ||
+            typeof action.emoji !== "string" || !action.emoji.trim() || action.emoji.length > 100) {
+          throw new Error("invalid_react_message_action");
+        }
+        break;
       case "log":
         if (!action.message || action.message.length > 1000) throw new Error("invalid_log_action");
         break;
@@ -1334,10 +1413,23 @@ export function validateAutomationRule(
         if (String(condition.left).length > 64 || !Number.isFinite(condition.right)) throw new Error("invalid_numeric_condition");
         break;
       case "has-role":
-        if (!/^\d{17,20}$/.test(condition.userId) || !/^\d{17,20}$/.test(condition.roleId)) throw new Error("invalid_role_condition");
+      case "not-has-role":
+        if ((!/^\d{17,20}$/.test(condition.userId) && condition.userId !== "@event") || !/^\d{17,20}$/.test(condition.roleId)) throw new Error("invalid_role_condition");
         break;
       case "channel-is":
         if (!/^\d{17,20}$/.test(condition.channelId)) throw new Error("invalid_condition_channel");
+        break;
+      case "channel-type-is":
+        if (!["text","announcement","forum","voice","stage","category","thread","other"].includes(condition.channelType)) throw new Error("invalid_channel_type_condition");
+        break;
+      case "user-is-bot":
+        if ((!/^\d{17,20}$/.test(condition.userId) && condition.userId !== "@event") || typeof condition.value !== "boolean") throw new Error("invalid_user_bot_condition");
+        break;
+      case "has-permission":
+        if ((!/^\d{17,20}$/.test(condition.userId) && condition.userId !== "@event") ||
+            !["Administrator","ManageGuild","ManageChannels","ManageRoles","ManageMessages","KickMembers","BanMembers","ModerateMembers"].includes(condition.permission)) {
+          throw new Error("invalid_permission_condition");
+        }
         break;
       case "cooldown-clear":
         if (!condition.key || condition.key.length > 100) throw new Error("invalid_cooldown_key");
@@ -1357,7 +1449,25 @@ function resolveTextField(event: RuntimeEvent, field: string): string | undefine
   if (field === "reason") return event.reason;
   if (field === "messageId") return event.messageId;
   if (field === "guildId") return event.guildId;
+  if (field === "channelType") return event.channelType;
   return undefined;
+}
+
+function channelTypeName(type: ChannelType | number | undefined): import("@dsp/domain").AutomationChannelType | undefined {
+  switch (type) {
+    case ChannelType.GuildText: return "text";
+    case ChannelType.GuildAnnouncement: return "announcement";
+    case ChannelType.GuildForum: return "forum";
+    case ChannelType.GuildVoice: return "voice";
+    case ChannelType.GuildStageVoice: return "stage";
+    case ChannelType.GuildCategory: return "category";
+    case ChannelType.PublicThread:
+    case ChannelType.PrivateThread:
+    case ChannelType.AnnouncementThread:
+      return "thread";
+    default:
+      return type === undefined ? undefined : "other";
+  }
 }
 
 function resolveUserReference(value: string, eventUserId?: string): string | undefined {
