@@ -486,6 +486,7 @@ function tableToModule(table: string): ServerModuleConfig["key"] | null {
     case "starboard_settings": return "starboard";
     case "music_settings": return "music";
     case "birthday_settings": return "birthdays";
+    case "analytics_settings": return "analytics";
     default: return null;
   }
 }
