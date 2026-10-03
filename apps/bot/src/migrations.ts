@@ -936,6 +936,23 @@ const migrations = [
       "  updated_at timestamptz NOT NULL DEFAULT now()",
       ");"
     ])
+  },
+  {
+    version: 59,
+    name: "moderation_escalations",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS moderation_escalations (",
+      "  guild_id text NOT NULL,",
+      "  warn_count integer NOT NULL CHECK(warn_count BETWEEN 1 AND 100),",
+      "  action text NOT NULL CHECK(action IN ('timeout','ban')),",
+      "  duration_minutes integer NOT NULL DEFAULT 0 CHECK(duration_minutes BETWEEN 0 AND 40320),",
+      "  reason text NOT NULL DEFAULT 'Automatic moderation escalation',",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,warn_count)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_moderation_escalations_guild_enabled ON moderation_escalations(guild_id,enabled);"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
