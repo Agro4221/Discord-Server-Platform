@@ -227,6 +227,94 @@ export class AutomationEngine implements PlatformModule {
     await interaction.reply({ content: "Automation rule создано.", ephemeral: true });
   }
 
+  async dryRun(input: {
+    guildId: string;
+    event: AutomationEvent;
+    conditions: AutomationCondition[];
+    anyConditions: AutomationCondition[];
+    actions: AutomationAction[];
+    content?: string;
+    userId?: string;
+    channelId?: string;
+    roleIds?: string[];
+    numeric?: Record<string, number>;
+  }): Promise<{
+    matched: boolean;
+    event: AutomationEvent;
+    renderedActions: Array<{ type: string; preview: string }>;
+  }> {
+    validateAutomationRule(input.event, [...input.conditions, ...input.anyConditions], input.actions);
+
+    const event: RuntimeEvent = {
+      type: input.event,
+      guildId: input.guildId,
+      content: input.content?.slice(0, 2000),
+      userId: input.userId,
+      channelId: input.channelId,
+      roleIds: Array.isArray(input.roleIds) ? input.roleIds.slice(0, 20) : [],
+      numeric: Object.fromEntries(
+        Object.entries(input.numeric ?? {})
+          .filter(([, value]) => Number.isFinite(value))
+          .slice(0, 20)
+      )
+    };
+
+    const allMatched = await this.conditionsMatch(input.conditions, event);
+    const anyMatched = input.anyConditions.length === 0 || await this.conditionsAnyMatch(input.anyConditions, event);
+    const matched = allMatched && anyMatched;
+
+    return {
+      matched,
+      event: input.event,
+      renderedActions: matched ? await this.previewActions(input.actions, event) : []
+    };
+  }
+
+  private async previewActions(actions: AutomationAction[], event: RuntimeEvent): Promise<Array<{ type: string; preview: string }>> {
+    const output: Array<{ type: string; preview: string }> = [];
+    for (const action of actions) {
+      switch (action.type) {
+        case "send-message":
+          output.push({ type: action.type, preview: "send-message → #" + action.channelId + ": " + await this.renderTemplate(event.guildId, action.content, event) });
+          break;
+        case "dm-user":
+          output.push({ type: action.type, preview: "dm-user → " + action.userId + ": " + await this.renderTemplate(event.guildId, action.content, event) });
+          break;
+        case "add-role":
+        case "remove-role":
+          output.push({ type: action.type, preview: action.type + " → user " + action.userId + ", role " + action.roleId });
+          break;
+        case "timeout":
+          output.push({ type: action.type, preview: "timeout → " + action.userId + " for " + action.durationSeconds + "s: " + await this.renderTemplate(event.guildId, action.reason, event) });
+          break;
+        case "warn":
+        case "kick":
+        case "ban":
+          output.push({ type: action.type, preview: action.type + " → " + action.userId + (action.type === "ban" && action.durationMinutes ? " for " + action.durationMinutes + "m" : "") + ": " + await this.renderTemplate(event.guildId, action.reason, event) });
+          break;
+        case "delete-message":
+          output.push({ type: action.type, preview: "delete-message → " + action.channelId + "/" + action.messageId });
+          break;
+        case "log":
+          output.push({ type: action.type, preview: "log → " + await this.renderTemplate(event.guildId, action.message, event) });
+          break;
+        case "delay":
+          output.push({ type: action.type, preview: "delay → " + action.seconds + "s, remaining actions would queue" });
+          break;
+        case "webhook":
+          output.push({ type: action.type, preview: "webhook → " + action.url + " with payload: " + await this.renderTemplate(event.guildId, action.content, event) });
+          break;
+        case "branch": {
+          const branchMatched = await this.conditionsMatch([action.condition], event);
+          const branch = await this.previewActions(branchMatched ? action.thenActions : action.elseActions, event);
+          output.push({ type: action.type, preview: (branchMatched ? "if matched" : "else") + "; " + (branch.map((item) => item.preview).join(" | ") || "no actions") });
+          break;
+        }
+      }
+    }
+    return output;
+  }
+
   async listRules(guildId: string): Promise<AutomationRuleRecord[]> {
     const result = await this.db.query<{
       id: string;

@@ -245,3 +245,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Expanded Automation runtime context with moderation action/reason/caseId, moderator user, roleId and ticketId fields.
 - Dashboard/API condition field catalog now exposes the additional string/numeric fields.
 - Template rendering supports expanded moderation, role, ticket and giveaway variables.
+
+
+## 2026-10-04 — Automation dry-run
+- Added a side-effect-free Automation dry-run API and Dashboard test surface for current unsaved rule definitions.
+- Dry-run validates conditions/actions, simulates ALL/ANY/branch matching and renders action previews without Discord sends, role changes, moderation calls, or webhooks.
+- Supports synthetic content/channel/user/role and bounded numeric event context for reproducible testing.

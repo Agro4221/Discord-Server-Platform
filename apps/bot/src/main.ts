@@ -275,6 +275,17 @@ async function main(): Promise<void> {
     },
     automation: {
       list: async (guildId) => automation.listRules(guildId),
+      dryRun: async (input) => automation.dryRun({
+        guildId: input.guildId,
+        event: input.event as import("@dsp/domain").AutomationEvent,
+        conditions: input.conditions as import("@dsp/domain").AutomationCondition[],
+        anyConditions: input.anyConditions as import("@dsp/domain").AutomationCondition[],
+        actions: input.actions as import("@dsp/domain").AutomationAction[],
+        content: input.content,
+        userId: input.userId,
+        channelId: input.channelId,
+        roleIds: input.roleIds
+      }),
       create: async (guildId, input) => automation.createRule(
         guildId,
         input.name,

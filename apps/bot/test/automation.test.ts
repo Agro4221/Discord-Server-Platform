@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateAutomationRule } from "../src/modules/automation-engine.js";
+import { AutomationEngine, validateAutomationRule } from "../src/modules/automation-engine.js";
 
 test("Automation conditional branches validate nested actions and depth", () => {
   assert.doesNotThrow(() => validateAutomationRule(
@@ -60,4 +60,41 @@ test("Automation supports expanded moderation context fields", () => {
     { type: "equals", left: "action", right: "ban" },
     { type: "number-gte", left: "caseId", right: 1 }
   ], [{ type: "log", message: "automation moderation context" }]));
+});
+
+
+test("Automation dry-run evaluates conditions and renders actions without execution", async () => {
+  const engine = new AutomationEngine(
+    {} as import("../src/database.js").Database,
+    {} as import("../src/modules/moderation.js").Moderation
+  );
+  const result = await engine.dryRun({
+    guildId: "123456789012345678",
+    event: "message.create",
+    conditions: [{ type: "contains", left: "content", right: "hello" }],
+    anyConditions: [],
+    actions: [{ type: "log", message: "Seen {content} in {channel}" }],
+    content: "Hello from dry run",
+    channelId: "234567890123456789"
+  });
+  assert.equal(result.matched, true);
+  assert.equal(result.renderedActions.length, 1);
+  assert.match(result.renderedActions[0]?.preview ?? "", /Hello from dry run/);
+});
+
+test("Automation dry-run returns no action previews when conditions do not match", async () => {
+  const engine = new AutomationEngine(
+    {} as import("../src/database.js").Database,
+    {} as import("../src/modules/moderation.js").Moderation
+  );
+  const result = await engine.dryRun({
+    guildId: "123456789012345678",
+    event: "message.create",
+    conditions: [{ type: "contains", left: "content", right: "expected" }],
+    anyConditions: [],
+    actions: [{ type: "log", message: "must not execute" }],
+    content: "different"
+  });
+  assert.equal(result.matched, false);
+  assert.equal(result.renderedActions.length, 0);
 });

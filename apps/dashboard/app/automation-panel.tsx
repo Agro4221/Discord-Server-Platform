@@ -72,6 +72,13 @@ export function AutomationPanel({
   const [actions, setActions] = useState<Action[]>([{ type: "send-message", channelId: "", content: "" }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [testContent, setTestContent] = useState("Тестовое сообщение");
+  const [testUserId, setTestUserId] = useState("");
+  const [testChannelId, setTestChannelId] = useState("");
+  const [testRoleIds, setTestRoleIds] = useState("");
+  const [testNumeric, setTestNumeric] = useState("{}");
+  const [dryRunBusy, setDryRunBusy] = useState(false);
+  const [dryRunResult, setDryRunResult] = useState<{ matched: boolean; event: string; renderedActions: Array<{ type: string; preview: string }> } | null>(null);
 
   async function load() {
     const [rulesResponse, templatesResponse] = await Promise.all([
@@ -529,6 +536,69 @@ export function AutomationPanel({
           </div>
         ))}
         <button type="button" disabled={saving || actions.length >= 10} onClick={() => setActions((current) => [...current, { type: "log", message: "" }])} style={buttonStyle("secondary")}>+ Действие</button>
+      </section>
+
+      <section style={sectionStyle}>
+        <div style={sectionTitle}>Dry run · безопасная проверка</div>
+        <div style={{ fontSize: 11, opacity: 0.5 }}>Не выполняет Discord-действия и не вызывает webhook. Проверяет текущее несохранённое правило и показывает ожидаемый результат.</div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(160px,1fr)", gap: 8 }}>
+          <input value={testContent} maxLength={2000} onChange={(e) => setTestContent(e.target.value)} placeholder="Содержимое события" style={inputStyle} />
+          <select value={testChannelId} onChange={(e) => setTestChannelId(e.target.value)} style={inputStyle}>
+            <option value="">Канал события</option>
+            {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+          </select>
+          <input value={testUserId} onChange={(e) => setTestUserId(e.target.value)} placeholder="User ID события" style={inputStyle} />
+          <input value={testRoleIds} onChange={(e) => setTestRoleIds(e.target.value)} placeholder="Role IDs через запятую" style={inputStyle} />
+          <input value={testNumeric} onChange={(e) => setTestNumeric(e.target.value)} placeholder='Числовые поля JSON, например {"caseId":1}' style={inputStyle} />
+        </div>
+        <button type="button" disabled={saving || dryRunBusy || actions.length === 0} onClick={() => void (async () => {
+          setDryRunBusy(true);
+          setError("");
+          try {
+            let numeric: Record<string, number> = {};
+            try {
+              const parsed = JSON.parse(testNumeric) as Record<string, unknown>;
+              if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") throw new Error();
+              numeric = Object.fromEntries(Object.entries(parsed).filter(([, value]) => typeof value === "number" && Number.isFinite(value))) as Record<string, number>;
+            } catch {
+              throw new Error("Числовые поля должны быть валидным JSON-объектом.");
+            }
+            const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation/dry-run", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                event,
+                conditions,
+                anyConditions,
+                actions,
+                cooldownSeconds,
+                content: testContent,
+                userId: testUserId || undefined,
+                channelId: testChannelId || undefined,
+                roleIds: testRoleIds.split(",").map((value) => value.trim()).filter(Boolean),
+                numeric
+              })
+            });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(body.error ?? "automation_dry_run_failed");
+            setDryRunResult(body.result ?? null);
+          } catch (caught) {
+            setDryRunResult(null);
+            setError(caught instanceof Error ? caught.message : "Dry run не выполнен.");
+          } finally {
+            setDryRunBusy(false);
+          }
+        })()} style={buttonStyle("secondary")}>{dryRunBusy ? "Проверка…" : "▶ Тестировать правило"}</button>
+        {dryRunResult && (
+          <div style={{ padding: 10, borderRadius: 9, border: "1px solid " + (dryRunResult.matched ? "#315c41" : "#513a3a"), background: "#0b1117" }}>
+            <strong>{dryRunResult.matched ? "Условия совпали" : "Условия не совпали"}</strong>
+            {dryRunResult.matched && dryRunResult.renderedActions.length > 0 && (
+              <div style={{ marginTop: 7, display: "grid", gap: 4 }}>
+                {dryRunResult.renderedActions.map((item, index) => <div key={item.type + index} style={{ fontSize: 10, opacity: 0.75 }}><code>{item.type}</code> · {item.preview}</div>)}
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       <div style={{ display: "flex", gap: 8 }}>

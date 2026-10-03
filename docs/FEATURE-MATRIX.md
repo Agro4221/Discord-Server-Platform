@@ -108,6 +108,7 @@
 | Delay / queue semantics | ✅ | Durable delayed-action queue with lease/retry and restart recovery
 | Template variables / reusable snippets | ✅ | Event + case/ticket/role/moderation context variables plus persistent named templates via `{template:name}` |
 | Visual automation builder | ✅ |
+| Automation dry-run / test execution | ✅ | Dashboard simulates condition matching and rendered actions without executing side effects |
 
 ## Notifications / Integrations
 

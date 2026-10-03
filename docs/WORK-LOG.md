@@ -365,3 +365,9 @@ Never write credentials, tokens or private user data here.
 - Expanded runtime event context so moderation/role/ticket workflows expose useful fields to conditions and templates.
 - Added action/reason/moderator/role/case/ticket context without introducing a second event system.
 - Kept existing event names and persistence contracts stable.
+
+
+## 2026-10-04 — Automation dry-run
+- Added `AutomationEngine.dryRun()` and Management API `/automation/dry-run` for safe preflight testing.
+- Dashboard can test the current unsaved rule against synthetic event fields and inspect rendered action previews.
+- No Discord mutation, webhook call or database write is performed by dry-run.

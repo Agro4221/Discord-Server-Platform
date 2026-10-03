@@ -166,3 +166,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-04 — Automation event context
 - Added regression coverage for moderation event conditions using `action` and `caseId` fields.
 - Expanded field catalog alignment between engine, Management API and Dashboard.
+
+
+### 2026-10-04 — Automation dry-run
+- Added unit coverage for matching + rendered previews and non-matching rules.
+- Dry-run remains intentionally side-effect-free; live execution is covered by existing runtime pathways and remains part of release-gate validation.

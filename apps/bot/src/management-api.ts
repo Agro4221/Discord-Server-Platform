@@ -72,6 +72,17 @@ type ApiOptions = {
   };
   automation?: {
     list: (guildId: string) => Promise<unknown[]>;
+    dryRun: (input: {
+      guildId: string;
+      event: string;
+      conditions: unknown[];
+      anyConditions: unknown[];
+      actions: unknown[];
+      content?: string;
+      userId?: string;
+      channelId?: string;
+      roleIds?: string[];
+    }) => Promise<unknown>;
     create: (guildId: string, input: {
       name: string;
       event: string;
@@ -742,9 +753,10 @@ export class ManagementApiServer {
           }
 
           const automationMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation$/);
+          const automationDryRunMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/dry-run$/);
           const automationItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/([^/]+)$/);
 
-          if ((automationMatch || automationItemMatch) && !this.options.automation) {
+          if ((automationMatch || automationDryRunMatch || automationItemMatch) && !this.options.automation) {
             this.json(res, 500, { error: "automation_unavailable" });
             return;
           }
@@ -756,6 +768,57 @@ export class ManagementApiServer {
               return;
             }
             this.json(res, 200, { guildId, rules: await this.options.automation!.list(guildId) });
+            return;
+          }
+
+          if (method === "POST" && automationDryRunMatch) {
+            const guildId = automationDryRunMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const event = typeof body.event === "string" ? body.event : "";
+            const conditions = body.conditions;
+            const anyConditions = body.anyConditions ?? [];
+            const actions = body.actions;
+            const cooldownSeconds = typeof body.cooldownSeconds === "number" ? body.cooldownSeconds : 0;
+            if (
+              typeof event !== "string" || event.length > 64 ||
+              !Array.isArray(conditions) || conditions.length > 10 ||
+              !Array.isArray(anyConditions) || anyConditions.length > 10 ||
+              conditions.length + anyConditions.length > 10 ||
+              !Array.isArray(actions) || actions.length < 1 || actions.length > 10 ||
+              !Number.isFinite(cooldownSeconds) || cooldownSeconds < 0 || cooldownSeconds > 86400
+            ) {
+              throw new RequestInputError("invalid_automation_rule", 400);
+            }
+            validateAutomationPayload(this.options.client, guildId, event, [...conditions, ...anyConditions], actions);
+            const result = await this.options.automation!.dryRun({
+              guildId,
+              event,
+              conditions,
+              anyConditions,
+              actions,
+              content: typeof body.content === "string" ? body.content.slice(0, 2000) : "",
+              userId: typeof body.userId === "string" ? body.userId : undefined,
+              channelId: typeof body.channelId === "string" ? body.channelId : undefined,
+              roleIds: Array.isArray(body.roleIds)
+                ? body.roleIds.filter((v: unknown): v is string => typeof v === "string").slice(0, 20)
+                : [],
+              numeric: body.numeric && typeof body.numeric === "object" && !Array.isArray(body.numeric)
+                ? Object.fromEntries(
+                    Object.entries(body.numeric as Record<string, unknown>)
+                      .filter(([key, value]) => [
+                        "memberCount","messageLength","mentionCount","previousLength",
+                        "caseId","ticketId","giveawayId","winnerCount","timestamp",
+                        "minute","hour","dayOfWeek","dayOfMonth"
+                      ].includes(key) && typeof value === "number" && Number.isFinite(value))
+                      .slice(0, 20)
+                  )
+                : {}
+            });
+            this.json(res, 200, { ok: true, result });
             return;
           }
 

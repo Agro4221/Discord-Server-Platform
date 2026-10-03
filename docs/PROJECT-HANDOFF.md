@@ -460,3 +460,9 @@ Live validation, требующая пользовательского окру�
 ### 2026-10-04 — Automation event context
 - Automation now exposes richer moderation/role/ticket context to conditions and templates while preserving the current event model.
 - Next automation priority: operational dry-run/test execution and diagnostics before further action expansion.
+
+
+### 2026-10-04 — Automation dry-run
+- Safe dry-run/test execution is implemented through the existing Automation engine and Dashboard builder.
+- It validates and previews rules without executing side effects; numeric/role event context can be supplied for deterministic tests.
+- Next automation work can focus on richer operational diagnostics/observability rather than another execution path.
