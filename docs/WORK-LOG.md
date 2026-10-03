@@ -207,3 +207,9 @@ Never write credentials, tokens or private user data here.
 - Added deterministic tests for AFK formatting/reason normalization and slash-command registration.
 - The container cannot resolve github.com, so local clone/build execution was unavailable. GitHub Actions CI for the immediately preceding test commit was observed in progress; the later cache-consistency fix requires a fresh green run before being called CI-verified.
 
+## 2026-10-03 — AFK audit and notification hardening
+- AFK state changes now use the existing durable audit pipeline as best-effort telemetry; an audit failure cannot turn a successful AFK operation into a command failure.
+- AFK mention responses cap combined output and explicitly restrict allowed mentions to the AFK users, preventing stored reasons from producing unintended role/everyone/here pings.
+- Final code head for this pass: `c554a216bccd56a16ee9965a57031663ca877dd0`.
+- Local execution remains unavailable in this container because DNS cannot resolve github.com. A fresh GitHub Actions run on the final head is the authoritative automated verification gate.
+

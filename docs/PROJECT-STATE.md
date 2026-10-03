@@ -172,3 +172,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Added migration 40 (`persistent_afk`) and regression tests for utility command shapes and AFK helper behavior.
 - This is a feature addition, not a live Discord acceptance result; real Discord behavior still belongs to the live release-gate suite.
 
+## 2026-10-03 — AFK audit hardening
+- Utility AFK set/clear operations feed the durable audit log without making user-facing operations depend on audit persistence success.
+- AFK mention output is bounded and uses explicit user-only allowed mentions so stored reasons cannot trigger @everyone/@here/role notifications.
+- Final feature-pass head: `c554a216bccd56a16ee9965a57031663ca877dd0`; automated CI on this final head remains the verification gate.
+

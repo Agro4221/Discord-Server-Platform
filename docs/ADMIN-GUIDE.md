@@ -333,3 +333,7 @@ Dashboard является основным способом редактиро�
   - AFK: `/afk set`, `/afk clear`, `/afk status`; prefix equivalents are also available.
 - AFK is persistent across bot restarts and reports an AFK user's reason when they are mentioned.
 
+### Utility / AFK hardening
+- AFK changes are included in durable audit telemetry.
+- AFK responses cap output and only explicitly allow mentions of affected users; stored reasons cannot create mass mentions.
+
