@@ -541,6 +541,12 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
+        if (action.type === "branch") {
+          const matched = await this.conditionsMatch([action.condition], event);
+          await this.perform(matched ? action.thenActions : action.elseActions, event);
+          continue;
+        }
+
         if (action.type === "webhook") {
           await assertSafeFeedUrl(action.url);
           await fetch(action.url, {
@@ -663,7 +669,13 @@ export function validateAutomationRule(
     }
   }
 
-  for (const action of actions) {
+  validateAutomationActions(actions, 0);
+
+  function validateAutomationActions(items: AutomationAction[], depth: number): void {
+    if (items.length < 1 || items.length > 10) throw new Error("invalid_action_count");
+    if (depth > 2) throw new Error("automation_branch_too_deep");
+
+    for (const action of items) {
     switch (action.type) {
       case "send-message":
         if (!/^\\d{17,20}$/.test(action.channelId) || !action.content || action.content.length > 2000) throw new Error("invalid_send_message_action");
@@ -696,6 +708,38 @@ export function validateAutomationRule(
           throw new Error("invalid_webhook_url");
         }
         if (!action.content || action.content.length > 2000) throw new Error("invalid_webhook_content");
+        break;
+      case "branch":
+        validateAutomationCondition(action.condition);
+        validateAutomationActions(action.thenActions, depth + 1);
+        if (action.elseActions.length > 0) validateAutomationActions(action.elseActions, depth + 1);
+        break;
+    }
+  }
+  }
+
+  function validateAutomationCondition(condition: AutomationCondition): void {
+    switch (condition.type) {
+      case "contains":
+      case "equals":
+        if (condition.left.length > 64 || condition.right.length > 200) throw new Error("automation_condition_too_long");
+        break;
+      case "matches":
+        if (condition.left.length > 64 || condition.pattern.length > 120) throw new Error("automation_pattern_too_long");
+        try { new RegExp(condition.pattern); } catch { throw new Error("invalid_automation_pattern"); }
+        break;
+      case "number-gte":
+      case "number-lte":
+        if (String(condition.left).length > 64 || !Number.isFinite(condition.right)) throw new Error("invalid_numeric_condition");
+        break;
+      case "has-role":
+        if (!/^\\d{17,20}$/.test(condition.userId) || !/^\\d{17,20}$/.test(condition.roleId)) throw new Error("invalid_role_condition");
+        break;
+      case "channel-is":
+        if (!/^\\d{17,20}$/.test(condition.channelId)) throw new Error("invalid_condition_channel");
+        break;
+      case "cooldown-clear":
+        if (!condition.key || condition.key.length > 100) throw new Error("invalid_cooldown_key");
         break;
     }
   }
