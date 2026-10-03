@@ -283,4 +283,5 @@ Never write credentials, tokens or private user data here.
 - Hardened per-rule validation for supported actions and numeric ranges; Dashboard deletions now write audit events.
 - AutoMod `warn` now creates a real moderation warning through the existing warning/escalation pipeline.
 - Activated the `emotes` detector alias so it behaves consistently with emoji-count detection.
+- Added per-user/per-detector cooldown enforcement using the rule window so repeated matches do not spam sanctions.
 - CI is the release gate for this increment; live Discord/resource hierarchy remains environment-dependent.
