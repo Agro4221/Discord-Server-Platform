@@ -293,3 +293,9 @@ Never write credentials, tokens or private user data here.
 - Welcome now has a dedicated Control Center panel with Welcome/Goodbye template preview and test delivery to a selected or configured text channel.
 - Test delivery validates bot `ViewChannel`, `SendMessages` and `EmbedLinks` permissions and records `welcome.test.sent` in the audit log.
 - Preview/test placeholders use `@example-user`, so the test path does not ping a real member.
+
+## 2026-10-04 — Community Tools poll creator verified
+- CI run **#1260** (`37152201261`) passed on development head `9be19adc51f501af87057178a1689f51414c2e01`.
+- Community Tools Control Center now creates polls directly: target channel, question, 2–5 options and 1–10080 minute duration.
+- Core validates the target text/announcement channel and bot `ViewChannel`, `SendMessages`, and `EmbedLinks` permissions, rolls back the database row if Discord publication fails, and keeps the existing poll close timer.
+- Dashboard creation is audited as `poll.created`; existing close/status/sticky administration remains intact.

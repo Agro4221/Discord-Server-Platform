@@ -237,3 +237,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-04 — Welcome Control Center verified
 - Development head `b9d3ac96021adc3f5c45dd9c81c1a34c327beacd` passed CI run **#1256**.
 - Welcome is now a full Control Center module while its Discord `/welcome setup` command remains the fallback/user-facing configuration path.
+
+## 2026-10-04 — Community Tools poll creator verified
+- Development head `9be19adc51f501af87057178a1689f51414c2e01` passed CI run **#1260**.
+- Community Tools is now a fuller Dashboard-first operational surface: create/close polls, moderate suggestions, and manage sticky messages.

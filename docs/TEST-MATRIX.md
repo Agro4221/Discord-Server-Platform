@@ -144,3 +144,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-04 — Welcome Control Center verification
 - CI run **#1256** passed the full automated matrix, including bot typecheck/tests, domain and bot builds, and Dashboard production build.
 - Welcome test delivery is covered by the Management API/route type and build path; live Discord permission and message-delivery behavior remains environment-dependent acceptance.
+
+## 2026-10-04 — Community Tools poll creator verification
+- CI run **#1260** passed the full automated matrix after adding Dashboard poll creation.
+- Production Dashboard build validates the new poll form; live Discord publication permissions and interaction behavior remain environment-dependent acceptance checks.
