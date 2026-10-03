@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 
 type Resource = { id: string; name: string };
+type ModerationPreset = {
+  name: string;
+  automodRuleCount: number;
+  escalationCount: number;
+  updatedAt: string;
+};
+
 type Escalation = {
   warnCount: number;
   action: "timeout" | "ban";
@@ -13,6 +20,8 @@ type Escalation = {
 
 export function ModerationPanel({ guildId, channels, onChanged }: { guildId: string; channels: Resource[]; onChanged?: () => void | Promise<void> }) {
   const [rules, setRules] = useState<Escalation[]>([]);
+  const [presets, setPresets] = useState<ModerationPreset[]>([]);
+  const [presetName, setPresetName] = useState("");
   const [cleanupRules, setCleanupRules] = useState<Array<{ id: number; channelId: string; intervalSeconds: number; maxMessages: number; enabled: boolean; lastRunAt: string | null }>>([]);
   const [cleanupChannelId, setCleanupChannelId] = useState("");
   const [cleanupIntervalSeconds, setCleanupIntervalSeconds] = useState(3600);
@@ -26,20 +35,86 @@ export function ModerationPanel({ guildId, channels, onChanged }: { guildId: str
   const [error, setError] = useState("");
 
   async function load() {
-    const [response, cleanupResponse] = await Promise.all([
+    const [response, cleanupResponse, presetsResponse] = await Promise.all([
       fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/escalations", { cache: "no-store" }),
-      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/cleanup", { cache: "no-store" })
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/cleanup", { cache: "no-store" }),
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/presets", { cache: "no-store" })
     ]);
     const body = await response.json().catch(() => ({}));
     const cleanupBody = await cleanupResponse.json().catch(() => ({}));
+    const presetsBody = await presetsResponse.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.error ?? "escalations_failed");
     if (!cleanupResponse.ok) throw new Error(cleanupBody.error ?? "cleanup_failed");
+    if (!presetsResponse.ok) throw new Error(presetsBody.error ?? "moderation_presets_failed");
     setRules((body.rules ?? []) as Escalation[]);
     setCleanupRules(cleanupBody.rules ?? []);
+    setPresets((presetsBody.presets ?? []) as ModerationPreset[]);
     const lockdownResponse = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/lockdown", { cache: "no-store" });
     const lockdownBody = await lockdownResponse.json().catch(() => ({}));
     if (!lockdownResponse.ok) throw new Error(lockdownBody.error ?? "lockdown_failed");
     setLockdown({ active: Boolean(lockdownBody.active), lockedChannels: Number(lockdownBody.lockedChannels ?? 0) });
+  }
+
+  async function savePreset() {
+    const name = presetName.trim();
+    if (!name) {
+      setError("Укажи имя moderation preset.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/presets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "moderation_preset_save_failed");
+      setPresetName("");
+      await load();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось сохранить moderation preset.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function applyPreset(name: string) {
+    if (!window.confirm("Применить moderation preset \"" + name + "\"? Текущие AutoMod rules и escalation rules будут заменены.")) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/presets/" + encodeURIComponent(name), {
+        method: "POST"
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "moderation_preset_apply_failed");
+      await load();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось применить moderation preset.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deletePreset(name: string) {
+    if (!window.confirm("Удалить moderation preset \"" + name + "\"?")) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/presets/" + encodeURIComponent(name), { method: "DELETE" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "moderation_preset_delete_failed");
+      await load();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось удалить moderation preset.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function saveCleanup() {
@@ -149,6 +224,31 @@ export function ModerationPanel({ guildId, channels, onChanged }: { guildId: str
       <div style={{ color: "#687486", fontSize: 10 }}>
         Timeout требует длительность. Для постоянного бана оставь 0 минут.
       </div>
+
+      <section style={sectionStyle}>
+        <div style={{ fontWeight: 700, fontSize: 13 }}>Moderation presets</div>
+        <div style={{ color: "#687486", fontSize: 10 }}>
+          Профиль сохраняет текущие AutoMod + Security + Warn escalation. Применение заменяет соответствующие настройки профиля.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+          <input value={presetName} maxLength={40} onChange={(e) => setPresetName(e.target.value)} placeholder="strict" style={inputStyle} />
+          <button type="button" disabled={busy} onClick={() => void savePreset()} style={buttonStyle}>Сохранить текущий</button>
+        </div>
+        {presets.length ? presets.map((preset) => (
+          <div key={preset.name} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid #202632" }}>
+            <div>
+              <strong style={{ fontSize: 11 }}>{preset.name}</strong>
+              <div style={{ color: "#687486", fontSize: 10 }}>
+                AutoMod rules: {preset.automodRuleCount} · escalations: {preset.escalationCount} · {new Date(preset.updatedAt).toLocaleString()}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button type="button" disabled={busy} onClick={() => void applyPreset(preset.name)} style={buttonStyle}>Применить</button>
+              <button type="button" disabled={busy} onClick={() => void deletePreset(preset.name)} style={buttonStyle}>Удалить</button>
+            </div>
+          </div>
+        )) : <div style={{ color: "#687486", fontSize: 10 }}>Сохранённых moderation presets пока нет.</div>}
+      </section>
 
       <section style={sectionStyle}>
         <div style={{ fontWeight: 700, fontSize: 13 }}>Incident Lockdown</div>
