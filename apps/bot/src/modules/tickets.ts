@@ -133,6 +133,7 @@ export class Tickets implements PlatformModule {
   }
 
   async closeByAutomation(guildId: string, ticketId: number, actorUserId: string): Promise<boolean> {
+    if (!await moduleEnabled(this.db, guildId, "tickets", false)) throw new Error("tickets_disabled");
     if (!Number.isSafeInteger(ticketId) || ticketId < 1) throw new Error("invalid_ticket_id");
 
     const result = await this.db.query<{
