@@ -250,6 +250,11 @@ async function main(): Promise<void> {
     backups,
     customCommands,
     autoResponder,
+    helpPages: {
+      list: async (guildId) => helpPages.list(guildId),
+      save: async (guildId, slug, title, content, enabled) => helpPages.save(guildId, slug, title, content, enabled),
+      delete: async (guildId, slug) => helpPages.delete(guildId, slug)
+    },
     tickets: {
       getFormFields: async (guildId) => tickets.getFormFields(guildId),
       setFormFields: async (guildId, fields) => tickets.setFormFields(guildId, fields),
