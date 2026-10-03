@@ -20,6 +20,10 @@ import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 import { assertSafeFeedUrl } from "./notifications.js";
 import type { Moderation } from "./moderation.js";
+import type { Tickets } from "./tickets.js";
+import type { Giveaways } from "./giveaways.js";
+import type { Notifications } from "./notifications.js";
+import type { Music } from "./music.js";
 
 type RuntimeEvent = {
   type: AutomationEvent;
@@ -77,7 +81,16 @@ export class AutomationEngine implements PlatformModule {
   private executionCounter = 0;
   private lastScheduleMinute: number | null = null;
 
-  constructor(private readonly db: Database, private readonly moderation: Moderation) {}
+  constructor(
+    private readonly db: Database,
+    private readonly moderation: Moderation,
+    private readonly integrations: {
+      tickets?: Tickets;
+      giveaways?: Giveaways;
+      notifications?: Notifications;
+      music?: Music;
+    } = {}
+  ) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
@@ -369,6 +382,21 @@ export class AutomationEngine implements PlatformModule {
           break;
         case "react-message":
           output.push({ type: action.type, preview: "react-message → " + action.channelId + "/" + action.messageId + " with " + action.emoji });
+          break;
+        case "ticket-close":
+          output.push({ type: action.type, preview: "ticket-close → #" + action.ticketId });
+          break;
+        case "giveaway-end":
+          output.push({ type: action.type, preview: "giveaway-end → #" + action.giveawayId });
+          break;
+        case "giveaway-reroll":
+          output.push({ type: action.type, preview: "giveaway-reroll → #" + action.giveawayId });
+          break;
+        case "notification-feed-toggle":
+          output.push({ type: action.type, preview: "notification-feed-toggle → #" + action.feedId + " = " + (action.enabled ? "enabled" : "disabled") });
+          break;
+        case "music-control":
+          output.push({ type: action.type, preview: "music-control → " + action.action + (action.mode ? " (" + action.mode + ")" : action.value !== undefined ? " (" + action.value + ")" : "") });
           break;
         case "log":
           output.push({ type: action.type, preview: "log → " + await this.renderTemplate(event.guildId, action.message, event) });
@@ -1286,6 +1314,47 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
+        if (action.type === "ticket-close") {
+          const ticketId = action.ticketId === "@event" ? Number(event.numeric?.ticketId) : Number(action.ticketId);
+          if (!Number.isSafeInteger(ticketId) || ticketId < 1) throw new Error("invalid_ticket_id");
+          if (!this.integrations.tickets) throw new Error("tickets_unavailable");
+          await this.integrations.tickets.closeByAutomation(event.guildId, ticketId, event.userId ?? "automation");
+          continue;
+        }
+
+        if (action.type === "giveaway-end") {
+          if (!this.integrations.giveaways) throw new Error("giveaways_unavailable");
+          const giveawayId = Number(action.giveawayId);
+          if (!Number.isSafeInteger(giveawayId) || giveawayId < 1) throw new Error("invalid_giveaway_id");
+          await this.integrations.giveaways.endGiveaway(giveawayId, event.guildId);
+          continue;
+        }
+
+        if (action.type === "giveaway-reroll") {
+          if (!this.integrations.giveaways) throw new Error("giveaways_unavailable");
+          const giveawayId = Number(action.giveawayId);
+          if (!Number.isSafeInteger(giveawayId) || giveawayId < 1) throw new Error("invalid_giveaway_id");
+          const winners = await this.integrations.giveaways.rerollGiveaway(giveawayId, event.guildId);
+          if (winners === null) throw new Error("giveaway_not_found_or_not_finished");
+          continue;
+        }
+
+        if (action.type === "notification-feed-toggle") {
+          if (!this.integrations.notifications) throw new Error("notifications_unavailable");
+          const changed = await this.integrations.notifications.setFeedEnabled(event.guildId, action.feedId, action.enabled);
+          if (!changed) throw new Error("notification_feed_not_found");
+          continue;
+        }
+
+        if (action.type === "music-control") {
+          if (!this.integrations.music) throw new Error("music_unavailable");
+          await this.integrations.music.dashboardControl(event.guildId, action.action, {
+            value: action.value,
+            mode: action.mode
+          });
+          continue;
+        }
+
       } catch (error) {
         logger.warn("Automation action failed", {
           guildId: event.guildId,
@@ -1400,6 +1469,27 @@ export function validateAutomationRule(
             typeof action.emoji !== "string" || !action.emoji.trim() || action.emoji.length > 100) {
           throw new Error("invalid_react_message_action");
         }
+        break;
+      case "ticket-close":
+        if ((!/^\d{1,12}$/.test(action.ticketId) && action.ticketId !== "@event")) throw new Error("invalid_ticket_close_action");
+        break;
+      case "giveaway-end":
+      case "giveaway-reroll":
+        if (!Number.isSafeInteger(action.giveawayId) || action.giveawayId < 1) throw new Error("invalid_giveaway_action");
+        break;
+      case "notification-feed-toggle":
+        if (!Number.isSafeInteger(action.feedId) || action.feedId < 1 || typeof action.enabled !== "boolean") throw new Error("invalid_notification_feed_action");
+        break;
+      case "music-control":
+        if (!["pause","resume","skip","stop","shuffle","repeat","seek","volume","autoplay"].includes(action.action)) {
+          throw new Error("invalid_music_control_action");
+        }
+        if (action.action === "repeat" && !["off","track","queue"].includes(action.mode)) throw new Error("invalid_music_repeat_mode");
+        if ((action.action === "seek" || action.action === "volume") && (!Number.isInteger(action.value) || action.value < 0 || action.value > 86400)) {
+          throw new Error("invalid_music_control_value");
+        }
+        if (action.action === "volume" && action.value > 200) throw new Error("invalid_music_volume");
+        if (action.action === "autoplay" && typeof action.value !== "number") throw new Error("invalid_music_autoplay_value");
         break;
       case "log":
         if (!action.message || action.message.length > 1000) throw new Error("invalid_log_action");
