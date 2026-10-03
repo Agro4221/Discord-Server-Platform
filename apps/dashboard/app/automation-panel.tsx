@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 type Resource = { id: string; name: string };
 type AutomationChannelType = "text" | "announcement" | "forum" | "voice" | "stage" | "category" | "thread" | "other";
 type AutomationPermission = "Administrator" | "ManageGuild" | "ManageChannels" | "ManageRoles" | "ManageMessages" | "KickMembers" | "BanMembers" | "ModerateMembers";
+type AutomationMusicControl = "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay";
+type AutomationMusicRepeatMode = "off" | "track" | "queue";
 
 type Condition =
   | { type: "contains" | "equals"; left: string; right: string }
@@ -30,7 +32,7 @@ type Action =
   | { type: "ticket-close"; ticketId: string }
   | { type: "giveaway-end" | "giveaway-reroll"; giveawayId: number }
   | { type: "notification-feed-toggle"; feedId: number; enabled: boolean }
-  | { type: "music-control"; action: "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay"; value?: number; enabled?: boolean; mode?: "off" | "track" | "queue" }
+  | { type: "music-control"; action: AutomationMusicControl; value?: number; enabled?: boolean; mode?: AutomationMusicRepeatMode }
   | { type: "log"; message: string }
   | { type: "delay"; seconds: number }
   | { type: "webhook"; url: string; content: string }
@@ -732,13 +734,13 @@ export function AutomationPanel({
 
             {action.type === "music-control" && (
               <div style={actionGrid}>
-                <select value={action.action} onChange={(e) => updateAction(index, { action: e.target.value as Action["action"] })} style={inputStyle}>
+                <select value={action.action} onChange={(e) => updateAction(index, { action: e.target.value as AutomationMusicControl })} style={inputStyle}>
                   {["pause","resume","skip","stop","shuffle","repeat","seek","volume","autoplay"].map((control) => (
                     <option key={control} value={control}>{control}</option>
                   ))}
                 </select>
                 {action.action === "repeat" && (
-                  <select value={action.mode ?? "off"} onChange={(e) => updateAction(index, { mode: e.target.value as Action["mode"] })} style={inputStyle}>
+                  <select value={action.mode ?? "off"} onChange={(e) => updateAction(index, { mode: e.target.value as AutomationMusicRepeatMode })} style={inputStyle}>
                     <option value="off">off</option>
                     <option value="track">track</option>
                     <option value="queue">queue</option>
