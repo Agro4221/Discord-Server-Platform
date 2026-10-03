@@ -99,7 +99,8 @@ export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
   { name: "8ball", label: "Magic 8-ball", module: "community-tools", prefix: true, slash: true },
   { name: "choose", label: "Choose", module: "community-tools", prefix: true, slash: true },
   { name: "roll", label: "Dice roll", module: "community-tools", prefix: true, slash: true },
-  { name: "logging", label: "Event logging", module: "logging", prefix: true, slash: true }
+  { name: "logging", label: "Event logging", module: "logging", prefix: true, slash: true },
+  { name: "voice", label: "Temporary Voice controls", module: "temporary-voice", prefix: true, slash: true }
 ];
 
 export class CommandPolicyService {

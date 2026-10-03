@@ -208,6 +208,38 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
     new SlashCommandBuilder().setName("unlock").setDescription("Unlock the current channel"),
 
     new SlashCommandBuilder()
+      .setName("voice")
+      .setDescription("Control your temporary voice room")
+      .addSubcommand((sub) => sub.setName("info").setDescription("Show your temporary room"))
+      .addSubcommand((sub) => sub.setName("lock").setDescription("Lock new connections"))
+      .addSubcommand((sub) => sub.setName("unlock").setDescription("Allow new connections"))
+      .addSubcommand((sub) => sub
+        .setName("limit")
+        .setDescription("Set room user limit")
+        .addIntegerOption((o) => o.setName("limit").setDescription("0 = unlimited").setMinValue(0).setMaxValue(99).setRequired(true))
+      )
+      .addSubcommand((sub) => sub
+        .setName("name")
+        .setDescription("Rename your room")
+        .addStringOption((o) => o.setName("name").setDescription("Room name").setMaxLength(100).setRequired(true))
+      )
+      .addSubcommand((sub) => sub
+        .setName("transfer")
+        .setDescription("Transfer room ownership")
+        .addUserOption((o) => o.setName("user").setDescription("New owner").setRequired(true))
+      )
+      .addSubcommand((sub) => sub
+        .setName("permit")
+        .setDescription("Allow a user into the room")
+        .addUserOption((o) => o.setName("user").setDescription("User").setRequired(true))
+      )
+      .addSubcommand((sub) => sub
+        .setName("reject")
+        .setDescription("Block a user from the room")
+        .addUserOption((o) => o.setName("user").setDescription("User").setRequired(true))
+      ),
+
+    new SlashCommandBuilder()
       .setName("setup")
       .setDescription("Configure the server")
       .addSubcommand((sub) =>

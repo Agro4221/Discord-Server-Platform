@@ -14,7 +14,7 @@ export const BUILTIN_PREFIX_COMMANDS = new Set([
   "balance", "daily", "leaderboard", "pay", "shop", "buy", "remind", "ticket", "roles", "giveaway",
   "automod", "welcome", "security", "verify", "starboard", "feed", "automation", "economy", "music",
   "serverinfo", "userinfo", "avatar", "membercount", "roleinfo", "channelinfo", "afk",
-  "poll", "suggest", "sticky", "8ball", "choose", "roll", "logging"
+  "poll", "suggest", "sticky", "8ball", "choose", "roll", "logging", "voice"
 ]);
 
 export class PrefixCommandRouter {

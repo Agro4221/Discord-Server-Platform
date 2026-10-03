@@ -67,6 +67,16 @@ test("all Discord application command option lists keep required options before 
   );
 });
 
+test("temporary voice control command exposes owner controls", () => {
+  const command = buildCommands().find((item) => item.name === "voice");
+  assert.ok(command);
+  const options = command.toJSON().options ?? [];
+  assert.deepEqual(options.map((option) => option.name), ["info", "lock", "unlock", "limit", "name", "transfer", "permit", "reject"]);
+  assert.equal(options.find((option) => option.name === "limit")?.options?.[0]?.required, true);
+  assert.equal(options.find((option) => option.name === "name")?.options?.[0]?.required, true);
+  assert.equal(options.find((option) => option.name === "transfer")?.options?.[0]?.required, true);
+});
+
 test("utility slash commands are registered with expected options", () => {
   const commands = buildCommands().map((command) => command.toJSON());
 
