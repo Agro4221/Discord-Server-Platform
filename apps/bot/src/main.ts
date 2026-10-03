@@ -340,7 +340,10 @@ async function main(): Promise<void> {
         rolePanels.createPanel(guildId, input.channelId, input.roles, input.title, input.selectionMode, input.maxSelections, 0, callbacks),
       update: async (guildId, panelId, input, callbacks) =>
         rolePanels.updatePanel(guildId, panelId, input.channelId, input.roles, input.title ?? "Выберите роли", input.selectionMode, input.maxSelections, input.durationMinutes, callbacks),
-      delete: async (guildId, panelId, deleteMessage) => rolePanels.deletePanel(guildId, panelId, deleteMessage)
+      delete: async (guildId, panelId, deleteMessage) => rolePanels.deletePanel(guildId, panelId, deleteMessage),
+      listAutomationRules: async (guildId) => rolePanels.listAutomationRules(guildId),
+      saveAutomationRule: async (guildId, input) => rolePanels.saveAutomationRule(guildId, input),
+      deleteAutomationRule: async (guildId, id) => rolePanels.deleteAutomationRule(guildId, id)
     },
     actions: {
       "temporary-voice.reconcile": async (guildId) => { await temporaryVoice.reconcileGuild(guildId); return { guildId, ok: true }; },
