@@ -192,3 +192,45 @@ test("Automation accepts expanded Discord trigger catalog", () => {
     );
   }
 });
+
+test("Automation validates richer condition and action catalog", () => {
+  assert.doesNotThrow(() => validateAutomationRule("message.create", [
+    { type: "not-has-role", userId: "@event", roleId: "12345678901234567" },
+    { type: "channel-type-is", channelType: "text" },
+    { type: "user-is-bot", userId: "@event", value: false },
+    { type: "has-permission", userId: "@event", permission: "ManageMessages" }
+  ], [
+    { type: "set-nickname", userId: "@event", nickname: "Automation" },
+    { type: "react-message", channelId: "@event", messageId: "@event", emoji: "👍" }
+  ]));
+});
+
+test("Automation dry-run evaluates bot and channel-type conditions and previews richer actions", async () => {
+  const engine = new AutomationEngine(
+    {} as import("../src/database.js").Database,
+    {} as import("../src/modules/moderation.js").Moderation
+  );
+  const result = await engine.dryRun({
+    guildId: "123456789012345678",
+    event: "message.create",
+    conditions: [
+      { type: "user-is-bot", userId: "@event", value: false },
+      { type: "channel-type-is", channelType: "text" },
+      { type: "has-permission", userId: "@event", permission: "ManageMessages" }
+    ],
+    anyConditions: [],
+    actions: [
+      { type: "set-nickname", userId: "@event", nickname: "Helper {userId}" },
+      { type: "react-message", channelId: "@event", messageId: "@event", emoji: "👍" }
+    ],
+    userId: "234567890123456789",
+    userIsBot: false,
+    channelId: "345678901234567890",
+    channelType: "text",
+    permissions: ["ManageMessages"]
+  });
+  assert.equal(result.matched, true);
+  assert.equal(result.renderedActions.length, 2);
+  assert.match(result.renderedActions[0]?.preview ?? "", /Helper 234567890123456789/);
+  assert.match(result.renderedActions[1]?.preview ?? "", /👍/);
+});
