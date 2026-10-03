@@ -1067,6 +1067,13 @@ export class ManagementApiServer {
               this.json(res, 404, { error: "automod_rule_not_found" });
               return;
             }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "automod.rule.deleted",
+              targetType: "automod-rule",
+              targetId: String(id)
+            });
             this.json(res, 200, { ok: true });
             return;
           }
