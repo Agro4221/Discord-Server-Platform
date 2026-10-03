@@ -1,3 +1,4 @@
+import { nextMusicRepeatMode, clampMusicVolume } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -43,3 +44,16 @@ test("Music node health is degraded only when every Lavalink node is unavailable
 });
 
 
+
+
+test("Music repeat controller cycles through off, track and queue", () => {
+  assert.equal(nextMusicRepeatMode("off"), "track");
+  assert.equal(nextMusicRepeatMode("track"), "queue");
+  assert.equal(nextMusicRepeatMode("queue"), "off");
+});
+
+test("Music volume controller clamps values to the Discord player range", () => {
+  assert.equal(clampMusicVolume(-10), 0);
+  assert.equal(clampMusicVolume(105), 105);
+  assert.equal(clampMusicVolume(999), 200);
+});
