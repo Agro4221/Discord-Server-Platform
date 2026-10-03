@@ -43,7 +43,7 @@ type ApiOptions = {
   notifications?: {
     list: (guildId: string) => Promise<unknown[]>;
     create: (guildId: string, channelId: string, url: string, intervalSeconds: number) => Promise<unknown>;
-    update: (guildId: string, feedId: number, input: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean }) => Promise<boolean>;
+    update: (guildId: string, feedId: number, input: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean; messageTemplate?: string }) => Promise<boolean>;
     delete: (guildId: string, feedId: number) => Promise<boolean>;
   };
   streamAlerts?: {
