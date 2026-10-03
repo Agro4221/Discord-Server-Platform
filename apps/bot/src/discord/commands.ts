@@ -743,6 +743,9 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addIntegerOption((o) => o.setName("destructive-window").setDescription("Destructive action window in seconds").setMinValue(5).setMaxValue(300))
           .addRoleOption((o) => o.setName("quarantine-role").setDescription("Optional quarantine role"))
           .addChannelOption((o) => o.setName("log-channel").setDescription("Security log channel").addChannelTypes(ChannelType.GuildText))
+          .addBooleanOption((o) => o.setName("raid-quarantine").setDescription("Quarantine members while Anti-Raid is active"))
+          .addBooleanOption((o) => o.setName("destructive-role-removal").setDescription("Remove manageable roles from destructive actors"))
+          .addBooleanOption((o) => o.setName("destructive-quarantine").setDescription("Quarantine destructive actors"))
       )
       .addSubcommand((sub) => sub.setName("status").setDescription("Show current security state")),
     new SlashCommandBuilder()
