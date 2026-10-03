@@ -36,9 +36,11 @@ const ACTION_LABELS: Record<Action, string> = {
 
 export function ModerationPanel({
   guildId,
+  channels,
   onChanged
 }: {
   guildId: string;
+  channels: Array<{ id: string; name: string; type?: number }>;
   onChanged?: () => void | Promise<void>;
 }) {
   const [members, setMembers] = useState<Member[]>([]);
@@ -285,6 +287,24 @@ export function ModerationPanel({
           placeholder="Или Discord ID пользователя"
           style={{ ...inputStyle, marginTop: 9 }}
         />
+      </section>
+
+      <section style={channelStyle}>
+        <div style={{ fontSize: 9, letterSpacing: 1.2, color: "#687486" }}>CHANNEL OPERATIONS</div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(190px,1fr) 120px 110px auto", gap: 8, marginTop: 9 }}>
+          <select value={channelId} onChange={(event) => setChannelId(event.target.value)} style={inputStyle}>
+            <option value="">Текстовый канал…</option>
+            {channels.map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}
+          </select>
+          <select value={channelAction} onChange={(event) => setChannelAction(event.target.value as typeof channelAction)} style={inputStyle}>
+            <option value="clear">Clear</option>
+            <option value="slowmode">Slowmode</option>
+            <option value="lock">Lock</option>
+            <option value="unlock">Unlock</option>
+          </select>
+          <input type="number" value={channelValue} min={0} max={21600} disabled={channelAction !== "clear" && channelAction !== "slowmode"} onChange={(event) => setChannelValue(event.target.value)} placeholder="Значение" style={inputStyle} />
+          <button type="button" disabled={busy} onClick={() => void channelExecute()} style={button("secondary")}>Выполнить</button>
+        </div>
       </section>
 
       <section style={panel}>
