@@ -287,6 +287,22 @@ const MODULE_META: Record<string, ModuleMeta> = {
     ],
     kind: "discord"
   },
+  utility: {
+    icon: "⌘",
+    accent: "#8fc7e8",
+    title: "Utility",
+    summary: "Информация о сервере и участниках, аватары, роли, каналы и AFK.",
+    category: "community",
+    commands: ["/serverinfo", "/userinfo", "/avatar", "/membercount", "/roleinfo", "/channelinfo", "/afk set", "/afk clear", "/afk status"],
+    functions: [
+      { title: "Server info", description: "Статистика сервера: участники, роли, каналы, бусты и владелец." },
+      { title: "User info", description: "Карточка пользователя с датами создания/входа и ролями." },
+      { title: "Avatars", description: "Показ аватара выбранного участника в высоком качестве." },
+      { title: "Role / channel info", description: "Быстрый просмотр основных свойств роли или канала." },
+      { title: "Persistent AFK", description: "AFK сохраняется в PostgreSQL, автоматически снимается при возвращении и уведомляет о статусе при упоминании." }
+    ],
+    kind: "discord"
+  },
   automation: {
     icon: "↯",
     accent: "#9f8cf2",
