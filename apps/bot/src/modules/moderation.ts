@@ -21,6 +21,7 @@ export type ModerationCase = {
   action: ModerationAction;
   reason: string | null;
   expiresAt: Date | null;
+  resolvedAt: Date | null;
   createdAt: Date;
 };
 
@@ -109,8 +110,63 @@ export class Moderation implements PlatformModule {
       action: row.action,
       reason: row.reason,
       expiresAt: row.expires_at,
+      resolvedAt: row.resolved_at,
       createdAt: row.created_at
     }));
+  }
+
+  async recent(
+    guildId: string,
+    limit = 50,
+    action?: ModerationAction
+  ): Promise<ModerationCase[]> {
+    const safeLimit = Math.min(Math.max(limit, 1), 200);
+    const result = await this.db.query<{
+      id: string;
+      guild_id: string;
+      target_user_id: string;
+      moderator_user_id: string;
+      action: ModerationAction;
+      reason: string | null;
+      expires_at: Date | null;
+      resolved_at: Date | null;
+      created_at: Date;
+    }>(
+      action
+        ? `SELECT id,guild_id,target_user_id,moderator_user_id,action,reason,expires_at,resolved_at,created_at
+           FROM moderation_cases
+           WHERE guild_id=$1 AND action=$2
+           ORDER BY created_at DESC
+           LIMIT $3`
+        : `SELECT id,guild_id,target_user_id,moderator_user_id,action,reason,expires_at,resolved_at,created_at
+           FROM moderation_cases
+           WHERE guild_id=$1
+           ORDER BY created_at DESC
+           LIMIT $2`,
+      action ? [guildId, action, safeLimit] : [guildId, safeLimit]
+    );
+
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      guildId: row.guild_id,
+      targetUserId: row.target_user_id,
+      moderatorUserId: row.moderator_user_id,
+      action: row.action,
+      reason: row.reason,
+      expiresAt: row.expires_at,
+      resolvedAt: row.resolved_at,
+      createdAt: row.created_at
+    }));
+  }
+
+  async resolveCase(guildId: string, caseId: number): Promise<boolean> {
+    const result = await this.db.query(
+      `UPDATE moderation_cases
+       SET resolved_at=COALESCE(resolved_at, now())
+       WHERE guild_id=$1 AND id=$2 AND resolved_at IS NULL`,
+      [guildId, caseId]
+    );
+    return result.rowCount === 1;
   }
 
   private async enabled(guildId: string): Promise<boolean> {
