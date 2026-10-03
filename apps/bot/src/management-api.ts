@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
-import type { Client } from "discord.js";
+import { EmbedBuilder, type Client } from "discord.js";
 import { logger } from "./logger.js";
 import { ModuleSettingsRepository } from "./module-settings.js";
 import { MODULE_CATALOG, type ModuleKey } from "./modules/catalog.js";
@@ -894,6 +894,55 @@ export class ManagementApiServer {
               action: "automation.template.deleted",
               targetType: "automation-template",
               targetId: name
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const embedMatch = path.match(/^\/api\/guilds\/([^/]+)\/embed$/);
+          if (method === "POST" && embedMatch) {
+            const guildId = embedMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const channelId = typeof body.channelId === "string" ? body.channelId : "";
+            const channel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(channelId);
+            if (!/^\d{17,20}$/.test(channelId) || channel?.type !== 0) {
+              throw new RequestInputError("text_channel_required", 400);
+            }
+            const title = typeof body.title === "string" ? body.title.trim().slice(0,256) : "";
+            const description = typeof body.description === "string" ? body.description.slice(0,4096) : "";
+            const footer = typeof body.footer === "string" ? body.footer.slice(0,2048) : "";
+            const url = typeof body.url === "string" ? body.url.trim() : "";
+            const image = typeof body.image === "string" ? body.image.trim() : "";
+            const thumbnail = typeof body.thumbnail === "string" ? body.thumbnail.trim() : "";
+            const color = typeof body.color === "string" ? body.color.trim() : "";
+            if (!title && !description && !footer && !image && !thumbnail) {
+              throw new RequestInputError("embed_content_required", 400);
+            }
+            for (const value of [url,image,thumbnail]) {
+              if (value && !/^https?:\/\//i.test(value)) throw new RequestInputError("embed_url_must_be_http", 400);
+            }
+            if (color && !/^#[0-9a-fA-F]{6}$/.test(color)) {
+              throw new RequestInputError("embed_color_invalid", 400);
+            }
+            const embed = new EmbedBuilder();
+            if (title) embed.setTitle(title);
+            if (description) embed.setDescription(description);
+            if (url) embed.setURL(url);
+            if (color) embed.setColor(parseInt(color.slice(1),16));
+            if (footer) embed.setFooter({ text: footer });
+            if (image) embed.setImage(image);
+            if (thumbnail) embed.setThumbnail(thumbnail);
+            await channel.send({ embeds: [embed] });
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "embed.published",
+              targetType: "channel",
+              targetId: channelId
             });
             this.json(res, 200, { ok: true });
             return;
