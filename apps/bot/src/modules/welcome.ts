@@ -107,6 +107,8 @@ export class Welcome implements PlatformModule {
       goodbye_embed: boolean;
       starter_role_ids: string;
       restore_roles: boolean;
+      image_url: string | null;
+      goodbye_image_url: string | null;
     }>(
       "SELECT enabled,channel_id,message,dm,embed,goodbye_enabled,goodbye_channel_id,goodbye_message,goodbye_embed,starter_role_ids,restore_roles,image_url,goodbye_image_url FROM welcome_settings WHERE guild_id=$1",
       [guildId]
