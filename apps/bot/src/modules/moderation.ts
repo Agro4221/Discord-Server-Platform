@@ -246,6 +246,54 @@ export class Moderation implements PlatformModule {
     return result.rows[0] ? Number(result.rows[0].id) : null;
   }
 
+  async applyLockdown(guildId: string, actorUserId: string): Promise<{ locked: number; failed: number }> {
+    if (!await this.enabled(guildId)) throw new Error("moderation_disabled");
+    const guild = this.client?.guilds.cache.get(guildId);
+    if (!guild) throw new Error("guild_not_found");
+    let locked = 0;
+    let failed = 0;
+    for (const channel of guild.channels.cache.values()) {
+      if (!channel.isTextBased() || !("permissionOverwrites" in channel)) continue;
+      try {
+        const everyone = guild.roles.everyone;
+        const current = channel.permissionsFor(everyone)?.has(PermissionFlagsBits.SendMessages) ?? null;
+        await this.db.query("INSERT INTO moderation_channel_locks(guild_id,channel_id,previous_send_messages) VALUES($1,$2,$3) ON CONFLICT(guild_id,channel_id) DO NOTHING",[guildId,channel.id,current]);
+        await channel.permissionOverwrites.edit(everyone,{ SendMessages: false },{ reason: "Vexa lockdown" });
+        locked += 1;
+      } catch (error) {
+        failed += 1;
+        logger.warn("Moderation lockdown channel failed",{guildId,channelId:channel.id,error:String(error)});
+      }
+    }
+    await this.audit("moderation.lockdown.applied",guildId,actorUserId,guildId,{locked,failed,preset:"all-text"});
+    return { locked, failed };
+  }
+
+  async releaseLockdown(guildId: string, actorUserId: string): Promise<{ restored: number; failed: number }> {
+    const guild = this.client?.guilds.cache.get(guildId);
+    if (!guild) throw new Error("guild_not_found");
+    const rows = await this.db.query<{ channel_id: string; previous_send_messages: boolean | null }>("SELECT channel_id,previous_send_messages FROM moderation_channel_locks WHERE guild_id=$1",[guildId]);
+    let restored = 0;
+    let failed = 0;
+    for (const row of rows.rows) {
+      const channel = guild.channels.cache.get(row.channel_id);
+      if (!channel || !("permissionOverwrites" in channel)) {
+        await this.db.query("DELETE FROM moderation_channel_locks WHERE guild_id=$1 AND channel_id=$2",[guildId,row.channel_id]);
+        continue;
+      }
+      try {
+        const everyone = guild.roles.everyone;
+        await channel.permissionOverwrites.edit(everyone,{ SendMessages: row.previous_send_messages },{ reason: "Vexa lockdown release" });
+        await this.db.query("DELETE FROM moderation_channel_locks WHERE guild_id=$1 AND channel_id=$2",[guildId,row.channel_id]);
+        restored += 1;
+      } catch (error) {
+        failed += 1;
+        logger.warn("Moderation lockdown release channel failed",{guildId,channelId:row.channel_id,error:String(error)});
+      }
+    }
+    await this.audit("moderation.lockdown.released",guildId,actorUserId,guildId,{restored,failed,preset:"all-text"});
+    return { restored, failed };
+  }
   async listCleanupRules(guildId: string): Promise<Array<{
     id: number;
     channelId: string;
