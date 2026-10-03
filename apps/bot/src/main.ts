@@ -37,6 +37,7 @@ import { CustomCommandService } from "./custom-commands.js";
 import { CommandPolicyService } from "./command-policy.js";
 import { Polls } from "./modules/polls.js";
 import { Reputation } from "./modules/reputation.js";
+import { Birthdays } from "./modules/birthdays.js";
 
 let fatalCleanup: (() => Promise<void>) | undefined;
 
@@ -109,6 +110,7 @@ async function main(): Promise<void> {
   const commandPolicy = new CommandPolicyService(database);
   const polls = new Polls(database);
   const reputation = new Reputation(database);
+  const birthdays = new Birthdays(database);
 
   const setModuleHealth = (
     name: string,
@@ -178,6 +180,7 @@ async function main(): Promise<void> {
   modules.register(customCommands);
   modules.register(polls);
   modules.register(reputation);
+  modules.register(birthdays);
 
   for (const name of modules.list()) health.setModule(name, "starting");
 
