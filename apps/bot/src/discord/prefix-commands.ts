@@ -145,12 +145,36 @@ export class PrefixCommandRouter {
       if (!allowed) return;
 
       if (custom.actionType === "alias" && custom.aliasTarget) {
-        if (await this.leveling.handlePrefixCommand(message, custom.aliasTarget, args)) return;
-        if (await this.music.handlePrefixCommand(message, custom.aliasTarget, args)) return;
-        if (["ban", "unban", "kick", "timeout", "warn"].includes(custom.aliasTarget)) {
-          await this.handleModeration(message, custom.aliasTarget, args);
+        const target = custom.aliasTarget;
+
+        if (target === "help") {
+          const policies = await this.commandPolicy.list(message.guild.id);
+          const available = policies
+            .filter((item) => item.enabled && item.prefixEnabled && item.helpVisible)
+            .map((item) => prefix + item.commandName);
+          await message.reply(
+            available.length ? available.join(", ").slice(0, 3900) : "Нет доступных prefix-команд."
+          );
           return;
         }
+
+        if (await this.leveling.handlePrefixCommand(message, target, args)) return;
+        if (await this.music.handlePrefixCommand(message, target, args)) return;
+        if (await this.economy.handlePrefixCommand(message, target, args)) return;
+        if (await this.reminders.handlePrefixCommand(message, target, args)) return;
+        if (await this.utility.handlePrefixCommand(message, target, args)) return;
+        if (await this.communityTools.handlePrefixCommand(message, target, args)) return;
+        if (await this.tickets.handlePrefixCommand(message, target)) return;
+        if (await this.rolePanels.handlePrefixCommand(message, target, args)) return;
+        if (await this.giveaways.handlePrefixCommand(message, target, args)) return;
+
+        if (["ban", "unban", "kick", "timeout", "warn"].includes(target)) {
+          await this.handleModeration(message, target, args);
+          return;
+        }
+
+        await message.reply("Неизвестная целевая команда alias: " + target);
+        return;
       }
 
       await this.customCommands.handlePrefixCommand(message, custom, args);;
