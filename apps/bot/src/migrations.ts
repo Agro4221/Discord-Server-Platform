@@ -702,7 +702,30 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_moderation_notes_guild_target ON moderation_notes(guild_id,target_user_id,created_at DESC);"
     ])
   }
- ] as const;
+ ,
+  {
+    version: 44,
+    name: "polls",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS polls (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  message_id text,",
+      "  creator_id text NOT NULL,",
+      "  question text NOT NULL,",
+      "  options jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  votes jsonb NOT NULL DEFAULT '{}'::jsonb,",
+      "  multiple boolean NOT NULL DEFAULT false,",
+      "  ends_at timestamptz,",
+      "  status text NOT NULL DEFAULT 'open' CHECK(status IN ('open','closed')),",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  closed_at timestamptz",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_polls_guild_status ON polls(guild_id,status);",
+      "CREATE INDEX IF NOT EXISTS idx_polls_open_end ON polls(status,ends_at);"
+    ])
+  } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
   await db.query(q([
