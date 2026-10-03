@@ -772,6 +772,35 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_music_playlists_user ON music_playlists(guild_id,user_id,updated_at DESC);"
     ])
+  } ,
+  {
+    version: 47,
+    name: "community_reputation_profiles",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS reputation_points (",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  points integer NOT NULL DEFAULT 0 CHECK(points >= 0),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,user_id)",
+      ");",
+      "CREATE TABLE IF NOT EXISTS reputation_gifts (",
+      "  guild_id text NOT NULL,",
+      "  from_user_id text NOT NULL,",
+      "  to_user_id text NOT NULL,",
+      "  day date NOT NULL DEFAULT CURRENT_DATE,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,from_user_id,to_user_id,day)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_reputation_points_guild ON reputation_points(guild_id,points DESC);",
+      "CREATE TABLE IF NOT EXISTS social_profiles (",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  bio text NOT NULL DEFAULT '',",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,user_id)",
+      ");"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
