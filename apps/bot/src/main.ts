@@ -41,6 +41,7 @@ import { Polls } from "./modules/polls.js";
 import { Reputation } from "./modules/reputation.js";
 import { Birthdays } from "./modules/birthdays.js";
 import { InviteTracking } from "./modules/invite-tracking.js";
+import { HelpPages } from "./help-pages.js";
 
 let fatalCleanup: (() => Promise<void>) | undefined;
 
@@ -122,6 +123,7 @@ async function main(): Promise<void> {
   const reputation = new Reputation(database);
   const birthdays = new Birthdays(database);
   const inviteTracking = new InviteTracking(database);
+  const helpPages = new HelpPages(database);
 
   const setModuleHealth = (
     name: string,
@@ -381,7 +383,7 @@ async function main(): Promise<void> {
   fleetTimer.unref();
 
   events.on("interaction.command", (interaction) => {
-    void routeCommand(client, interaction, database, temporaryVoice, moderation);
+    void routeCommand(client, interaction, database, temporaryVoice, moderation, helpPages);
   });
 
   events.addCommandGuard((interaction) => commandPolicy.checkInteraction(interaction));
