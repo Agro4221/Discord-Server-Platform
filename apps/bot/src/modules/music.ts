@@ -1228,9 +1228,23 @@ export class Music implements PlatformModule {
       await this.persistPlayer(player);
       response = `🔊 Громкость: **${next}**`;
     } else if (action === "queue") {
-      const tracks = player.queue.tracks.slice(0, 15);
-      const lines = tracks.map((track, index) => `${index + 1}. **${track.info.title}** — ${track.info.author ?? "Unknown artist"}`);
-      response = lines.length ? `📋 Очередь\\n${lines.join("\\n")}` : "📋 Очередь пуста.";
+      const page = this.buildQueuePage(player, 0);
+      await interaction.reply({
+        content: page.content,
+        components: page.components,
+        ephemeral: true
+      });
+      return;
+    } else if (action.startsWith("queue-page:")) {
+      const pageNumber = Number(action.slice("queue-page:".length));
+      if (!Number.isInteger(pageNumber) || pageNumber < 0) return;
+      const page = this.buildQueuePage(player, pageNumber);
+      await interaction.reply({
+        content: page.content,
+        components: page.components,
+        ephemeral: true
+      });
+      return;
     } else {
       return;
     }
@@ -1478,6 +1492,43 @@ export class Music implements PlatformModule {
         JSON.stringify(player.toJSON())
       ]
     ).catch((error) => logger.warn("Failed to persist music player", { error: String(error) }));
+  }
+
+  private buildQueuePage(player: Player, requestedPage: number): {
+    content: string;
+    components: ActionRowBuilder<ButtonBuilder>[];
+  } {
+    const pageSize = 10;
+    const total = player.queue.tracks.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const page = Math.min(Math.max(Math.trunc(requestedPage), 0), totalPages - 1);
+    const start = page * pageSize;
+    const tracks = player.queue.tracks.slice(start, start + pageSize);
+    const lines = tracks.map((track, index) =>
+      `${start + index + 1}. **${track.info.title}** — ${track.info.author ?? "Unknown artist"}`
+    );
+
+    const components = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`dsp:music:queue-page:${Math.max(0, page - 1)}`)
+        .setEmoji("⬅️")
+        .setLabel("Назад")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page === 0),
+      new ButtonBuilder()
+        .setCustomId(`dsp:music:queue-page:${Math.min(totalPages - 1, page + 1)}`)
+        .setEmoji("➡️")
+        .setLabel("Дальше")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page >= totalPages - 1)
+    );
+
+    return {
+      content: lines.length
+        ? `📋 **Очередь** · страница ${page + 1}/${totalPages} · треков: ${total}\n\n${lines.join("\n")}`
+        : "📋 Очередь пуста.",
+      components: total > 0 ? [components] : []
+    };
   }
 
   private buildControllerComponents(player: Player): ActionRowBuilder<ButtonBuilder>[] {
