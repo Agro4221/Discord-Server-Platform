@@ -34,3 +34,12 @@ test("Security executor audit lookback honors configured destructive window", ()
   assert.equal(securityAuditLookbackCutoff(100_000, 1), 95_000);
   assert.equal(securityAuditLookbackCutoff(100_000, 999), -200_000);
 });
+
+
+test("Security response policy defaults preserve quarantine and role removal", () => {
+  assert.equal(securityResponsePolicy({}), {
+    raidQuarantine: true,
+    destructiveRoleRemoval: true,
+    destructiveQuarantine: true
+  });
+});
