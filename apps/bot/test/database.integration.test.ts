@@ -269,6 +269,45 @@ test("config transfer preserves automation workflow presets", { skip: !enabled }
   }
 });
 
+test("config transfer preserves analytics settings", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345759";
+  try {
+    await migrate(db);
+    await db.query("DELETE FROM guild_modules WHERE guild_id=$1", [guildId]);
+    await db.query("DELETE FROM analytics_settings WHERE guild_id=$1", [guildId]);
+    await db.query(
+      "INSERT INTO guild_modules(guild_id,module_key,enabled) VALUES($1,'analytics',true)",
+      [guildId]
+    );
+    await db.query(
+      "INSERT INTO analytics_settings(guild_id,retention_days,visible_counters) VALUES($1,90,$2::jsonb)",
+      [guildId, JSON.stringify(["message","voice_move"])]
+    );
+
+    const transfer = new ConfigTransferService(db);
+    const exported = await transfer.exportGuild(guildId);
+    const analytics = exported.modules.find((module) => module.key === "analytics");
+    assert.equal(analytics?.enabled, true);
+    assert.equal(analytics?.settings.retention_days, 90);
+    assert.deepEqual(analytics?.settings.visible_counters, ["message","voice_move"]);
+
+    await db.query("UPDATE analytics_settings SET retention_days=7,visible_counters='["message"]'::jsonb WHERE guild_id=$1", [guildId]);
+    await transfer.importGuild(guildId, exported);
+
+    const restored = await db.query<{ retention_days: number; visible_counters: string[] }>(
+      "SELECT retention_days,visible_counters FROM analytics_settings WHERE guild_id=$1",
+      [guildId]
+    );
+    assert.equal(restored.rows[0]?.retention_days, 90);
+    assert.deepEqual(restored.rows[0]?.visible_counters, ["message","voice_move"]);
+  } finally {
+    await db.query("DELETE FROM guild_modules WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.query("DELETE FROM analytics_settings WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.close();
+  }
+});
+
 test("config transfer and local backup round-trip preserve guild configuration", { skip: !enabled }, async () => {
   const db = new Database(process.env.DATABASE_URL!);
   const directory = await mkdtemp(join(tmpdir(), "dsp-backup-"));
