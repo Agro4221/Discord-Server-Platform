@@ -345,7 +345,7 @@ Music должен стремиться к функциональности си
 | Mod notes / history | ✅ |
 | Full action logging | 🟡 |
 | Rule-specific AutoMod punishments | ✅ |
-| Rate limits per rule | 🟡 |
+| Rate limits per rule | ✅ |
 | Channel / role / user exemptions | ✅ / расширять |
 | Attachments / URL / invite / mention / emoji / caps / spam controls | ✅ / расширять |
 | Anti-raid / anti-nuke / quarantine | ✅ / расширять |
