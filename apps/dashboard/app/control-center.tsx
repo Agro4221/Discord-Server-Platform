@@ -12,6 +12,7 @@ import { NotificationsPanel } from "./notifications-panel";
 import { RolePanelsEditor } from "./role-panels-editor";
 import { CustomCommandsPanel } from "./custom-commands-panel";
 import { StreamAlertsPanel } from "./stream-alerts-panel";
+import { EconomyShopPanel } from "./economy-shop-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -430,7 +431,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts"]);
+const PANEL_KEYS = new Set(["roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1489,6 +1490,17 @@ function ModulePage(props: {
             guildId={props.guildId}
             channels={props.resources.channels.filter((item) => item.type === 0)}
             roles={props.resources.roles}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "economy" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Economy Shop" eyebrow="OPERATIONS" />
+          <EconomyShopPanel
+            guildId={props.guildId}
+            roles={props.resources.roles.filter((item) => item.manageable !== false)}
             onChanged={props.onAudit}
           />
         </section>
