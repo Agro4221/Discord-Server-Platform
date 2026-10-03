@@ -1466,8 +1466,14 @@ export class ManagementApiServer {
             const channelId = body.channelId;
             const title = body.title;
             const rawRoles = body.roles;
-            const selectionMode = body.selectionMode ?? "toggle";
-            const maxSelections = body.maxSelections ?? 1;
+            const selectionModeValue = body.selectionMode;
+            const selectionMode = typeof selectionModeValue === "string" && ["toggle","exclusive","max"].includes(selectionModeValue)
+              ? selectionModeValue as "toggle" | "exclusive" | "max"
+              : "toggle";
+            const maxSelectionsValue = body.maxSelections;
+            const maxSelections = typeof maxSelectionsValue === "number" && Number.isFinite(maxSelectionsValue)
+              ? Math.trunc(maxSelectionsValue)
+              : 1;
 
             if (
               typeof channelId !== "string" ||
