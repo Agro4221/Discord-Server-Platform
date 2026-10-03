@@ -1455,7 +1455,7 @@ function ModulePage(props: {
       {props.module?.key === "moderation" && (
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Escalation rules" eyebrow="OPERATIONS" />
-          <ModerationPanel guildId={props.guildId} onChanged={props.onAudit} />
+          <ModerationPanel guildId={props.guildId} channels={props.resources.channels.filter((item) => item.type === 0)} onChanged={props.onAudit} />
         </section>
       )}
 
