@@ -264,6 +264,12 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       )
       .addSubcommand((sub) =>
         sub
+          .setName("reopen")
+          .setDescription("Reopen a closed ticket")
+          .addIntegerOption((o) => o.setName("id").setDescription("Ticket id").setMinValue(1).setRequired(true))
+      )
+      .addSubcommand((sub) =>
+        sub
           .setName("setup")
           .setDescription("Configure tickets")
           .addChannelOption((option) =>
