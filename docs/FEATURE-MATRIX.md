@@ -440,7 +440,7 @@ Music должен стремиться к функциональности си
 | Richer trigger catalog | 🟡 |
 | Richer condition catalog | 🟡 |
 | Richer action catalog | 🟡 |
-| Workflow retries / dead-letter diagnostics | 🟡 | Operational delayed-job diagnostics are implemented; retry/dead-letter policy remains next step |
+| Workflow retries / dead-letter diagnostics | ✅ | Durable delayed jobs retry with bounded exponential backoff and move to a persistent dead-letter state after five failed attempts; Dashboard diagnostics exposes the state |
 | Reusable workflow presets | 🟡 |
 | Cross-module actions (tickets, roles, giveaway, moderation, music, notifications) | 🟡 |
 
