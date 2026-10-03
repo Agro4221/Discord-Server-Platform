@@ -88,6 +88,9 @@ type ApiOptions = {
       enabled?: boolean;
     }) => Promise<boolean>;
     delete: (guildId: string, ruleId: string) => Promise<boolean>;
+    listTemplates: (guildId: string) => Promise<unknown[]>;
+    setTemplate: (guildId: string, name: string, content: string) => Promise<void>;
+    deleteTemplate: (guildId: string, name: string) => Promise<boolean>;
   };
   customCommands?: CustomCommandService;
   moderation?: Moderation;
@@ -826,6 +829,71 @@ export class ManagementApiServer {
               action: "automation.deleted",
               targetType: "automation-rule",
               targetId: ruleId
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const automationTemplatesMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/templates$/);
+          const automationTemplateItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/templates\/([^/]+)$/);
+
+          if ((automationTemplatesMatch || automationTemplateItemMatch) && !this.options.automation) {
+            this.json(res, 500, { error: "automation_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && automationTemplatesMatch) {
+            const guildId = automationTemplatesMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, templates: await this.options.automation!.listTemplates(guildId) });
+            return;
+          }
+
+          if (method === "POST" && automationTemplatesMatch) {
+            const guildId = automationTemplatesMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const name = typeof body.name === "string" ? body.name.trim().toLowerCase() : "";
+            const content = typeof body.content === "string" ? body.content : "";
+            if (!/^[a-z0-9_-]{1,40}$/.test(name) || !content.trim() || content.length > 2000) {
+              throw new RequestInputError("invalid_automation_template", 400);
+            }
+            await this.options.automation!.setTemplate(guildId, name, content);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "automation.template.saved",
+              targetType: "automation-template",
+              targetId: name
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          if (method === "DELETE" && automationTemplateItemMatch) {
+            const guildId = automationTemplateItemMatch[1] ?? "";
+            const name = decodeURIComponent(automationTemplateItemMatch[2] ?? "").toLowerCase();
+            if (!guildId || !/^[a-z0-9_-]{1,40}$/.test(name) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_template_not_found" });
+              return;
+            }
+            const deleted = await this.options.automation!.deleteTemplate(guildId, name);
+            if (!deleted) {
+              this.json(res, 404, { error: "template_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "automation.template.deleted",
+              targetType: "automation-template",
+              targetId: name
             });
             this.json(res, 200, { ok: true });
             return;
