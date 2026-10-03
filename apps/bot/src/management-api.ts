@@ -853,7 +853,9 @@ export class ManagementApiServer {
             rows.push(["summary","voiceJoins",String(report.counters.voiceJoins ?? 0)]);
             rows.push(["summary","voiceLeaves",String(report.counters.voiceLeaves ?? 0)]);
             rows.push(["summary","voiceMoves",String(report.counters.voiceMoves ?? 0)]);
-            const csv = rows.map((row) => row.map((value) => """ + String(value).replaceAll(""","""") + """).join(",")).join("\n") + "\n";
+            const csv = rows
+              .map((row) => row.map((value) => '"' + String(value).replaceAll('"', '""') + '"').join(","))
+              .join("\n") + "\n";
             res.writeHead(200, {
               "content-type": "text/csv; charset=utf-8",
               "content-disposition": "attachment; filename=\"analytics-" + guildId + "-" + hours + "h.csv\"",
