@@ -299,7 +299,7 @@ export class RolePanels implements PlatformModule {
       }
     }
 
-    await this.createPanel(message.guild.id, message.channelId, roles, args.join(" ").trim() || "Выберите роли", "toggle", 1, {
+    await this.createPanel(message.guild.id, message.channelId, roles, args.join(" ").trim() || "Выберите роли", "toggle", 1, 0, {
       deleteMessage: async (channelId, messageId) => {
         const channel = message.guild!.channels.cache.get(channelId);
         if (channel && channel.type === 0) await channel.messages.delete(messageId).catch(() => undefined);
