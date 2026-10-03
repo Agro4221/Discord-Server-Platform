@@ -25,12 +25,13 @@ const CONFIG_TABLES: ExportTable[] = [
   { table: "ticket_settings", fields: ["enabled","category_id","staff_role_id","transcript_channel_id","max_open_per_user","auto_close_minutes"] },
   { table: "security_settings", fields: [
     "enabled","max_joins","window_seconds","max_destructive_actions",
-    "destructive_window_seconds","quarantine_role_id","log_channel_id"
+    "destructive_window_seconds","quarantine_role_id","log_channel_id",
+    "raid_quarantine_enabled","destructive_role_removal","destructive_quarantine_enabled"
   ] },
   { table: "verification_settings", fields: ["enabled","channel_id","verified_role_id","quarantine_role_id","log_channel_id","code_ttl_minutes"] },
   { table: "leveling_settings", fields: ["enabled","xp_per_message","cooldown_seconds","announce_level_up"] },
   { table: "starboard_settings", fields: ["channel_id","threshold","ignore_self_reaction","ignore_bots"] },
-  { table: "music_settings", fields: ["enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven","queue_access","queue_access"] },
+  { table: "music_settings", fields: ["enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven","queue_access"] },
   { table: "birthday_settings", fields: ["channel_id","announcement_template"] },
 ];
 
@@ -298,7 +299,8 @@ export class ConfigTransferService {
 
     await execute("security_settings", "security", [
       "enabled","max_joins","window_seconds","max_destructive_actions",
-      "destructive_window_seconds","quarantine_role_id","log_channel_id"
+      "destructive_window_seconds","quarantine_role_id","log_channel_id",
+      "raid_quarantine_enabled","destructive_role_removal","destructive_quarantine_enabled"
     ], {
       enabled: false,
       max_joins: 10,
@@ -306,7 +308,10 @@ export class ConfigTransferService {
       max_destructive_actions: 5,
       destructive_window_seconds: 20,
       quarantine_role_id: null,
-      log_channel_id: null
+      log_channel_id: null,
+      raid_quarantine_enabled: true,
+      destructive_role_removal: true,
+      destructive_quarantine_enabled: true
     });
 
     await execute("verification_settings", "verification", [
@@ -538,7 +543,7 @@ function normalizeImportedRolePanel(value: unknown): ImportedRolePanel {
 }
 
 type ImportedStreamAlert = {
-  platform: "twitch" | "youtube" | "vk";
+  platform: "twitch" | "youtube" | "vk" | "kick";
   target: string;
   channelId: string;
   mentionRoleId: string | null;
@@ -551,7 +556,7 @@ function normalizeImportedStreamAlert(value: unknown): ImportedStreamAlert {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_stream_alert");
   const object = value as Record<string, unknown>;
   if (
-    !["twitch","youtube","vk"].includes(String(object.platform)) ||
+    !["twitch","youtube","vk","kick"].includes(String(object.platform)) ||
     typeof object.target !== "string" ||
     !object.target.trim() ||
     object.target.length > 200 ||
