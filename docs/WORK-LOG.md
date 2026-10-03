@@ -299,3 +299,8 @@ Never write credentials, tokens or private user data here.
 - Community Tools Control Center now creates polls directly: target channel, question, 2–5 options and 1–10080 minute duration.
 - Core validates the target text/announcement channel and bot `ViewChannel`, `SendMessages`, and `EmbedLinks` permissions, rolls back the database row if Discord publication fails, and keeps the existing poll close timer.
 - Dashboard creation is audited as `poll.created`; existing close/status/sticky administration remains intact.
+
+## 2026-10-04 — Control Center consistency audit verified
+- CI run **#1262** (`37152334156`) passed on development head `c9fd897e4a5574119480e4dfc6fd7d434a20cae3` after adding `automod` to `PANEL_KEYS`.
+- Cross-module audit confirmed every `full` module has both a rendered operational branch and a `PANEL_KEYS` entry; there are no extra panel keys and no missing panel branches.
+- Community Tools poll creation remains CI-verified by run **#1260** (`37152201261`) on its feature head.

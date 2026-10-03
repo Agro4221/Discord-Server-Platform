@@ -241,3 +241,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-04 — Community Tools poll creator verified
 - Development head `9be19adc51f501af87057178a1689f51414c2e01` passed CI run **#1260**.
 - Community Tools is now a fuller Dashboard-first operational surface: create/close polls, moderate suggestions, and manage sticky messages.
+
+## 2026-10-04 — Control Center consistency audit
+- Development head `c9fd897e4a5574119480e4dfc6fd7d434a20cae3` passed CI run **#1262**.
+- Operational module metadata, panel keys and rendered panel branches are now internally consistent for all `full` modules.
