@@ -22,6 +22,7 @@ export function ModerationPanel({ guildId, channels, onChanged }: { guildId: str
   const [minutes, setMinutes] = useState(60);
   const [reason, setReason] = useState("Automatic escalation");
   const [busy, setBusy] = useState(false);
+  const [lockdown, setLockdown] = useState<{ active: boolean; lockedChannels: number }>({ active: false, lockedChannels: 0 });
   const [error, setError] = useState("");
 
   async function load() {
@@ -35,6 +36,10 @@ export function ModerationPanel({ guildId, channels, onChanged }: { guildId: str
     if (!cleanupResponse.ok) throw new Error(cleanupBody.error ?? "cleanup_failed");
     setRules((body.rules ?? []) as Escalation[]);
     setCleanupRules(cleanupBody.rules ?? []);
+    const lockdownResponse = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/lockdown", { cache: "no-store" });
+    const lockdownBody = await lockdownResponse.json().catch(() => ({}));
+    if (!lockdownResponse.ok) throw new Error(lockdownBody.error ?? "lockdown_failed");
+    setLockdown({ active: Boolean(lockdownBody.active), lockedChannels: Number(lockdownBody.lockedChannels ?? 0) });
   }
 
   async function saveCleanup() {
@@ -144,6 +149,69 @@ export function ModerationPanel({ guildId, channels, onChanged }: { guildId: str
       <div style={{ color: "#687486", fontSize: 10 }}>
         Timeout требует длительность. Для постоянного бана оставь 0 минут.
       </div>
+
+      <section style={sectionStyle}>
+        <div style={{ fontWeight: 700, fontSize: 13 }}>Incident Lockdown</div>
+        <div style={{ color: "#687486", fontSize: 10 }}>
+          Пресет <strong>all-text</strong>: блокирует отправку сообщений для @everyone во всех текстовых каналах и запоминает исходные значения для точного восстановления.
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <strong style={{ fontSize: 11 }}>{lockdown.active ? "🔒 ACTIVE" : "✅ RELEASED"}</strong>
+          <span style={{ fontSize: 10, color: "#687486" }}>каналов: {lockdown.lockedChannels}</span>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true); setError("");
+                try {
+                  const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/lockdown", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ enabled: true })
+                  });
+                  const body = await response.json().catch(() => ({}));
+                  if (!response.ok) throw new Error(body.error ?? "lockdown_apply_failed");
+                  await load();
+                  await onChanged?.();
+                } catch (caught) {
+                  setError(caught instanceof Error ? caught.message : "Не удалось включить lockdown.");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              style={buttonStyle}
+            >
+              🔒 Включить
+            </button>
+            <button
+              type="button"
+              disabled={busy || !lockdown.active}
+              onClick={async () => {
+                setBusy(true); setError("");
+                try {
+                  const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/lockdown", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ enabled: false })
+                  });
+                  const body = await response.json().catch(() => ({}));
+                  if (!response.ok) throw new Error(body.error ?? "lockdown_release_failed");
+                  await load();
+                  await onChanged?.();
+                } catch (caught) {
+                  setError(caught instanceof Error ? caught.message : "Не удалось снять lockdown.");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              style={buttonStyle}
+            >
+              🔓 Снять
+            </button>
+          </div>
+        </div>
+      </section>
 
       <section style={sectionStyle}>
         <div style={{ fontWeight: 700, fontSize: 13 }}>Scheduled cleanup / Auto-purge</div>
