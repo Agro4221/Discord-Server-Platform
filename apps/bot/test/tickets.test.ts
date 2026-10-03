@@ -54,6 +54,9 @@ test("Tickets removes a persisted open row when Discord channel publication fail
   const db = {
     async query<T>(text: string, values: readonly unknown[] = []) {
       queries.push(text);
+      if (text.startsWith("SELECT enabled,first_response_minutes")) {
+        return { rows: [] as T[], rowCount: 0 };
+      }
       if (text.startsWith("SELECT enabled,category_id")) {
         return {
           rows: [{
