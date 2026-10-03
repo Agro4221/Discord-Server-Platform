@@ -67,7 +67,7 @@ export class Starboard implements PlatformModule {
     this.unsubscribe = undefined;
   }
 
-  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
     if (!interaction.inGuild() || commandName !== "starboard") return;
 
     if (!interaction.memberPermissions?.has("ManageGuild")) {
