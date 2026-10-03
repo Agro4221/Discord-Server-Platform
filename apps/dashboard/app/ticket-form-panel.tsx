@@ -2,6 +2,19 @@
 
 import { useEffect, useState } from "react";
 
+type TicketSummary = {
+  id: number;
+  channelId: string;
+  creatorId: string;
+  claimedBy: string | null;
+  status: "open" | "closed" | "closing";
+  priority: "low" | "normal" | "high" | "urgent";
+  tags: string[];
+  createdAt: string;
+  closedAt: string | null;
+  lastActivityAt: string | null;
+};
+
 type Field = {
   id: string;
   label: string;
@@ -40,25 +53,38 @@ export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onCha
   const [fields, setFields] = useState<Field[]>([]);
   const [customization, setCustomization] = useState<Customization>(DEFAULT_CUSTOMIZATION);
   const [status, setStatus] = useState("");
+  const [tickets, setTickets] = useState<TicketSummary[]>([]);
+  const [ticketFilter, setTicketFilter] = useState<"open" | "closed" | "closing" | "all">("open");
+  const [ticketEdits, setTicketEdits] = useState<Record<number, { priority: TicketSummary["priority"]; tags: string }>>({});
   const [busy, setBusy] = useState(false);
 
   async function load() {
-    const [formResponse, customizationResponse] = await Promise.all([
+    const ticketQuery = ticketFilter === "all" ? "" : "?status=" + ticketFilter;
+    const [formResponse, customizationResponse, ticketsResponse] = await Promise.all([
       fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/form", { cache: "no-store" }),
-      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/customization", { cache: "no-store" })
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/customization", { cache: "no-store" }),
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets" + ticketQuery, { cache: "no-store" })
     ]);
     const formBody = await formResponse.json().catch(() => ({}));
     const customizationBody = await customizationResponse.json().catch(() => ({}));
+    const ticketsBody = await ticketsResponse.json().catch(() => ({}));
     if (!formResponse.ok) throw new Error(formBody.error ?? "ticket_form_failed");
     if (!customizationResponse.ok) throw new Error(customizationBody.error ?? "ticket_customization_failed");
+    if (!ticketsResponse.ok) throw new Error(ticketsBody.error ?? "tickets_failed");
     setFields((formBody.fields ?? []) as Field[]);
     setCustomization((customizationBody.customization ?? DEFAULT_CUSTOMIZATION) as Customization);
+    const nextTickets = (ticketsBody.tickets ?? []) as TicketSummary[];
+    setTickets(nextTickets);
+    setTicketEdits(Object.fromEntries(nextTickets.map((ticket) => [
+      ticket.id,
+      { priority: ticket.priority, tags: ticket.tags.join(", ") }
+    ])));
   }
 
   useEffect(() => {
     setStatus("");
     void load().catch((error) => setStatus(error instanceof Error ? error.message : "Не удалось загрузить форму."));
-  }, [guildId]);
+  }, [guildId, ticketFilter]);
 
   function patch(index: number, patchValue: Partial<Field>) {
     setFields((current) => current.map((field, i) => i === index ? { ...field, ...patchValue } : field));
@@ -82,6 +108,31 @@ export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onCha
       return;
     }
     setFields((current) => current.filter((_, i) => i !== index));
+  }
+
+  async function saveTicketMetadata(ticket: TicketSummary) {
+    const edit = ticketEdits[ticket.id] ?? { priority: ticket.priority, tags: ticket.tags.join(", ") };
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/" + ticket.id, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          priority: edit.priority,
+          tags: edit.tags.split(",").map((value) => value.trim()).filter(Boolean)
+        })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "ticket_metadata_save_failed");
+      setStatus("Ticket #" + ticket.id + " обновлён.");
+      await load();
+      await onChanged?.();
+    } catch (caught) {
+      setStatus(caught instanceof Error ? caught.message : "Не удалось обновить ticket.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function saveCustomization() {
@@ -133,6 +184,55 @@ export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onCha
   return (
     <div style={{ display: "grid", gap: 10 }}>
       {status && <div style={notice}>{status}</div>}
+      <section style={sectionStyle}>
+        <div style={sectionTitle}>Ticket queue · priority / tags / assignment</div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <select value={ticketFilter} onChange={(e) => setTicketFilter(e.target.value as typeof ticketFilter)} style={input}>
+            <option value="open">Открытые</option>
+            <option value="closing">Закрывающиеся</option>
+            <option value="closed">Закрытые</option>
+            <option value="all">Все</option>
+          </select>
+          <span style={{ color: "#697486", fontSize: 10 }}>{tickets.length} tickets</span>
+        </div>
+        {tickets.length === 0 ? (
+          <div style={{ color: "#697486", fontSize: 10 }}>В выбранном статусе тикетов нет.</div>
+        ) : tickets.map((ticket) => {
+          const edit = ticketEdits[ticket.id] ?? { priority: ticket.priority, tags: ticket.tags.join(", ") };
+          return (
+            <div key={ticket.id} style={card}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                <strong style={{ fontSize: 11 }}>#{ticket.id}</strong>
+                <span style={{ color: "#697486", fontSize: 10 }}>{ticket.status} · {new Date(ticket.createdAt).toLocaleString()}</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "140px 1fr auto", gap: 7 }}>
+                <select
+                  value={edit.priority}
+                  onChange={(e) => setTicketEdits((current) => ({ ...current, [ticket.id]: { ...edit, priority: e.target.value as TicketSummary["priority"] } }))}
+                  style={input}
+                >
+                  <option value="urgent">urgent</option>
+                  <option value="high">high</option>
+                  <option value="normal">normal</option>
+                  <option value="low">low</option>
+                </select>
+                <input
+                  value={edit.tags}
+                  maxLength={400}
+                  onChange={(e) => setTicketEdits((current) => ({ ...current, [ticket.id]: { ...edit, tags: e.target.value } }))}
+                  placeholder="Теги через запятую"
+                  style={input}
+                />
+                <button type="button" disabled={busy} onClick={() => void saveTicketMetadata(ticket)} style={secondary}>Сохранить</button>
+              </div>
+              <div style={{ color: "#697486", fontSize: 9 }}>
+                creator: {ticket.creatorId} · assigned: {ticket.claimedBy ?? "—"} · channel: {ticket.channelId}
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
       <section style={sectionStyle}>
         <div style={sectionTitle}>Оформление и кнопки</div>
         <div style={{ display: "grid", gap: 8 }}>
