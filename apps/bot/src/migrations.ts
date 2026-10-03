@@ -1125,7 +1125,7 @@ const migrations = [
       "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS include_keywords text[] NOT NULL DEFAULT '{}';",
       "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS exclude_keywords text[] NOT NULL DEFAULT '{}';"
     ])
-  }
+  } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
   await db.query(q([
