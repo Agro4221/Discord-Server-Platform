@@ -478,6 +478,32 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       ),
 
     new SlashCommandBuilder()
+      .setName("schedule")
+      .setDescription("Schedule a message in a channel")
+      .addIntegerOption((option) =>
+        option
+          .setName("minutes")
+          .setDescription("Delay in minutes")
+          .setMinValue(1)
+          .setMaxValue(525600)
+          .setRequired(true)
+      )
+      .addChannelOption((option) =>
+        option
+          .setName("channel")
+          .setDescription("Destination channel")
+          .addChannelTypes(ChannelType.GuildText)
+          .setRequired(true)
+      )
+      .addStringOption((option) =>
+        option
+          .setName("text")
+          .setDescription("Message text")
+          .setMaxLength(2000)
+          .setRequired(true)
+      ),
+
+    new SlashCommandBuilder()
       .setName("starboard")
       .setDescription("Starboard")
       .addSubcommand((sub) =>
