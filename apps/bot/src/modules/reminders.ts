@@ -148,9 +148,6 @@ export class Reminders implements PlatformModule {
       return;
     }
 
-    const minutes = interaction.options.getInteger("minutes", true);
-    const text = interaction.options.getString("text", true);
-
     if (interaction.commandName === "sticky") {
       if (!interaction.memberPermissions?.has("ManageGuild")) {
         await interaction.reply({ content: "Для sticky message нужны права Manage Server.", ephemeral: true });
@@ -186,6 +183,9 @@ export class Reminders implements PlatformModule {
       await interaction.reply({ content: "📌 Sticky message настроен в <#" + channel.id + ">.", ephemeral: true });
       return;
     }
+
+    const minutes = interaction.options.getInteger("minutes", true);
+    const text = interaction.options.getString("text", true);
 
     if (interaction.commandName === "schedule") {
       if (!interaction.memberPermissions?.has("ManageGuild")) {
