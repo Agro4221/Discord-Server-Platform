@@ -355,28 +355,10 @@ async function main(): Promise<void> {
 
   const prefixCommands = new PrefixCommandRouter(
     database,
-    leveling,
-    moderation,
-    music,
     customCommands,
     commandPolicy,
-    economy,
-    reminders,
-    utility,
-    communityTools,
-    logging,
-    welcome,
-    verification,
-    security,
-    autoMod,
-    starboard,
-    notifications,
-    automation,
-    tickets,
-    rolePanels,
-    giveaways
-  );
-  events.on("message.create", (message) => {
+    dispatcher
+  );  events.on("message.create", (message) => {
     void prefixCommands.handleMessage(message);
   });
 
