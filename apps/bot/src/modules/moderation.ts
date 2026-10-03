@@ -514,7 +514,8 @@ export class Moderation implements PlatformModule {
     interaction: ChatInputCommandInteraction,
     member: GuildMember,
     durationMinutes: number,
-    reason: string
+    reason: string,
+    enabled = true
   ): Promise<void> {
     if (!interaction.guild || !await this.enabled(interaction.guild.id)) {
       await interaction.reply({ content: "Модуль Moderation выключен для этого сервера.", ephemeral: true });
@@ -864,10 +865,10 @@ export class Moderation implements PlatformModule {
 
     await this.db.query(
       `INSERT INTO moderation_escalations(guild_id,warn_count,action,duration_minutes,reason,enabled)
-       VALUES($1,$2,$3,$4,$5,true)
+       VALUES($1,$2,$3,$4,$5,$6)
        ON CONFLICT(guild_id,warn_count)
-       DO UPDATE SET action=EXCLUDED.action,duration_minutes=EXCLUDED.duration_minutes,reason=EXCLUDED.reason,enabled=true,updated_at=now()`,
-      [guildId,warnCount,action,durationMinutes,cleanReason]
+       DO UPDATE SET action=EXCLUDED.action,duration_minutes=EXCLUDED.duration_minutes,reason=EXCLUDED.reason,enabled=EXCLUDED.enabled,updated_at=now()`,
+      [guildId,warnCount,action,durationMinutes,cleanReason,enabled]
     );
   }
 
