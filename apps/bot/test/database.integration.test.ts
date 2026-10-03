@@ -53,6 +53,34 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
   }
 });
 
+test("ticket SLA configuration persists and clamps safely", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345756";
+  const tickets = new (await import("../src/modules/tickets.js")).Tickets(db);
+  try {
+    await migrate(db);
+    const saved = await tickets.setSlaConfig(guildId, {
+      enabled: true,
+      firstResponseMinutes: 45,
+      reminderMinutes: 90,
+      escalationMinutes: 180,
+      escalationRoleId: "123456789012345678"
+    });
+    assert.deepEqual(saved, {
+      enabled: true,
+      firstResponseMinutes: 45,
+      reminderMinutes: 90,
+      escalationMinutes: 180,
+      escalationRoleId: "123456789012345678"
+    });
+    const restored = await tickets.getSlaConfig(guildId);
+    assert.deepEqual(restored, saved);
+  } finally {
+    await db.query("DELETE FROM ticket_sla_settings WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.close();
+  }
+});
+
 test("music bot assignment is unique per voice channel", { skip: !enabled }, async () => {
   const db = new Database(process.env.DATABASE_URL!);
   const guildId = "123456789012345680";
