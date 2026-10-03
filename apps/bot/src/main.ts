@@ -336,6 +336,9 @@ async function main(): Promise<void> {
     utility,
     communityTools,
     logging,
+    welcome,
+    verification,
+    security,
     tickets,
     rolePanels,
     giveaways
