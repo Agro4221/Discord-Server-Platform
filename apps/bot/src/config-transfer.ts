@@ -100,6 +100,7 @@ export class ConfigTransferService {
         table.table === "role_panels" || table.table === "role_automation_rules" ? "roles" :
         table.table === "notification_feeds" ? "notifications" :
         table.table === "tickets" ? "tickets" :
+        table.table === "help_pages" ? "custom-commands" :
         "stream-alerts";
       const target = modules.find((module) => module.key === moduleKey);
       if (target) {
