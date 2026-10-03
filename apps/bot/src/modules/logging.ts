@@ -58,7 +58,9 @@ export class Logging implements PlatformModule {
       context.events.on("member.remove", (member) => { void this.onMemberLeave(member); }),
       context.events.on("member.update", ({ oldMember, newMember }) => { void this.onMemberUpdate(oldMember, newMember); }),
       context.events.on("voice.state", ({ oldState, newState }) => { void this.onVoice(oldState, newState); }),
+      context.events.on("channel.create", (channel) => { void this.onChannelCreate(channel); }),
       context.events.on("channel.delete", (channel) => { void this.onChannelDelete(channel); }),
+      context.events.on("role.create", (role) => { void this.onRoleCreate(role); }),
       context.events.on("role.delete", (role) => { void this.onRoleDelete(role); }),
       context.events.on("member.ban", ({ guildId, userId }) => { void this.onBan(guildId, userId); }),
       context.events.on("member.unban", ({ guildId, userId }) => { void this.onUnban(guildId, userId); }),
@@ -217,7 +219,7 @@ export class Logging implements PlatformModule {
     if (!await moduleEnabled(this.db, guildId, "logging", false)) return;
 
     const config = await this.getConfig(guildId);
-    if (!config.enabled || !config.channelId || !this.client) return;
+    if (!config.channelId || !this.client) return;
 
     try {
       await this.auditLog?.record({
@@ -313,6 +315,13 @@ export class Logging implements PlatformModule {
       );
     }
 
+    const before = new Set(oldMember.roles.cache.keys());
+    const after = new Set(newMember.roles.cache.keys());
+    const addedRoles = [...after].filter((id) => id !== newMember.guild.id && !before.has(id));
+    const removedRoles = [...before].filter((id) => id !== newMember.guild.id && !after.has(id));
+    if (addedRoles.length) changes.push("Добавлены роли: " + addedRoles.map((id) => "<@&" + id + ">").join(", "));
+    if (removedRoles.length) changes.push("Сняты роли: " + removedRoles.map((id) => "<@&" + id + ">").join(", "));
+
     if (!changes.length) return;
 
     await this.emit(
@@ -320,7 +329,7 @@ export class Logging implements PlatformModule {
       "logging.member.update",
       "👤 Участник изменён",
       "Пользователь: <@" + newMember.id + ">\\n" + changes.join("\\n"),
-      { userId: newMember.id }
+      { userId: newMember.id, addedRoles, removedRoles }
     );
   }
 
@@ -343,6 +352,21 @@ export class Logging implements PlatformModule {
     );
   }
 
+  private async onChannelCreate(
+    channel: import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel
+  ): Promise<void> {
+    if (!channel.guildId) return;
+    const config = await this.getConfig(channel.guildId);
+    if (!config.channelDelete) return;
+    await this.emit(
+      channel.guildId,
+      "logging.channel.create",
+      "📁 Канал создан",
+      "Канал: " + (channel.name ?? channel.id) + "\nID: " + channel.id,
+      { channelId: channel.id }
+    );
+  }
+
   private async onChannelDelete(
     channel: import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel
   ): Promise<void> {
@@ -356,6 +380,20 @@ export class Logging implements PlatformModule {
       "🗑️ Канал удалён",
       "Канал: " + (channel.name ?? channel.id) + "\\nID: " + channel.id,
       { channelId: channel.id }
+    );
+  }
+
+  private async onRoleCreate(
+    role: import("discord.js").Role
+  ): Promise<void> {
+    const config = await this.getConfig(role.guild.id);
+    if (!config.roleDelete) return;
+    await this.emit(
+      role.guild.id,
+      "logging.role.create",
+      "🎭 Роль создана",
+      "Роль: " + role.name + "\nID: " + role.id,
+      { roleId: role.id, roleName: role.name }
     );
   }
 

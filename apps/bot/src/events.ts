@@ -31,7 +31,9 @@ export type PlatformEventMap = {
   "ticket.close": { guildId: string; userId: string; ticketId: number; channelId: string };
   "giveaway.end": { guildId: string; giveawayId: number; winners: string[] };
   "schedule": { guildId: string; timestamp: number };
+  "channel.create": import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel;
   "channel.delete": import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel;
+  "role.create": import("discord.js").Role;
   "role.delete": import("discord.js").Role;
   "member.ban": { guildId: string; userId: string };
   "member.unban": { guildId: string; userId: string };
@@ -131,10 +133,10 @@ function extractGuildId<K extends keyof PlatformEventMap>(
       event === "giveaway.end" || event === "schedule") {
     return (payload as { guildId: string }).guildId;
   }
-  if (event === "channel.delete") {
+  if (event === "channel.create" || event === "channel.delete") {
     return (payload as { guildId: string | null }).guildId;
   }
-  if (event === "role.delete") {
+  if (event === "role.create" || event === "role.delete") {
     return (payload as import("discord.js").Role).guild.id;
   }
   if (event === "member.ban" || event === "member.unban") {

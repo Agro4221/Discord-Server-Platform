@@ -105,10 +105,20 @@ export function wireDiscordEvents(
     void emitMemberUpdate(events, oldMember, newMember);
   });
 
-  client.on(Events.ChannelDelete, (channel) => {
+  client.on(Events.ChannelCreate, (channel) => {
+    if ("guildId" in channel && channel.guildId) {
+      void events.emit("channel.create", channel);
+    }
+  });
+
+    client.on(Events.ChannelDelete, (channel) => {
     if ("guildId" in channel && channel.guildId) {
       void events.emit("channel.delete", channel);
     }
+  });
+
+  client.on("roleCreate", (role) => {
+    void events.emit("role.create", role);
   });
 
   client.on("roleDelete", (role) => {
