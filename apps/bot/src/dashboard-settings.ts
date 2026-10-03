@@ -90,7 +90,10 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "maxDestructiveActions", label: "Destructive actions до тревоги", type: "number", min: 2, max: 100 },
       { key: "destructiveWindowSeconds", label: "Окно destructive actions, сек.", type: "number", min: 5, max: 300 },
       { key: "quarantineRoleId", label: "Quarantine role", type: "role" },
-      { key: "logChannelId", label: "Security log channel", type: "channel" }
+      { key: "logChannelId", label: "Security log channel", type: "channel" },
+      { key: "raidQuarantineEnabled", label: "Quarantine при Anti-Raid", type: "boolean", description: "Автоматически добавлять quarantine role участникам при срабатывании Anti-Raid." },
+      { key: "destructiveRoleRemoval", label: "Снимать роли при destructive burst", type: "boolean", description: "Снимать управляемые роли у найденного исполнителя." },
+      { key: "destructiveQuarantineEnabled", label: "Quarantine при destructive burst", type: "boolean", description: "Добавлять quarantine role найденному исполнителю." }
     ],
     actions: [{ id: "check-hierarchy", label: "Проверить role hierarchy", kind: "safe" }]
   },
@@ -220,7 +223,10 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       maxDestructiveActions: "max_destructive_actions",
       destructiveWindowSeconds: "destructive_window_seconds",
       quarantineRoleId: "quarantine_role_id",
-      logChannelId: "log_channel_id"
+      logChannelId: "log_channel_id",
+      raidQuarantineEnabled: "raid_quarantine_enabled",
+      destructiveRoleRemoval: "destructive_role_removal",
+      destructiveQuarantineEnabled: "destructive_quarantine_enabled"
     }
   },
   leveling: {
