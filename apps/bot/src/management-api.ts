@@ -648,7 +648,7 @@ export class ManagementApiServer {
             const mentionRoleId = body.mentionRoleId == null ? null : typeof body.mentionRoleId === "string" ? body.mentionRoleId : "";
             const messageTemplate = typeof body.messageTemplate === "string" ? body.messageTemplate.slice(0, 1000) : undefined;
             const intervalSeconds = Number(body.intervalSeconds);
-            if (!["twitch","youtube","vk"].includes(platform) || !target || target.length > 200 || !/^\d{17,20}$/.test(channelId) || (mentionRoleId && !/^\d{17,20}$/.test(mentionRoleId)) || !Number.isFinite(intervalSeconds)) {
+            if (!["twitch","youtube","vk","kick"].includes(platform) || !target || target.length > 200 || !/^\d{17,20}$/.test(channelId) || (mentionRoleId && !/^\d{17,20}$/.test(mentionRoleId)) || !Number.isFinite(intervalSeconds)) {
               throw new RequestInputError("invalid_stream_alert", 400);
             }
             const guild = this.options.client.guilds.cache.get(guildId);
