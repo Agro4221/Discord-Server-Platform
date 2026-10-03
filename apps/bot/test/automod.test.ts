@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AutoMod, detectAutoModViolation, parseAutoModIdList } from "../src/modules/automod.js";
+import { AutoMod, detectAutoModViolation, isAutoModRuleCooldownActive, parseAutoModIdList } from "../src/modules/automod.js";
+
+test("AutoMod rule cooldown helper blocks only while the window is active", () => {
+  const now = 1_000;
+  assert.equal(isAutoModRuleCooldownActive(now, 999), false);
+  assert.equal(isAutoModRuleCooldownActive(now, 1_000), false);
+  assert.equal(isAutoModRuleCooldownActive(now, 1_001), true);
+  assert.equal(isAutoModRuleCooldownActive(now, Number.NaN), false);
+  assert.equal(isAutoModRuleCooldownActive(now, Number.POSITIVE_INFINITY), false);
+});
 
 test("AutoMod configure sends every extended setting to PostgreSQL", async () => {
   const queries: Array<{ text: string; values: readonly unknown[] }> = [];
