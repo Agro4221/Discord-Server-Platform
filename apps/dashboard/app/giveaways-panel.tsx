@@ -175,6 +175,7 @@ function formatGiveawayError(error: unknown): string {
 }
 
 const panelBox = { padding: 15, border: "1px solid #222a35", borderRadius: 14, background: "#0d1219" } as const;
+const label = { color: "#566274", fontSize: 9, letterSpacing: 1.2 } as const;
 const inputStyle = { width: "100%", boxSizing: "border-box" as const, background: "#0b1016", border: "1px solid #29313e", borderRadius: 9, padding: "9px 10px", color: "#f1f5f9" };
 function buttonStyle(kind: "secondary" | "danger" | "primary") {
   return {

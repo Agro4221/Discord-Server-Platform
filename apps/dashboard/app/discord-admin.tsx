@@ -500,7 +500,7 @@ export function DiscordAdmin() {
 
             {view === "giveaways" && (
               <ModuleShell title="Giveaways" enabled={Boolean(modules.giveaways)} onToggle={(value) => void toggleModule("giveaways", value)}>
-                <GiveawaysPanel guildId={guildId} onChanged={refreshAudit} />
+                <GiveawaysPanel guildId={guildId} channels={resources.channels.filter((item) => item.type === 0)} onChanged={refreshAudit} />
               </ModuleShell>
             )}
 

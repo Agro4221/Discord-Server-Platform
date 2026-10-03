@@ -1550,7 +1550,7 @@ function ModulePage(props: {
       {props.module?.key === "giveaways" && (
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Giveaways" eyebrow="OPERATIONS" />
-          <GiveawaysPanel guildId={props.guildId} onChanged={props.onAudit} />
+          <GiveawaysPanel guildId={props.guildId} channels={props.resources.channels.filter((item) => item.type === 0)} onChanged={props.onAudit} />
         </section>
       )}
 

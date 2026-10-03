@@ -527,7 +527,7 @@ function ModulePage(props: {
       </section>
 
       {props.module?.key === "roles" && <section style={{ ...panel, padding: 20 }}><RolePanelsEditor guildId={props.guildId} channels={props.resources.channels.filter((item) => item.type === 0)} roles={props.resources.roles} onChanged={props.onAudit} /></section>}
-      {props.module?.key === "giveaways" && <section style={{ ...panel, padding: 20 }}><GiveawaysPanel guildId={props.guildId} onChanged={props.onAudit} /></section>}
+      {props.module?.key === "giveaways" && <section style={{ ...panel, padding: 20 }}><GiveawaysPanel guildId={props.guildId} channels={props.resources.channels.filter((item) => item.type === 0)} onChanged={props.onAudit} /></section>}
       {props.module?.key === "analytics" && <section style={{ ...panel, padding: 20 }}><AnalyticsPanel guildId={props.guildId} /></section>}
       {props.module?.key === "automation" && <section style={{ ...panel, padding: 20 }}><AutomationPanel guildId={props.guildId} channels={props.resources.channels.filter((item) => item.type === 0)} roles={props.resources.roles.filter((item) => item.manageable !== false)} onChanged={props.onAudit} /></section>}
       {props.module?.key === "notifications" && <section style={{ ...panel, padding: 20 }}><NotificationsPanel guildId={props.guildId} channels={props.resources.channels.filter((item) => item.type === 0)} onChanged={props.onAudit} /></section>}
