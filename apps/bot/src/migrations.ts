@@ -1232,6 +1232,24 @@ const migrations = [
       ");"
     ])
   },
+  {
+    version: 79,
+    name: "music_history",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS music_history (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  bot_identity_id text NOT NULL,",
+      "  requester_id text,",
+      "  title text NOT NULL,",
+      "  author text NOT NULL DEFAULT '',",
+      "  url text,",
+      "  duration_ms bigint NOT NULL DEFAULT 0,",
+      "  played_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_music_history_guild_recent ON music_history(guild_id,bot_identity_id,played_at DESC,id DESC);"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
