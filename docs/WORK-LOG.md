@@ -216,3 +216,10 @@ Never write credentials, tokens or private user data here.
 - Exposed the same controls in Dashboard module settings and optional `/security setup` flags.
 - Existing defaults preserve the previous behavior (all three response actions enabled).
 - Added pure helper coverage for policy defaults; full live Discord response and lockdown behavior remain release-gate validation.
+
+
+## 2026-10-03 — Music node failover
+- Kept lavalink-client's built-in `autoMove` enabled and added an explicit fallback on node disconnect/destroy.
+- Players still bound to a failed node are moved to another connected node with an active session; player state is persisted afterwards.
+- Added a pure failover availability predicate test.
+- Live two-node outage/recovery remains a release-gate drill because it requires real Lavalink + Discord voice traffic.
