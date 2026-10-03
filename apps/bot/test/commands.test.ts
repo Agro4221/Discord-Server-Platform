@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildCommands } from "../src/discord/commands.js";
+import { COMMAND_DEFINITIONS } from "../src/command-policy.js";
 
 function assertRequiredOptionsFirst(node: unknown, path: string): void {
   if (!node || typeof node !== "object") return;
@@ -126,4 +127,24 @@ test("automation slash command exposes server and security events", () => {
   for (const value of ["channel.create", "channel.delete", "role.create", "role.delete", "member.ban", "member.unban"]) {
     assert.ok(values.includes(value), value);
   }
+});
+
+
+test("command policy names are unique and cover every top-level slash command", () => {
+  const commands = buildCommands().map((command) => command.toJSON());
+  const topLevelNames = commands.map((command) => command.name);
+  const uniqueTopLevelNames = new Set(topLevelNames);
+  assert.equal(uniqueTopLevelNames.size, topLevelNames.length, "duplicate top-level Discord command name");
+
+  const policyNames = new Set(COMMAND_DEFINITIONS.map((definition) => definition.name));
+  for (const name of uniqueTopLevelNames) {
+    assert.ok(policyNames.has(name), "Missing command policy definition for /" + name);
+  }
+
+  const definitionNames = COMMAND_DEFINITIONS.map((definition) => definition.name);
+  assert.equal(
+    new Set(definitionNames).size,
+    definitionNames.length,
+    "duplicate command policy definition"
+  );
 });
