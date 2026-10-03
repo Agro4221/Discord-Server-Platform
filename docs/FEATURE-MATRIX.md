@@ -296,26 +296,176 @@ Music должен стремиться к функциональности си
 - lyrics;
 - multi-bot voice assignments.
 
-## Admin / UX parity
+## All-in-one / Premium parity
 
-Функциональность, которую берём как поведенческие ориентиры у распространённых all-in-one ботов:
-- подробный moderation/audit;
-- AutoMod с исключениями и action policy;
-- reaction/button/select roles;
-- leveling с текстовым и voice XP;
-- welcome/goodbye и role restore;
-- tickets/transcripts;
-- custom commands and templates;
-- automation builder;
-- stream/social notifications;
-- embeds;
-- reminders / scheduled messages;
-- statistics / counters;
-- music controller and provider breadth;
-- anti-raid / anti-nuke;
-- backups / import-export.
+Цель проекта — **не музыкальный бот с несколькими дополнительными модулями**, а самостоятельная self-hosted all-in-one Discord platform. Music — один из крупных модулей наряду с Moderation, AutoMod/Security, Community, Tickets/Forms, Roles, Automation, Notifications, Analytics и Administration.
 
-Не переносим чужой код или закрытые implementation details — реализуем собственное поведение на основе публично описанных функций.
+Поведенческие ориентиры берём у распространённых многофункциональных ботов. В актуальных материалах Dyno и Carl-bot среди таких возможностей фигурируют AutoMod, action/logging, autoroles, custom commands/autoresponders, automessages/autopurge, forms, tickets, embeds, reaction roles, feeds/notifications, leveling и другие server-management функции; часть из них у коммерческих ботов ограничена Premium-подпиской. citeturn795228search0turn795228search2turn795228search12
+
+### Master backlog — не только Music
+
+#### Administration / Dashboard
+| Функция | План |
+|---|---|
+| Полный module/function catalog | ✅ / расширять |
+| Единые permissions per command/action | ✅ |
+| Function-level permission editor | 🟡 |
+| Dashboard previews и test actions | 🟡 |
+| Permission / hierarchy diagnostics | ✅ |
+| Audit trail всех административных действий | 🟡 |
+| Per-module activity/error history | 🟡 |
+| Mass configuration / reusable server presets | 🟡 |
+| Import/export с корректным resource remapping | ✅ / расширять |
+| Multi-server / fleet administration | ✅ / расширять |
+| Configurable bot identity (name/avatar/status/banner где разрешено) | 🟡 |
+
+#### Moderation / AutoMod / Security
+| Функция | План |
+|---|---|
+| Warn / timeout / kick / ban / unban + cases | ✅ |
+| Timed punishments | ✅ |
+| Escalation policies | ✅ |
+| Mod notes / history | ✅ |
+| Full action logging | 🟡 |
+| Rule-specific AutoMod punishments | 🟡 |
+| Rate limits per rule | 🟡 |
+| Channel / role / user exemptions | ✅ / расширять |
+| Attachments / URL / invite / mention / emoji / caps / spam controls | ✅ / расширять |
+| Anti-raid / anti-nuke / quarantine | ✅ / расширять |
+| Scam / phishing / honeypot detectors | ✅ / расширять |
+| Autoban rules | 🟡 |
+| Auto-purge / scheduled cleanup | 🟡 |
+| Lockdown presets / incident response playbooks | 🟡 |
+| Moderation presets/templates | 🟡 |
+
+#### Server utilities / customisation
+| Функция | План |
+|---|---|
+| Custom commands | 🟡 |
+| Autoresponder / keyword triggers | 🟡 |
+| Reusable tags/templates/snippets | ✅ / расширять |
+| Rich embed builder | ✅ / расширять |
+| Scheduled messages / automessages | ✅ / расширять |
+| Sticky messages | ✅ |
+| Reminders | ✅ |
+| Channel tools / lock / slowmode / cleanup | ✅ |
+| Forms | 🟡 |
+| Interactive buttons/selects/modals toolkit | 🟡 |
+| Custom help/menu pages | 🟡 |
+| Server info / user info / role/channel utility suite | 🟡 |
+| AFK / away system | 🟡 |
+
+#### Roles / onboarding
+| Функция | План |
+|---|---|
+| Autoroles | ✅ |
+| Restore roles on return | ✅ |
+| Reaction roles | ✅ |
+| Button/select role panels | ✅ |
+| Timed roles | ✅ |
+| Exclusive/max-selection role groups | ✅ |
+| Joinable ranks / self-service role menus | 🟡 |
+| Voice-role links | 🟡 |
+| Delayed autoroles | 🟡 |
+| Onboarding / verification flow builder | 🟡 |
+| Welcome/goodbye customization and images | 🟡 |
+
+#### Tickets / Support / Forms
+| Функция | План |
+|---|---|
+| Ticket panels | ✅ |
+| Claim / close / reopen | ✅ |
+| Staff roles / category routing | ✅ |
+| HTML transcripts | ✅ |
+| Auto-close | ✅ |
+| Per-user limits | ✅ |
+| Intake forms | 🟡 |
+| Custom form fields / validation | 🟡 |
+| Custom ticket buttons/messages | 🟡 |
+| Linked/related panels | 🟡 |
+| Ticket tags / priorities / assignment state | 🟡 |
+| Staff SLA / reminders / escalation | 🟡 |
+
+#### Community / Engagement
+| Функция | План |
+|---|---|
+| Welcome/goodbye | ✅ |
+| Verification | ✅ |
+| Leveling / XP / rank / leaderboard | ✅ |
+| Text + voice XP | ✅ |
+| XP anti-abuse/exclusions | ✅ |
+| Giveaways + requirements | ✅ |
+| Polls | ✅ |
+| Suggestions + moderation workflow | ✅ |
+| Starboard | ✅ |
+| Reputation / profiles | ✅ |
+| Birthdays / achievements | ✅ |
+| Invite tracking | ✅ |
+| Server counters / statistics | ✅ |
+| Economy / shop / ledger | ✅ |
+| Social/community engagement widgets | 🟡 |
+| Custom member rewards / milestones | 🟡 |
+
+#### Automation / workflows
+| Функция | План |
+|---|---|
+| Event → conditions → actions | ✅ |
+| ALL / ANY conditions | ✅ |
+| Cooldowns | ✅ |
+| Schedule trigger | ✅ |
+| Delay / durable delayed jobs | ✅ |
+| DM / webhook actions | ✅ |
+| Branches / if-else | ✅ |
+| Templates | ✅ |
+| Visual automation builder | ✅ |
+| Richer trigger catalog | 🟡 |
+| Richer condition catalog | 🟡 |
+| Richer action catalog | 🟡 |
+| Workflow retries / dead-letter diagnostics | 🟡 |
+| Reusable workflow presets | 🟡 |
+| Cross-module actions (tickets, roles, giveaway, moderation, music, notifications) | 🟡 |
+
+#### Notifications / integrations
+| Функция | План |
+|---|---|
+| RSS / Atom | ✅ |
+| Twitch / YouTube / VK Live alerts | ✅ |
+| Stream templates | ✅ |
+| GitHub feeds | ✅ |
+| Secure feed validation / SSRF protection | ✅ |
+| Additional social feeds | 🟡 |
+| Per-feed filters / keywords | 🟡 |
+| Rich notification templates / embeds | 🟡 |
+| Multiple credentials/providers per guild | 🟡 |
+| Integration test/diagnostics UI | 🟡 |
+
+#### Analytics / observability
+| Функция | План |
+|---|---|
+| Server stats | ✅ |
+| Persistent counters | ✅ |
+| Analytics dashboard | ✅ |
+| Moderation/security incident drilldown | ✅ |
+| Per-module health | ✅ |
+| Music/Lavalink health | ✅ |
+| Audit/activity timeline | 🟡 |
+| Configurable metrics/counters | 🟡 |
+| Exportable analytics | 🟡 |
+| Retention/history settings | 🟡 |
+
+#### Music
+Music остаётся отдельным крупным направлением внутри общей платформы. Полный backlog описан выше в разделе **Music**, включая advanced queue management, granular DJ permissions, vote-skip/fair queue, emoji-controller, **Loop One**, effects, autoplay/radio, lyrics, shared playlists и расширение источников (Spotify, Apple Music, Deezer, **Yandex Music**, VK Music, Tidal, Qobuz, yt-dlp, JioSaavn).
+
+### Product principle
+
+**Не строим “ещё один музыкальный бот”.** Строим self-hosted замену нескольким Discord-ботам одновременно.
+
+Premium-функции коммерческих ботов используем как внешний ориентир функциональности и UX, но:
+- не копируем закрытый код;
+- не переносим искусственные платные ограничения;
+- не делаем Music единственным центром разработки;
+- каждая возможность должна иметь понятные Discord permissions, persistence, audit/diagnostics и Dashboard-представление;
+- приоритет определяется пользой для полноценного сервера, а не количеством поддерживаемых внешних сервисов.
 
 ## Release order
 
