@@ -200,3 +200,12 @@ Never write credentials, tokens or private user data here.
 - Docker local launcher now avoids image rebuilds on normal starts; -Rebuild performs an explicit no-cache image rebuild.
 - Recommended single-PC gaming/streaming path: native mode, one Lavalink, Dashboard off except during administration.
 - Live Windows runtime and actual Sea of Thieves + OBS + multi-RTMP load still require validation on the user's PC.
+
+
+## 2026-10-03 — Kick stream alerts
+- Added Kick as a stream-alert provider on `feature/music-v2`.
+- Added optional `KICK_CLIENT_ID` / `KICK_CLIENT_SECRET` configuration and cached OAuth 2.1 App Access Tokens.
+- Added Kick channel/live polling through the public API, including slug or broadcaster-user-ID targets and stream-start deduplication.
+- Added `/streamalert create` and Dashboard support for Kick alongside the existing Twitch/YouTube/VK alert flow.
+- Migration 62 extends the persistent stream-alert platform constraint to include Kick.
+- Added deterministic tests for Kick target normalization; live provider behavior still requires real Kick developer credentials and a live channel.
