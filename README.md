@@ -154,7 +154,7 @@ sequenceDiagram
 
 **Notifications** — внешние feed/webhook-сценарии с HTTPS/SSRF-проверками.
 
-**Music** — интеграция через Lavalink.
+**Music** — интеграция через Lavalink. Сейчас модуль умеет очередь, repeat/autoplay, persistent player state, per-voice bot routing и интерактивный controller. В Music v2 добавлены запросы через выделенный текстовый канал и загрузка до 500 треков за один playlist-запрос. Для расширения источников подключён LavaSrc: Spotify, Apple Music, Deezer, Yandex Music, VK Music, Tidal, Qobuz, yt-dlp и JioSaavn доступны как opt-in источники после настройки соответствующих credentials.
 
 **Control Center** — управление сервером, конфигурацией, модулями, ролями, каналами, backup/import/export и диагностикой.
 
