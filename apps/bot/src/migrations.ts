@@ -722,7 +722,7 @@ export async function migrate(db: Database): Promise<void> {
     const applied = new Set(result.rows.map((row) => row.version));
 
     for (const migration of migrations) {
-      if (applied.has(migration.version)) continue;
+      if (!migration || applied.has(migration.version)) continue;
 
       await db.transaction(async (client) => {
         await client.query(migration.sql);
