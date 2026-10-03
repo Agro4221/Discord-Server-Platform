@@ -4,7 +4,8 @@ import {
   securityAuditLookbackCutoff,
   shouldTriggerSecurityIncident,
   securityIncidentCooldownUntil,
-  securityResponseThreshold
+  securityResponseThreshold,
+  securityResponsePolicy
 } from "../src/modules/security.js";
 
 test("Security burst incident is opened only at threshold and outside active window", () => {
