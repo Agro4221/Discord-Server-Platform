@@ -602,6 +602,210 @@ export class Music implements PlatformModule {
     });
   }
 
+  private serializedTrack(track: Track): { encoded?: string; info: Record<string, unknown> } {
+    return {
+      encoded: track.encoded,
+      info: {
+        identifier: track.info.identifier,
+        isSeekable: Boolean(track.info.isSeekable),
+        author: track.info.author ?? "",
+        length: Number((track.info as typeof track.info & { length?: number; duration?: number }).length ?? (track.info as typeof track.info & { duration?: number }).duration ?? 0),
+        isStream: Boolean(track.info.isStream),
+        position: Number((track.info as typeof track.info & { position?: number }).position ?? 0),
+        title: track.info.title,
+        uri: (track.info as typeof track.info & { uri?: string | null }).uri ?? null,
+        artworkUrl: (track.info as typeof track.info & { artworkUrl?: string | null }).artworkUrl ?? null,
+        isrc: (track.info as typeof track.info & { isrc?: string | null }).isrc ?? null,
+        sourceName: track.info.sourceName
+      }
+    };
+  }
+
+  private async favorite(interaction: ChatInputCommandInteraction): Promise<void> {
+    const action = interaction.options.getString("action", true);
+    const player = this.manager?.players.get(interaction.guild!.id);
+
+    if (action === "list") {
+      const result = await this.db.query<{ track: { info?: { title?: string; author?: string } } }>(
+        "SELECT track FROM music_favorites WHERE guild_id=$1 AND user_id=$2 ORDER BY created_at DESC LIMIT 25",
+        [interaction.guild!.id, interaction.user.id]
+      );
+      const lines = result.rows.map((row, index) =>
+        (index + 1) + ". **" + String(row.track?.info?.title ?? "Unknown track") + "** — " + String(row.track?.info?.author ?? "Unknown artist")
+      );
+      await interaction.reply({
+        content: lines.length ? "❤️ **Избранное**\n" + lines.join("\n") : "❤️ Избранное пока пусто.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    const track = player?.queue.current;
+    if (!track) {
+      await interaction.reply({ content: "Нужен текущий трек в плеере.", ephemeral: true });
+      return;
+    }
+
+    if (action === "add") {
+      await this.db.query(
+        "INSERT INTO music_favorites(guild_id,user_id,identifier,track) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT(guild_id,user_id,identifier) DO UPDATE SET track=EXCLUDED.track",
+        [interaction.guild!.id,interaction.user.id,track.info.identifier,JSON.stringify(this.serializedTrack(track))]
+      );
+      await interaction.reply({ content: "❤️ Трек сохранён в избранное.", ephemeral: true });
+      return;
+    }
+
+    if (action === "remove") {
+      const deleted = await this.db.query(
+        "DELETE FROM music_favorites WHERE guild_id=$1 AND user_id=$2 AND identifier=$3",
+        [interaction.guild!.id,interaction.user.id,track.info.identifier]
+      );
+      await interaction.reply({
+        content: deleted.rowCount ? "🗑️ Трек удалён из избранного." : "Этого трека нет в избранном.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    await interaction.reply({ content: "Неизвестное действие favorite.", ephemeral: true });
+  }
+
+  private async savedPlaylist(interaction: ChatInputCommandInteraction): Promise<void> {
+    const action = interaction.options.getString("action", true);
+    const name = interaction.options.getString("name")?.trim().slice(0, 80) ?? "";
+    const guildId = interaction.guild!.id;
+
+    if (action === "list") {
+      const result = await this.db.query<{ name: string; tracks: unknown[] }>(
+        "SELECT name,tracks FROM music_playlists WHERE guild_id=$1 AND user_id=$2 ORDER BY updated_at DESC LIMIT 25",
+        [guildId,interaction.user.id]
+      );
+      const lines = result.rows.map((row, index) =>
+        (index + 1) + ". **" + row.name + "** — " + String(Array.isArray(row.tracks) ? row.tracks.length : 0) + " треков"
+      );
+      await interaction.reply({
+        content: lines.length ? "🎼 **Мои плейлисты**\n" + lines.join("\n") : "🎼 Плейлистов пока нет.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (!name) {
+      await interaction.reply({ content: "Укажи имя плейлиста.", ephemeral: true });
+      return;
+    }
+
+    if (action === "create") {
+      try {
+        await this.db.query(
+          "INSERT INTO music_playlists(guild_id,user_id,name) VALUES($1,$2,$3)",
+          [guildId,interaction.user.id,name]
+        );
+      } catch {
+        await interaction.reply({ content: "Плейлист с таким именем уже существует.", ephemeral: true });
+        return;
+      }
+      await interaction.reply({ content: "🎼 Плейлист **" + name + "** создан.", ephemeral: true });
+      return;
+    }
+
+    const playlist = await this.db.query<{ id: string; tracks: unknown[] }>(
+      "SELECT id,tracks FROM music_playlists WHERE guild_id=$1 AND user_id=$2 AND name=$3",
+      [guildId,interaction.user.id,name]
+    );
+    const row = playlist.rows[0];
+    if (!row) {
+      await interaction.reply({ content: "Плейлист не найден.", ephemeral: true });
+      return;
+    }
+
+    if (action === "delete") {
+      await this.db.query("DELETE FROM music_playlists WHERE id=$1", [row.id]);
+      await interaction.reply({ content: "🗑️ Плейлист **" + name + "** удалён.", ephemeral: true });
+      return;
+    }
+
+    const stored = Array.isArray(row.tracks) ? [...row.tracks] : [];
+    const current = this.manager?.players.get(guildId);
+
+    if (action === "add") {
+      const track = current?.queue.current;
+      if (!track) {
+        await interaction.reply({ content: "Нужен текущий трек в плеере.", ephemeral: true });
+        return;
+      }
+      if (stored.length >= MAX_PLAYLIST_TRACKS) {
+        await interaction.reply({ content: "Плейлист уже содержит максимум 500 треков.", ephemeral: true });
+        return;
+      }
+
+      const existingIds = new Set(
+        stored.map((item) => {
+          const obj = item as { info?: { identifier?: string } };
+          return obj.info?.identifier ?? "";
+        })
+      );
+      if (existingIds.has(track.info.identifier)) {
+        await interaction.reply({ content: "Этот трек уже есть в плейлисте.", ephemeral: true });
+        return;
+      }
+
+      stored.push(this.serializedTrack(track));
+      await this.db.query(
+        "UPDATE music_playlists SET tracks=$1::jsonb,updated_at=now() WHERE id=$2",
+        [JSON.stringify(stored),row.id]
+      );
+      await interaction.reply({ content: "➕ Трек добавлен в **" + name + "**.", ephemeral: true });
+      return;
+    }
+
+    if (action === "load") {
+      const voice = (await interaction.guild!.members.fetch(interaction.user.id)).voice.channelId;
+      if (!voice) {
+        await interaction.reply({ content: "Сначала зайди в голосовой канал.", ephemeral: true });
+        return;
+      }
+
+      const player = current ?? await this.getOrCreatePlayer(interaction, voice);
+      if (player.voiceChannelId !== voice) {
+        await interaction.reply({ content: "Музыкальный бот уже занят другим голосовым каналом.", ephemeral: true });
+        return;
+      }
+      if (!player.connected) await player.connect();
+
+      let added = 0;
+      for (const item of stored.slice(0, MAX_PLAYLIST_TRACKS)) {
+        try {
+          const built = this.manager?.utils.buildTrack(
+            item as Parameters<LavalinkManager["utils"]["buildTrack"]>[0],
+            interaction.user
+          );
+          if (built) {
+            player.queue.add(built);
+            added += 1;
+          }
+        } catch (error) {
+          logger.warn("Saved music track restore failed", {
+            guildId,
+            playlist: name,
+            error: String(error)
+          });
+        }
+      }
+
+      if (!player.playing && added > 0) await player.play();
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await interaction.reply({
+        content: "▶️ В очередь загружено **" + added + "** треков из **" + name + "**.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    await interaction.reply({ content: "Неизвестное действие playlist.", ephemeral: true });
+  }
+
   private async queueQuery(
     guildId: string,
     voiceChannelId: string,
