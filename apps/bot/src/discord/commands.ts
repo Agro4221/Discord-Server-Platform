@@ -672,6 +672,27 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       )
       .addSubcommand((sub) =>
         sub
+          .setName("filter")
+          .setDescription("Audio filters")
+          .addStringOption((o) =>
+            o.setName("action").setDescription("Filter action").addChoices(
+              { name: "Clear filters", value: "clear" },
+              { name: "Bassboost low", value: "bassboost-low" },
+              { name: "Bassboost medium", value: "bassboost-medium" },
+              { name: "Bassboost high", value: "bassboost-high" },
+              { name: "Rock", value: "rock" },
+              { name: "Classic", value: "classic" },
+              { name: "Pop", value: "pop" },
+              { name: "Electronic", value: "electronic" },
+              { name: "Full sound", value: "fullsound" },
+              { name: "Gaming", value: "gaming" },
+              { name: "Nightcore", value: "nightcore" },
+              { name: "8D rotation", value: "8d" }
+            ).setRequired(true)
+          )
+      )
+      .addSubcommand((sub) =>
+        sub
           .setName("favorite")
           .setDescription("Manage personal favorites")
           .addStringOption((o) =>
