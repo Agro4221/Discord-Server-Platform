@@ -120,6 +120,8 @@
 | Multiple provider credentials per guild | 🟡 |
 | Reddit / TikTok / Kick adapters | 🟡 |
 | GitHub notifications | ✅ | `/feed github` для releases и commits через существующий RSS/Atom worker |
+| Twitch / YouTube / VK stream alerts | ✅ | Dashboard + persistent polling |
+| Kick stream alerts | ✅ | Kick OAuth client-credentials + public channel API |
 | Secure feed validation / SSRF protection | ✅ |
 
 ## Music
