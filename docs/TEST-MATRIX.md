@@ -156,3 +156,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-04 — Economy Admin verification
 - CI run **#1268** passed the full automated matrix after adding Economy account management.
 - Dashboard production build validates the account editor and route contracts; live authorization remains dependent on the protected local Control Center environment.
+
+## 2026-10-04 — Command routing verification
+- CI run **#1272** passed the full automated matrix after the Temporary Voice slash-command listener wiring fix.
+- Existing command registration tests plus full build/typecheck validate the routing contract; live Discord interaction acceptance remains environment-dependent.

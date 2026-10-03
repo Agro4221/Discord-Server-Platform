@@ -309,3 +309,8 @@ Never write credentials, tokens or private user data here.
 - CI run **#1268** (`37153371438`) passed on development head `c8188f61840235c784560f7507d8276dee5acf59`.
 - Economy Control Center now exposes the top 100 persisted economy accounts and a protected admin balance editor.
 - Core validates Discord user IDs and PostgreSQL bigint-compatible non-negative balances before upserting; Dashboard writes are audited as `economy.balance.updated`.
+
+## 2026-10-04 — Command routing audit verified
+- CI run **#1272** (`37153758025`) passed on development head `e709c239a4bc3a852e7f55f719f47ba43e9cc54e`.
+- Routing audit caught a concrete Temporary Voice gap: `/voice` was implemented but not subscribed to the `interaction.command` event. The module now registers and removes that listener with its lifecycle.
+- Notification feed channel preflight and Role Panel channel permission preflight are also part of the hardened Core path.

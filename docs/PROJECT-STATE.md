@@ -249,3 +249,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-04 — Economy Admin verified
 - Development head `c8188f61840235c784560f7507d8276dee5acf59` passed CI run **#1268**.
 - Economy is now a full operational module for both shop management and administrator balance control.
+
+## 2026-10-04 — Command routing checkpoint
+- Development head `e709c239a4bc3a852e7f55f719f47ba43e9cc54e` passed CI run **#1272**.
+- Temporary Voice slash routing is now connected through the same event-bus lifecycle used by other command-driven modules.
