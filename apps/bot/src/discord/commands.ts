@@ -695,6 +695,13 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addBooleanOption((o) => o.setName("enabled").setDescription("24/7 state"))
       )
       .addSubcommand((sub) => sub.setName("providers").setDescription("Show configured music providers"))
+      .addSubcommand((sub) => sub
+        .setName("queue-policy")
+        .setDescription("Configure who may add tracks to the queue")
+        .addStringOption((o) => o.setName("mode").setDescription("Queue access").addChoices(
+          { name: "Everyone", value: "everyone" },
+          { name: "DJ only", value: "dj" }
+        )))
       .addSubcommand((sub) =>
         sub
           .setName("seek")
