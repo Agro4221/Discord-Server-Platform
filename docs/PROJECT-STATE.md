@@ -251,3 +251,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Added a side-effect-free Automation dry-run API and Dashboard test surface for current unsaved rule definitions.
 - Dry-run validates conditions/actions, simulates ALL/ANY/branch matching and renders action previews without Discord sends, role changes, moderation calls, or webhooks.
 - Supports synthetic content/channel/user/role and bounded numeric event context for reproducible testing.
+
+
+## 2026-10-04 — Automation diagnostics
+- Automation now has an operational diagnostics surface backed by the existing delayed-job queue and rule/template state.
+- Management API: GET /api/guilds/:guildId/automation/diagnostics.
+- Dashboard shows rules/templates, delayed pending/processing/error/completed-24h counts, oldest pending job and recent job attempts/errors.
+- Diagnostics deliberately omit event payloads and action bodies; runtime execution remains unchanged.
+- Regression coverage was added for aggregation/status mapping.
