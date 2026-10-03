@@ -1,4 +1,5 @@
 import type { ChatInputCommandInteraction } from "discord.js";
+import type { ChatInputCommandInteraction } from "discord.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
@@ -6,6 +7,7 @@ import { moduleEnabled } from "../module-utils.js";
 export class Analytics implements PlatformModule {
   readonly name = "analytics";
   private unsubscribe?: () => void;
+  private client?: ModuleContext["client"];
 
   constructor(private readonly db: Database) {}
 
@@ -43,6 +45,7 @@ export class Analytics implements PlatformModule {
   }
 
   async init(context: ModuleContext): Promise<void> {
+    this.client = context.client;
     const a = context.events.on("member.add", (member) => this.count(member.guild.id, "member_join"));
     const b = context.events.on("member.remove", (member) => this.count(member.guild.id, "member_leave"));
     const c = context.events.on("message.create", (message) => message.guild ? this.count(message.guild.id, "message") : undefined);
@@ -57,6 +60,7 @@ export class Analytics implements PlatformModule {
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    this.client = undefined;
   }
 
   private async count(guildId: string, eventType: string): Promise<void> {
@@ -71,7 +75,31 @@ export class Analytics implements PlatformModule {
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "analytics") return;
+    if (!interaction.inGuild() || !["analytics","stats"].includes(interaction.commandName)) return;
+
+    if (interaction.commandName === "stats") {
+      const guild = interaction.guild!;
+      const members = await guild.members.fetch().catch(() => guild.members.cache);
+      const memberCount = guild.memberCount;
+      const botCount = members.filter((member) => member.user.bot).size;
+      const humanCount = Math.max(0, memberCount - botCount);
+      const textChannels = guild.channels.cache.filter((channel) => channel.isTextBased() && channel.type === 0).size;
+      const voiceChannels = guild.channels.cache.filter((channel) => channel.isVoiceBased() && channel.type === 2).size;
+      const categories = guild.channels.cache.filter((channel) => channel.type === 4).size;
+      const activeVoiceUsers = [...guild.voiceStates.cache.values()].filter((state) => Boolean(state.channelId)).length;
+      await interaction.reply({
+        content: [
+          "📊 **Статистика сервера**",
+          "👥 Участников: **" + memberCount + "** (людей **" + humanCount + "** · ботов **" + botCount + "**)",
+          "💬 Текстовых каналов: **" + textChannels + "**",
+          "🔊 Voice-каналов: **" + voiceChannels + "**",
+          "🗂️ Категорий: **" + categories + "**",
+          "🎧 Сейчас в voice: **" + activeVoiceUsers + "**"
+        ].join("\n")
+      });
+      return;
+    }
+
     if (!await moduleEnabled(this.db, interaction.guild!.id, "analytics", false)) {
       await interaction.reply({ content: "Модуль Analytics выключен.", ephemeral: true });
       return;
