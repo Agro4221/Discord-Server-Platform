@@ -24,6 +24,50 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .setDescription("Check platform health"),
 
     new SlashCommandBuilder()
+      .setName("serverinfo")
+      .setDescription("Show server information"),
+
+    new SlashCommandBuilder()
+      .setName("userinfo")
+      .setDescription("Show user information")
+      .addUserOption((o) => o.setName("user").setDescription("Optional user")),
+
+    new SlashCommandBuilder()
+      .setName("avatar")
+      .setDescription("Show a user's avatar")
+      .addUserOption((o) => o.setName("user").setDescription("Optional user")),
+
+    new SlashCommandBuilder()
+      .setName("membercount")
+      .setDescription("Show server member count"),
+
+    new SlashCommandBuilder()
+      .setName("roleinfo")
+      .setDescription("Show role information")
+      .addRoleOption((o) => o.setName("role").setDescription("Role").setRequired(true)),
+
+    new SlashCommandBuilder()
+      .setName("channelinfo")
+      .setDescription("Show channel information")
+      .addChannelOption((o) => o.setName("channel").setDescription("Optional channel")),
+
+    new SlashCommandBuilder()
+      .setName("afk")
+      .setDescription("Set or clear your AFK status")
+      .addSubcommand((sub) =>
+        sub
+          .setName("set")
+          .setDescription("Set AFK status")
+          .addStringOption((o) => o.setName("reason").setDescription("Optional reason").setMaxLength(300))
+      )
+      .addSubcommand((sub) =>
+        sub.setName("clear").setDescription("Clear AFK status")
+      )
+      .addSubcommand((sub) =>
+        sub.setName("status").setDescription("Show your AFK status")
+      ),
+
+    new SlashCommandBuilder()
       .setName("level")
       .setDescription("Show your leveling rank")
       .addUserOption((o) => o.setName("user").setDescription("Optional user")),
