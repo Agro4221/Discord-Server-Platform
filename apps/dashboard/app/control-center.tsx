@@ -22,6 +22,7 @@ import { StarboardPanel } from "./starboard-panel";
 import { ServerSettingsPanel } from "./server-settings-panel";
 import { DiscordDiagnosticsPanel } from "./discord-diagnostics-panel";
 import { CommunityToolsPanel } from "./community-tools-panel";
+import { VerificationPanel } from "./verification-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -440,7 +441,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "starboard", "community-tools"]);
+const PANEL_KEYS = new Set(["moderation", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "starboard", "community-tools", "verification"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1499,7 +1500,18 @@ function ModulePage(props: {
         </section>
       )}
 
-      {props.module?.key === "automod" && (
+      {props.module?.key === "verification" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Verification Center" eyebrow="OPERATIONS" />
+          <VerificationPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+            {props.module?.key === "automod" && (
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="AutoMod rule builder" eyebrow="OPERATIONS" />
           <AutoModRulesPanel

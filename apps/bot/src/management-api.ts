@@ -18,6 +18,7 @@ import type { AutoMod } from "./modules/automod.js";
 import type { Tickets } from "./modules/tickets.js";
 import type { Starboard } from "./modules/starboard.js";
 import type { CommunityTools } from "./modules/community-tools.js";
+import type { Verification } from "./modules/verification.js";
 import { CommandPolicyService, COMMAND_DEFINITIONS } from "./command-policy.js";
 import type { StreamAlertPlatform } from "./modules/stream-alerts.js";
 import { BotIdentityRepository } from "./bot-identity.js";
@@ -99,6 +100,7 @@ type ApiOptions = {
   tickets?: Tickets;
   starboard?: Starboard;
   communityTools?: CommunityTools;
+  verification?: Verification;
   commandPolicy?: CommandPolicyService;
   rolePanels?: {
     list: (guildId: string) => Promise<unknown[]>;
@@ -917,6 +919,33 @@ export class ManagementApiServer {
               targetId: ruleId
             });
             this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const verificationPanelMatch = path.match(/^\/api\/guilds\/([^/]+)\/verification\/panel$/);
+
+          if (method === "POST" && verificationPanelMatch) {
+            if (!this.options.verification) {
+              this.json(res, 500, { error: "verification_unavailable" });
+              return;
+            }
+            const guildId = verificationPanelMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const channelId = typeof body.channelId === "string" ? body.channelId : "";
+            const messageId = await this.options.verification!.dashboardPublishPanel(guildId, channelId);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "verification.panel.published",
+              targetType: "channel",
+              targetId: channelId,
+              metadata: { messageId }
+            });
+            this.json(res, 201, { ok: true, messageId });
             return;
           }
 

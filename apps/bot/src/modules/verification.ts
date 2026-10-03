@@ -139,6 +139,31 @@ export class Verification implements PlatformModule {
     );
   }
 
+  async dashboardPublishPanel(guildId: string, channelId: string): Promise<string> {
+    if (!await this.config(guildId).then((config) => config.enabled)) throw new Error("verification_disabled");
+    if (!/^\d{15,25}$/.test(channelId)) throw new Error("invalid_channel");
+    const guild = this.client?.guilds.cache.get(guildId);
+    const channel = guild?.channels.cache.get(channelId);
+    const member = guild?.members.me;
+    if (!guild || !channel || channel.type !== 0) throw new Error("text_channel_required");
+    if (!member?.permissions.has(PermissionFlagsBits.SendMessages) || !channel.permissionsFor(member)?.has(PermissionFlagsBits.SendMessages)) {
+      throw new Error("bot_missing_send_messages");
+    }
+    const message = await channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle("✅ Проверка участника")
+          .setDescription("Нажми кнопку, получи одноразовый код и подтверди его через кнопку ниже.")
+      ],
+      components: [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId("dsp:verify:issue").setLabel("Получить код").setStyle(ButtonStyle.Primary)
+        )
+      ]
+    });
+    return message.id;
+  }
+
   async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
     if (!interaction.inGuild() || commandName !== "verify") return;
     const sub = interaction.options.getSubcommand();

@@ -270,6 +270,7 @@ async function main(): Promise<void> {
     leveling,
     tickets,
     communityTools,
+    verification,
     autoMod,
     commandPolicy,
     giveaways: {
