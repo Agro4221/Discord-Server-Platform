@@ -138,7 +138,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Исключения", description: "Исключение отдельных каналов и ролей." },
       { title: "Реакция", description: "Удаление сообщения и опциональный timeout." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   security: {
     icon: "◉",
@@ -424,7 +424,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Lavalink health", description: "Статус модуля зависит от доступности узлов." },
       { title: "Multi-bot routing", description: "Отдельные bot identities могут обслуживать разные voice-каналы." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   analytics: {
     icon: "▥",
