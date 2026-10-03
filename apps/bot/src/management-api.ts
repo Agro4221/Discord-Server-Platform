@@ -98,7 +98,7 @@ type ApiOptions = {
     list: (guildId: string) => Promise<unknown[]>;
     create: (
       guildId: string,
-      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number },
+      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number },
       callbacks: {
         deleteMessage: (channelId: string, messageId: string) => Promise<void>;
         sendMessage: (channelId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => Promise<string>;
@@ -1474,6 +1474,10 @@ export class ManagementApiServer {
             const maxSelections = typeof maxSelectionsValue === "number" && Number.isFinite(maxSelectionsValue)
               ? Math.trunc(maxSelectionsValue)
               : 1;
+            const durationMinutesValue = body.durationMinutes;
+            const durationMinutes = typeof durationMinutesValue === "number" && Number.isFinite(durationMinutesValue)
+              ? Math.trunc(durationMinutesValue)
+              : 0;
 
             if (
               typeof channelId !== "string" ||
@@ -1483,6 +1487,8 @@ export class ManagementApiServer {
               !Number.isInteger(maxSelections) ||
               maxSelections < 1 ||
               maxSelections > 5 ||
+              durationMinutes < 0 ||
+              durationMinutes > 43200 ||
               !Array.isArray(rawRoles) ||
               rawRoles.length < 1 ||
               rawRoles.length > 5
@@ -1519,7 +1525,8 @@ export class ManagementApiServer {
               title: typeof title === "string" ? title : undefined,
               roles,
               selectionMode,
-              maxSelections
+              maxSelections,
+              durationMinutes
             };
 
             const helpers = {
