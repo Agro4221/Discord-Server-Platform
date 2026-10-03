@@ -360,9 +360,6 @@ export class CustomCommandService implements PlatformModule {
   private async assertNameFree(guildId: string, name: string): Promise<void> {
     const builtIn = new Set(buildCommands().map((command) => command.name));
     if (builtIn.has(name)) throw new Error("custom_command_name_conflicts_with_builtin");
-    if ((input.aliases ?? []).some((alias) => builtIn.has(normalizeName(alias)))) {
-      throw new Error("custom_command_alias_conflicts_with_builtin");
-    }
     const result = await this.db.query<{ id: string }>(
       "SELECT id FROM custom_commands WHERE guild_id=$1 AND (name=$2 OR $2=ANY(aliases)) LIMIT 1",
       [guildId, name]
@@ -461,6 +458,10 @@ function validateInput(input: CustomCommandInput): Required<Omit<CustomCommandIn
 
   const aliases = (input.aliases ?? []).map(normalizeName).filter(Boolean);
   if (aliases.some((alias) => !/^[a-z0-9_-]{1,32}$/.test(alias))) throw new Error("invalid_custom_command_alias");
+  const builtIn = new Set(buildCommands().map((command) => command.name));
+  if (builtIn.has(name) || aliases.some((alias) => builtIn.has(alias))) {
+    throw new Error("custom_command_name_conflicts_with_builtin");
+  }
   if (new Set([name, ...aliases]).size !== aliases.length + 1) throw new Error("duplicate_custom_command_alias");
 
   const description = (input.description ?? "").trim().slice(0, 100);
