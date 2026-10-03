@@ -33,6 +33,7 @@ const CONFIG_TABLES: ExportTable[] = [
   { table: "starboard_settings", fields: ["channel_id","threshold","ignore_self_reaction","ignore_bots"] },
   { table: "music_settings", fields: ["enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven","queue_access"] },
   { table: "birthday_settings", fields: ["channel_id","announcement_template"] },
+  { table: "analytics_settings", fields: ["retention_days","visible_counters"] },
 ];
 
 const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
@@ -462,6 +463,13 @@ export class ConfigTransferService {
     ], {
       channel_id: null,
       announcement_template: "🎂 С днём рождения, {user}!"
+    });
+
+    await execute("analytics_settings", "analytics", [
+      "retention_days","visible_counters"
+    ], {
+      retention_days: 30,
+      visible_counters: ["message","member_join","member_leave","voice_join","voice_leave","voice_move"]
     });
   }
 }
