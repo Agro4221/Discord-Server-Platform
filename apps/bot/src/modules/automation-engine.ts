@@ -44,6 +44,7 @@ export class AutomationEngine implements PlatformModule {
   private client?: import("discord.js").Client;
   private readonly cooldowns = new Map<string, number>();
   private readonly keyedCooldowns = new Map<string, number>();
+  private readonly templates = new Map<string, Map<string, string>>();
   private scheduleTimer?: NodeJS.Timeout;
   private identityId = "primary";
   private executionCounter = 0;
@@ -125,6 +126,7 @@ export class AutomationEngine implements PlatformModule {
     this.rules.clear();
     this.cooldowns.clear();
     this.keyedCooldowns.clear();
+    this.templates.clear();
     this.executionCounter = 0;
     this.lastScheduleMinute = null;
     if (this.scheduleTimer) clearInterval(this.scheduleTimer);
@@ -281,6 +283,16 @@ export class AutomationEngine implements PlatformModule {
         actions: row.actions ?? []
       });
       this.rules.set(row.guild_id, list);
+    }
+
+    const templateResult = await this.db.query<{ guild_id: string; name: string; content: string }>(
+      "SELECT guild_id,name,content FROM automation_templates ORDER BY guild_id,name"
+    );
+    this.templates.clear();
+    for (const row of templateResult.rows) {
+      const guildTemplates = this.templates.get(row.guild_id) ?? new Map<string, string>();
+      guildTemplates.set(row.name, row.content);
+      this.templates.set(row.guild_id, guildTemplates);
     }
   }
 
@@ -531,6 +543,20 @@ export class AutomationEngine implements PlatformModule {
     }
     return true;
   }
+  private async renderTemplate(guildId: string, value: string, event: RuntimeEvent): Promise<string> {
+    let output = value;
+    const guildTemplates = this.templates.get(guildId);
+    for (let depth = 0; depth < 2; depth += 1) {
+      const before = output;
+      output = await renderTemplate(output, event);
+      output = output.replace(/\{template:([a-z0-9_-]{1,40})\}/gi, (_match, rawName: string) => {
+        return guildTemplates?.get(rawName.toLowerCase()) ?? "{template:" + rawName + "}";
+      });
+      if (output === before) break;
+    }
+    return output.slice(0, 2000);
+  }
+
   private async perform(actions: AutomationAction[], event: RuntimeEvent): Promise<void> {
     const client = this.client;
 
@@ -552,7 +578,7 @@ export class AutomationEngine implements PlatformModule {
           await fetch(action.url, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ content: renderTemplate(action.content, event) }),
+            body: JSON.stringify({ content: await this.renderTemplate(event.guildId, action.content, event) }),
             signal: AbortSignal.timeout(5000)
           });
           continue;
@@ -561,7 +587,7 @@ export class AutomationEngine implements PlatformModule {
         if (action.type === "log") {
           await this.db.query(
             "INSERT INTO audit_events(guild_id,source,action,target_type,target_id,metadata) VALUES($1,'system','automation.log','automation',NULL,$2::jsonb)",
-            [event.guildId, JSON.stringify({ message: renderTemplate(action.message, event) })]
+            [event.guildId, JSON.stringify({ message: await this.renderTemplate(event.guildId, action.message, event) })]
           );
           continue;
         }
@@ -569,7 +595,7 @@ export class AutomationEngine implements PlatformModule {
         if (action.type === "send-message") {
           const channel = client?.channels.cache.get(action.channelId);
           if (channel?.isTextBased() && "send" in channel) {
-            await channel.send(renderTemplate(action.content, event));
+            await channel.send(await this.renderTemplate(event.guildId, action.content, event));
           }
           continue;
         }
@@ -577,7 +603,7 @@ export class AutomationEngine implements PlatformModule {
         if (action.type === "dm-user") {
           const userId = resolveUserReference(action.userId, event.userId);
           const user = userId ? await client?.users.fetch(userId).catch(() => null) : null;
-          if (user) await user.send(renderTemplate(action.content, event));
+          if (user) await user.send(await this.renderTemplate(event.guildId, action.content, event));
           continue;
         }
 
@@ -607,7 +633,7 @@ export class AutomationEngine implements PlatformModule {
           const userId = resolveUserReference(action.userId, event.userId);
           const member = userId ? await guild?.members.fetch(userId).catch(() => null) : null;
           if (member?.moderatable) {
-            await member.timeout(action.durationSeconds * 1000, renderTemplate(action.reason, event));
+            await member.timeout(action.durationSeconds * 1000, await this.renderTemplate(event.guildId, action.reason, event));
           }
           continue;
         }
@@ -759,14 +785,17 @@ function resolveUserReference(value: string, eventUserId?: string): string | und
   return value === "@event" ? eventUserId : value;
 }
 
-function renderTemplate(value: string, event: RuntimeEvent): string {
+async function renderTemplate(value: string, event: RuntimeEvent): Promise<string> {
   return value
     .replaceAll("{user}", event.userId ? "<@" + event.userId + ">" : "{user}")
     .replaceAll("{userId}", event.userId ?? "{userId}")
     .replaceAll("{channel}", event.channelId ? "<#" + event.channelId + ">" : "{channel}")
     .replaceAll("{channelId}", event.channelId ?? "{channelId}")
     .replaceAll("{messageId}", event.messageId ?? "{messageId}")
-    .replaceAll("{content}", event.content ?? "{content}");
+    .replaceAll("{content}", event.content ?? "{content}")
+    .replaceAll("{guildId}", event.guildId)
+    .replaceAll("{event}", event.type)
+    .replaceAll("{timestamp}", event.content ?? new Date().toISOString());
 }
 
 
