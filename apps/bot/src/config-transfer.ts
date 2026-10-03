@@ -245,8 +245,8 @@ export class ConfigTransferService {
         }
       }
 
-      const rolesModule = data.modules.find((module) => module.key === "roles");
-      const roleAutomationRules = rolesModule?.settings.role_automation_rules;
+      const rolesAutomationModule = data.modules.find((module) => module.key === "roles");
+      const roleAutomationRules = rolesAutomationModule?.settings.role_automation_rules;
       if (roleAutomationRules !== undefined && !Array.isArray(roleAutomationRules)) {
         throw new Error("invalid_role_automation_rules");
       }
