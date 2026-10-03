@@ -876,6 +876,18 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .setDescription("Automation rules")
       .addSubcommand((sub) =>
         sub
+          .setName("template")
+          .setDescription("Manage reusable automation templates")
+          .addStringOption((o) => o.setName("action").setDescription("Action").addChoices(
+            { name: "Set", value: "set" },
+            { name: "List", value: "list" },
+            { name: "Delete", value: "delete" }
+          ).setRequired(true))
+          .addStringOption((o) => o.setName("name").setDescription("Template name, e.g. welcome").setMaxLength(40))
+          .addStringOption((o) => o.setName("content").setDescription("Template content").setMaxLength(2000))
+      ),
+      .addSubcommand((sub) =>
+        sub
           .setName("create")
           .setDescription("Create a simple automation rule")
           .addStringOption((option) =>
