@@ -181,7 +181,7 @@ export class CommunityTools implements PlatformModule {
 
   async executeSlashCommand(
     interaction: ChatInputCommandInteraction
-  , commandName = commandName): Promise<void> {
+  , commandName = interaction.commandName): Promise<void> {
     if (!interaction.inGuild()) return;
     if (!SUPPORTED.has(commandName)) return;
 
