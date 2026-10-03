@@ -231,13 +231,21 @@ export class Utility implements PlatformModule {
         });
         return;
 
-      case "roleinfo":
+      case "roleinfo": {
+        const selectedRole = interaction.options.getRole("role", true);
+        const role = interaction.guild!.roles.cache.get(selectedRole.id);
+        if (!role) {
+          await interaction.reply({
+            content: "Роль не найдена.",
+            ephemeral: true
+          });
+          return;
+        }
         await interaction.reply({
-          embeds: [
-            this.buildRoleInfo(interaction.options.getRole("role", true))
-          ]
+          embeds: [this.buildRoleInfo(role)]
         });
         return;
+      }
 
       case "channelinfo": {
         const channel =
