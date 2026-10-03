@@ -644,6 +644,13 @@ const migrations = [
     ])
   },
   {
+    version: 40,
+    name: "music_request_channel",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS request_channel_id text;"
+    ])
+  },
+  {
     version: 39,
     name: "stream_alerts",
     sql: q([
