@@ -271,3 +271,8 @@ Never write credentials, tokens or private user data here.
 - AutoMod Rule Builder now supports rule editing, enable/disable toggles, validated threshold/window/timeout input and the complete detector set supported by Core.
 - Dashboard deletion of AutoMod rules now creates a durable `automod.rule.deleted` audit event.
 - Added regression coverage that unsupported rule detectors are rejected before database writes.
+
+## 2026-10-04 — Security Center verified
+- CI run **#1245** (`37151126039`) passed the full automated pipeline on development head `7ac4f4505479d518f8c55847466111124ca0ea6d`.
+- Security now has a dedicated Control Center surface with active-incident visibility, hierarchy/readiness diagnostics and guarded incident-closing operations.
+- Security snapshot access is exposed through the Management API and local Dashboard proxy; existing generic configuration remains available alongside the operational panel.

@@ -127,3 +127,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-04 — AutoMod CRUD verification
 - CI run **#1242** passed the full automated matrix after the AutoMod Control Center CRUD pass.
 - Regression coverage includes unsupported-detector rejection before SQL writes; production Dashboard build also validates the new editor UI contracts.
+
+## 2026-10-04 — Security Center verification
+- CI run **#1245** passed the full automated matrix after adding the Security Control Center and local security snapshot route.
+- Live Discord role hierarchy, permission, incident and quarantine restoration behavior still require the live acceptance environment.

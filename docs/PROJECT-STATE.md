@@ -220,3 +220,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-04 — AutoMod CRUD verified
 - Development head `0e79a64ab1cb0aa2c70ead8ae98b4950f2764b2a` passed CI run **#1242**.
 - AutoMod is now a full Control Center surface: list, create/update, enable/disable and delete rules, with audit coverage for Dashboard deletion.
+
+## 2026-10-04 — Security Center verified
+- Development head `7ac4f4505479d518f8c55847466111124ca0ea6d` passed CI run **#1245**.
+- Security is now a full Control Center module with active incident monitoring and Discord readiness checks.
