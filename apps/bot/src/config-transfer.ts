@@ -310,7 +310,7 @@ export class ConfigTransferService {
     });
 
     await execute("music_settings", "music", [
-      "enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven"
+      "enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven","queue_access"
     ], {
       enabled: false,
       preferred_text_channel_id: null,
