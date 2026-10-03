@@ -234,3 +234,16 @@ test("Automation dry-run evaluates bot and channel-type conditions and previews 
   assert.match(result.renderedActions[0]?.preview ?? "", /Helper 234567890123456789/);
   assert.match(result.renderedActions[1]?.preview ?? "", /👍/);
 });
+
+test("Automation validates cross-module actions", () => {
+  assert.doesNotThrow(() => validateAutomationRule("ticket.create", [], [
+    { type: "ticket-close", ticketId: "@event" },
+    { type: "giveaway-end", giveawayId: 1 },
+    { type: "giveaway-reroll", giveawayId: 1 },
+    { type: "notification-feed-toggle", feedId: 1, enabled: false },
+    { type: "music-control", action: "stop" },
+    { type: "music-control", action: "repeat", mode: "track" },
+    { type: "music-control", action: "volume", value: 100 },
+    { type: "music-control", action: "autoplay", enabled: true }
+  ]));
+});
