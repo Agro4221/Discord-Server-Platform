@@ -267,7 +267,8 @@ async function main(): Promise<void> {
     },
     notifications: {
       list: async (guildId) => notifications.listFeeds(guildId),
-      create: async (guildId, channelId, url, intervalSeconds) => notifications.addFeed(guildId, channelId, url, intervalSeconds),
+      create: async (guildId, channelId, url, intervalSeconds, options) =>
+        notifications.addFeed(guildId, channelId, url, intervalSeconds, options),
       update: async (guildId, feedId, input) => notifications.updateFeed(guildId, feedId, input),
       delete: async (guildId, feedId) => notifications.deleteFeed(guildId, feedId)
     },
