@@ -953,6 +953,19 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_moderation_escalations_guild_enabled ON moderation_escalations(guild_id,enabled);"
     ])
+  },
+  {
+    version: 60,
+    name: "automation_templates",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS automation_templates (",
+      "  guild_id text NOT NULL,",
+      "  name text NOT NULL,",
+      "  content text NOT NULL,",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,name)",
+      ");"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
