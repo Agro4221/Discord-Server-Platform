@@ -173,6 +173,12 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Dry-run remains intentionally side-effect-free; live execution is covered by existing runtime pathways and remains part of release-gate validation.
 
 
+## 2026-10-04 — Automation retry/dead-letter gate
+- Migration 69 must create durable dead-letter state and retry-state indexing.
+- Unit: bounded exponential backoff and dead-letter threshold; diagnostics status mapping includes dead-lettered jobs.
+- Runtime: delayed action failures must retry with backoff and move to dead letter on the fifth failed attempt; successful delayed jobs must still complete normally.
+- Live Discord failure injection remains a release-gate validation case because retrying a partially completed action sequence has at-least-once semantics.
+
 ## 2026-10-04 — Automation diagnostics gate
 - Unit: rule/event aggregation and delayed-job status mapping.
 - API contract: diagnostics endpoint returns bounded operational metadata without event/action payloads.
