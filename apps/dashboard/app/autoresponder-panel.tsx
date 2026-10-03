@@ -91,9 +91,9 @@ export function AutoResponderPanel(props: {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? "autoresponder_save_failed");
-      setItems((body.rules ?? []) as Rule[]);
       setDraft(null);
       setStatus("Автоответчик сохранён.");
+      await load();
       await props.onChanged?.();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Не удалось сохранить правило.");

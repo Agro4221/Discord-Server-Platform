@@ -106,9 +106,9 @@ export function CustomCommandsPanel(props: {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? "custom_command_save_failed");
-      setItems((body.commands ?? []) as Command[]);
       setDraft(null);
       setStatus("Команда сохранена.");
+      await load();
       await props.onChanged?.();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Не удалось сохранить команду.");

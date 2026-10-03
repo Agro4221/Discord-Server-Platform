@@ -86,7 +86,7 @@ export function AutoModRulesPanel(props: {
   }, [props.guildId]);
 
   const detectorLabel = useMemo(
-    () => new Map(DETECTORS.map(([value, label]) => [value, label])),
+    () => new Map<string, string>(DETECTORS.map(([value, label]) => [value, label])),
     []
   );
 
@@ -304,7 +304,7 @@ function IdPicker(props: {
       <select
         multiple
         value={props.values}
-        onChange={(e) => onChange([...e.currentTarget.selectedOptions].map((option) => option.value))}
+        onChange={(e) => props.onChange([...e.currentTarget.selectedOptions].map((option) => option.value))}
         style={{ ...inputStyle, minHeight: 90 }}
       >
         {props.options.filter((item) => item.manageable !== false).map((item) => (
