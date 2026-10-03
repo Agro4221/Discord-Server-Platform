@@ -36,7 +36,8 @@ const CONFIG_TABLES: ExportTable[] = [
 
 const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
   { table: "automation_rules", fields: ["name","enabled","event","conditions","any_conditions","actions","cooldown_seconds"] },
-  { table: "role_panels", fields: ["channel_id","message_id","title","roles","selection_mode","max_selections","duration_minutes"] }
+  { table: "role_panels", fields: ["channel_id","message_id","title","roles","selection_mode","max_selections","duration_minutes"] },
+  { table: "stream_alerts", fields: ["platform","target","channel_id","mention_role_id","enabled","interval_seconds","message_template"] }
 ];
 
 export class ConfigTransferService {
@@ -86,7 +87,10 @@ export class ConfigTransferService {
         `SELECT ${table.fields.join(",")} FROM ${quoteIdentifier(table.table)} WHERE guild_id=$1 ORDER BY id`,
         [guildId]
       );
-      const moduleKey = table.table === "automation_rules" ? "automation" : "roles";
+      const moduleKey =
+        table.table === "automation_rules" ? "automation" :
+        table.table === "role_panels" ? "roles" :
+        "stream-alerts";
       const target = modules.find((module) => module.key === moduleKey);
       if (target) {
         target.settings[table.table] = result.rows.map((row) => sanitizeJson(row));
@@ -150,6 +154,31 @@ export class ConfigTransferService {
               JSON.stringify(rule.anyConditions),
               JSON.stringify(rule.actions),
               rule.cooldownSeconds
+            ]
+          );
+        }
+      }
+
+      const streamModule = data.modules.find((module) => module.key === "stream-alerts");
+      const streamAlerts = streamModule?.settings.stream_alerts;
+      if (streamAlerts !== undefined && !Array.isArray(streamAlerts)) {
+        throw new Error("invalid_stream_alerts");
+      }
+      if (Array.isArray(streamAlerts)) {
+        const normalizedAlerts = streamAlerts.map((alert) => normalizeImportedStreamAlert(alert));
+        await client.query("DELETE FROM stream_alerts WHERE guild_id=$1", [targetGuildId]);
+        for (const alert of normalizedAlerts) {
+          await client.query(
+            "INSERT INTO stream_alerts(guild_id,platform,target,channel_id,mention_role_id,enabled,interval_seconds,message_template) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
+            [
+              targetGuildId,
+              alert.platform,
+              alert.target,
+              alert.channelId,
+              alert.mentionRoleId,
+              alert.enabled,
+              alert.intervalSeconds,
+              alert.messageTemplate
             ]
           );
         }
@@ -505,5 +534,46 @@ function normalizeImportedRolePanel(value: unknown): ImportedRolePanel {
       : "toggle") as "toggle" | "exclusive" | "max",
     maxSelections: typeof object.max_selections === "number" ? Math.min(Math.max(Math.trunc(object.max_selections),1),5) : 1,
     durationMinutes: typeof object.duration_minutes === "number" ? Math.min(Math.max(Math.trunc(object.duration_minutes),0),43200) : 0
+  };
+}
+
+type ImportedStreamAlert = {
+  platform: "twitch" | "youtube" | "vk";
+  target: string;
+  channelId: string;
+  mentionRoleId: string | null;
+  enabled: boolean;
+  intervalSeconds: number;
+  messageTemplate: string;
+};
+
+function normalizeImportedStreamAlert(value: unknown): ImportedStreamAlert {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_stream_alert");
+  const object = value as Record<string, unknown>;
+  if (
+    !["twitch","youtube","vk"].includes(String(object.platform)) ||
+    typeof object.target !== "string" ||
+    !object.target.trim() ||
+    object.target.length > 200 ||
+    typeof object.channel_id !== "string" ||
+    !/^\d{17,20}$/.test(object.channel_id) ||
+    (object.mention_role_id !== null && object.mention_role_id !== undefined &&
+      (typeof object.mention_role_id !== "string" || !/^\d{17,20}$/.test(object.mention_role_id))) ||
+    typeof object.enabled !== "boolean" ||
+    typeof object.interval_seconds !== "number" ||
+    !Number.isInteger(object.interval_seconds) ||
+    object.interval_seconds < 15 ||
+    object.interval_seconds > 3600 ||
+    typeof object.message_template !== "string" ||
+    object.message_template.length > 1000
+  ) throw new Error("invalid_stream_alert");
+  return {
+    platform: String(object.platform) as ImportedStreamAlert["platform"],
+    target: object.target.trim().slice(0,200),
+    channelId: object.channel_id,
+    mentionRoleId: typeof object.mention_role_id === "string" ? object.mention_role_id : null,
+    enabled: object.enabled,
+    intervalSeconds: object.interval_seconds,
+    messageTemplate: object.message_template
   };
 }
