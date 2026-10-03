@@ -109,7 +109,7 @@ type ApiOptions = {
     update: (
       guildId: string,
       panelId: number,
-      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number },
+      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number },
       callbacks: {
         editMessage: (channelId: string, messageId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => Promise<void>;
         deleteMessage: (channelId: string, messageId: string) => Promise<void>;
