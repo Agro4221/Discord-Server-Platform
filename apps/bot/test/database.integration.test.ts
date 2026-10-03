@@ -22,13 +22,13 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1)",
       [[
         "guild_modules","automod_settings","verification_settings","automation_rules",
-        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts"
+        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users"
       ]]
     );
-    assert.equal(tables.rows.length, 10);
+    assert.equal(tables.rows.length, 11);
     const version = (await db.query("SELECT max(version) AS version FROM schema_migrations")).rows[0]?.version;
-    assert.equal(Number(version), 63);
-    assert.equal(Number(first.rows[0]?.count), 63);
+    assert.equal(Number(version), 64);
+    assert.equal(Number(first.rows[0]?.count), 64);
   } finally {
     await db.close();
   }
