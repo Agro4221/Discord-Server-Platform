@@ -323,7 +323,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
     ],
     kind: "full"
   },
-  stream-alerts: {
+  "stream-alerts": {
     icon: "◉",
     accent: "#ef7272",
     title: "Stream Alerts",
