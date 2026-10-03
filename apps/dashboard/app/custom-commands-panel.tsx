@@ -66,7 +66,7 @@ export function CustomCommandsPanel(props: {
     void load().catch((error) => setStatus(error instanceof Error ? error.message : "Не удалось загрузить команды."));
   }, [props.guildId]);
 
-"  function edit(item: Command) {
+  function edit(item: Command) {
     setDraft({
       ...item,
       aliases: [...item.aliases],
