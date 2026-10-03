@@ -45,7 +45,10 @@ test("all Discord application command option lists keep required options before 
     [
       { name: "minutes", required: true },
       { name: "prize", required: true },
-      { name: "winners", required: false }
+      { name: "winners", required: false },
+      { name: "required-role", required: false },
+      { name: "min-level", required: false },
+      { name: "template", required: false }
     ]
   );
 
