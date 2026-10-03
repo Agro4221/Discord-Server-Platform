@@ -183,6 +183,8 @@ export function loadConfig(): AppConfig {
       ...(process.env.TWITCH_CLIENT_ID?.trim() ? { twitchClientId: process.env.TWITCH_CLIENT_ID.trim() } : {}),
       ...(process.env.TWITCH_CLIENT_SECRET?.trim() ? { twitchClientSecret: process.env.TWITCH_CLIENT_SECRET.trim() } : {}),
       ...(process.env.YOUTUBE_API_KEY?.trim() ? { youtubeApiKey: process.env.YOUTUBE_API_KEY.trim() } : {}),
+      ...(process.env.KICK_CLIENT_ID?.trim() ? { kickClientId: process.env.KICK_CLIENT_ID.trim() } : {}),
+      ...(process.env.KICK_CLIENT_SECRET?.trim() ? { kickClientSecret: process.env.KICK_CLIENT_SECRET.trim() } : {}),
       vkApiBaseUrl: (process.env.VK_VIDEO_LIVE_API_BASE_URL?.trim() || "https://api.live.vkvideo.ru/v1").replace(/\/$/, ""),
       pollIntervalSeconds: integer("STREAM_ALERTS_POLL_INTERVAL_SECONDS", 30, 15, 300)
     },
