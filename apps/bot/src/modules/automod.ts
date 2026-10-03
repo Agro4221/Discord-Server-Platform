@@ -6,7 +6,7 @@ import type { Moderation } from "./moderation.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 
-type AutoModConfig = {
+export type AutoModConfig = {
   enabled: boolean;
   blockedWords: string[];
   maxMentions: number;
