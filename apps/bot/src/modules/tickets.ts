@@ -132,6 +132,99 @@ export class Tickets implements PlatformModule {
     );
   }
 
+  async closeByAutomation(guildId: string, ticketId: number, actorUserId: string): Promise<boolean> {
+    if (!Number.isSafeInteger(ticketId) || ticketId < 1) throw new Error("invalid_ticket_id");
+
+    const result = await this.db.query<{
+      channel_id: string;
+      status: "open" | "closed" | "closing";
+    }>(
+      "SELECT channel_id,status FROM tickets WHERE id=$1 AND guild_id=$2",
+      [ticketId, guildId]
+    );
+    const row = result.rows[0];
+    if (!row) return false;
+    if (row.status !== "open") return false;
+
+    const claimed = await this.db.query<{ channel_id: string }>(
+      "UPDATE tickets SET status='closing',closing_at=now() WHERE id=$1 AND guild_id=$2 AND status='open' RETURNING channel_id",
+      [ticketId, guildId]
+    );
+    if (!claimed.rows[0]) return false;
+
+    const guild = this.client?.guilds.cache.get(guildId);
+    const channel = guild?.channels.cache.get(claimed.rows[0].channel_id);
+    let transcript = "Transcript unavailable.";
+
+    try {
+      transcript = channel?.type === ChannelType.GuildText ? await this.transcript(channel) : transcript;
+      await this.db.transaction(async (client) => {
+        await client.query(
+          "INSERT INTO ticket_transcripts(ticket_id,guild_id,content) VALUES($1,$2,$3) ON CONFLICT(ticket_id) DO UPDATE SET content=EXCLUDED.content",
+          [ticketId,guildId,transcript]
+        );
+        await client.query(
+          "UPDATE tickets SET status='closed',closed_at=now(),closing_at=NULL WHERE id=$1 AND status='closing'",
+          [ticketId]
+        );
+      });
+    } catch (error) {
+      await this.db.query(
+        "UPDATE tickets SET status='open',closing_at=NULL WHERE id=$1 AND status='closing'",
+        [ticketId]
+      ).catch((rollbackError) => logger.error("Automation ticket close rollback failed", {
+        guildId,
+        ticketId,
+        error: String(rollbackError)
+      }));
+      logger.error("Automation ticket close failed", { guildId, ticketId, error: String(error) });
+      throw error;
+    }
+
+    const config = await this.config(guildId);
+    if (config.transcriptChannelId) {
+      const transcriptChannel = guild?.channels.cache.get(config.transcriptChannelId);
+      if (transcriptChannel?.isTextBased() && "send" in transcriptChannel) {
+        const { AttachmentBuilder } = await import("discord.js");
+        await transcriptChannel.send({
+          content: "Transcript ticket #" + ticketId,
+          files: [new AttachmentBuilder(
+            Buffer.from(
+              channel?.type === ChannelType.GuildText ? await this.transcriptHtml(channel) : transcript,
+              "utf8"
+            ),
+            { name: "ticket-" + ticketId + ".html" }
+          )]
+        }).catch((error) => logger.warn("Automation ticket transcript delivery failed", {
+          guildId,
+          ticketId,
+          channelId: config.transcriptChannelId,
+          error: String(error)
+        }));
+      }
+    }
+
+    await this.events?.emit("ticket.close", {
+      guildId,
+      userId: actorUserId,
+      ticketId,
+      channelId: row.channel_id
+    });
+
+    if (channel?.type === ChannelType.GuildText) {
+      await channel.delete("Ticket closed by automation").catch((error) => {
+        logger.warn("Automation ticket channel cleanup failed", {
+          guildId,
+          ticketId,
+          channelId: row.channel_id,
+          error: String(error)
+        });
+      });
+    }
+
+    return true;
+  }
+
   async handlePrefixCommand(message: Message, commandName: string): Promise<boolean> {
     if (!message.guild || message.author.bot || commandName !== "ticket") return false;
     if (!await moduleEnabled(this.db, message.guild.id, "tickets", false)) {
