@@ -164,9 +164,17 @@ export class AutoMod implements PlatformModule {
     if (!supported.has(detector)) throw new Error("unsupported_automod_detector");
 
     const action = input.action ?? "delete";
-    const threshold = input.threshold === undefined || input.threshold === null ? null : Number(input.threshold);
-    const windowSeconds = input.windowSeconds === undefined || input.windowSeconds === null ? null : Math.floor(input.windowSeconds);
-    const timeoutMinutes = Math.min(Math.max(Math.floor(input.timeoutMinutes ?? 0),0),40320);
+    if (!["delete","timeout","warn","log"].includes(action)) throw new Error("invalid_automod_rule_action");
+
+    const threshold =
+      input.threshold === undefined || input.threshold === null
+        ? null
+        : finiteInt(input.threshold, 0, 100000);
+    const windowSeconds =
+      input.windowSeconds === undefined || input.windowSeconds === null
+        ? null
+        : finiteInt(input.windowSeconds, 1, 3600);
+    const timeoutMinutes = finiteInt(input.timeoutMinutes ?? 0, 0, 40320);
 
     await this.db.query(
       "INSERT INTO automod_rules(guild_id,detector,enabled,threshold,window_seconds,action,timeout_minutes,affected_role_ids,ignored_role_ids,affected_channel_ids,ignored_channel_ids,ignore_moderators,message_template) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(guild_id,detector) DO UPDATE SET enabled=EXCLUDED.enabled,threshold=EXCLUDED.threshold,window_seconds=EXCLUDED.window_seconds,action=EXCLUDED.action,timeout_minutes=EXCLUDED.timeout_minutes,affected_role_ids=EXCLUDED.affected_role_ids,ignored_role_ids=EXCLUDED.ignored_role_ids,affected_channel_ids=EXCLUDED.affected_channel_ids,ignored_channel_ids=EXCLUDED.ignored_channel_ids,ignore_moderators=EXCLUDED.ignore_moderators,message_template=EXCLUDED.message_template,updated_at=now()",
@@ -194,7 +202,10 @@ export class AutoMod implements PlatformModule {
   }
 
   async deleteRule(guildId: string, id: number): Promise<boolean> {
-    const result = await this.db.query("DELETE FROM automod_rules WHERE guild_id=$1 AND id=$2", [guildId,id]);
+    const result = await this.db.query(
+      "DELETE FROM automod_rules WHERE guild_id=$1 AND id=$2 RETURNING detector",
+      [guildId,id]
+    );
     return result.rowCount === 1;
   }
 
@@ -532,6 +543,13 @@ export class AutoMod implements PlatformModule {
 }
 
 
+
+function finiteInt(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) throw new Error("invalid_automod_rule_number");
+  const integer = Math.floor(value);
+  if (integer < min || integer > max) throw new Error("invalid_automod_rule_number");
+  return integer;
+}
 
 function cleanIds(values?: string[]): string[] {
   return [...new Set((values ?? []).filter((value) => /^\d{15,25}$/.test(value)))].slice(0,100);
