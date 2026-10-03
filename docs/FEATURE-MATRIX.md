@@ -438,8 +438,8 @@ Music должен стремиться к функциональности си
 | Templates | ✅ |
 | Visual automation builder | ✅ |
 | Richer trigger catalog | ✅ | Added reaction.remove, channel.delete, role.delete and member.ban triggers through the existing PlatformEventBus |
-| Richer condition catalog | 🟡 |
-| Richer action catalog | 🟡 |
+| Richer condition catalog | ✅ | Added role absence, bot identity, channel type and permission conditions |
+| Richer action catalog | ✅ | Added nickname management and message reaction actions |
 | Workflow retries / dead-letter diagnostics | ✅ | Durable delayed jobs retry with bounded exponential backoff and move to a persistent dead-letter state after five failed attempts; Dashboard diagnostics exposes the state |
 | Reusable workflow presets | ✅ | Per-guild workflow presets can be saved/loaded/deleted in Dashboard and are included in Config Export/Import |
 | Cross-module actions (tickets, roles, giveaway, moderation, music, notifications) | 🟡 |
