@@ -217,7 +217,8 @@ export async function routeCommand(
   interaction: ChatInputCommandInteraction,
   db: Database,
   temporaryVoice: TemporaryVoice,
-  moderation: Moderation
+  moderation: Moderation,
+  helpPages?: HelpPages
 ): Promise<void> {
   try {
     await handleCommand(
@@ -225,7 +226,8 @@ export async function routeCommand(
       interaction,
       db,
       temporaryVoice,
-      moderation
+      moderation,
+      helpPages
     );
   } catch (error) {
     logger.error("Command failed", {
