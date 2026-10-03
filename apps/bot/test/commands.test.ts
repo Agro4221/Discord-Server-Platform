@@ -52,6 +52,18 @@ test("all Discord application command option lists keep required options before 
     ]
   );
 
+  const streamAlertCreate = commands.find((command) => command.name === "streamalert")?.options?.find((option) => option.name === "create");
+  assert.deepEqual(
+    streamAlertCreate?.options?.map((option) => ({ name: option.name, required: option.required })),
+    [
+      { name: "platform", required: true },
+      { name: "target", required: true },
+      { name: "channel", required: true },
+      { name: "mention-role", required: false },
+      { name: "interval", required: false }
+    ]
+  );
+
   assert.deepEqual(
     commands.find((command) => command.name === "automation")?.options?.find((option) => option.name === "create")?.options?.map((option) => ({
       name: option.name,
