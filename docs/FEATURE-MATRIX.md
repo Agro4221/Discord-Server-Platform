@@ -50,7 +50,7 @@
 | Anti-nuke / destructive burst | ✅ |
 | Quarantine / lockdown workflow | ✅ |
 | Scam / phishing heuristics | ✅ |
-| Security incident dashboard | 🟡 | `/security status` is live; Dashboard drilldown remains
+| Security incident dashboard | ✅ | `/security status` + Dashboard incident drilldown
 | Honeypot / advanced detectors | 🟡 |
 
 ## Community
