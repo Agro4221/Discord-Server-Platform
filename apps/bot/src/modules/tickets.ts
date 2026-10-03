@@ -9,22 +9,27 @@ type TicketConfig = {
   categoryId: string | null;
   staffRoleId: string | null;
   transcriptChannelId: string | null;
+  maxOpenPerUser: number;
+  autoCloseMinutes: number;
 };
 
 export class Tickets implements PlatformModule {
   readonly name = "tickets";
   private unsubscribe?: () => void;
   private events?: import("../events.js").PlatformEventBus;
+  private client?: ModuleContext["client"];
   private recoveryTimer?: NodeJS.Timeout;
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.events = context.events;
+    this.client = context.client;
     await this.recoverStaleClosures();
     const a = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const b = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
-    this.unsubscribe = () => { a(); b(); };
+    const m = context.events.on("message.create", (message) => this.onMessage(message));
+    this.unsubscribe = () => { a(); b(); m(); };
     this.recoveryTimer = setInterval(() => {
       void this.recoverStaleClosures().catch((error) => {
         logger.warn("Ticket stale-closure recovery failed", { error: String(error) });
@@ -39,11 +44,12 @@ export class Tickets implements PlatformModule {
     if (this.recoveryTimer) clearInterval(this.recoveryTimer);
     this.recoveryTimer = undefined;
     this.events = undefined;
+    this.client = undefined;
   }
 
   private async config(guildId: string): Promise<TicketConfig> {
-    const result = await this.db.query<{ enabled: boolean; category_id: string | null; staff_role_id: string | null; transcript_channel_id: string | null }>(
-      "SELECT enabled,category_id,staff_role_id,transcript_channel_id FROM ticket_settings WHERE guild_id=$1",
+    const result = await this.db.query<{ enabled: boolean; category_id: string | null; staff_role_id: string | null; transcript_channel_id: string | null; max_open_per_user: number; auto_close_minutes: number }>(
+      "SELECT enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes FROM ticket_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -51,7 +57,9 @@ export class Tickets implements PlatformModule {
       enabled: row?.enabled ?? false,
       categoryId: row?.category_id ?? null,
       staffRoleId: row?.staff_role_id ?? null,
-      transcriptChannelId: row?.transcript_channel_id ?? null
+      transcriptChannelId: row?.transcript_channel_id ?? null,
+      maxOpenPerUser: Math.min(Math.max(Number(row?.max_open_per_user ?? 1), 1), 10),
+      autoCloseMinutes: Math.min(Math.max(Number(row?.auto_close_minutes ?? 0), 0), 43200)
     };
   }
 
@@ -62,7 +70,7 @@ export class Tickets implements PlatformModule {
       `INSERT INTO ticket_settings(guild_id,enabled,category_id,staff_role_id,transcript_channel_id)
        VALUES($1,$2,$3,$4,$5)
        ON CONFLICT(guild_id) DO UPDATE SET enabled=EXCLUDED.enabled,category_id=EXCLUDED.category_id,staff_role_id=EXCLUDED.staff_role_id,transcript_channel_id=EXCLUDED.transcript_channel_id,updated_at=now()`,
-      [guildId,next.enabled,next.categoryId,next.staffRoleId,next.transcriptChannelId]
+      [guildId,next.enabled,next.categoryId,next.staffRoleId,next.transcriptChannelId,Math.min(Math.max(Math.trunc(next.maxOpenPerUser),1),10),Math.min(Math.max(Math.trunc(next.autoCloseMinutes),0),43200)]
     );
     await this.db.query(
       `INSERT INTO guild_modules(guild_id,module_key,enabled)
@@ -126,7 +134,9 @@ export class Tickets implements PlatformModule {
         enabled: true,
         categoryId: category?.id ?? null,
         staffRoleId: staffRole?.id ?? null,
-        transcriptChannelId: transcriptChannel?.id ?? null
+        transcriptChannelId: transcriptChannel?.id ?? null,
+        maxOpenPerUser: interaction.options.getInteger("max-open") ?? 1,
+        autoCloseMinutes: interaction.options.getInteger("auto-close") ?? 0
       });
       await interaction.reply({ content: "Tickets настроены и включены.", ephemeral: true });
       return;
@@ -139,7 +149,7 @@ export class Tickets implements PlatformModule {
     }
 
     const existing = await this.db.query<{ channel_id: string }>(
-      "SELECT channel_id FROM tickets WHERE guild_id=$1 AND creator_id=$2 AND status='open' LIMIT 1",
+      "SELECT channel_id FROM tickets WHERE guild_id=$1 AND creator_id=$2 AND status IN ('open','closing') ORDER BY created_at DESC LIMIT 1",
       [interaction.guild!.id,interaction.user.id]
     );
     if (existing.rows[0]?.channel_id) {
