@@ -373,6 +373,13 @@ Never write credentials, tokens or private user data here.
 - No Discord mutation, webhook call or database write is performed by dry-run.
 
 
+## 2026-10-04 — Automation workflow presets
+- Added migration 70 with durable per-guild workflow presets storing event, ALL/ANY conditions, actions and cooldown.
+- Added AutomationEngine preset CRUD with normalized names and the same validation contract as live rules.
+- Added Management API CRUD with audit events and Dashboard save/load/delete controls.
+- Included workflow presets in the existing Config Export/Import path with validation and safe ordering.
+- Loading a preset only populates the Builder; it does not execute or publish the workflow automatically.
+
 ## 2026-10-04 — Automation retries and dead-letter
 - Added migration 69 with durable dead-letter state for automation_delayed_jobs.
 - Delayed jobs now execute in fail-fast mode so actual action exceptions leave the job eligible for retry instead of being marked completed.
