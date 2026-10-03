@@ -17,7 +17,8 @@ type Action =
   | { type: "add-role" | "remove-role"; userId: string; roleId: string }
   | { type: "timeout"; userId: string; durationSeconds: number; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
-  | { type: "log"; message: string };
+  | { type: "log"; message: string }
+  | { type: "delay"; seconds: number };
 
 type Rule = {
   id: string;
@@ -188,6 +189,7 @@ export function AutomationPanel({
       type === "add-role" || type === "remove-role" ? { type, userId: "@event", roleId: "" } :
       type === "timeout" ? { type, userId: "@event", durationSeconds: 60, reason: "" } :
       type === "delete-message" ? { type, channelId: "@event", messageId: "@event" } :
+      type === "delay" ? { type, seconds: 5 } :
       { type: "log", message: "" };
     setActions((current) => current.map((item, i) => i === index ? next : item));
   }
@@ -366,6 +368,7 @@ export function AutomationPanel({
               <option value="timeout">timeout</option>
               <option value="delete-message">delete-message</option>
               <option value="log">log</option>
+              <option value="delay">delay</option>
             </select>
 
             {action.type === "send-message" && (
@@ -412,6 +415,10 @@ export function AutomationPanel({
 
             {action.type === "log" && (
               <input value={action.message} maxLength={1000} onChange={(e) => updateAction(index, { message: e.target.value })} placeholder="Audit log message" style={inputStyle} />
+            )}
+
+            {action.type === "delay" && (
+              <input type="number" min={1} max={3600} value={action.seconds} onChange={(e) => updateAction(index, { seconds: Number(e.target.value) })} placeholder="Seconds" style={inputStyle} />
             )}
 
             <button type="button" disabled={saving || actions.length === 1} onClick={() => setActions((current) => current.filter((_, i) => i !== index))} style={buttonStyle("secondary")}>×</button>
