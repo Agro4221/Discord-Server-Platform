@@ -154,7 +154,7 @@ export class CommandDispatcher {
   private executorFor(
     target: string
   ): ((interaction: ChatInputCommandInteraction, commandName: string) => Promise<void>) | null {
-    if (["level","rank","top"].includes(target)) return (interaction, commandName) => this.leveling.executeSlashCommand(interaction, commandName);
+    if (["leveling","level","rank","top"].includes(target)) return (interaction, commandName) => this.leveling.executeSlashCommand(interaction, commandName);
     if (["economy","shop","balance","daily","leaderboard","pay","buy"].includes(target)) return (interaction, commandName) => this.economy.executeSlashCommand(interaction, commandName);
     if (target === "remind") return (interaction, commandName) => this.reminders.executeSlashCommand(interaction, commandName);
     if (["serverinfo","userinfo","avatar","membercount","roleinfo","channelinfo","afk"].includes(target)) return (interaction, commandName) => this.utility.executeSlashCommand(interaction, commandName);
