@@ -118,13 +118,17 @@ export class Notifications implements PlatformModule {
     if (!current) return false;
     await this.db.query(
       `UPDATE notification_feeds
-       SET channel_id=$1,url=$2,interval_seconds=$3,enabled=$4,updated_at=now()
-       WHERE id=$5 AND guild_id=$6`,
+       SET channel_id=$1,url=$2,interval_seconds=$3,enabled=$4,
+           message_template=$5,include_keywords=$6,exclude_keywords=$7,updated_at=now()
+       WHERE id=$8 AND guild_id=$9`,
       [
         patch.channelId ?? current.channelId,
         patch.url ?? current.url,
         Math.min(Math.max(Math.trunc(patch.intervalSeconds ?? current.intervalSeconds), 60), 86_400),
         patch.enabled ?? current.enabled,
+        patch.messageTemplate !== undefined ? normalizeFeedTemplate(patch.messageTemplate) : current.messageTemplate,
+        patch.includeKeywords !== undefined ? normalizeKeywords(patch.includeKeywords) : current.includeKeywords,
+        patch.excludeKeywords !== undefined ? normalizeKeywords(patch.excludeKeywords) : current.excludeKeywords,
         id,
         guildId
       ]
@@ -248,7 +252,10 @@ export class Notifications implements PlatformModule {
          ) claim
          WHERE nf.id=claim.id
          RETURNING nf.id,nf.guild_id AS "guildId",nf.channel_id AS "channelId",nf.url,
-                   nf.interval_seconds AS "intervalSeconds",nf.last_item_key AS "lastItemKey"`,
+                   nf.interval_seconds AS "intervalSeconds",nf.last_item_key AS "lastItemKey",
+                   nf.message_template AS "messageTemplate",
+                   nf.include_keywords AS "includeKeywords",
+                   nf.exclude_keywords AS "excludeKeywords"`,
         [this.identityId]
       );
 
