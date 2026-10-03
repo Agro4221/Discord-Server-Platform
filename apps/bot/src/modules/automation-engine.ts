@@ -1318,7 +1318,8 @@ export class AutomationEngine implements PlatformModule {
           const ticketId = action.ticketId === "@event" ? Number(event.numeric?.ticketId) : Number(action.ticketId);
           if (!Number.isSafeInteger(ticketId) || ticketId < 1) throw new Error("invalid_ticket_id");
           if (!this.integrations.tickets) throw new Error("tickets_unavailable");
-          await this.integrations.tickets.closeByAutomation(event.guildId, ticketId, event.userId ?? "automation");
+          const closed = await this.integrations.tickets.closeByAutomation(event.guildId, ticketId, event.userId ?? "automation");
+          if (!closed) throw new Error("ticket_not_found_or_not_open");
           continue;
         }
 
