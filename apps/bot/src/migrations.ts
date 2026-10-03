@@ -1079,6 +1079,24 @@ const migrations = [
     ])
   },
   {
+    version: 71,
+    name: "ticket_sla",
+    sql: q([
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS sla_reminded_at timestamptz;",
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS sla_escalated_at timestamptz;",
+      "CREATE TABLE IF NOT EXISTS ticket_sla_settings (",
+      "  guild_id text PRIMARY KEY,",
+      "  enabled boolean NOT NULL DEFAULT false,",
+      "  first_response_minutes integer NOT NULL DEFAULT 30 CHECK(first_response_minutes BETWEEN 1 AND 10080),",
+      "  reminder_minutes integer NOT NULL DEFAULT 120 CHECK(reminder_minutes BETWEEN 1 AND 10080),",
+      "  escalation_minutes integer NOT NULL DEFAULT 240 CHECK(escalation_minutes BETWEEN 1 AND 20160),",
+      "  escalation_role_id text,",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_ticket_sla_open_activity ON tickets(guild_id,status,last_activity_at,created_at) WHERE status='open';"
+    ])
+  },
+  {
     version: 70,
     name: "automation_workflow_presets",
     sql: q([
