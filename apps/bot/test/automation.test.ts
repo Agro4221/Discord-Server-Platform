@@ -98,3 +98,79 @@ test("Automation dry-run returns no action previews when conditions do not match
   assert.equal(result.matched, false);
   assert.equal(result.renderedActions.length, 0);
 });
+
+test("Automation diagnostics expose safe rule and delayed-job health", async () => {
+  const db = {
+    async query(sql: string) {
+      if (sql.includes("FROM automation_rules WHERE guild_id=$1")) {
+        return {
+          rows: [{
+            id: "2", guild_id: "123456789012345678", name: "Rule 2", enabled: true,
+            event: "message.create", conditions: [], any_conditions: [], actions: [], cooldown_seconds: 0
+          }, {
+            id: "1", guild_id: "123456789012345678", name: "Rule 1", enabled: false,
+            event: "message.create", conditions: [], any_conditions: [], actions: [], cooldown_seconds: 0
+          }]
+        };
+      }
+      if (sql.includes("FROM automation_templates WHERE guild_id=$1")) {
+        return { rows: [{ name: "welcome", content: "Hello {user}" }] };
+      }
+      if (sql.includes("COUNT(*) FILTER")) {
+        return {
+          rows: [{
+            pending: "2",
+            processing: "1",
+            with_errors: "1",
+            completed_24h: "4",
+            oldest_pending_at: "2026-10-04T00:00:00.000Z"
+          }]
+        };
+      }
+      if (sql.includes("FROM automation_delayed_jobs WHERE guild_id=$1")) {
+        return {
+          rows: [{
+            id: "42",
+            rule_id: "2",
+            attempts: "3",
+            available_at: "2026-10-04T00:00:00.000Z",
+            processing_until: new Date(Date.now() + 60_000).toISOString(),
+            last_error: "provider failed",
+            completed_at: null,
+            created_at: "2026-10-04T00:00:00.000Z"
+          }, {
+            id: "41",
+            rule_id: "1",
+            attempts: "1",
+            available_at: "2026-10-03T23:00:00.000Z",
+            processing_until: null,
+            last_error: null,
+            completed_at: "2026-10-04T00:30:00.000Z",
+            created_at: "2026-10-03T23:00:00.000Z"
+          }]
+        };
+      }
+      throw new Error("unexpected query: " + sql);
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const engine = new AutomationEngine(db, {} as import("../src/modules/moderation.js").Moderation);
+  const diagnostics = await engine.diagnostics("123456789012345678");
+
+  assert.deepEqual(diagnostics.rules, {
+    total: 2,
+    enabled: 1,
+    byEvent: { "message.create": 2 }
+  });
+  assert.equal(diagnostics.templates.total, 1);
+  assert.deepEqual(diagnostics.delayedJobs.pending, 2);
+  assert.deepEqual(diagnostics.delayedJobs.processing, 1);
+  assert.deepEqual(diagnostics.delayedJobs.withErrors, 1);
+  assert.deepEqual(diagnostics.delayedJobs.completed24h, 4);
+  assert.equal(diagnostics.delayedJobs.recent.length, 2);
+  assert.equal(diagnostics.delayedJobs.recent[0]?.status, "processing");
+  assert.equal(diagnostics.delayedJobs.recent[0]?.attempts, 3);
+  assert.equal(diagnostics.delayedJobs.recent[0]?.lastError, "provider failed");
+  assert.equal(diagnostics.runtime.loadedRules, 0);
+});
+
