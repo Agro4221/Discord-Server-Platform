@@ -258,6 +258,8 @@ export class Reminders implements PlatformModule {
     if (!await moduleEnabled(this.db, message.guild.id, "reminders", false)) return;
 
     try {
+      if (await this.isAfkCommandMessage(message)) return;
+
       const mentions = [...message.mentions.users.values()]
         .filter((user) => !user.bot && user.id !== message.author.id)
         .map((user) => user.id)
@@ -294,7 +296,12 @@ export class Reminders implements PlatformModule {
     userId: string,
     rawReason: string | null
   ): Promise<{ cleared: boolean; record?: AfkRecord }> {
-    if (isAfkClearRequest(rawReason) || (rawReason === null && await this.getAfk(guildId, userId))) {
+    if (isAfkClearRequest(rawReason)) {
+      await this.clearAfk(guildId, userId);
+      return { cleared: true };
+    }
+
+    if (rawReason === null && await this.getAfk(guildId, userId)) {
       const cleared = await this.clearAfk(guildId, userId);
       return { cleared: Boolean(cleared) };
     }
@@ -355,6 +362,22 @@ export class Reminders implements PlatformModule {
     return row
       ? { userId: row.user_id, reason: row.reason, sinceAt: toAfkDate(row.since_at) }
       : null;
+  }
+
+  private async isAfkCommandMessage(message: Message): Promise<boolean> {
+    const firstToken = message.content.trim().toLowerCase().split(/\s+/, 1)[0] ?? "";
+    if (!firstToken.endsWith("afk") || firstToken.length <= 3) return false;
+
+    const configuredPrefix = await this.getPrefix(message.guild!.id);
+    return firstToken === (configuredPrefix + "afk").toLowerCase();
+  }
+
+  private async getPrefix(guildId: string): Promise<string> {
+    const result = await this.db.query<{ command_prefix: string }>(
+      "SELECT command_prefix FROM guild_settings WHERE guild_id=$1",
+      [guildId]
+    );
+    return result.rows[0]?.command_prefix || "!";
   }
 
   private async loadSticky(): Promise<void> {
