@@ -438,7 +438,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "command-policies", "starboard"]);
+const PANEL_KEYS = new Set(["moderation", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "starboard"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -936,7 +936,7 @@ export function ControlCenter() {
             )}
 
             {view === "system" && (
-              <SystemPage guildId={guildId} health={health} audit={audit} onAudit={() => setView("audit")} />
+              <SystemPage guildId={guildId} health={health} audit={audit} resources={resources} onAudit={() => setView("audit")} />
             )}
 
             {view === "audit" && <AuditPage audit={audit} />}
@@ -1693,7 +1693,7 @@ function ModulePage(props: {
   );
 }
 
-function SystemPage(props: { guildId: string; health: Health; audit: AuditEvent[]; onAudit: () => void }) {
+function SystemPage(props: { guildId: string; health: Health; audit: AuditEvent[]; resources: { channels: Resource[]; roles: Resource[] }; onAudit: () => void }) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <PageHeader eyebrow="SYSTEM" title="Система" description="Операционные инструменты экземпляра: fleet, здоровье Core, backups и аудит." />
