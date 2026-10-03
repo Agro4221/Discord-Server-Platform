@@ -45,10 +45,12 @@ export class Giveaways implements PlatformModule {
       ends_at: string;
       status: string;
       selected_winners: unknown;
+      requirements: unknown;
+      message_template: string;
       created_at: string;
       finished_at: string | null;
     }>(
-      "SELECT id,channel_id,message_id,host_user_id,prize,winners,ends_at,status,selected_winners,created_at,finished_at FROM giveaways WHERE guild_id=$1 ORDER BY id DESC LIMIT 100",
+      "SELECT id,channel_id,message_id,host_user_id,prize,winners,ends_at,status,selected_winners,requirements,message_template,created_at,finished_at FROM giveaways WHERE guild_id=$1 ORDER BY id DESC LIMIT 100",
       [guildId]
     );
 
@@ -62,6 +64,8 @@ export class Giveaways implements PlatformModule {
       endsAt: row.ends_at,
       status: row.status,
       selectedWinners: Array.isArray(row.selected_winners) ? row.selected_winners.filter((id): id is string => typeof id === "string") : [],
+      requirements: normalizeRequirements(row.requirements),
+      messageTemplate: row.message_template,
       createdAt: row.created_at,
       finishedAt: row.finished_at
     }));
@@ -202,6 +206,14 @@ export class Giveaways implements PlatformModule {
     );
     const id = created.rows[0]?.id;
     if (!id) throw new Error("giveaway id missing");
+    await this.db.query(
+      "UPDATE giveaways SET requirements=$1::jsonb,message_template=$2,updated_at=now() WHERE id=$3 AND guild_id=$4",
+      [JSON.stringify(requirements), messageTemplate, id, interaction.guild!.id]
+    );
+    await this.db.query(
+      "UPDATE giveaways SET requirements=$1::jsonb,message_template=$2,updated_at=now() WHERE id=$3 AND guild_id=$4",
+      [JSON.stringify({ requiredRoleIds: [], minLevel: 0 }), defaultGiveawayTemplate(), id, message.guild.id]
+    );
 
     try {
       if (!message.channel.isTextBased() || !("send" in message.channel)) {
@@ -265,6 +277,11 @@ export class Giveaways implements PlatformModule {
     const minutes = interaction.options.getInteger("minutes", true);
     const winners = interaction.options.getInteger("winners") ?? 1;
     const prize = interaction.options.getString("prize", true);
+    const requiredRole = interaction.options.getRole("required-role");
+    const minLevel = interaction.options.getInteger("min-level") ?? 0;
+    const customTemplate = interaction.options.getString("template")?.trim();
+    const messageTemplate = normalizeGiveawayTemplate(customTemplate || defaultGiveawayTemplate());
+    const requirements = { requiredRoleIds: requiredRole ? [requiredRole.id] : [], minLevel };
     const endsAt = new Date(Date.now() + minutes * 60_000);
 
     const created = await this.db.query<{ id: string }>(
@@ -385,6 +402,39 @@ export class Giveaways implements PlatformModule {
       return;
     }
 
+    const giveaway = await this.db.query<{ requirements: unknown }>(
+      "SELECT requirements FROM giveaways WHERE id=$1 AND guild_id=$2 AND status='running'",
+      [id, interaction.guild.id]
+    );
+    const activeGiveaway = giveaway.rows[0];
+    if (!activeGiveaway) {
+      await interaction.reply({ content: "Этот giveaway уже завершён или не найден.", ephemeral: true });
+      return;
+    }
+
+    const requirements = normalizeRequirements(activeGiveaway.requirements);
+    const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+    if (!member) {
+      await interaction.reply({ content: "Не удалось проверить требования giveaway.", ephemeral: true });
+      return;
+    }
+    const missingRole = requirements.requiredRoleIds.find((roleId) => !member.roles.cache.has(roleId));
+    if (missingRole) {
+      await interaction.reply({ content: "Для участия нужна роль <@&" + missingRole + ">.", ephemeral: true });
+      return;
+    }
+    if (requirements.minLevel > 0) {
+      const level = await this.db.query<{ level: number }>(
+        "SELECT level FROM leveling_users WHERE guild_id=$1 AND user_id=$2",
+        [interaction.guild.id, interaction.user.id]
+      );
+      const currentLevel = level.rows[0]?.level ?? 0;
+      if (currentLevel < requirements.minLevel) {
+        await interaction.reply({ content: "Для участия нужен уровень " + requirements.minLevel + ". Твой уровень: " + currentLevel + ".", ephemeral: true });
+        return;
+      }
+    }
+
     const result = await this.db.query<{ giveaway_id: string }>(
       "INSERT INTO giveaway_entries(giveaway_id,user_id) SELECT $1,$2 WHERE EXISTS (SELECT 1 FROM giveaways WHERE id=$1 AND guild_id=$3 AND status='running') ON CONFLICT DO NOTHING RETURNING giveaway_id",
       [id, interaction.user.id, interaction.guild.id]
@@ -443,4 +493,45 @@ function parseGiveawayMinutes(value: string): number | null {
   const factor = match[2] === "w" ? 10080 : match[2] === "d" ? 1440 : match[2] === "h" ? 60 : 1;
   const minutes = n * factor;
   return Number.isSafeInteger(minutes) && minutes >= 1 && minutes <= 10080 ? minutes : null;
+}
+
+
+type GiveawayRequirements = {
+  requiredRoleIds: string[];
+  minLevel: number;
+};
+
+function normalizeRequirements(value: unknown): GiveawayRequirements {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { requiredRoleIds: [], minLevel: 0 };
+  }
+  const object = value as Record<string, unknown>;
+  const requiredRoleIds = Array.isArray(object.requiredRoleIds)
+    ? object.requiredRoleIds.filter((id): id is string => typeof id === "string" && /^\d{17,20}$/.test(id)).slice(0, 5)
+    : [];
+  const minLevel = typeof object.minLevel === "number" && Number.isInteger(object.minLevel)
+    ? Math.min(Math.max(object.minLevel, 0), 1000)
+    : 0;
+  return { requiredRoleIds, minLevel };
+}
+
+function defaultGiveawayTemplate(): string {
+  return "🎉 **{prize}**\n\nПобедителей: **{winners}**\nЗавершение: <t:{endsAt}:R>";
+}
+
+function normalizeGiveawayTemplate(value: string): string {
+  const template = value.trim();
+  if (!template || template.length > 1000) return defaultGiveawayTemplate();
+  return template;
+}
+
+function renderGiveawayTemplate(
+  template: string,
+  values: { id: number; prize: string; winners: number; endsAt: Date }
+): string {
+  return template
+    .replaceAll("{id}", String(values.id))
+    .replaceAll("{prize}", values.prize)
+    .replaceAll("{winners}", String(values.winners))
+    .replaceAll("{endsAt}", String(Math.floor(values.endsAt.getTime() / 1000)));
 }
