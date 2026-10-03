@@ -1216,6 +1216,41 @@ export class ManagementApiServer {
             return;
           }
 
+          const moderationCaseMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/cases\/(\\d+)$/);
+          if (method === "PATCH" && moderationCaseMatch) {
+            if (!this.options.moderation) {
+              this.json(res, 500, { error: "moderation_unavailable" });
+              return;
+            }
+            const guildId = moderationCaseMatch[1] ?? "";
+            const caseId = Number(moderationCaseMatch[2]);
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !Number.isSafeInteger(caseId) || caseId <= 0) {
+              this.json(res, 400, { error: "invalid_moderation_case" });
+              return;
+            }
+            const body = await readJson(req);
+            if (typeof body.resolved !== "boolean") {
+              throw new RequestInputError("resolved_must_be_boolean", 400);
+            }
+            if (!body.resolved) {
+              throw new RequestInputError("case_reopen_not_supported", 400);
+            }
+            const resolved = await this.options.moderation.resolveCase(guildId, caseId);
+            if (!resolved) {
+              this.json(res, 404, { error: "moderation_case_not_found_or_already_resolved" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "moderation.case.resolved",
+              targetType: "moderation-case",
+              targetId: String(caseId)
+            });
+            this.json(res, 200, { ok: true, caseId, resolved: true });
+            return;
+          }
+
           const moderationHistoryMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/history$/);
           if (method === "GET" && moderationHistoryMatch) {
             if (!this.options.moderation) {
@@ -1224,15 +1259,24 @@ export class ManagementApiServer {
             }
             const guildId = moderationHistoryMatch[1] ?? "";
             const userId = url.searchParams.get("userId") ?? "";
-            if (!guildId || !/^\d{15,25}$/.test(userId) || !this.options.client.guilds.cache.has(guildId)) {
+            const actionRaw = url.searchParams.get("action");
+            const limitRaw = url.searchParams.get("limit");
+            const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 50;
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) ||
+                (userId && !/^\d{15,25}$/.test(userId)) ||
+                (actionRaw && !["warn","timeout","kick","ban","unban"].includes(actionRaw)) ||
+                !Number.isInteger(limit) || limit < 1 || limit > 200) {
               this.json(res, 400, { error: "invalid_moderation_history_query" });
               return;
             }
-            this.json(res, 200, {
-              guildId,
-              userId,
-              cases: await this.options.moderation.history(guildId, userId, 50)
-            });
+            const cases = userId
+              ? await this.options.moderation.history(guildId, userId, limit)
+              : await this.options.moderation.recent(
+                  guildId,
+                  limit,
+                  actionRaw as "warn" | "timeout" | "kick" | "ban" | "unban" | undefined
+                );
+            this.json(res, 200, { guildId, ...(userId ? { userId } : {}), cases });
             return;
           }
 
