@@ -407,3 +407,10 @@ Never write credentials, tokens or private user data here.
 - Event payloads and action definitions are intentionally not returned by diagnostics to avoid exposing message/request content in an operational view.
 - Added regression coverage for diagnostics aggregation and safe job metadata.
 - This increment does not alter Automation execution semantics or introduce a second queue/logging system.
+
+
+### 2026-10-04 — Welcome/goodbye embed images
+- Welcome now supports optional persistent HTTPS image URLs for both welcome and goodbye embeds.
+- The Dashboard exposes both image URLs with bounded length and HTTPS-only validation; slash `/welcome setup` accepts the same two options.
+- Config export/import carries the new fields, and migration 80 adds the persistent columns.
+- Added regression coverage for accepted, empty, malformed, non-HTTPS and oversized image URLs.
