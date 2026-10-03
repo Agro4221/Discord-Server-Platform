@@ -280,8 +280,9 @@ async function main(): Promise<void> {
     rolePanels: {
       list: async (guildId) => rolePanels.list(guildId),
       create: async (guildId, input, callbacks) =>
-        rolePanels.createPanel(guildId, input.channelId, input.roles, input.title, callbacks),
-      update: async (guildId, panelId, input, callbacks) => rolePanels.updatePanel(guildId, panelId, input.channelId, input.roles, input.title ?? "Выберите роли", callbacks),
+        rolePanels.createPanel(guildId, input.channelId, input.roles, input.title, input.selectionMode, input.maxSelections, callbacks),
+      update: async (guildId, panelId, input, callbacks) =>
+        rolePanels.updatePanel(guildId, panelId, input.channelId, input.roles, input.title ?? "Выберите роли", input.selectionMode, input.maxSelections, callbacks),
       delete: async (guildId, panelId, deleteMessage) => rolePanels.deletePanel(guildId, panelId, deleteMessage)
     },
     actions: {
