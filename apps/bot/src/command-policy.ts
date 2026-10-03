@@ -31,6 +31,11 @@ export type CommandDefinition = {
 
 export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
   { name: "help", label: "Help", module: "system", prefix: true, slash: true },
+  { name: "User Info", label: "User info context menu", module: "context-commands", prefix: false, slash: true },
+  { name: "Moderation History", label: "Moderation history context menu", module: "context-commands", requiredPermission: PermissionFlagsBits.ModerateMembers, prefix: false, slash: true },
+  { name: "User Avatar", label: "User avatar context menu", module: "context-commands", prefix: false, slash: true },
+  { name: "Quote Message", label: "Quote message context menu", module: "context-commands", prefix: false, slash: true },
+  { name: "Delete Message", label: "Delete message context menu", module: "context-commands", requiredPermission: PermissionFlagsBits.ManageMessages, prefix: false, slash: true },
   { name: "ping", label: "Ping", module: "system", prefix: false, slash: true },
   { name: "level", label: "Level", module: "leveling", prefix: true, slash: true },
   { name: "rank", label: "Rank", module: "leveling", prefix: true, slash: true },
@@ -249,6 +254,36 @@ export class CommandPolicyService {
 
     if (!passesScope(policy, member.roles.cache.map((role) => role.id), interaction.channelId)) {
       await interaction.reply({ content: "Команда недоступна в этом канале или для этой роли.", ephemeral: true });
+      return false;
+    }
+
+    return this.acquireCooldown(policy, interaction.guildId!, interaction.user.id);
+  }
+
+  async checkContext(
+    interaction: import("discord.js").ContextMenuCommandInteraction,
+    commandName: string
+  ): Promise<boolean> {
+    if (!interaction.inGuild()) return true;
+
+    const policy = await this.get(interaction.guildId!, commandName);
+    const definition = COMMAND_DEFINITIONS.find((item) => item.name === commandName);
+    if (!policy.enabled || !policy.slashEnabled) {
+      await interaction.reply({ content: "Эта контекстная команда отключена для сервера.", ephemeral: true });
+      return false;
+    }
+
+    const member = await interaction.guild!.members.fetch(interaction.user.id).catch(() => null);
+    if (!member) return false;
+
+    const moderatorOverride = definition?.module === "moderation" && await this.hasModeratorRole(interaction.guildId!, member);
+    if (definition?.requiredPermission && !moderatorOverride && !member.permissions.has(definition.requiredPermission)) {
+      await interaction.reply({ content: "У тебя нет необходимых прав для этой контекстной команды.", ephemeral: true });
+      return false;
+    }
+
+    if (!passesScope(policy, member.roles.cache.map((role) => role.id), interaction.channelId)) {
+      await interaction.reply({ content: "Контекстная команда недоступна в этом канале или для этой роли.", ephemeral: true });
       return false;
     }
 
