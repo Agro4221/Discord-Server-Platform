@@ -7,6 +7,7 @@ import { AutomationPanel } from "./automation-panel";
 import { BackupPanel } from "./backup-panel";
 import { FleetPanel } from "./fleet-panel";
 import { GiveawaysPanel } from "./giveaways-panel";
+import { ModerationPanel } from "./moderation-panel";
 import { NotificationsPanel } from "./notifications-panel";
 import { RolePanelsEditor } from "./role-panels-editor";
 
@@ -385,7 +386,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["roles", "giveaways", "analytics", "automation", "notifications"]);
+const PANEL_KEYS = new Set(["moderation", "roles", "giveaways", "analytics", "automation", "notifications"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1396,6 +1397,13 @@ function ModulePage(props: {
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {props.module?.key === "moderation" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Escalation rules" eyebrow="OPERATIONS" />
+          <ModerationPanel guildId={props.guildId} onChanged={props.onAudit} />
         </section>
       )}
 
