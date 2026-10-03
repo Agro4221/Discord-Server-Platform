@@ -157,6 +157,7 @@ export class CommandDispatcher {
     if (["leveling","level","rank","top"].includes(target)) return (interaction, commandName) => this.leveling.executeSlashCommand(interaction, commandName);
     if (["economy","shop","balance","daily","leaderboard","pay","buy"].includes(target)) return (interaction, commandName) => this.economy.executeSlashCommand(interaction, commandName);
     if (target === "remind") return (interaction, commandName) => this.reminders.executeSlashCommand(interaction, commandName);
+    if (target === "voice") return (interaction, commandName) => this.temporaryVoice.executeSlashCommand(interaction, commandName);
     if (["serverinfo","userinfo","avatar","membercount","roleinfo","channelinfo","afk"].includes(target)) return (interaction, commandName) => this.utility.executeSlashCommand(interaction, commandName);
     if (["poll","suggest","sticky","8ball","choose","roll"].includes(target)) return (interaction, commandName) => this.communityTools.executeSlashCommand(interaction, commandName);
     if (target === "logging") return (interaction, commandName) => this.logging.executeSlashCommand(interaction, commandName);
