@@ -78,7 +78,7 @@
 | Birthdays / achievements | ✅ |
 | Invite tracking | ✅ |
 | Server statistics / counters | 🟡 | Live `/stats`; persistent counters remain
-| Embed builder | 🟡 |
+| Embed builder | ✅ | `/embed` с title, description, URL, color, footer, image и thumbnail |
 | Sticky messages / scheduled messages | 🟡 |
 
 ## Tickets / Support
