@@ -22,7 +22,7 @@ const CONFIG_TABLES: ExportTable[] = [
     "delete_message","timeout_minutes"
   ]},
   { table: "welcome_settings", fields: ["enabled","channel_id","message","dm","embed"] },
-  { table: "ticket_settings", fields: ["enabled","category_id","staff_role_id","transcript_channel_id"] },
+  { table: "ticket_settings", fields: ["enabled","category_id","staff_role_id","transcript_channel_id","max_open_per_user","auto_close_minutes"] },
   { table: "security_settings", fields: [
     "enabled","max_joins","window_seconds","max_destructive_actions",
     "destructive_window_seconds","quarantine_role_id","log_channel_id"
@@ -30,12 +30,13 @@ const CONFIG_TABLES: ExportTable[] = [
   { table: "verification_settings", fields: ["enabled","channel_id","verified_role_id","quarantine_role_id","log_channel_id","code_ttl_minutes"] },
   { table: "leveling_settings", fields: ["enabled","xp_per_message","cooldown_seconds","announce_level_up"] },
   { table: "starboard_settings", fields: ["channel_id","threshold","ignore_self_reaction","ignore_bots"] },
-  { table: "music_settings", fields: ["enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven","twenty_four_seven"] }
+  { table: "music_settings", fields: ["enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven"] },
+  { table: "birthday_settings", fields: ["channel_id","announcement_template"] },,
 ];
 
 const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
   { table: "automation_rules", fields: ["name","enabled","event","conditions","any_conditions","actions","cooldown_seconds"] },
-  { table: "role_panels", fields: ["channel_id","message_id","title","roles"] }
+  { table: "role_panels", fields: ["channel_id","message_id","title","roles","selection_mode","max_selections","duration_minutes"] }
 ];
 
 export class ConfigTransferService {
