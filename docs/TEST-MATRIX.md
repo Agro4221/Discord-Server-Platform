@@ -173,6 +173,10 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Dry-run remains intentionally side-effect-free; live execution is covered by existing runtime pathways and remains part of release-gate validation.
 
 
+## 2026-10-04 — Automation richer conditions/actions gate
+- Unit test must validate all new condition/action variants.
+- Dry-run must evaluate user/bot and channel-type context and render new action previews without side effects.
+- Browser release gate: Dashboard Builder can create/save the new condition/action variants.
 ## 2026-10-04 — Automation workflow preset gate
 - Migration 70 must create the preset table/index.
 - Unit/API contract: preset names and workflow definitions use the same validation limits as Automation rules.
