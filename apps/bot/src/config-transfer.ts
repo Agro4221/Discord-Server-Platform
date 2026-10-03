@@ -23,6 +23,7 @@ const CONFIG_TABLES: ExportTable[] = [
   ]},
   { table: "welcome_settings", fields: ["enabled","channel_id","message","dm","embed"] },
   { table: "ticket_settings", fields: ["enabled","category_id","staff_role_id","transcript_channel_id","max_open_per_user","auto_close_minutes"] },
+  { table: "ticket_sla_settings", fields: ["enabled","first_response_minutes","reminder_minutes","escalation_minutes","escalation_role_id"] },
   { table: "security_settings", fields: [
     "enabled","max_joins","window_seconds","max_destructive_actions",
     "destructive_window_seconds","quarantine_role_id","log_channel_id",
@@ -39,6 +40,7 @@ const CONFIG_TABLES: ExportTable[] = [
 const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
   { table: "automation_rules", fields: ["name","enabled","event","conditions","any_conditions","actions","cooldown_seconds"] },
   { table: "automation_workflow_presets", fields: ["name","event","conditions","any_conditions","actions","cooldown_seconds"] },
+  { table: "help_pages", fields: ["slug","title","content","enabled"] },
   { table: "role_panels", fields: ["channel_id","message_id","title","roles","selection_mode","max_selections","duration_minutes"] },
   { table: "stream_alerts", fields: ["platform","target","channel_id","mention_role_id","enabled","interval_seconds","message_template"] },
   { table: "tickets", fields: ["channel_id","creator_id","claimed_by","status","priority","tags","created_at","closed_at","last_activity_at"] },
@@ -262,6 +264,22 @@ export class ConfigTransferService {
         }
       }
 
+      const helpModule = data.modules.find((module) => module.key === "custom-commands" || module.key === "automation");
+      const helpPages = helpModule?.settings.help_pages;
+      if (helpPages !== undefined && !Array.isArray(helpPages)) {
+        throw new Error("invalid_help_pages");
+      }
+      if (Array.isArray(helpPages)) {
+        const normalizedPages = helpPages.map((page) => normalizeImportedHelpPage(page));
+        await client.query("DELETE FROM help_pages WHERE guild_id=$1", [targetGuildId]);
+        for (const page of normalizedPages) {
+          await client.query(
+            "INSERT INTO help_pages(guild_id,slug,title,content,enabled) VALUES($1,$2,$3,$4,$5)",
+            [targetGuildId,page.slug,page.title,page.content,page.enabled]
+          );
+        }
+      }
+
       const streamModule = data.modules.find((module) => module.key === "stream-alerts");
       const streamAlerts = streamModule?.settings.stream_alerts;
       if (streamAlerts !== undefined && !Array.isArray(streamAlerts)) {
@@ -388,6 +406,16 @@ export class ConfigTransferService {
       embed: true
     });
 
+    await execute("ticket_sla_settings", "tickets", [
+      "enabled","first_response_minutes","reminder_minutes","escalation_minutes","escalation_role_id"
+    ], {
+      enabled: false,
+      first_response_minutes: 30,
+      reminder_minutes: 120,
+      escalation_minutes: 240,
+      escalation_role_id: null
+    });
+
     await execute("ticket_settings", "tickets", [
       "enabled","category_id","staff_role_id","transcript_channel_id","max_open_per_user","auto_close_minutes"
     ], {
@@ -480,6 +508,8 @@ function tableToModule(table: string): ServerModuleConfig["key"] | null {
     case "automod_settings": return "automod";
     case "welcome_settings": return "welcome";
     case "ticket_settings": return "tickets";
+    case "ticket_sla_settings": return "tickets";
+    case "analytics_settings": return "analytics";
     case "security_settings": return "security";
     case "verification_settings": return "verification";
     case "leveling_settings": return "leveling";
@@ -535,6 +565,13 @@ function validateExport(payload: unknown): asserts payload is ServerConfigExport
 }
 
 
+type NormalizedHelpPage = {
+  slug: string;
+  title: string;
+  content: string;
+  enabled: boolean;
+};
+
 type NormalizedAutomationPreset = {
   name: string;
   event: AutomationEvent;
@@ -552,6 +589,32 @@ type NormalizedAutomationRule = {
   actions: AutomationAction[];
   cooldownSeconds: number;
 };
+
+function normalizeImportedHelpPage(value: unknown): NormalizedHelpPage {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("invalid_help_page");
+  }
+  const object = value as Record<string, unknown>;
+  if (
+    typeof object.slug !== "string" ||
+    !/^[a-z0-9_-]{1,40}$/.test(object.slug) ||
+    typeof object.title !== "string" ||
+    !object.title.trim() ||
+    object.title.length > 100 ||
+    typeof object.content !== "string" ||
+    !object.content.trim() ||
+    object.content.length > 3900 ||
+    typeof object.enabled !== "boolean"
+  ) {
+    throw new Error("invalid_help_page");
+  }
+  return {
+    slug: object.slug.toLowerCase(),
+    title: object.title.trim(),
+    content: object.content.trim(),
+    enabled: object.enabled
+  };
+}
 
 function normalizeImportedAutomationPreset(value: unknown): NormalizedAutomationPreset {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
