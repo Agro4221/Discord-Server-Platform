@@ -541,6 +541,12 @@ export class Music implements PlatformModule {
         await this.shuffle(interaction);
         break;
       case "playlist":
+        if (interaction.commandName === "music") await this.savedPlaylist(interaction);
+        else await this.queue(interaction);
+        break;
+      case "favorite":
+        await this.favorite(interaction);
+        break;
       case "queue":
         await this.queue(interaction);
         break;
