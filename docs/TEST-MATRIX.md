@@ -104,3 +104,13 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Secondary bot automatic stale-guild failover is wired into the 15-second fleet maintenance cycle and covered by deterministic repository tests.
 - Passive Event Bus guild filtering is regression-tested for bulk message deletion, channel/role create-update-delete, unban and Security incident events.
 - Final head `6c74c0f68e621ff44d7cbdf0089407f46a5b1301` is awaiting its fresh CI result; live multi-bot Discord behavior remains an environment-dependent acceptance case.
+
+
+### 2026-10-04 — Local Control Center coverage snapshot
+- Logging dashboard field-to-storage parity is covered by deterministic schema/storage tests.
+- Leveling rewards/exclusion API/UI wiring, Starboard configuration wiring, Server Settings wiring and Command Policies wiring were added; live Discord authorization remains release-gate validation.
+- Moderation clear/slowmode/lock/unlock includes Core-side permission checks; live channel permission-overwrite and bulk-delete behavior remains a Discord smoke/chaos case.
+- Community Tools sticky/poll/suggestion administrative operations are wired through Management API/Core; live message edits/deletions and suggestion-button updates remain environment-dependent.
+- Giveaway creation includes DB-to-Discord publication rollback logic; live publication failure injection remains a release-gate test.
+- Verification panel publication checks bot/channel permissions; live Discord interaction flow remains a release-gate case.
+- Latest recorded development head: `ab1f67805e8a164782e935c2422724a55f1c221f`.

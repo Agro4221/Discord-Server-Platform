@@ -195,3 +195,12 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Added centralized command-policy parity checks, complete prefix allowlist coverage, root `/leveling` alias routing and automatic secondary-identity stale-guild failover.
 - Deterministic regression coverage was added for command registry consistency, failover guard/claim behavior and passive-event guild isolation.
 - CI on the preceding head passed; CI for the latest failover/alias head remains the active verification gate.
+
+
+## 2026-10-04 — Control Center architecture checkpoint
+- Control Center is now the intended local control plane for administrative operations; Discord commands remain fallback/user-facing entry points.
+- Specialized operations currently surfaced include Moderation, Role Panels, Tickets, Leveling, Giveaways, Economy Shop, Starboard, Community Tools, Stream Alerts, Notifications, Automation, Custom Commands, Analytics and Music, plus system-level Server Settings, Command Policies, Diagnostics, Fleet and Backups.
+- Generic module schemas continue to cover settings-heavy modules such as Temporary Voice, AutoMod, Welcome, Security, Verification, Logging and Music.
+- Verification now has a dedicated operational panel for publishing the verification message; user verification itself remains an end-user Discord interaction.
+- Giveaway creation is now available without Discord command entry; administrative giveaway lifecycle operations remain audited through Management API/Core.
+- Current development head: `ab1f67805e8a164782e935c2422724a55f1c221f`.

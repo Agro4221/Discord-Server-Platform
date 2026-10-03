@@ -240,3 +240,16 @@ Never write credentials, tokens or private user data here.
 - Secondary bot identities with `failover_enabled=true` now periodically claim stale guild assignments they are connected to, using the existing atomic `FOR UPDATE SKIP LOCKED` claim path; each fleet cycle refreshes assignments and still attempts the heartbeat when assignment refresh fails.
 - Added regression coverage for failover guard/claim behavior and guild filtering across passive Event Bus events.
 - CI run #1195 on the preceding command-policy/prefix-routing head passed. The final failover/alias head requires its own fresh green CI run before it is marked fully verified.
+
+
+## 2026-10-04 — Local Control Center expansion
+- Local-first operating model confirmed: Windows/local Control Center is the primary administration surface; VPS remains a future deployment target only.
+- Added persistent Logging dashboard storage parity for message bulk-delete, reactions, channel-update and role-update switches, with schema/storage contract regression coverage.
+- Added Economy Shop management, Leveling rewards/exclusions, Starboard configuration, Server Settings, Command Policies, Discord permission diagnostics and Moderation channel operations to the local Control Center.
+- Moderation channel operations reuse Core-side Discord permission checks and support clear, slowmode, lock and unlock with audit records.
+- Command Policies moved into System Center because they are a cross-cutting access-control service rather than a runtime module.
+- Added Community Tools administration for sticky messages, poll closing and suggestion approve/deny workflows.
+- Added Giveaway creation from Control Center with channel/host/prize/duration/winner validation, Discord publication and database rollback on publish failure.
+- Added Verification Center panel publishing from Control Center.
+- Current development head: `ab1f67805e8a164782e935c2422724a55f1c221f`.
+- Automated CI remains the verification gate for the latest head; live Discord behavior, real bot permissions, hierarchy and PostgreSQL failure injection remain environment-dependent acceptance tests.
