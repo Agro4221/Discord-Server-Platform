@@ -11,6 +11,7 @@ import { GiveawaysPanel } from "./giveaways-panel";
 import { NotificationsPanel } from "./notifications-panel";
 import { RolePanelsEditor } from "./role-panels-editor";
 import { CustomCommandsPanel } from "./custom-commands-panel";
+import { StreamAlertsPanel } from "./stream-alerts-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -305,6 +306,21 @@ const MODULE_META: Record<string, ModuleMeta> = {
     ],
     kind: "discord"
   },
+  "stream-alerts": {
+    icon: "◍",
+    accent: "#6ea6ee",
+    title: "Stream Alerts",
+    summary: "Уведомления о начале трансляций Twitch, YouTube и VK Live.",
+    category: "integrations",
+    commands: ["/stream-alert"],
+    functions: [
+      { title: "Live notifications", description: "Отправка уведомления при переходе стримера в live." },
+      { title: "Providers", description: "Twitch, YouTube и VK Video Live через существующие provider adapters." },
+      { title: "Mentions", description: "Опциональное упоминание роли при старте трансляции." },
+      { title: "State / retry", description: "Хранение последнего состояния и повторная проверка после ошибок." }
+    ],
+    kind: "full"
+  },
   "custom-commands": {
     icon: "⌘",
     accent: "#9cb6f4",
@@ -413,7 +429,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["roles", "giveaways", "analytics", "automation", "notifications", "custom-commands"]);
+const PANEL_KEYS = new Set(["roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1469,6 +1485,18 @@ function ModulePage(props: {
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Custom Commands" eyebrow="OPERATIONS" />
           <CustomCommandsPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            roles={props.resources.roles}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "stream-alerts" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Stream Alerts" eyebrow="OPERATIONS" />
+          <StreamAlertsPanel
             guildId={props.guildId}
             channels={props.resources.channels.filter((item) => item.type === 0)}
             roles={props.resources.roles}
