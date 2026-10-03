@@ -3,15 +3,18 @@
 import { useEffect, useState } from "react";
 
 type Resource = { id: string; name: string };
+type AutomationChannelType = "text" | "announcement" | "forum" | "voice" | "stage" | "category" | "thread" | "other";
+type AutomationPermission = "Administrator" | "ManageGuild" | "ManageChannels" | "ManageRoles" | "ManageMessages" | "KickMembers" | "BanMembers" | "ModerateMembers";
+
 type Condition =
   | { type: "contains" | "equals"; left: string; right: string }
   | { type: "matches"; left: string; pattern: string }
   | { type: "number-gte" | "number-lte"; left: string; right: number }
   | { type: "has-role" | "not-has-role"; userId: string; roleId: string }
   | { type: "channel-is"; channelId: string }
-  | { type: "channel-type-is"; channelType: "text" | "announcement" | "forum" | "voice" | "stage" | "category" | "thread" | "other" }
+  | { type: "channel-type-is"; channelType: AutomationChannelType }
   | { type: "user-is-bot"; userId: string; value: boolean }
-  | { type: "has-permission"; userId: string; permission: "Administrator" | "ManageGuild" | "ManageChannels" | "ManageRoles" | "ManageMessages" | "KickMembers" | "BanMembers" | "ModerateMembers" }
+  | { type: "has-permission"; userId: string; permission: AutomationPermission }
   | { type: "cooldown-clear"; key: string };
 
 type Action =
@@ -94,8 +97,8 @@ const EVENTS = [
 
 const TEXT_FIELDS = ["content","userId","moderatorUserId","channelId","roleId","action","reason","messageId","guildId"] as const;
 const NUMBER_FIELDS = ["memberCount","messageLength","mentionCount","previousLength","caseId","ticketId","giveawayId","winnerCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"] as const;
-const CHANNEL_TYPES = ["text","announcement","forum","voice","stage","category","thread","other"] as const;
-const PERMISSIONS = ["Administrator","ManageGuild","ManageChannels","ManageRoles","ManageMessages","KickMembers","BanMembers","ModerateMembers"] as const;
+const CHANNEL_TYPES: AutomationChannelType[] = ["text","announcement","forum","voice","stage","category","thread","other"];
+const PERMISSIONS: AutomationPermission[] = ["Administrator","ManageGuild","ManageChannels","ManageRoles","ManageMessages","KickMembers","BanMembers","ModerateMembers"];
 
 export function AutomationPanel({
   guildId,
@@ -129,7 +132,7 @@ export function AutomationPanel({
   const [testChannelId, setTestChannelId] = useState("");
   const [testRoleIds, setTestRoleIds] = useState("");
   const [testUserIsBot, setTestUserIsBot] = useState(false);
-  const [testChannelType, setTestChannelType] = useState<Condition["channelType"]>("text");
+  const [testChannelType, setTestChannelType] = useState<AutomationChannelType>("text");
   const [testPermissions, setTestPermissions] = useState("");
   const [testNumeric, setTestNumeric] = useState("{}");
   const [dryRunBusy, setDryRunBusy] = useState(false);
@@ -509,7 +512,7 @@ export function AutomationPanel({
             )}
 
             {condition.type === "channel-type-is" && (
-              <select value={condition.channelType} onChange={(e) => updateCondition(index, { channelType: e.target.value as Condition["channelType"] })} style={inputStyle}>
+              <select value={condition.channelType} onChange={(e) => updateCondition(index, { channelType: e.target.value as AutomationChannelType })} style={inputStyle}>
                 {CHANNEL_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
               </select>
             )}
@@ -527,7 +530,7 @@ export function AutomationPanel({
             {condition.type === "has-permission" && (
               <>
                 <input value={condition.userId} onChange={(e) => updateCondition(index, { userId: e.target.value })} placeholder="@event или user ID" style={inputStyle} />
-                <select value={condition.permission} onChange={(e) => updateCondition(index, { permission: e.target.value as Condition["permission"] })} style={inputStyle}>
+                <select value={condition.permission} onChange={(e) => updateCondition(index, { permission: e.target.value as AutomationPermission })} style={inputStyle}>
                   {PERMISSIONS.map((permission) => <option key={permission} value={permission}>{permission}</option>)}
                 </select>
               </>
@@ -825,7 +828,7 @@ export function AutomationPanel({
             <option value="false">event user = member</option>
             <option value="true">event user = bot</option>
           </select>
-          <select value={testChannelType} onChange={(e) => setTestChannelType(e.target.value as Condition["channelType"])} style={inputStyle}>
+          <select value={testChannelType} onChange={(e) => setTestChannelType(e.target.value as AutomationChannelType)} style={inputStyle}>
             {CHANNEL_TYPES.map((type) => <option key={type} value={type}>channel type: {type}</option>)}
           </select>
           <input value={testRoleIds} onChange={(e) => setTestRoleIds(e.target.value)} placeholder="Role IDs через запятую" style={inputStyle} />
