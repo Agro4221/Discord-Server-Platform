@@ -43,3 +43,49 @@ test("event bus extracts guild id from member ban events", async () => {
   await bus.emit("member.ban", payload);
   assert.deepEqual(received, ["123456789012345777"]);
 });
+
+
+test("guild filter scopes passive guild events", async () => {
+  const foreignGuild = "111111111111111111";
+  const ownedGuild = "222222222222222222";
+  const passiveEvents: Array<[keyof import("../src/events.js").PlatformEventMap, unknown]> = [
+    ["message.bulk-delete", { guildId: foreignGuild, channelId: "333333333333333333", messages: [] }],
+    ["channel.create", { guildId: foreignGuild }],
+    ["channel.delete", { guildId: foreignGuild }],
+    ["channel.update", { oldChannel: { guildId: foreignGuild }, newChannel: { guildId: foreignGuild } }],
+    ["role.create", { guild: { id: foreignGuild } }],
+    ["role.delete", { guild: { id: foreignGuild } }],
+    ["role.update", { oldRole: { guild: { id: foreignGuild } }, newRole: { guild: { id: foreignGuild } } }],
+    ["member.unban", { guildId: foreignGuild, userId: "444444444444444444" }],
+    ["security.incident", { guildId: foreignGuild, incidentId: 1, eventType: "raid" }]
+  ];
+
+  const bus = new PlatformEventBus((guildId) => guildId === ownedGuild);
+  const received: string[] = [];
+
+  for (const [event, payload] of passiveEvents) {
+    bus.on(event as never, () => {
+      received.push(String(event));
+    });
+    await bus.emit(event as never, payload as never);
+  }
+
+  assert.deepEqual(received, []);
+
+  for (const [event, payload] of passiveEvents) {
+    const ownedPayload =
+      event === "channel.create" || event === "channel.delete"
+        ? { ...(payload as { guildId: string }), guildId: ownedGuild }
+        : event === "channel.update"
+          ? { oldChannel: { guildId: ownedGuild }, newChannel: { guildId: ownedGuild } }
+          : event === "role.create" || event === "role.delete"
+            ? { guild: { id: ownedGuild } }
+            : event === "role.update"
+              ? { oldRole: { guild: { id: ownedGuild } }, newRole: { guild: { id: ownedGuild } } }
+              : { ...(payload as Record<string, unknown>), guildId: ownedGuild };
+
+    await bus.emit(event as never, ownedPayload as never);
+  }
+
+  assert.equal(received.length, passiveEvents.length);
+});

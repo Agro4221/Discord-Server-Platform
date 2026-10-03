@@ -341,12 +341,44 @@ async function main(): Promise<void> {
   await identities.refreshAssignments();
 
   fleetTimer = setInterval(() => {
-    void identities.refreshAssignments()
-      .then(() => identities.heartbeat(modulesHealthy ? "ready" : "degraded", client.guilds.cache.size))
-      .catch((error) => logger.warn("Fleet heartbeat failed", {
+    void (async () => {
+      const connectedGuildIds = [...client.guilds.cache.keys()];
+
+      if (config.botIdentityId !== "primary") {
+        try {
+          const claimed = await identities.claimStaleGuilds(connectedGuildIds, 20);
+          if (claimed.length) {
+            logger.warn("Fleet failover claimed stale guilds", {
+              identityId: config.botIdentityId,
+              guildIds: claimed,
+              count: claimed.length
+            });
+          }
+        } catch (error) {
+          logger.warn("Fleet failover check failed", {
+            identityId: config.botIdentityId,
+            error: String(error)
+          });
+        }
+      }
+
+      try {
+        await identities.refreshAssignments();
+      } catch (error) {
+        logger.warn("Fleet assignment refresh failed", {
+          identityId: config.botIdentityId,
+          error: String(error)
+        });
+      }
+
+      await identities.heartbeat(
+        modulesHealthy ? "ready" : "degraded",
+        client.guilds.cache.size
+      ).catch((error) => logger.warn("Fleet heartbeat failed", {
         identityId: config.botIdentityId,
         error: String(error)
       }));
+    })();
   }, 15_000);
   fleetTimer.unref();
 

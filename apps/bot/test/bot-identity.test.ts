@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clampFailoverBatchLimit, resolveIdentityEnv } from "../src/bot-identity.js";
+import { BotIdentityRepository, clampFailoverBatchLimit, resolveIdentityEnv } from "../src/bot-identity.js";
 
 test("primary may use legacy Discord credentials", () => {
   const old = {
@@ -62,4 +62,56 @@ test("failover claim batch limit is bounded", () => {
   assert.equal(clampFailoverBatchLimit(0), 1);
   assert.equal(clampFailoverBatchLimit(20), 20);
   assert.equal(clampFailoverBatchLimit(1000), 100);
+});
+
+
+test("claimStaleGuilds ignores primary identities and disabled failover", async () => {
+  const calls: string[] = [];
+  const db = {
+    query: async () => {
+      calls.push("query");
+      return { rows: [{ failover_enabled: false, enabled: true }] };
+    },
+    transaction: async () => {
+      calls.push("transaction");
+      return ["unexpected"];
+    }
+  } as never;
+
+  const secondary = new BotIdentityRepository(db, "secondary");
+  assert.deepEqual(await secondary.claimStaleGuilds(["111111111111111111"], 20), []);
+  assert.deepEqual(calls, ["query"]);
+
+  calls.length = 0;
+  const primary = new BotIdentityRepository(db, "primary");
+  assert.deepEqual(await primary.claimStaleGuilds(["111111111111111111"], 20), []);
+  assert.deepEqual(calls, []);
+});
+
+test("claimStaleGuilds atomically returns guilds claimed by an enabled failover identity", async () => {
+  let transactionCalls = 0;
+  const db = {
+    query: async () => ({
+      rows: [{ failover_enabled: true, enabled: true }]
+    }),
+    transaction: async (fn: (client: never) => Promise<unknown>) => {
+      transactionCalls += 1;
+      const client = {
+        query: async () => ({
+          rows: [{ guild_id: "111111111111111111" }, { guild_id: "222222222222222222" }]
+        })
+      };
+      return fn(client as never);
+    }
+  } as never;
+
+  const secondary = new BotIdentityRepository(db, "secondary");
+  assert.deepEqual(
+    await secondary.claimStaleGuilds(
+      ["111111111111111111", "222222222222222222"],
+      20
+    ),
+    ["111111111111111111", "222222222222222222"]
+  );
+  assert.equal(transactionCalls, 1);
 });
