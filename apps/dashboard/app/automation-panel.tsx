@@ -128,6 +128,9 @@ export function AutomationPanel({
   const [testUserId, setTestUserId] = useState("");
   const [testChannelId, setTestChannelId] = useState("");
   const [testRoleIds, setTestRoleIds] = useState("");
+  const [testUserIsBot, setTestUserIsBot] = useState(false);
+  const [testChannelType, setTestChannelType] = useState<Condition["channelType"]>("text");
+  const [testPermissions, setTestPermissions] = useState("");
   const [testNumeric, setTestNumeric] = useState("{}");
   const [dryRunBusy, setDryRunBusy] = useState(false);
   const [dryRunResult, setDryRunResult] = useState<{ matched: boolean; event: string; renderedActions: Array<{ type: string; preview: string }> } | null>(null);
@@ -818,7 +821,15 @@ export function AutomationPanel({
             {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
           </select>
           <input value={testUserId} onChange={(e) => setTestUserId(e.target.value)} placeholder="User ID события" style={inputStyle} />
+          <select value={String(testUserIsBot)} onChange={(e) => setTestUserIsBot(e.target.value === "true")} style={inputStyle}>
+            <option value="false">event user = member</option>
+            <option value="true">event user = bot</option>
+          </select>
+          <select value={testChannelType} onChange={(e) => setTestChannelType(e.target.value as Condition["channelType"])} style={inputStyle}>
+            {CHANNEL_TYPES.map((type) => <option key={type} value={type}>channel type: {type}</option>)}
+          </select>
           <input value={testRoleIds} onChange={(e) => setTestRoleIds(e.target.value)} placeholder="Role IDs через запятую" style={inputStyle} />
+          <input value={testPermissions} onChange={(e) => setTestPermissions(e.target.value)} placeholder="Permissions через запятую" style={inputStyle} />
           <input value={testNumeric} onChange={(e) => setTestNumeric(e.target.value)} placeholder='Числовые поля JSON, например {"caseId":1}' style={inputStyle} />
         </div>
         <button type="button" disabled={saving || dryRunBusy || actions.length === 0} onClick={() => void (async () => {
@@ -845,7 +856,10 @@ export function AutomationPanel({
                 content: testContent,
                 userId: testUserId || undefined,
                 channelId: testChannelId || undefined,
+                channelType: testChannelType,
+                userIsBot: testUserIsBot,
                 roleIds: testRoleIds.split(",").map((value) => value.trim()).filter(Boolean),
+                permissions: testPermissions.split(",").map((value) => value.trim()).filter(Boolean),
                 numeric
               })
             });
