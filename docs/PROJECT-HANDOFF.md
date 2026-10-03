@@ -444,3 +444,8 @@ Live validation, требующая пользовательского окру�
 - AutoMod rule actions now include `ban` in addition to delete/timeout/warn/log.
 - The implementation reuses the existing Moderation service for role-hierarchy validation, audit and case persistence.
 - Migration 67 updates the persistent action constraint; live Discord ban execution remains a release-gate check.
+
+
+### 2026-10-04 — Ticket customization
+- Ticket customization is now implemented alongside intake forms: panel title/description and the three primary button labels are persisted and used by Ticket UI flows.
+- Migration 68 is the schema gate; API/Dashboard use the same normalized contract. Live Discord rendering remains release-gate validation.

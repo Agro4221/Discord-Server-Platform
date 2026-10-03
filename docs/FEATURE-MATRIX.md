@@ -399,7 +399,7 @@ Music должен стремиться к функциональности си
 | Per-user limits | ✅ |
 | Intake forms | ✅ | Up to 5 Discord modal fields with persistent answers and Dashboard editor | |
 | Custom form fields / validation | 🟡 |
-| Custom ticket buttons/messages | 🟡 |
+| Custom ticket buttons/messages | ✅ | Dashboard-configurable panel title/description and create/claim/close button labels, used by ticket flows |
 | Linked/related panels | 🟡 |
 | Ticket tags / priorities / assignment state | 🟡 |
 | Staff SLA / reminders / escalation | 🟡 |

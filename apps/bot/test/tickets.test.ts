@@ -147,3 +147,23 @@ test("Tickets sanitize custom intake form fields to Discord modal limits", async
   assert.equal(fields[1]?.maxLength, 4000);
   await module.shutdown();
 });
+
+
+test("Tickets normalize persisted customization with safe Discord-facing limits", async () => {
+  assert.deepEqual(
+    (await import("../src/modules/tickets.js")).normalizeTicketCustomization({
+      panelTitle: "",
+      panelDescription: "  Custom support panel  ",
+      createButtonLabel: " Open ",
+      claimButtonLabel: " Claim ",
+      closeButtonLabel: " Close "
+    }),
+    {
+      panelTitle: "🎫 Поддержка",
+      panelDescription: "Custom support panel",
+      createButtonLabel: "Open",
+      claimButtonLabel: "Claim",
+      closeButtonLabel: "Close"
+    }
+  );
+});

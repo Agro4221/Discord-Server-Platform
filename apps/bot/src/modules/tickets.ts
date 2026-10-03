@@ -13,6 +13,22 @@ export type TicketFormField = {
   placeholder: string;
   maxLength: number;
 };
+export type TicketCustomization = {
+  panelTitle: string;
+  panelDescription: string;
+  createButtonLabel: string;
+  claimButtonLabel: string;
+  closeButtonLabel: string;
+};
+
+export const DEFAULT_TICKET_CUSTOMIZATION: Readonly<TicketCustomization> = {
+  panelTitle: "🎫 Поддержка",
+  panelDescription: "Нажми кнопку ниже — Vexa откроет форму тикета.",
+  createButtonLabel: "Создать тикет",
+  claimButtonLabel: "Забрать",
+  closeButtonLabel: "Закрыть"
+};
+
 export type TicketConfig = {
   enabled: boolean;
   categoryId: string | null;
@@ -21,6 +37,7 @@ export type TicketConfig = {
   maxOpenPerUser: number;
   autoCloseMinutes: number;
   formFields: TicketFormField[];
+  customization: TicketCustomization;
 };
 export const DEFAULT_TICKET_FORM_FIELDS: readonly TicketFormField[] = [
   { id: "subject", label: "Тема", type: "short", required: true, placeholder: "Кратко опиши вопрос", maxLength: 100 },
@@ -70,8 +87,13 @@ export class Tickets implements PlatformModule {
       max_open_per_user: number;
       auto_close_minutes: number;
       form_fields: unknown;
+      panel_title: string | null;
+      panel_description: string | null;
+      create_button_label: string | null;
+      claim_button_label: string | null;
+      close_button_label: string | null;
     }>(
-      "SELECT enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes,form_fields FROM ticket_settings WHERE guild_id=$1",
+      "SELECT enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes,form_fields,panel_title,panel_description,create_button_label,claim_button_label,close_button_label FROM ticket_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -82,7 +104,14 @@ export class Tickets implements PlatformModule {
       transcriptChannelId: row?.transcript_channel_id ?? null,
       maxOpenPerUser: Math.min(Math.max(Number(row?.max_open_per_user ?? 1), 1), 10),
       autoCloseMinutes: Math.min(Math.max(Number(row?.auto_close_minutes ?? 0), 0), 43200),
-      formFields: normalizeFormFields(row?.form_fields)
+      formFields: normalizeFormFields(row?.form_fields),
+      customization: normalizeTicketCustomization({
+        panelTitle: row?.panel_title,
+        panelDescription: row?.panel_description,
+        createButtonLabel: row?.create_button_label,
+        claimButtonLabel: row?.claim_button_label,
+        closeButtonLabel: row?.close_button_label
+      })
     };
   }
 
@@ -90,10 +119,10 @@ export class Tickets implements PlatformModule {
     const current = await this.config(guildId);
     const next = { ...current, ...patch };
     await this.db.query(
-      `INSERT INTO ticket_settings(guild_id,enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes,form_fields)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8)
-       ON CONFLICT(guild_id) DO UPDATE SET enabled=EXCLUDED.enabled,category_id=EXCLUDED.category_id,staff_role_id=EXCLUDED.staff_role_id,transcript_channel_id=EXCLUDED.transcript_channel_id,max_open_per_user=EXCLUDED.max_open_per_user,auto_close_minutes=EXCLUDED.auto_close_minutes,form_fields=EXCLUDED.form_fields,updated_at=now()`,
-      [guildId,next.enabled,next.categoryId,next.staffRoleId,next.transcriptChannelId,Math.min(Math.max(Math.trunc(next.maxOpenPerUser),1),10),Math.min(Math.max(Math.trunc(next.autoCloseMinutes),0),43200),JSON.stringify(normalizeFormFields(next.formFields))]
+      `INSERT INTO ticket_settings(guild_id,enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes,form_fields,panel_title,panel_description,create_button_label,claim_button_label,close_button_label)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       ON CONFLICT(guild_id) DO UPDATE SET enabled=EXCLUDED.enabled,category_id=EXCLUDED.category_id,staff_role_id=EXCLUDED.staff_role_id,transcript_channel_id=EXCLUDED.transcript_channel_id,max_open_per_user=EXCLUDED.max_open_per_user,auto_close_minutes=EXCLUDED.auto_close_minutes,form_fields=EXCLUDED.form_fields,panel_title=EXCLUDED.panel_title,panel_description=EXCLUDED.panel_description,create_button_label=EXCLUDED.create_button_label,claim_button_label=EXCLUDED.claim_button_label,close_button_label=EXCLUDED.close_button_label,updated_at=now()`,
+      [guildId,next.enabled,next.categoryId,next.staffRoleId,next.transcriptChannelId,Math.min(Math.max(Math.trunc(next.maxOpenPerUser),1),10),Math.min(Math.max(Math.trunc(next.autoCloseMinutes),0),43200),JSON.stringify(normalizeFormFields(next.formFields)),normalizeTicketCustomization(next.customization).panelTitle,normalizeTicketCustomization(next.customization).panelDescription,normalizeTicketCustomization(next.customization).createButtonLabel,normalizeTicketCustomization(next.customization).claimButtonLabel,normalizeTicketCustomization(next.customization).closeButtonLabel]
     );
     await this.db.query(
       `INSERT INTO guild_modules(guild_id,module_key,enabled)
@@ -118,13 +147,13 @@ export class Tickets implements PlatformModule {
 
     const button = new ButtonBuilder()
       .setCustomId("dsp:ticket:quick")
-      .setLabel("Создать тикет")
+      .setLabel(config.customization.createButtonLabel)
       .setStyle(ButtonStyle.Primary);
     await message.reply({
       embeds: [
         new EmbedBuilder()
-          .setTitle("🎫 Поддержка")
-          .setDescription("Нажми кнопку ниже — Vexa откроет форму тикета.")
+          .setTitle(config.customization.panelTitle)
+          .setDescription(config.customization.panelDescription)
       ],
       components: [new ActionRowBuilder<ButtonBuilder>().addComponents(button)]
     });
@@ -282,6 +311,23 @@ export class Tickets implements PlatformModule {
     return (await this.config(guildId)).formFields;
   }
 
+  async getCustomization(guildId: string): Promise<TicketCustomization> {
+    return (await this.config(guildId)).customization;
+  }
+
+  async setCustomization(guildId: string, customization: Partial<TicketCustomization>): Promise<TicketCustomization> {
+    const current = await this.config(guildId);
+    const next = normalizeTicketCustomization({ ...current.customization, ...customization });
+    await this.db.query(
+      `INSERT INTO ticket_settings(
+         guild_id,enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes,form_fields,panel_title,panel_description,create_button_label,claim_button_label,close_button_label
+       ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       ON CONFLICT(guild_id) DO UPDATE SET panel_title=EXCLUDED.panel_title,panel_description=EXCLUDED.panel_description,create_button_label=EXCLUDED.create_button_label,claim_button_label=EXCLUDED.claim_button_label,close_button_label=EXCLUDED.close_button_label,updated_at=now()`,
+      [guildId,current.enabled,current.categoryId,current.staffRoleId,current.transcriptChannelId,current.maxOpenPerUser,current.autoCloseMinutes,JSON.stringify(current.formFields),next.panelTitle,next.panelDescription,next.createButtonLabel,next.claimButtonLabel,next.closeButtonLabel]
+    );
+    return next;
+  }
+
   async setFormFields(guildId: string, fields: TicketFormField[]): Promise<TicketFormField[]> {
     const normalized = normalizeFormFields(fields);
     const current = await this.config(guildId);
@@ -290,7 +336,7 @@ export class Tickets implements PlatformModule {
          guild_id,enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes,form_fields
        ) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
        ON CONFLICT(guild_id) DO UPDATE SET form_fields=EXCLUDED.form_fields,updated_at=now()`,
-      [guildId,current.enabled,current.categoryId,current.staffRoleId,current.transcriptChannelId,current.maxOpenPerUser,current.autoCloseMinutes,JSON.stringify(normalized)]
+      [guildId,current.enabled,current.categoryId,current.staffRoleId,current.transcriptChannelId,current.maxOpenPerUser,current.autoCloseMinutes,JSON.stringify(normalized),current.customization.panelTitle,current.customization.panelDescription,current.customization.createButtonLabel,current.customization.claimButtonLabel,current.customization.closeButtonLabel]
     );
     return normalized;
   }
@@ -356,8 +402,8 @@ export class Tickets implements PlatformModule {
         ],
         components: [
           new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder().setCustomId(`dsp:ticket:claim:${ticketId}`).setLabel("Забрать").setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId(`dsp:ticket:close:${ticketId}`).setLabel("Закрыть").setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId(`dsp:ticket:claim:${ticketId}`).setLabel(config.customization.claimButtonLabel).setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId(`dsp:ticket:close:${ticketId}`).setLabel(config.customization.closeButtonLabel).setStyle(ButtonStyle.Danger)
           )
         ]
       });
@@ -731,4 +777,20 @@ function normalizeFormFields(value: unknown): TicketFormField[] {
     if (normalized.length >= 5) break;
   }
   return normalized.length ? normalized : [...DEFAULT_TICKET_FORM_FIELDS];
+}
+
+ 
+export function normalizeTicketCustomization(input?: Partial<TicketCustomization> | null): TicketCustomization {
+  const source = input ?? {};
+  const clean = (value: unknown, fallback: string, max: number) => {
+    const text = typeof value === "string" ? value.trim().slice(0, max) : "";
+    return text || fallback;
+  };
+  return {
+    panelTitle: clean(source.panelTitle, DEFAULT_TICKET_CUSTOMIZATION.panelTitle, 256),
+    panelDescription: clean(source.panelDescription, DEFAULT_TICKET_CUSTOMIZATION.panelDescription, 1000),
+    createButtonLabel: clean(source.createButtonLabel, DEFAULT_TICKET_CUSTOMIZATION.createButtonLabel, 80),
+    claimButtonLabel: clean(source.claimButtonLabel, DEFAULT_TICKET_CUSTOMIZATION.claimButtonLabel, 80),
+    closeButtonLabel: clean(source.closeButtonLabel, DEFAULT_TICKET_CUSTOMIZATION.closeButtonLabel, 80)
+  };
 }

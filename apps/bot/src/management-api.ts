@@ -11,7 +11,7 @@ import { ConfigTransferService } from "./config-transfer.js";
 import { BackupService } from "./backup.js";
 import type { CustomCommandService } from "./custom-commands.js";
 import type { AutoResponder, AutoResponderInput } from "./modules/autoresponder.js";
-import type { TicketFormField } from "./modules/tickets.js";
+import type { TicketCustomization, TicketFormField } from "./modules/tickets.js";
 import type { Moderation } from "./modules/moderation.js";
 import type { Music } from "./modules/music.js";
 import type { Leveling } from "./modules/leveling.js";
@@ -99,6 +99,8 @@ type ApiOptions = {
   tickets?: {
     getFormFields: (guildId: string) => Promise<TicketFormField[]>;
     setFormFields: (guildId: string, fields: TicketFormField[]) => Promise<TicketFormField[]>;
+    getCustomization: (guildId: string) => Promise<TicketCustomization>;
+    setCustomization: (guildId: string, customization: Partial<TicketCustomization>) => Promise<TicketCustomization>;
   };
   moderation?: Moderation;
   music?: Music;
@@ -1449,6 +1451,43 @@ export class ManagementApiServer {
               metadata: { fieldCount: fields.length, fieldIds: fields.map((field) => field.id) }
             });
             this.json(res, 200, { ok: true, guildId, fields });
+            return;
+          }
+
+          const ticketCustomizationMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/customization$/);
+          if (ticketCustomizationMatch && !this.options.tickets) {
+            this.json(res, 500, { error: "tickets_unavailable" });
+            return;
+          }
+          if (method === "GET" && ticketCustomizationMatch) {
+            const guildId = ticketCustomizationMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, customization: await this.options.tickets!.getCustomization(guildId) });
+            return;
+          }
+          if (method === "PUT" && ticketCustomizationMatch) {
+            const guildId = ticketCustomizationMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const customization = await this.options.tickets!.setCustomization(guildId, {
+              panelTitle: typeof body.panelTitle === "string" ? body.panelTitle : undefined,
+              panelDescription: typeof body.panelDescription === "string" ? body.panelDescription : undefined,
+              createButtonLabel: typeof body.createButtonLabel === "string" ? body.createButtonLabel : undefined,
+              claimButtonLabel: typeof body.claimButtonLabel === "string" ? body.claimButtonLabel : undefined,
+              closeButtonLabel: typeof body.closeButtonLabel === "string" ? body.closeButtonLabel : undefined
+            });
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "tickets.customization.updated",
+              targetType: "ticket-customization", targetId: guildId,
+              metadata: { keys: Object.keys(body).filter((key) => ["panelTitle","panelDescription","createButtonLabel","claimButtonLabel","closeButtonLabel"].includes(key)) }
+            });
+            this.json(res, 200, { ok: true, guildId, customization });
             return;
           }
 

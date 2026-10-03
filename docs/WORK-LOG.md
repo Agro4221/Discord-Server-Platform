@@ -346,3 +346,10 @@ Never write credentials, tokens or private user data here.
 ## 2026-10-04 — Help policy defaults
 - Fixed `/help` to merge persisted command policies over the shared `COMMAND_DEFINITIONS` defaults instead of showing only commands with existing DB rows.
 - This makes newly introduced commands visible by default and keeps function-level help visibility consistent with the policy editor.
+
+
+## 2026-10-04 — Ticket customization
+- Extended Ticket settings with persistent panel title/description and create/claim/close button labels.
+- Reused the existing Ticket module, form editor and Management API surface; no second ticket subsystem was introduced.
+- Applied customization to prefix quick-panel plus create/reopen ticket controls.
+- Added migration 68, Dashboard editor, API audit event and deterministic normalization tests.

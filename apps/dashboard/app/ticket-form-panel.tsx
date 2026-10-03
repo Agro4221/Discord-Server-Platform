@@ -20,16 +20,39 @@ const EMPTY: Field = {
   maxLength: 100
 };
 
+type Customization = {
+  panelTitle: string;
+  panelDescription: string;
+  createButtonLabel: string;
+  claimButtonLabel: string;
+  closeButtonLabel: string;
+};
+
+const DEFAULT_CUSTOMIZATION: Customization = {
+  panelTitle: "🎫 Поддержка",
+  panelDescription: "Нажми кнопку ниже — Vexa откроет форму тикета.",
+  createButtonLabel: "Создать тикет",
+  claimButtonLabel: "Забрать",
+  closeButtonLabel: "Закрыть"
+};
+
 export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onChanged?: () => void | Promise<void> }) {
   const [fields, setFields] = useState<Field[]>([]);
+  const [customization, setCustomization] = useState<Customization>(DEFAULT_CUSTOMIZATION);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function load() {
-    const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/form", { cache: "no-store" });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body.error ?? "ticket_form_failed");
-    setFields((body.fields ?? []) as Field[]);
+    const [formResponse, customizationResponse] = await Promise.all([
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/form", { cache: "no-store" }),
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/customization", { cache: "no-store" })
+    ]);
+    const formBody = await formResponse.json().catch(() => ({}));
+    const customizationBody = await customizationResponse.json().catch(() => ({}));
+    if (!formResponse.ok) throw new Error(formBody.error ?? "ticket_form_failed");
+    if (!customizationResponse.ok) throw new Error(customizationBody.error ?? "ticket_customization_failed");
+    setFields((formBody.fields ?? []) as Field[]);
+    setCustomization((customizationBody.customization ?? DEFAULT_CUSTOMIZATION) as Customization);
   }
 
   useEffect(() => {
@@ -61,6 +84,31 @@ export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onCha
     setFields((current) => current.filter((_, i) => i !== index));
   }
 
+  async function saveCustomization() {
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/customization", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(customization)
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "ticket_customization_save_failed");
+      setCustomization((body.customization ?? customization) as Customization);
+      setStatus("Оформление тикетов сохранено.");
+      await onChanged?.();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Не удалось сохранить оформление.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function patchCustomization(patchValue: Partial<Customization>) {
+    setCustomization((current) => ({ ...current, ...patchValue }));
+  }
+
   async function save() {
     setBusy(true);
     setStatus("");
@@ -85,6 +133,22 @@ export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onCha
   return (
     <div style={{ display: "grid", gap: 10 }}>
       {status && <div style={notice}>{status}</div>}
+      <section style={sectionStyle}>
+        <div style={sectionTitle}>Оформление и кнопки</div>
+        <div style={{ display: "grid", gap: 8 }}>
+          <label style={label}><span>Заголовок панели</span><input value={customization.panelTitle} maxLength={256} onChange={(e) => patchCustomization({ panelTitle: e.target.value })} style={input} /></label>
+          <label style={label}><span>Описание панели</span><textarea value={customization.panelDescription} maxLength={1000} onChange={(e) => patchCustomization({ panelDescription: e.target.value })} style={{ ...input, minHeight: 70 }} /></label>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
+            <label style={label}><span>Создать</span><input value={customization.createButtonLabel} maxLength={80} onChange={(e) => patchCustomization({ createButtonLabel: e.target.value })} style={input} /></label>
+            <label style={label}><span>Забрать</span><input value={customization.claimButtonLabel} maxLength={80} onChange={(e) => patchCustomization({ claimButtonLabel: e.target.value })} style={input} /></label>
+            <label style={label}><span>Закрыть</span><input value={customization.closeButtonLabel} maxLength={80} onChange={(e) => patchCustomization({ closeButtonLabel: e.target.value })} style={input} /></label>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button type="button" onClick={() => void saveCustomization()} disabled={busy} style={secondary}>{busy ? "Сохранение…" : "Сохранить оформление"}</button>
+          </div>
+        </div>
+      </section>
+
       <div style={{ color: "#697486", fontSize: 10 }}>
         До 5 полей Discord Modal. Ответы сохраняются вместе с тикетом и попадают в transcript.
       </div>
@@ -111,6 +175,8 @@ export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onCha
   );
 }
 
+const sectionStyle = { display: "grid", gap: 8, padding: 12, borderRadius: 11, border: "1px solid #2c3949", background: "#0b1017" } as const;
+const sectionTitle = { fontSize: 11, fontWeight: 700, color: "#d7dde6" } as const;
 const card = { display: "grid", gap: 8, padding: 12, borderRadius: 11, border: "1px solid #232a35", background: "#0d1219" } as const;
 const label = { display: "grid", gap: 4, color: "#8d98a8", fontSize: 9 } as const;
 const check = { display: "flex", gap: 6, alignItems: "center", color: "#8d98a8", fontSize: 9, paddingTop: 17 } as const;

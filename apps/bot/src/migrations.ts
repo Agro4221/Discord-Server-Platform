@@ -1058,6 +1058,17 @@ const migrations = [
       "ALTER TABLE automod_rules DROP CONSTRAINT IF EXISTS automod_rules_action_check;",
       "ALTER TABLE automod_rules ADD CONSTRAINT automod_rules_action_check CHECK(action IN ('delete','timeout','warn','ban','log'));"
     ])
+  },
+  {
+    version: 68,
+    name: "ticket_customization",
+    sql: q([
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS panel_title text NOT NULL DEFAULT '🎫 Поддержка';",
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS panel_description text NOT NULL DEFAULT 'Нажми кнопку ниже — Vexa откроет форму тикета.';",
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS create_button_label text NOT NULL DEFAULT 'Создать тикет';",
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS claim_button_label text NOT NULL DEFAULT 'Забрать';",
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS close_button_label text NOT NULL DEFAULT 'Закрыть';"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {

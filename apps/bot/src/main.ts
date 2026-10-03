@@ -243,7 +243,9 @@ async function main(): Promise<void> {
     autoResponder,
     tickets: {
       getFormFields: async (guildId) => tickets.getFormFields(guildId),
-      setFormFields: async (guildId, fields) => tickets.setFormFields(guildId, fields)
+      setFormFields: async (guildId, fields) => tickets.setFormFields(guildId, fields),
+      getCustomization: async (guildId) => tickets.getCustomization(guildId),
+      setCustomization: async (guildId, customization) => tickets.setCustomization(guildId, customization)
     },
     moderation,
     music,

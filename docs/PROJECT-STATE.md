@@ -226,3 +226,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-04 — Help policy defaults
 - `/help` now derives its built-in command list from `COMMAND_DEFINITIONS` and overlays any persisted per-guild policy.
 - Commands without a stored policy therefore retain their declared defaults, while explicit enabled/slash/help visibility overrides are respected.
+
+
+## 2026-10-04 — Ticket customization
+- Added persistent Ticket customization for panel title/description and create/claim/close button labels.
+- Configuration is normalized to Discord-safe lengths and applied consistently to the prefix quick-panel and ticket create/reopen controls.
+- Management API and Dashboard now expose the customization contract beside intake-form editing.
+- Migration 68 adds the five ticket customization columns; live Discord rendering remains release-gate validation.

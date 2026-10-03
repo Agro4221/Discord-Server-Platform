@@ -151,3 +151,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-04 — Help policy defaults
 - Help command now honors persisted `enabled`, `slash_enabled` and `help_visible` overrides while using command-definition defaults for commands without a stored row.
 - Live Discord rendering remains release-gate validation.
+
+
+### 2026-10-04 — Ticket customization
+- Added unit coverage for Ticket customization normalization and a migration gate for version 68.
+- Dashboard/API contract covers panel text and create/claim/close button labels; live Discord component rendering remains release-gate validation.
