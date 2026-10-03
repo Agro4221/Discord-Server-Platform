@@ -34,18 +34,26 @@ export class RolePanels implements PlatformModule {
   readonly name = "roles";
   private unsubscribe?: () => void;
   private expiryTimer?: NodeJS.Timeout;
+  private automationTimer?: NodeJS.Timeout;
   private client?: ModuleContext["client"];
+  private identityId = "primary";
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+    this.identityId = context.identityId;
     const a = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const b = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
-    this.unsubscribe = () => { a(); b(); };
+    const c = context.events.on("member.add", (member) => this.handleAutomationMemberJoin(member));
+    const d = context.events.on("voice.state", ({ oldState, newState }) => this.handleAutomationVoiceState(oldState, newState));
+    this.unsubscribe = () => { a(); b(); c(); d(); };
     this.expiryTimer = setInterval(() => void this.processExpiredAssignments(), 30_000);
     this.expiryTimer.unref();
+    this.automationTimer = setInterval(() => void this.processAutomationJobs(), 30_000);
+    this.automationTimer.unref();
     await this.processExpiredAssignments();
+    await this.processAutomationJobs();
   }
 
   async shutdown(): Promise<void> {
@@ -53,6 +61,8 @@ export class RolePanels implements PlatformModule {
     this.unsubscribe = undefined;
     if (this.expiryTimer) clearInterval(this.expiryTimer);
     this.expiryTimer = undefined;
+    if (this.automationTimer) clearInterval(this.automationTimer);
+    this.automationTimer = undefined;
     this.client = undefined;
   }
 
@@ -72,6 +82,60 @@ export class RolePanels implements PlatformModule {
       maxSelections: Math.min(Math.max(Number(row.max_selections ?? 1), 1), 5),
       durationMinutes: Math.min(Math.max(Number(row.duration_minutes ?? 0), 0), 43200)
     }));
+  }
+
+
+  async listAutomationRules(guildId: string): Promise<Array<{
+    id: number;
+    trigger: "member.join" | "voice.join" | "voice.leave";
+    channelId: string;
+    roleId: string;
+    delaySeconds: number;
+    enabled: boolean;
+  }>> {
+    const result = await this.db.query<{
+      id: string;
+      trigger: "member.join" | "voice.join" | "voice.leave";
+      channel_id: string;
+      role_id: string;
+      delay_seconds: number;
+      enabled: boolean;
+    }>("SELECT id,trigger,channel_id,role_id,delay_seconds,enabled FROM role_automation_rules WHERE guild_id=$1 ORDER BY id DESC",[guildId]);
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      trigger: row.trigger,
+      channelId: row.channel_id,
+      roleId: row.role_id,
+      delaySeconds: row.delay_seconds,
+      enabled: row.enabled
+    }));
+  }
+
+  async saveAutomationRule(
+    guildId: string,
+    input: { trigger: "member.join" | "voice.join" | "voice.leave"; channelId?: string; roleId: string; delaySeconds?: number; enabled?: boolean }
+  ): Promise<void> {
+    const channelId = input.trigger === "member.join" ? "" : String(input.channelId ?? "");
+    if (input.trigger !== "member.join" && !/^\d{17,20}$/.test(channelId)) throw new Error("invalid_role_automation_channel");
+    if (!/^\d{17,20}$/.test(input.roleId)) throw new Error("invalid_role_automation_role");
+    if (input.delaySeconds !== undefined && (!Number.isInteger(input.delaySeconds) || input.delaySeconds < 0 || input.delaySeconds > 604800)) throw new Error("invalid_role_automation_delay");
+    const delaySeconds = Math.min(Math.max(Math.trunc(input.delaySeconds ?? 0),0),604800);
+    const guild = this.client?.guilds.cache.get(guildId);
+    const role = guild?.roles.cache.get(input.roleId);
+    if (!guild || !role || role.managed) throw new Error("invalid_role_automation_role");
+    if (channelId) {
+      const channel = guild.channels.cache.get(channelId);
+      if (!channel || !channel.isVoiceBased()) throw new Error("invalid_role_automation_channel");
+    }
+    await this.db.query(
+      "INSERT INTO role_automation_rules(guild_id,trigger,channel_id,role_id,delay_seconds,enabled) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(guild_id,trigger,channel_id,role_id) DO UPDATE SET delay_seconds=EXCLUDED.delay_seconds,enabled=EXCLUDED.enabled,updated_at=now()",
+      [guildId,input.trigger,channelId,input.roleId,delaySeconds,input.enabled !== false]
+    );
+  }
+
+  async deleteAutomationRule(guildId: string, id: number): Promise<boolean> {
+    const result = await this.db.query("DELETE FROM role_automation_rules WHERE id=$1 AND guild_id=$2",[id,guildId]);
+    return result.rowCount === 1;
   }
 
   async createPanel(
@@ -396,6 +460,103 @@ export class RolePanels implements PlatformModule {
       }
     });
     await interaction.reply({ content: "Панель ролей создана.", ephemeral: true });
+  }
+
+
+  private async handleAutomationMemberJoin(member: import("discord.js").GuildMember): Promise<void> {
+    if (!await moduleEnabled(this.db, member.guild.id, "roles", false)) return;
+    const result = await this.db.query<{ role_id: string; delay_seconds: number }>(
+      "SELECT role_id,delay_seconds FROM role_automation_rules WHERE guild_id=$1 AND trigger='member.join' AND enabled=true",
+      [member.guild.id]
+    );
+    for (const rule of result.rows) await this.scheduleRoleAutomation(member.guild.id,member.id,rule.role_id,true,rule.delay_seconds);
+  }
+
+  private async handleAutomationVoiceState(oldState: import("discord.js").VoiceState, newState: import("discord.js").VoiceState): Promise<void> {
+    if (!await moduleEnabled(this.db, newState.guild.id, "roles", false)) return;
+    if (oldState.channelId === newState.channelId) return;
+
+    if (oldState.channelId) {
+      const result = await this.db.query<{ role_id: string; delay_seconds: number }>(
+        "SELECT role_id,delay_seconds FROM role_automation_rules WHERE guild_id=$1 AND trigger='voice.leave' AND channel_id=$2 AND enabled=true",
+        [newState.guild.id,oldState.channelId]
+      );
+      for (const rule of result.rows) await this.scheduleRoleAutomation(newState.guild.id,newState.id,rule.role_id,false,rule.delay_seconds);
+    }
+
+    if (newState.channelId) {
+      const result = await this.db.query<{ role_id: string; delay_seconds: number }>(
+        "SELECT role_id,delay_seconds FROM role_automation_rules WHERE guild_id=$1 AND trigger='voice.join' AND channel_id=$2 AND enabled=true",
+        [newState.guild.id,newState.channelId]
+      );
+      for (const rule of result.rows) await this.scheduleRoleAutomation(newState.guild.id,newState.id,rule.role_id,true,rule.delay_seconds);
+    }
+  }
+
+  private async scheduleRoleAutomation(guildId: string,userId: string,roleId: string,addRole: boolean,delaySeconds: number): Promise<void> {
+    if (delaySeconds <= 0) {
+      try {
+        await this.applyRoleAutomation(guildId,userId,roleId,addRole);
+      } catch (error) {
+        logger.warn("Role automation immediate action failed",{guildId,userId,roleId,addRole,error:String(error)});
+      }
+      return;
+    }
+    await this.db.query(
+      "INSERT INTO role_automation_jobs(guild_id,user_id,role_id,add_role,available_at) VALUES($1,$2,$3,$4,now()+make_interval(secs => $5))",
+      [guildId,userId,roleId,addRole,delaySeconds]
+    );
+  }
+
+  private async processAutomationJobs(): Promise<void> {
+    await this.db.query(
+      "DELETE FROM role_automation_jobs WHERE (completed_at IS NOT NULL OR dead_lettered_at IS NOT NULL) AND COALESCE(completed_at,dead_lettered_at) < now()-interval '7 days'"
+    ).catch(() => undefined);
+    if (!this.client) return;
+    try {
+      const claimed = await this.db.query<{
+        id: string;
+        guild_id: string;
+        user_id: string;
+        role_id: string;
+        add_role: boolean;
+        attempts: number;
+      }>(
+        "UPDATE role_automation_jobs raj SET processing_until=now()+interval '2 minutes',attempts=attempts+1 FROM (SELECT j.id FROM role_automation_jobs j INNER JOIN guild_bot_assignments ga ON ga.guild_id=j.guild_id LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id WHERE j.completed_at IS NULL AND j.dead_lettered_at IS NULL AND j.available_at <= now() AND (j.processing_until IS NULL OR j.processing_until < now()) AND (ga.bot_identity_id=$1 OR ($1='primary' AND ga.bot_identity_id <> 'primary' AND (bh.last_seen_at IS NULL OR bh.last_seen_at < now()-interval '90 seconds'))) ORDER BY j.available_at LIMIT 20 FOR UPDATE SKIP LOCKED) claim WHERE raj.id=claim.id RETURNING raj.id,raj.guild_id,raj.user_id,raj.role_id,raj.add_role,raj.attempts",
+        [this.identityId]
+      );
+      for (const job of claimed.rows) {
+        try {
+          await this.applyRoleAutomation(job.guild_id,job.user_id,job.role_id,job.add_role);
+          await this.db.query("UPDATE role_automation_jobs SET completed_at=now(),processing_until=NULL,last_error=NULL WHERE id=$1 AND completed_at IS NULL",[job.id]);
+        } catch (error) {
+          const attempts = Number(job.attempts) || 0;
+          const message = String(error).slice(0,1000);
+          if (attempts >= 5) {
+            await this.db.query("UPDATE role_automation_jobs SET processing_until=NULL,last_error=$1,dead_lettered_at=now() WHERE id=$2 AND completed_at IS NULL",[message,job.id]);
+          } else {
+            const retryDelay = Math.min(300,30 * 2 ** Math.max(0,attempts - 1));
+            await this.db.query("UPDATE role_automation_jobs SET processing_until=NULL,last_error=$1,available_at=now()+make_interval(secs => $2) WHERE id=$3 AND completed_at IS NULL AND dead_lettered_at IS NULL",[message,retryDelay,job.id]);
+          }
+        }
+      }
+    } catch (error) {
+      logger.warn("Role automation job worker failed",{identityId:this.identityId,error:String(error)});
+    }
+  }
+
+  private async applyRoleAutomation(guildId: string,userId: string,roleId: string,addRole: boolean): Promise<void> {
+    const guild = this.client?.guilds.cache.get(guildId);
+    const member = await guild?.members.fetch(userId).catch(() => null);
+    const role = guild?.roles.cache.get(roleId);
+    if (!member || !role) throw new Error("role_automation_target_unavailable");
+    if (!member.manageable || !guild?.members.me || role.position >= guild.members.me.roles.highest.position) throw new Error("role_automation_hierarchy_blocked");
+    if (addRole && !member.roles.cache.has(roleId)) await member.roles.add(role,"Vexa role automation");
+    if (!addRole && member.roles.cache.has(roleId)) await member.roles.remove(role,"Vexa role automation");
+    await this.db.query(
+      "INSERT INTO audit_events(guild_id,source,action,target_type,target_id,metadata) VALUES($1,'system',$2,'role',$3,$4::jsonb)",
+      [guildId,addRole ? "role.automation.add" : "role.automation.remove",roleId,JSON.stringify({userId,automationIdentity:this.identityId})]
+    );
   }
 
   private async processExpiredAssignments(): Promise<void> {
