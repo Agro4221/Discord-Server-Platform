@@ -683,7 +683,14 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
                 { name: "Message created", value: "message.create" },
                 { name: "Voice joins", value: "voice.join" },
                 { name: "Voice leaves", value: "voice.leave" },
-                { name: "Voice moves", value: "voice.move" }
+                { name: "Voice moves", value: "voice.move" },
+                { name: "Channel created", value: "channel.create" },
+                { name: "Channel deleted", value: "channel.delete" },
+                { name: "Role created", value: "role.create" },
+                { name: "Role deleted", value: "role.delete" },
+                { name: "Member banned", value: "member.ban" },
+                { name: "Member unbanned", value: "member.unban" },
+                { name: "Security incident", value: "security.incident" }
               )
               .setRequired(true)
           )

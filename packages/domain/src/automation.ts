@@ -14,7 +14,14 @@ export type AutomationEvent =
   | "ticket.create"
   | "ticket.close"
   | "giveaway.end"
-  | "schedule";
+  | "schedule"
+  | "channel.create"
+  | "channel.delete"
+  | "role.create"
+  | "role.delete"
+  | "member.ban"
+  | "member.unban"
+  | "security.incident";
 
 export type AutomationCondition =
   | { type: "equals"; left: string; right: string }

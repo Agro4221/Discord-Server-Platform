@@ -43,6 +43,7 @@ export class AutomationEngine implements PlatformModule {
   private client?: import("discord.js").Client;
   private readonly cooldowns = new Map<string, number>();
   private readonly keyedCooldowns = new Map<string, number>();
+  private readonly executionWindows = new Map<string, { startedAt: number; count: number }>();
   private scheduleTimer?: NodeJS.Timeout;
   private identityId = "primary";
   private executionCounter = 0;
@@ -105,6 +106,55 @@ export class AutomationEngine implements PlatformModule {
         type: "giveaway.end", guildId: event.guildId,
         numeric: { giveawayId: event.giveawayId, winnerCount: event.winners.length },
         content: event.winners.join(",")
+      })),
+      context.events.on("channel.create", (channel) => {
+        if (!channel.guildId) return;
+        return this.execute({
+          type: "channel.create",
+          guildId: channel.guildId,
+          channelId: channel.id,
+          content: channel.name ?? undefined
+        });
+      }),
+      context.events.on("channel.delete", (channel) => {
+        if (!channel.guildId) return;
+        return this.execute({
+          type: "channel.delete",
+          guildId: channel.guildId,
+          channelId: channel.id,
+          content: channel.name ?? undefined
+        });
+      }),
+      context.events.on("role.create", (role) => this.execute({
+        type: "role.create",
+        guildId: role.guild.id,
+        content: role.id,
+        numeric: { rolePosition: role.position }
+      })),
+      context.events.on("role.delete", (role) => this.execute({
+        type: "role.delete",
+        guildId: role.guild.id,
+        content: role.id,
+        numeric: { rolePosition: role.position }
+      })),
+      context.events.on("member.ban", (event) => this.execute({
+        type: "member.ban",
+        guildId: event.guildId,
+        userId: event.userId,
+        content: event.userId
+      })),
+      context.events.on("member.unban", (event) => this.execute({
+        type: "member.unban",
+        guildId: event.guildId,
+        userId: event.userId,
+        content: event.userId
+      })),
+      context.events.on("security.incident", (event) => this.execute({
+        type: "security.incident",
+        guildId: event.guildId,
+        userId: event.userId,
+        content: event.eventType,
+        numeric: { incidentId: event.incidentId, actionCount: event.actionCount, joinCount: event.joinCount }
       }))
     ];
 
@@ -170,6 +220,7 @@ export class AutomationEngine implements PlatformModule {
     this.rules.clear();
     this.cooldowns.clear();
     this.keyedCooldowns.clear();
+    this.executionWindows.clear();
     this.executionCounter = 0;
     this.lastScheduleMinute = null;
     if (this.scheduleTimer) clearInterval(this.scheduleTimer);
@@ -323,7 +374,8 @@ export class AutomationEngine implements PlatformModule {
         all: row.conditions ?? [],
         any: row.any_conditions ?? [],
         event: row.event,
-        actions: row.actions ?? []
+        actions: row.actions ?? [],
+        cooldownSeconds: row.cooldown_seconds
       });
       this.rules.set(row.guild_id, list);
     }
@@ -456,6 +508,7 @@ export class AutomationEngine implements PlatformModule {
 
   private async execute(event: RuntimeEvent): Promise<void> {
     if (!await moduleEnabled(this.db, event.guildId, "automation", false)) return;
+    if (!this.allowExecution(event.guildId)) return;
 
     const rules = this.rules.get(event.guildId) ?? [];
 
@@ -464,7 +517,7 @@ export class AutomationEngine implements PlatformModule {
       if (!await this.conditionsMatch(rule.all, event)) continue;
       if (rule.any.length > 0 && !await this.conditionsAnyMatch(rule.any, event)) continue;
 
-      const cooldownSeconds = await this.cooldownFor(rule.id);
+      const cooldownSeconds = rule.cooldownSeconds;
       this.executionCounter += 1;
       if (this.executionCounter % 100 === 0) this.pruneCooldowns(Date.now());
       const cooldownKey = `${event.guildId}:${rule.id}:${event.userId ?? "global"}`;
@@ -488,6 +541,9 @@ export class AutomationEngine implements PlatformModule {
     }
     for (const [key, timestamp] of this.keyedCooldowns) {
       if (timestamp < now) this.keyedCooldowns.delete(key);
+    }
+    for (const [guildId, window] of this.executionWindows) {
+      if (window.startedAt + 60_000 < now) this.executionWindows.delete(guildId);
     }
 
     const maxKeys = 10_000;
@@ -514,12 +570,19 @@ export class AutomationEngine implements PlatformModule {
     }
   }
 
-  private async cooldownFor(ruleId: string): Promise<number> {
-    const result = await this.db.query<{ cooldown_seconds: number }>(
-      "SELECT cooldown_seconds FROM automation_rules WHERE id=$1",
-      [ruleId]
-    );
-    return result.rows[0]?.cooldown_seconds ?? 0;
+  private allowExecution(guildId: string): boolean {
+    const now = Date.now();
+    const window = this.executionWindows.get(guildId);
+    if (!window || now - window.startedAt >= 10_000) {
+      this.executionWindows.set(guildId, { startedAt: now, count: 1 });
+      return true;
+    }
+    if (window.count >= 100) {
+      logger.warn("Automation execution rate limited", { guildId, count: window.count, windowSeconds: 10 });
+      return false;
+    }
+    window.count += 1;
+    return true;
   }
 
   private async conditionsAnyMatch(conditions: AutomationCondition[], event: RuntimeEvent): Promise<boolean> {
