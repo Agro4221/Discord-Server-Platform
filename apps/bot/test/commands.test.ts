@@ -64,3 +64,26 @@ test("all Discord application command option lists keep required options before 
     ]
   );
 });
+
+test("utility slash commands are registered with expected options", () => {
+  const commands = buildCommands().map((command) => command.toJSON());
+
+  assert.ok(commands.some((command) => command.name === "serverinfo"));
+  assert.ok(commands.some((command) => command.name === "userinfo"));
+  assert.ok(commands.some((command) => command.name === "avatar"));
+  assert.ok(commands.some((command) => command.name === "membercount"));
+  assert.ok(commands.some((command) => command.name === "roleinfo"));
+  assert.ok(commands.some((command) => command.name === "channelinfo"));
+
+  const roleInfo = commands.find((command) => command.name === "roleinfo");
+  assert.equal(roleInfo?.options?.[0]?.name, "role");
+  assert.equal(roleInfo?.options?.[0]?.required, true);
+
+  const afk = commands.find((command) => command.name === "afk");
+  assert.deepEqual(
+    afk?.options?.map((option) => option.name),
+    ["set", "clear", "status"]
+  );
+  assert.equal(afk?.options?.[0]?.options?.[0]?.required, false);
+});
+
