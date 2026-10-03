@@ -138,6 +138,31 @@ export class ConfigTransferService {
         throw new Error("invalid_automation_rules");
       }
 
+      const automationPresets = automation?.settings.automation_workflow_presets;
+      if (automationPresets !== undefined && !Array.isArray(automationPresets)) {
+        throw new Error("invalid_automation_workflow_presets");
+      }
+
+      if (Array.isArray(automationPresets)) {
+        const normalizedPresets = automationPresets.map((preset) => normalizeImportedAutomationPreset(preset));
+
+        await client.query("DELETE FROM automation_workflow_presets WHERE guild_id=$1", [targetGuildId]);
+        for (const preset of normalizedPresets) {
+          await client.query(
+            "INSERT INTO automation_workflow_presets(guild_id,name,event,conditions,any_conditions,actions,cooldown_seconds) VALUES($1,$2,$3,$4::jsonb,$5::jsonb,$6::jsonb,$7)",
+            [
+              targetGuildId,
+              preset.name,
+              preset.event,
+              JSON.stringify(preset.conditions),
+              JSON.stringify(preset.anyConditions),
+              JSON.stringify(preset.actions),
+              preset.cooldownSeconds
+            ]
+          );
+        }
+      }
+
       if (Array.isArray(automationRules)) {
         const normalizedRules = automationRules.map((rule) => normalizeImportedAutomationRule(rule));
 
