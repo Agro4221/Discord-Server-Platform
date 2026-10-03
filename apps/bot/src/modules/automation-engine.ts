@@ -341,7 +341,7 @@ export class AutomationEngine implements PlatformModule {
       oldestPendingAt: string | null;
       recent: Array<{
         id: string;
-        status: "pending" | "processing" | "completed";
+        status: "pending" | "processing" | "completed" | "dead-lettered";
         ruleId: string | null;
         attempts: number;
         availableAt: string;
@@ -371,8 +371,8 @@ export class AutomationEngine implements PlatformModule {
         oldest_pending_at: string | null;
       }>(
         "SELECT " +
-        "COUNT(*) FILTER (WHERE completed_at IS NULL) AS pending, " +
-        "COUNT(*) FILTER (WHERE completed_at IS NULL AND processing_until IS NOT NULL AND processing_until >= now()) AS processing, " +
+        "COUNT(*) FILTER (WHERE completed_at IS NULL AND dead_lettered_at IS NULL) AS pending, " +
+        "COUNT(*) FILTER (WHERE completed_at IS NULL AND dead_lettered_at IS NULL AND processing_until IS NOT NULL AND processing_until >= now()) AS processing, " +
         "COUNT(*) FILTER (WHERE completed_at IS NULL AND dead_lettered_at IS NULL AND last_error IS NOT NULL) AS with_errors, " +
         "COUNT(*) FILTER (WHERE completed_at IS NULL AND dead_lettered_at IS NOT NULL) AS dead_lettered, " +
         "COUNT(*) FILTER (WHERE completed_at IS NOT NULL AND completed_at >= now()-interval '24 hours') AS completed_24h, " +
@@ -915,7 +915,7 @@ export class AutomationEngine implements PlatformModule {
           await this.db.query("UPDATE automation_delayed_jobs SET completed_at=now(),processing_until=NULL,last_error='invalid queued job' WHERE id=$1", [job.id]);
           continue;
         }
-        await this.perform(job.actions, job.event);
+        await this.perform(job.actions, job.event, { failFast: true, ruleId: job.rule_id ?? undefined });
         await this.db.query(
           "UPDATE automation_delayed_jobs SET completed_at=now(),processing_until=NULL,last_error=NULL WHERE id=$1 AND completed_at IS NULL",
           [job.id]
