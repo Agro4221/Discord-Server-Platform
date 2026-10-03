@@ -261,3 +261,11 @@ Never write credentials, tokens or private user data here.
 - Jockie Music is used specifically for advanced music architecture: multiple dedicated music bots, deep queue/collection handling, permission/session ownership, Spotify/Apple Music support, large collections and 24/7 behavior. citeturn410738search2turn410738search7
 - Product principle: combine the strongest useful capabilities across these ecosystems while keeping one coherent permission/persistence/audit/Dashboard architecture. Premium parity means broad and deep functionality, not reproducing any single vendor's monetization model or copying proprietary code.
 - Documentation commit for the broadened benchmark: `3569375679263c235be134696174146dec0e32e8`.
+
+
+## 2026-10-03 — Canonical cross-chat handoff added
+- Added **docs/PROJECT-HANDOFF.md** as the canonical continuity document for future chats.
+- The handoff records: product goal, all-in-one scope, multi-bot benchmark methodology, implemented baseline across modules, complete high-level backlog, detailed Music backlog, provider requirements, priorities, explicit anti-drift rules, current branch/PR state, validation status and the exact procedure for continuing in a new chat.
+- New chats must read `docs/PROJECT-HANDOFF.md` first, then `docs/PROJECT-STATE.md`, recent `docs/WORK-LOG.md` entries and `docs/TEST-MATRIX.md` before proposing new work.
+- This is intended to prevent repeated re-explanation of the product goal and previously accepted decisions, especially the distinction between the all-in-one platform goal and the Music module.
+- Handoff creation commit: `cee66211`; wording fix commit: `c9c5dbe4`.
