@@ -821,7 +821,9 @@ export class ManagementApiServer {
               actions,
               content: typeof body.content === "string" ? body.content.slice(0, 2000) : "",
               userId: typeof body.userId === "string" ? body.userId : undefined,
+              userIsBot: typeof body.userIsBot === "boolean" ? body.userIsBot : undefined,
               channelId: typeof body.channelId === "string" ? body.channelId : undefined,
+              channelType: typeof body.channelType === "string" ? body.channelType as import("@dsp/domain").AutomationChannelType : undefined,
               roleIds: Array.isArray(body.roleIds)
                 ? body.roleIds.filter((v: unknown): v is string => typeof v === "string").slice(0, 20)
                 : [],
