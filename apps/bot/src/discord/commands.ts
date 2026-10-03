@@ -694,6 +694,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .setDescription("Keep the music bot in voice 24/7")
           .addBooleanOption((o) => o.setName("enabled").setDescription("24/7 state"))
       )
+      .addSubcommand((sub) => sub.setName("providers").setDescription("Show configured music providers"))
       .addSubcommand((sub) =>
         sub
           .setName("seek")
