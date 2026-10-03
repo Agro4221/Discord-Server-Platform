@@ -39,6 +39,7 @@ import { Utility } from "./modules/utility.js";
 import { CommunityTools } from "./modules/community-tools.js";
 import { Logging } from "./modules/logging.js";
 import { CommandDispatcher } from "./command-dispatcher.js";
+import { ContextCommandService } from "./context-commands.js";
 
 let fatalCleanup: (() => Promise<void>) | undefined;
 
@@ -112,6 +113,7 @@ async function main(): Promise<void> {
   const music = new Music(database, config, identities);
   const customCommands = new CustomCommandService(database, config);
   const commandPolicy = new CommandPolicyService(database);
+  const contextCommands = new ContextCommandService(commandPolicy, moderation);
 
   const dispatcher = new CommandDispatcher(
     client,
@@ -189,6 +191,7 @@ async function main(): Promise<void> {
 
   modules.register(temporaryVoice);
   modules.register(moderation);
+  modules.register(contextCommands);
   modules.register(autoMod);
   modules.register(welcome);
   modules.register(leveling);
