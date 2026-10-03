@@ -158,7 +158,7 @@ export class Notifications implements PlatformModule {
     this.client = undefined;
   }
 
-  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
     if (!interaction.inGuild() || commandName !== "feed") return;
     if (!await moduleEnabled(this.db, interaction.guild!.id, "notifications", false)) {
       await interaction.reply({ content: "Модуль Notifications выключен.", ephemeral: true });
