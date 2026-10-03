@@ -636,6 +636,76 @@ export class AutomationEngine implements PlatformModule {
     return result.rowCount === 1;
   }
 
+  async listPresets(guildId: string): Promise<Array<{
+    name: string;
+    event: AutomationEvent;
+    conditions: AutomationCondition[];
+    anyConditions: AutomationCondition[];
+    actions: AutomationAction[];
+    cooldownSeconds: number;
+    updatedAt: string;
+  }>> {
+    const result = await this.db.query<{
+      name: string;
+      event: AutomationEvent;
+      conditions: AutomationCondition[];
+      any_conditions: AutomationCondition[];
+      actions: AutomationAction[];
+      cooldown_seconds: number;
+      updated_at: string;
+    }>(
+      "SELECT name,event,conditions,any_conditions,actions,cooldown_seconds,updated_at FROM automation_workflow_presets WHERE guild_id=$1 ORDER BY updated_at DESC,name",
+      [guildId]
+    );
+    return result.rows.map((row) => ({
+      name: row.name,
+      event: row.event,
+      conditions: row.conditions ?? [],
+      anyConditions: row.any_conditions ?? [],
+      actions: row.actions ?? [],
+      cooldownSeconds: Number(row.cooldown_seconds) || 0,
+      updatedAt: row.updated_at
+    }));
+  }
+
+  async savePreset(
+    guildId: string,
+    name: string,
+    event: AutomationEvent,
+    conditions: AutomationCondition[],
+    anyConditions: AutomationCondition[],
+    actions: AutomationAction[],
+    cooldownSeconds = 0
+  ): Promise<void> {
+    const normalizedName = normalizePresetName(name);
+    if (!normalizedName) throw new Error("invalid_automation_preset_name");
+    validateAutomationRule(event, [...conditions, ...anyConditions], actions);
+
+    const safeCooldown = Math.min(Math.max(Math.trunc(cooldownSeconds), 0), 86_400);
+    await this.db.query(
+      "INSERT INTO automation_workflow_presets(guild_id,name,event,conditions,any_conditions,actions,cooldown_seconds) VALUES($1,$2,$3,$4::jsonb,$5::jsonb,$6::jsonb,$7) ON CONFLICT(guild_id,name) DO UPDATE SET event=EXCLUDED.event,conditions=EXCLUDED.conditions,any_conditions=EXCLUDED.any_conditions,actions=EXCLUDED.actions,cooldown_seconds=EXCLUDED.cooldown_seconds,updated_at=now()",
+      [
+        guildId,
+        normalizedName,
+        event,
+        JSON.stringify(conditions),
+        JSON.stringify(anyConditions),
+        JSON.stringify(actions),
+        safeCooldown
+      ]
+    );
+  }
+
+  async deletePreset(guildId: string, name: string): Promise<boolean> {
+    const normalizedName = normalizePresetName(name);
+    if (!normalizedName) throw new Error("invalid_automation_preset_name");
+    const result = await this.db.query(
+      "DELETE FROM automation_workflow_presets WHERE guild_id=$1 AND name=$2",
+      [guildId, normalizedName]
+    );
+    return result.rowCount === 1;
+  }
+
   async createRule(
     guildId: string,
     name: string,
@@ -1296,6 +1366,11 @@ export function shouldEmitSchedule(minute: number, lastMinute: number | null): b
   return lastMinute !== minute;
 }
 
+
+function normalizePresetName(value: string): string {
+  const name = value.trim().toLowerCase();
+  return /^[a-z0-9_-]{1,40}$/.test(name) ? name : "";
+}
 
 function normalizeTemplateName(value: string): string {
   const name = value.trim().toLowerCase();
