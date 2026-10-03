@@ -139,7 +139,7 @@ export class Verification implements PlatformModule {
     );
   }
 
-  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
     if (!interaction.inGuild() || commandName !== "verify") return;
     const sub = interaction.options.getSubcommand();
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
