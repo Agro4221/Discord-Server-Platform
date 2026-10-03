@@ -29,6 +29,7 @@ type RuntimeEvent = {
   content?: string;
   messageId?: string;
   numeric?: Record<string, number>;
+  roleIds?: string[];
 };
 
 const SUPPORTED_EVENTS: AutomationEvent[] = [
