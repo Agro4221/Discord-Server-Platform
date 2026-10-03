@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isPrivateIp } from "../src/modules/notifications.js";
+import { isPrivateIp, normalizeKeywords, renderFeedTemplate } from "../src/modules/notifications.js";
 
 test("notification SSRF guard rejects private, special and mapped addresses", () => {
   for (const address of [
@@ -31,4 +31,18 @@ test("notification SSRF guard rejects private, special and mapped addresses", ()
   ]) {
     assert.equal(isPrivateIp(address), false, address);
   }
+});
+
+test("notification feed filters normalize and templates render supported fields", () => {
+  assert.deepEqual(
+    normalizeKeywords([" Release ", "release", "", "UPDATE", "update "]),
+    ["release", "update"]
+  );
+  assert.equal(
+    renderFeedTemplate("**{title}**\\n{url}\\n{timestamp}", {
+      title: "Release 1",
+      url: "https://example.com/release"
+    }).startsWith("**Release 1**\\nhttps://example.com/release\\n"),
+    true
+  );
 });
