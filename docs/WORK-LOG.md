@@ -371,3 +371,13 @@ Never write credentials, tokens or private user data here.
 - Added `AutomationEngine.dryRun()` and Management API `/automation/dry-run` for safe preflight testing.
 - Dashboard can test the current unsaved rule against synthetic event fields and inspect rendered action previews.
 - No Discord mutation, webhook call or database write is performed by dry-run.
+
+
+## 2026-10-04 — Automation operational diagnostics
+- Added AutomationEngine.diagnostics(guildId) over the existing automation_delayed_jobs and rule/template persistence.
+- Diagnostics expose rule totals/event distribution, delayed-job pending/processing/error/completed-24h counts, oldest pending timestamp, recent job metadata and in-memory runtime counters.
+- Management API exposes GET /api/guilds/:guildId/automation/diagnostics; route ordering keeps it distinct from rule item routes.
+- Dashboard Automation Builder now shows a compact diagnostics section with manual refresh and recent delayed-job status/attempts/errors.
+- Event payloads and action definitions are intentionally not returned by diagnostics to avoid exposing message/request content in an operational view.
+- Added regression coverage for diagnostics aggregation and safe job metadata.
+- This increment does not alter Automation execution semantics or introduce a second queue/logging system.
