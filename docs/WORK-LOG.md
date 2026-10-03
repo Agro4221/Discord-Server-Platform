@@ -269,3 +269,11 @@ Never write credentials, tokens or private user data here.
 - New chats must read `docs/PROJECT-HANDOFF.md` first, then `docs/PROJECT-STATE.md`, recent `docs/WORK-LOG.md` entries and `docs/TEST-MATRIX.md` before proposing new work.
 - This is intended to prevent repeated re-explanation of the product goal and previously accepted decisions, especially the distinction between the all-in-one platform goal and the Music module.
 - Handoff creation commit: `cee66211`; wording fix commit: `c9c5dbe4`.
+## 2026-10-03 — AFK / away lifecycle
+- Implemented persistent AFK state in migration 64 (`afk_users`) inside the existing Reminders module.
+- Added `/afk [reason]` and prefix `!afk [reason]`; `off`, `clear`, `remove` and `unset` clear the current status.
+- Setting AFK persists a reason and start time; a message mentioning an AFK user produces a relative-time notice.
+- The first non-bot message sent after setting AFK atomically clears the sender's state and posts a short return notice.
+- Added command-policy registration so AFK is visible/configurable in the existing Dashboard command policy editor without introducing a second permissions model.
+- Added deterministic helper/command-schema regressions.
+- Live Discord and restart validation remain release-gate checks.
