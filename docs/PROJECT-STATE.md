@@ -258,6 +258,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Delayed execution propagates action errors instead of swallowing them, while non-delayed event execution retains its existing per-action best-effort behavior.
 - Rule IDs are preserved on delayed jobs and diagnostics distinguish pending, processing, completed and dead-lettered jobs.
 
+## 2026-10-04 — Music history / skip-to
+- Queue editing, Loop One/Queue Loop, progress display, persistent recent history and skip-to are now implemented in Music v2.
+- Recent history is bounded to 200 entries per guild/bot identity and is operational telemetry, not configuration.
+
 ## 2026-10-04 — Automation richer conditions/actions
 - Automation conditions now cover role absence, bot identity, channel type and Discord permission checks.
 - Actions now include managed nickname updates and message reactions, with dry-run previews and Dashboard controls.
