@@ -41,7 +41,8 @@ const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
   { table: "role_panels", fields: ["channel_id","message_id","title","roles","selection_mode","max_selections","duration_minutes"] },
   { table: "stream_alerts", fields: ["platform","target","channel_id","mention_role_id","enabled","interval_seconds","message_template"] },
   { table: "tickets", fields: ["channel_id","creator_id","claimed_by","status","priority","tags","created_at","closed_at","last_activity_at"] },
-  { table: "notification_feeds", fields: ["channel_id","url","enabled","interval_seconds","last_item_key","last_polled_at","message_template","include_keywords","exclude_keywords"] }
+  { table: "notification_feeds", fields: ["channel_id","url","enabled","interval_seconds","last_item_key","last_polled_at","message_template","include_keywords","exclude_keywords"] },
+  { table: "role_automation_rules", fields: ["trigger","channel_id","role_id","delay_seconds","enabled"] }
 ];
 
 export class ConfigTransferService {
@@ -93,7 +94,7 @@ export class ConfigTransferService {
       );
       const moduleKey =
         table.table === "automation_rules" || table.table === "automation_workflow_presets" ? "automation" :
-        table.table === "role_panels" ? "roles" :
+        table.table === "role_panels" || table.table === "role_automation_rules" ? "roles" :
         table.table === "notification_feeds" ? "notifications" :
         table.table === "tickets" ? "tickets" :
         "stream-alerts";
@@ -240,6 +241,22 @@ export class ConfigTransferService {
               feed.includeKeywords,
               feed.excludeKeywords
             ]
+          );
+        }
+      }
+
+      const rolesModule = data.modules.find((module) => module.key === "roles");
+      const roleAutomationRules = rolesModule?.settings.role_automation_rules;
+      if (roleAutomationRules !== undefined && !Array.isArray(roleAutomationRules)) {
+        throw new Error("invalid_role_automation_rules");
+      }
+      if (Array.isArray(roleAutomationRules)) {
+        const normalizedRoleRules = roleAutomationRules.map((rule) => normalizeImportedRoleAutomationRule(rule));
+        await client.query("DELETE FROM role_automation_rules WHERE guild_id=$1",[targetGuildId]);
+        for (const rule of normalizedRoleRules) {
+          await client.query(
+            "INSERT INTO role_automation_rules(guild_id,trigger,channel_id,role_id,delay_seconds,enabled) VALUES($1,$2,$3,$4,$5,$6)",
+            [targetGuildId,rule.trigger,rule.channelId,rule.roleId,rule.delaySeconds,rule.enabled]
           );
         }
       }
@@ -742,6 +759,35 @@ function normalizeImportedTicket(value: unknown): NormalizedTicket {
     createdAt: object.created_at,
     closedAt: typeof object.closed_at === "string" ? object.closed_at : null,
     lastActivityAt: typeof object.last_activity_at === "string" ? object.last_activity_at : null
+  };
+}
+
+type NormalizedRoleAutomationRule = {
+  trigger: "member.join" | "voice.join" | "voice.leave";
+  channelId: string;
+  roleId: string;
+  delaySeconds: number;
+  enabled: boolean;
+};
+
+function normalizeImportedRoleAutomationRule(value: unknown): NormalizedRoleAutomationRule {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_role_automation_rule");
+  const object = value as Record<string, unknown>;
+  if (
+    typeof object.trigger !== "string" || !["member.join","voice.join","voice.leave"].includes(object.trigger) ||
+    typeof object.channel_id !== "string" || (object.channel_id && !/^\d{17,20}$/.test(object.channel_id)) ||
+    typeof object.role_id !== "string" || !/^\d{17,20}$/.test(object.role_id) ||
+    typeof object.delay_seconds !== "number" || !Number.isInteger(object.delay_seconds) ||
+    object.delay_seconds < 0 || object.delay_seconds > 604800 ||
+    typeof object.enabled !== "boolean"
+  ) throw new Error("invalid_role_automation_rule");
+  if (object.trigger !== "member.join" && !object.channel_id) throw new Error("invalid_role_automation_channel");
+  return {
+    trigger: object.trigger as NormalizedRoleAutomationRule["trigger"],
+    channelId: object.channel_id,
+    roleId: object.role_id,
+    delaySeconds: object.delay_seconds,
+    enabled: object.enabled
   };
 }
 
