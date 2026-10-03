@@ -12,6 +12,7 @@ import { BackupService } from "./backup.js";
 import type { CustomCommandService } from "./custom-commands.js";
 import type { AutoResponder, AutoResponderInput } from "./modules/autoresponder.js";
 import type { TicketCustomization, TicketFormField } from "./modules/tickets.js";
+import type { HelpPage } from "./help-pages.js";
 import type { Moderation } from "./modules/moderation.js";
 import type { Music } from "./modules/music.js";
 import type { Leveling } from "./modules/leveling.js";
@@ -130,6 +131,11 @@ type ApiOptions = {
     listPresets: (guildId: string) => Promise<unknown[]>;
     savePreset: (guildId: string, name: string, event: string, conditions: unknown[], anyConditions: unknown[], actions: unknown[], cooldownSeconds: number) => Promise<void>;
     deletePreset: (guildId: string, name: string) => Promise<boolean>;
+  };
+  helpPages?: {
+    list: (guildId: string) => Promise<HelpPage[]>;
+    save: (guildId: string, slug: string, title: string, content: string, enabled?: boolean) => Promise<HelpPage>;
+    delete: (guildId: string, slug: string) => Promise<boolean>;
   };
   customCommands?: CustomCommandService;
   autoResponder?: AutoResponder;
@@ -884,6 +890,63 @@ export class ManagementApiServer {
             res.end(csv);
             return;
           }
+          const helpPagesMatch = path.match(/^\/api\/guilds\/([^/]+)\/help-pages$/);
+          const helpPageItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/help-pages\/([^/]+)$/);
+
+          if ((helpPagesMatch || helpPageItemMatch) && !this.options.helpPages) {
+            this.json(res, 500, { error: "help_pages_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && helpPagesMatch) {
+            const guildId = helpPagesMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, pages: await this.options.helpPages!.list(guildId) });
+            return;
+          }
+
+          if (method === "POST" && helpPagesMatch) {
+            const guildId = helpPagesMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            if (typeof body.slug !== "string" || typeof body.title !== "string" || typeof body.content !== "string" ||
+                body.slug.length > 40 || body.title.length > 100 || body.content.length > 3900 ||
+                (body.enabled !== undefined && typeof body.enabled !== "boolean")) {
+              throw new RequestInputError("invalid_help_page", 400);
+            }
+            const page = await this.options.helpPages!.save(guildId, body.slug, body.title, body.content, body.enabled !== false);
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "help-page.saved", targetType: "help-page", targetId: page.slug
+            });
+            this.json(res, 200, { guildId, page });
+            return;
+          }
+
+          if (method === "DELETE" && helpPageItemMatch) {
+            const guildId = helpPageItemMatch[1] ?? "";
+            const slug = decodeURIComponent(helpPageItemMatch[2] ?? "");
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const deleted = await this.options.helpPages!.delete(guildId, slug);
+            if (!deleted) {
+              this.json(res, 404, { error: "help_page_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "help-page.deleted", targetType: "help-page", targetId: slug.toLowerCase()
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
           const automationMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation$/);
           const automationDryRunMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/dry-run$/);
           const automationDiagnosticsMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/diagnostics$/);
