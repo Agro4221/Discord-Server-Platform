@@ -138,6 +138,12 @@ type ApiOptions = {
     setFormFields: (guildId: string, fields: TicketFormField[]) => Promise<TicketFormField[]>;
     getCustomization: (guildId: string) => Promise<TicketCustomization>;
     setCustomization: (guildId: string, customization: Partial<TicketCustomization>) => Promise<TicketCustomization>;
+    listTickets: (guildId: string, status?: "open" | "closed" | "closing") => Promise<unknown[]>;
+    updateTicketMetadata: (
+      guildId: string,
+      ticketId: number,
+      input: { priority?: "low" | "normal" | "high" | "urgent"; tags?: string[] }
+    ) => Promise<boolean>;
   };
   moderation?: Moderation & {
     listCleanupRules?: (guildId: string) => Promise<unknown[]>;
@@ -1802,6 +1808,67 @@ export class ManagementApiServer {
               userId,
               cases: await this.options.moderation.history(guildId, userId, 50)
             });
+            return;
+          }
+
+          const ticketsQueueMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets$/);
+          const ticketsQueueItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/(\d+)$/);
+
+          if ((ticketsQueueMatch || ticketsQueueItemMatch) && !this.options.tickets) {
+            this.json(res, 500, { error: "tickets_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && ticketsQueueMatch) {
+            const guildId = ticketsQueueMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const requested = url.searchParams.get("status");
+            const status = requested === "open" || requested === "closed" || requested === "closing" ? requested : undefined;
+            this.json(res, 200, { guildId, tickets: await this.options.tickets!.listTickets(guildId, status) });
+            return;
+          }
+
+          if (method === "PUT" && ticketsQueueItemMatch) {
+            const guildId = ticketsQueueItemMatch[1] ?? "";
+            const ticketId = Number(ticketsQueueItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(ticketId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_ticket_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const input: { priority?: "low" | "normal" | "high" | "urgent"; tags?: string[] } = {};
+            if (body.priority !== undefined) {
+              if (typeof body.priority !== "string" || !["low","normal","high","urgent"].includes(body.priority)) {
+                throw new RequestInputError("invalid_ticket_priority",400);
+              }
+              input.priority = body.priority as "low" | "normal" | "high" | "urgent";
+            }
+            if (body.tags !== undefined) {
+              if (!Array.isArray(body.tags) || body.tags.length > 10 || body.tags.some((tag: unknown) => typeof tag !== "string" || !tag.trim() || tag.length > 40)) {
+                throw new RequestInputError("invalid_ticket_tags",400);
+              }
+              input.tags = [...new Set(body.tags.map((tag: string) => tag.trim().slice(0,40)))];
+            }
+            if (input.priority === undefined && input.tags === undefined) {
+              throw new RequestInputError("ticket_metadata_empty",400);
+            }
+            const updated = await this.options.tickets!.updateTicketMetadata(guildId,ticketId,input);
+            if (!updated) {
+              this.json(res,404,{error:"ticket_not_found"});
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source:"dashboard",
+              action:"ticket.metadata.updated",
+              targetType:"ticket",
+              targetId:String(ticketId),
+              metadata:input
+            });
+            this.json(res,200,{ok:true});
             return;
           }
 
