@@ -82,7 +82,8 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "goodbyeImageUrl", label: "Goodbye image URL", type: "text", maxLength: 2048, description: "Только HTTPS. Используется как большая картинка goodbye embed." },
       { key: "starterRoleIds", label: "Стартовые роли", type: "textarea", description: "ID ролей через пробел." },
       { key: "restoreRoles", label: "Восстанавливать роли вернувшимся", type: "boolean" }
-    ]
+    ],
+    actions: [{ id: "preview", label: "Отправить Welcome preview", kind: "safe" }]
   },
   {
     key: "security",
