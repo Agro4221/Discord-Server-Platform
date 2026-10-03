@@ -1203,7 +1203,24 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_ticket_sla_open_activity ON tickets(guild_id,status,last_activity_at,created_at) WHERE status='open';"
     ])
   }
-  } ] as const;
+  {
+    version: 77,
+    name: "help_pages",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS help_pages (",
+      "  guild_id text NOT NULL,",
+      "  slug text NOT NULL,",
+      "  title text NOT NULL,",
+      "  content text NOT NULL,",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,slug)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_help_pages_guild_updated ON help_pages(guild_id,updated_at DESC);"
+    ])
+  },
+] as const;
 
 export async function migrate(db: Database): Promise<void> {
   await db.query(q([
