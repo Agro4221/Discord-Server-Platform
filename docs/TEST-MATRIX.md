@@ -173,6 +173,12 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Dry-run remains intentionally side-effect-free; live execution is covered by existing runtime pathways and remains part of release-gate validation.
 
 
+## 2026-10-04 — Automation workflow preset gate
+- Migration 70 must create the preset table/index.
+- Unit/API contract: preset names and workflow definitions use the same validation limits as Automation rules.
+- Integration: Config Export/Import round-trip preserves a workflow preset.
+- Dashboard: save/load/delete behavior remains a browser release-gate check.
+
 ## 2026-10-04 — Automation retry/dead-letter gate
 - Migration 69 must create durable dead-letter state and retry-state indexing.
 - Unit: bounded exponential backoff and dead-letter threshold; diagnostics status mapping includes dead-lettered jobs.
