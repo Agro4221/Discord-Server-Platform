@@ -10,6 +10,7 @@ import type { AppConfig } from "../config.js";
 import type { Database } from "../database.js";
 import { logger } from "../logger.js";
 import { buildCommands, handleCommand } from "./commands.js";
+import { buildContextCommands } from "../context-commands.js";
 import { TemporaryVoice } from "../modules/temporary-voice.js";
 import { Moderation } from "../modules/moderation.js";
 import type { PlatformEventBus } from "../events.js";
@@ -33,9 +34,12 @@ export async function registerCommands(
   _client: Client
 ): Promise<void> {
   const rest = new REST({ version: "10" }).setToken(config.discordToken);
-  const commands = buildCommands()
-    .filter((command) => config.botIdentityId === "primary" || command.name === "music")
-    .map((command) => command.toJSON());
+  const slashCommands = buildCommands()
+    .filter((command) => config.botIdentityId === "primary" || command.name === "music");
+  const contextCommands = config.botIdentityId === "primary"
+    ? buildContextCommands()
+    : [];
+  const commands = [...slashCommands, ...contextCommands].map((command) => command.toJSON());
 
   if (config.discordTestGuildId) {
     await rest.put(
