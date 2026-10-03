@@ -25,12 +25,16 @@ export class TemporaryVoice implements PlatformModule {
   private readonly creationInFlight = new Set<string>();
   private ready = false;
   private unsubscribeFromVoice?: () => void;
+  private unsubscribeFromCommand?: () => void;
 
   constructor(private readonly db: Database, private readonly getGuilds: () => Iterable<Guild>) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.unsubscribeFromVoice = context.events.on("voice.state", ({ oldState, newState }) => {
       return this.handleVoiceState(oldState, newState);
+    });
+    this.unsubscribeFromCommand = context.events.on("interaction.command", (interaction) => {
+      return this.executeSlashCommand(interaction);
     });
     const result = await this.db.query<{
       guild_id: string;
@@ -50,6 +54,8 @@ export class TemporaryVoice implements PlatformModule {
     this.creationInFlight.clear();
     this.unsubscribeFromVoice?.();
     this.unsubscribeFromVoice = undefined;
+    this.unsubscribeFromCommand?.();
+    this.unsubscribeFromCommand = undefined;
   }
 
   markReady(): void {
