@@ -35,6 +35,7 @@ import { ConfigTransferService } from "./config-transfer.js";
 import { BackupService } from "./backup.js";
 import { CustomCommandService } from "./custom-commands.js";
 import { CommandPolicyService } from "./command-policy.js";
+import { Utility } from "./modules/utility.js";
 
 let fatalCleanup: (() => Promise<void>) | undefined;
 
@@ -95,6 +96,7 @@ async function main(): Promise<void> {
   const giveaways = new Giveaways(database);
   const economy = new Economy(database);
   const reminders = new Reminders(database);
+  const utility = new Utility(database);
   const starboard = new Starboard(database);
   const automation = new AutomationEngine(database);
   const security = new Security(database);
@@ -163,6 +165,7 @@ async function main(): Promise<void> {
   modules.register(giveaways);
   modules.register(economy);
   modules.register(reminders);
+  modules.register(utility);
   modules.register(starboard);
   modules.register(automation);
   modules.register(security);
@@ -324,6 +327,7 @@ async function main(): Promise<void> {
     commandPolicy,
     economy,
     reminders,
+    utility,
     tickets,
     rolePanels,
     giveaways
