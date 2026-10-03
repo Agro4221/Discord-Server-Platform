@@ -535,6 +535,11 @@ export class AutomationEngine implements PlatformModule {
 
     for (const action of actions) {
       try {
+        if (action.type === "delay") {
+          await new Promise((resolve) => setTimeout(resolve, action.seconds * 1000));
+          continue;
+        }
+
         if (action.type === "log") {
           await this.db.query(
             "INSERT INTO audit_events(guild_id,source,action,target_type,target_id,metadata) VALUES($1,'system','automation.log','automation',NULL,$2::jsonb)",
@@ -670,6 +675,9 @@ export function validateAutomationRule(
         break;
       case "log":
         if (!action.message || action.message.length > 1000) throw new Error("invalid_log_action");
+        break;
+      case "delay":
+        if (!Number.isInteger(action.seconds) || action.seconds < 1 || action.seconds > 3600) throw new Error("invalid_delay_action");
         break;
     }
   }
