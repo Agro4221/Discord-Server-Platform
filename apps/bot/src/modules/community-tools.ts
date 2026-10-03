@@ -179,6 +179,54 @@ export class CommunityTools implements PlatformModule {
     };
   }
 
+  async dashboardCreatePoll(
+    guildId: string,
+    channelId: string,
+    question: string,
+    options: string[],
+    durationMinutes: number
+  ): Promise<{ id: number; channelId: string }> {
+    if (!await moduleEnabled(this.db, guildId, "community-tools", false)) {
+      throw new Error("community_tools_disabled");
+    }
+    if (!/^\d{15,25}$/.test(channelId)) throw new Error("invalid_channel");
+
+    const guild = this.client?.guilds.cache.get(guildId);
+    if (!guild) throw new Error("guild_not_found");
+    const channel = guild.channels.cache.get(channelId);
+    if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) {
+      throw new Error("text_channel_required");
+    }
+
+    const me = guild.members.me;
+    const permissions = channel.permissionsFor(me ?? guild.roles.everyone);
+    if (!me || !permissions?.has(PermissionFlagsBits.ViewChannel) || !permissions.has(PermissionFlagsBits.SendMessages)) {
+      throw new Error("bot_missing_send_messages");
+    }
+    if (!permissions.has(PermissionFlagsBits.EmbedLinks)) {
+      throw new Error("bot_missing_embed_links");
+    }
+
+    const poll = await this.createPoll(guildId, channelId, question, options, durationMinutes);
+
+    try {
+      const message = await channel.send({
+        embeds: [this.buildPollEmbed(poll, new Map())],
+        components: [this.buildPollButtons(poll)]
+      });
+
+      await this.db.query("UPDATE polls SET message_id=$2 WHERE id=$1", [poll.id, message.id]);
+      await this.refreshPollMessage(poll.id, poll);
+      return { id: poll.id, channelId };
+    } catch (error) {
+      await this.db.query("DELETE FROM polls WHERE id=$1", [poll.id]);
+      const timer = this.pollTimers.get(poll.id);
+      if (timer) clearTimeout(timer);
+      this.pollTimers.delete(poll.id);
+      throw error;
+    }
+  }
+
   async dashboardClosePoll(guildId: string, pollId: number): Promise<boolean> {
     if (!Number.isSafeInteger(pollId) || pollId < 1) throw new Error("invalid_poll");
     const poll = await this.getPoll(pollId);
