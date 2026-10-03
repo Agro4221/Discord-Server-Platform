@@ -21,6 +21,7 @@ export type PlatformEventMap = {
   "message.delete": Message;
   "message.update": { oldMessage: Message; newMessage: Message };
   "reaction.add": { reaction: MessageReaction; user: User };
+  "reaction.remove": { reaction: MessageReaction; user: User };
   "member.add": GuildMember;
   "member.remove": GuildMember;
   "member.update": { oldMember: GuildMember; newMember: GuildMember };
@@ -117,7 +118,7 @@ function extractGuildId<K extends keyof PlatformEventMap>(
   if (event === "message.update") {
     return (payload as { newMessage: Message }).newMessage.guildId;
   }
-  if (event === "reaction.add") {
+  if (event === "reaction.add" || event === "reaction.remove") {
     return (payload as { reaction: MessageReaction }).reaction.message.guildId;
   }
   if (event === "member.add" || event === "member.remove" || event === "member.update") {
