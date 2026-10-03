@@ -29,7 +29,7 @@ const CONFIG_TABLES: ExportTable[] = [
     "destructive_window_seconds","quarantine_role_id","log_channel_id",
     "raid_quarantine_enabled","destructive_role_removal","destructive_quarantine_enabled"
   ] },
-  { table: "verification_settings", fields: ["enabled","channel_id","verified_role_id","quarantine_role_id","log_channel_id","code_ttl_minutes"] },
+  { table: "verification_settings", fields: ["enabled","channel_id","verified_role_id","quarantine_role_id","log_channel_id","code_ttl_minutes","panel_title","panel_description","issue_button_label","confirm_button_label"] },
   { table: "leveling_settings", fields: ["enabled","xp_per_message","cooldown_seconds","announce_level_up"] },
   { table: "starboard_settings", fields: ["channel_id","threshold","ignore_self_reaction","ignore_bots"] },
   { table: "music_settings", fields: ["enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven","queue_access"] },
