@@ -96,3 +96,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Added slash-command shape coverage for /moderate unban.
 - Added service-level regression coverage for the Discord unban action and moderation-case persistence.
 - Live banned-user/unban behavior remains part of the Discord smoke test.
+### 2026-10-03 — AFK/away snapshot
+- Added deterministic coverage for AFK reason normalization, clear keywords and Discord relative-time notice formatting.
+- AFK persistence, mention notifications and automatic return clearing are wired through the Reminders module.
+- Live Discord behavior (message-volume interaction, permission/resource edge cases and restart persistence against a live PostgreSQL instance) remains part of the release-gate suite.
