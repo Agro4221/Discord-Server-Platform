@@ -53,7 +53,7 @@ test("all Discord application command option lists keep required options before 
   );
 
   assert.deepEqual(
-    commands.find((command) => command.name === "automation")?.options?.[0]?.options?.map((option) => ({
+    commands.find((command) => command.name === "automation")?.options?.find((option) => option.name === "create")?.options?.map((option) => ({
       name: option.name,
       required: option.required
     })),
