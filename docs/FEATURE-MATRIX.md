@@ -298,9 +298,26 @@ Music должен стремиться к функциональности си
 
 ## All-in-one / Premium parity
 
+Модель parity должна учитывать различия между ботами: отдельные проекты могут быть лучшими в конкретном узком модуле. Поэтому сравниваем не только наличие функции, но и глубину настройки, лимиты, permission model, UX, persistence, integrations и automation hooks.
+
 Цель проекта — **не музыкальный бот с несколькими дополнительными модулями**, а самостоятельная self-hosted all-in-one Discord platform. Music — один из крупных модулей наряду с Moderation, AutoMod/Security, Community, Tickets/Forms, Roles, Automation, Notifications, Analytics и Administration.
 
 Поведенческие ориентиры берём у распространённых многофункциональных ботов. В актуальных материалах Dyno и Carl-bot среди таких возможностей фигурируют AutoMod, action/logging, autoroles, custom commands/autoresponders, automessages/autopurge, forms, tickets, embeds, reaction roles, feeds/notifications, leveling и другие server-management функции; часть из них у коммерческих ботов ограничена Premium-подпиской. citeturn795228search0turn795228search2turn795228search12
+
+### Competitor benchmark set
+
+Не привязываемся к одному боту. Для product parity используем **несколько независимых эталонов** и объединяем полезные возможности:
+
+| Эталон | Основные области, которые изучаем |
+|---|---|
+| **MEE6** | Automations, Moderator, Custom Commands, Welcome/Goodbye, Levels, Economy, Giveaways, Polls, Invite Tracker, Reaction Roles, Bot Personalizer, Social Alerts, AI, Bot Maker |
+| **JuniperBot** | Auto-Moderation, custom commands, message-template engine, subscriptions, ranking/XP, welcome/role restore, audit/logging, forms/components |
+| **ProBot** | Moderation/logging, AutoMod, anti-raid/protection, variables, autoroles/self-roles, starboard, server statistics, Twitch/YouTube notifications, custom bot controls |
+| **Dyno** | AutoMod, custom commands, autoresponders, automessages, autodelete, forms, tickets, giveaways, reaction roles, message embedder, feeds, AFK and configurable module limits |
+| **Jockie Music** | Multi-bot voice scaling, deep queue/collection management, permissions/session ownership, Spotify/Apple Music sources, large playlists/collections, 24/7 |
+| **Другие специализированные боты** | Берём сильные узкие функции там, где all-in-one боты обычно слабее: music, tickets, moderation, statistics, social alerts, games/engagement |
+
+Таким образом, **Premium parity означает совокупность сильных возможностей экосистемы**, а не копирование Premium-функций Carl-bot или любого другого одного проекта. Источники для текущего benchmark: официальные материалы MEE6, JuniperBot, ProBot, Dyno и Jockie Music. citeturn368099search1turn368099search17turn510043search2turn410738search3turn410738search0turn410738search2turn410738search7
 
 ### Master backlog — не только Music
 
