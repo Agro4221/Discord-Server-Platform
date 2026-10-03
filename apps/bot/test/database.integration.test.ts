@@ -292,7 +292,7 @@ test("config transfer preserves analytics settings", { skip: !enabled }, async (
     assert.equal(analytics?.settings.retention_days, 90);
     assert.deepEqual(analytics?.settings.visible_counters, ["message","voice_move"]);
 
-    await db.query("UPDATE analytics_settings SET retention_days=7,visible_counters='["message"]'::jsonb WHERE guild_id=$1", [guildId]);
+    await db.query("UPDATE analytics_settings SET retention_days=7,visible_counters='[\"message\"]'::jsonb WHERE guild_id=$1", [guildId]);
     await transfer.importGuild(guildId, exported);
 
     const restored = await db.query<{ retention_days: number; visible_counters: string[] }>(
