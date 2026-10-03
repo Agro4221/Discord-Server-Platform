@@ -128,6 +128,22 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
     ]
   },
   {
+    key: "logging",
+    title: "Logging",
+    fields: [
+      { key: "channelId", label: "Канал логов", type: "channel" },
+      { key: "messageDelete", label: "Удаление сообщений", type: "boolean" },
+      { key: "messageEdit", label: "Изменение сообщений", type: "boolean" },
+      { key: "memberJoin", label: "Вход участников", type: "boolean" },
+      { key: "memberLeave", label: "Выход участников", type: "boolean" },
+      { key: "memberUpdate", label: "Изменение участников", type: "boolean" },
+      { key: "voice", label: "Voice activity", type: "boolean" },
+      { key: "channelDelete", label: "Удаление каналов", type: "boolean" },
+      { key: "roleDelete", label: "Удаление ролей", type: "boolean" },
+      { key: "bans", label: "Ban / Unban", type: "boolean" }
+    ]
+  },
+  {
     key: "music",
     title: "Music / Lavalink",
     fields: [
@@ -238,6 +254,21 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       threshold: "threshold",
       ignoreSelfReaction: "ignore_self_reaction",
       ignoreBots: "ignore_bots"
+    }
+  },
+  logging: {
+    table: "logging_settings",
+    columns: {
+      channelId: "channel_id",
+      messageDelete: "message_delete",
+      messageEdit: "message_edit",
+      memberJoin: "member_join",
+      memberLeave: "member_leave",
+      memberUpdate: "member_update",
+      voice: "voice",
+      channelDelete: "channel_delete",
+      roleDelete: "role_delete",
+      bans: "bans"
     }
   },
   music: {

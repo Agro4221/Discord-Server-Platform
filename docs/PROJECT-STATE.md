@@ -185,3 +185,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Core now includes a Community Tools module for polls, suggestions, sticky messages and small fun commands.
 - Poll/suggestion state is persisted in PostgreSQL; poll timers are reconstructed at startup.
 - Community Tools is enabled by default in the catalog and can be disabled per guild like other modules.
+
+## 2026-10-03 — Discord event logging
+- Added the Logging module with persistent per-guild settings.
+- Passive Discord events can now be routed to a dedicated log channel while remaining available in durable audit history.

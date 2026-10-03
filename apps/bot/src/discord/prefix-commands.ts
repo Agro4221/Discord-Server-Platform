@@ -12,6 +12,7 @@ import type { RolePanels } from "../modules/role-panels.js";
 import type { Giveaways } from "../modules/giveaways.js";
 import type { Utility } from "../modules/utility.js";
 import type { CommunityTools } from "../modules/community-tools.js";
+import type { Logging } from "../modules/logging.js";
 
 const BUILTIN_PREFIX_COMMANDS = new Set([
   "help",
@@ -21,7 +22,7 @@ const BUILTIN_PREFIX_COMMANDS = new Set([
   "playlist", "queue", "nowplaying", "repeat", "seek", "volume", "autoplay",
   "balance", "daily", "leaderboard", "pay", "shop", "buy", "remind", "ticket", "roles", "giveaway",
   "serverinfo", "userinfo", "avatar", "membercount", "roleinfo", "channelinfo", "afk",
-  "poll", "suggest", "sticky", "8ball", "choose", "roll"
+  "poll", "suggest", "sticky", "8ball", "choose", "roll", "logging"
 ]);
 
 export class PrefixCommandRouter {
@@ -38,6 +39,7 @@ export class PrefixCommandRouter {
     private readonly reminders: Reminders,
     private readonly utility: Utility,
     private readonly communityTools: CommunityTools,
+    private readonly logging: Logging,
     private readonly tickets: Tickets,
     private readonly rolePanels: RolePanels,
     private readonly giveaways: Giveaways
@@ -91,6 +93,7 @@ export class PrefixCommandRouter {
         if (await this.reminders.handlePrefixCommand(message, commandName, args)) return;
         if (await this.utility.handlePrefixCommand(message, commandName, args)) return;
         if (await this.communityTools.handlePrefixCommand(message, commandName, args)) return;
+        if (await this.logging.handlePrefixCommand(message, commandName, args)) return;
         if (await this.tickets.handlePrefixCommand(message, commandName)) return;
         if (await this.rolePanels.handlePrefixCommand(message, commandName, args)) return;
         if (await this.giveaways.handlePrefixCommand(message, commandName, args)) return;

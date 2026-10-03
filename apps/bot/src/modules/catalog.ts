@@ -18,7 +18,8 @@ export type ModuleKey =
   | "music"
   | "analytics"
   | "utility"
-  | "community-tools";
+  | "community-tools"
+  | "logging";
 
 export const MODULE_CATALOG: readonly {
   key: ModuleKey;
@@ -41,6 +42,7 @@ export const MODULE_CATALOG: readonly {
   { key: "reminders", title: "Reminders", description: "Scheduled personal reminders", defaultEnabled: false },
   { key: "utility", title: "Utility", description: "Server and member information plus AFK", defaultEnabled: true },
   { key: "community-tools", title: "Community Tools", description: "Polls, suggestions, sticky messages and fun commands", defaultEnabled: true },
+  { key: "logging", title: "Logging", description: "Discord event logging to a dedicated channel", defaultEnabled: false },
   { key: "notifications", title: "Notifications", description: "External feed notifications", defaultEnabled: false },
   { key: "stream-alerts", title: "Stream Alerts", description: "Twitch, YouTube and VK Video Live start notifications", defaultEnabled: false },
   { key: "automation", title: "Automation", description: "Event / condition / action workflows", defaultEnabled: false },

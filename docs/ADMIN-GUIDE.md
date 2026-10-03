@@ -342,3 +342,8 @@ Dashboard является основным способом редактиро�
 - Suggestions: /suggest text or prefix equivalent; moderators can approve or deny from the buttons.
 - Sticky: /sticky set text /sticky clear; slash command also allows selecting a text channel.
 - Fun: /8ball, /choose, /roll and corresponding prefix commands.
+
+### Logging
+- Configure with `/logging setup channel enabled` or `!logging setup #канал`.
+- Dashboard exposes per-event switches for messages, members, voice, deleted channels/roles and bans.
+- Events are retained in the durable audit store as well as sent to the configured Discord log channel.

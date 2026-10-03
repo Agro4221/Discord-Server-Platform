@@ -303,6 +303,22 @@ const MODULE_META: Record<string, ModuleMeta> = {
     ],
     kind: "discord"
   },
+  logging: {
+    icon: "▤",
+    accent: "#d3a4f0",
+    title: "Logging",
+    summary: "Discord event logging в отдельный канал с выбором категорий.",
+    category: "system",
+    commands: ["/logging setup", "!logging setup"],
+    functions: [
+      { title: "Message logs", description: "Удаление и редактирование сообщений." },
+      { title: "Member logs", description: "Вход, выход и изменения участников." },
+      { title: "Voice logs", description: "Входы, выходы и перемещения в voice." },
+      { title: "Server structure", description: "Удаление каналов и ролей." },
+      { title: "Ban / Unban", description: "События блокировки и снятия блокировки." }
+    ],
+    kind: "settings"
+  },
   "community-tools": {
     icon: "✦",
     accent: "#e6a86b",

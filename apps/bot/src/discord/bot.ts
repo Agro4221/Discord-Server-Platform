@@ -121,6 +121,13 @@ export function wireDiscordEvents(
       userId: ban.user.id
     });
   });
+
+  client.on("guildBanRemove", (ban) => {
+    void events.emit("member.unban", {
+      guildId: ban.guild.id,
+      userId: ban.user.id
+    });
+  });
 }
 
 async function emitReaction(

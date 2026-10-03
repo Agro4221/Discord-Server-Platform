@@ -113,6 +113,17 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .addStringOption((o) => o.setName("dice").setDescription("Notation such as 2d6 or 1d20").setMaxLength(20)),
 
     new SlashCommandBuilder()
+      .setName("logging")
+      .setDescription("Configure Discord event logging")
+      .addSubcommand((sub) =>
+        sub
+          .setName("setup")
+          .setDescription("Configure the log channel")
+          .addChannelOption((o) => o.setName("channel").setDescription("Log channel").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+          .addBooleanOption((o) => o.setName("enabled").setDescription("Enable event logging"))
+      ),
+
+    new SlashCommandBuilder()
       .setName("level")
       .setDescription("Show your leveling rank")
       .addUserOption((o) => o.setName("user").setDescription("Optional user")),

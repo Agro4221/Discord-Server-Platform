@@ -224,3 +224,9 @@ Never write credentials, tokens or private user data here.
 - Suggestions support moderator approval/rejection buttons and durable status history.
 - Sticky messages persist across restart and are re-posted after new user messages in the configured channel.
 - Added migration 41, command-policy entries, prefix routing, Control Center metadata and regression coverage.
+
+## 2026-10-03 — Discord event logging
+- Added a dedicated Logging module for configurable passive Discord event logging.
+- Events covered: message delete/edit, member join/leave/update, voice joins/leaves/moves, channel deletion, role deletion and ban/unban.
+- Logging is persisted through the existing audit event store and delivered to a configured dedicated Discord channel.
+- Added migration 42, slash/prefix setup, Dashboard settings and Control Center metadata.

@@ -34,6 +34,7 @@ export type PlatformEventMap = {
   "channel.delete": import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel;
   "role.delete": import("discord.js").Role;
   "member.ban": { guildId: string; userId: string };
+  "member.unban": { guildId: string; userId: string };
 };
 
 type Listener<K extends keyof PlatformEventMap> = (
@@ -136,7 +137,7 @@ function extractGuildId<K extends keyof PlatformEventMap>(
   if (event === "role.delete") {
     return (payload as import("discord.js").Role).guild.id;
   }
-  if (event === "member.ban") {
+  if (event === "member.ban" || event === "member.unban") {
     return (payload as { guildId: string }).guildId;
   }
   return null;

@@ -718,6 +718,28 @@ const migrations = [
       "  PRIMARY KEY(guild_id,channel_id)",
       ");"
     ])
+  },
+  {
+    version: 42,
+    name: "discord_event_logging",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS logging_settings (",
+      "  guild_id text PRIMARY KEY,",
+      "  enabled boolean NOT NULL DEFAULT false,",
+      "  channel_id text,",
+      "  message_delete boolean NOT NULL DEFAULT true,",
+      "  message_edit boolean NOT NULL DEFAULT true,",
+      "  member_join boolean NOT NULL DEFAULT true,",
+      "  member_leave boolean NOT NULL DEFAULT true,",
+      "  member_update boolean NOT NULL DEFAULT true,",
+      "  voice boolean NOT NULL DEFAULT true,",
+      "  channel_delete boolean NOT NULL DEFAULT true,",
+      "  role_delete boolean NOT NULL DEFAULT true,",
+      "  bans boolean NOT NULL DEFAULT true,",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_logging_settings_enabled ON logging_settings(enabled,guild_id);"
+    ])
   }
 ] as const;
 
