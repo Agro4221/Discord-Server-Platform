@@ -38,7 +38,7 @@ test("Security executor audit lookback honors configured destructive window", ()
 
 
 test("Security response policy defaults preserve quarantine and role removal", () => {
-  assert.equal(securityResponsePolicy({}), {
+  assert.deepEqual(securityResponsePolicy({}), {
     raidQuarantineEnabled: true,
     destructiveRoleRemoval: true,
     destructiveQuarantineEnabled: true
