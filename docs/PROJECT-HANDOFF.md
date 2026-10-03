@@ -96,6 +96,7 @@ Premium parity = **совокупность сильных функций раз
 - server counters/statistics;
 - embed builder;
 - sticky/scheduled messages.
+- AFK / away status with persistent state, automatic return clearing and mention notices.
 
 ### Tickets
 - ticket panels;
@@ -196,7 +197,6 @@ Premium parity = **совокупность сильных функций раз
 - interactive buttons/selects/modals toolkit;
 - custom help/menu pages;
 - server/user/role/channel utility commands;
-- AFK/away.
 
 ### Roles / Onboarding
 - richer self-service role menus;
