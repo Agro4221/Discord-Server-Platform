@@ -16,7 +16,7 @@
 | Audit log | ✅ |
 | Dashboard | ✅ |
 | Backups / import / export | ✅ |
-| Multi-bot identities | 🟡 |
+| Multi-bot identities | ✅ | Fleet identities, guild assignment, Music voice assignment, heartbeats and Dashboard controls |
 | Native Windows runtime | ✅ |
 | Docker / VPS | 🟡 |
 | RU / EN localization | 🟡 |
@@ -77,7 +77,7 @@
 | Polls / suggestions | ✅ | Polls + Suggestions implemented
 | Birthdays / achievements | ✅ |
 | Invite tracking | ✅ |
-| Server statistics / counters | 🟡 | Live `/stats`; persistent counters remain
+| Server statistics / counters | ✅ | Live `/stats` + persistent message/member/voice counters |
 | Embed builder | ✅ | `/embed` с title, description, URL, color, footer, image и thumbnail |
 | Sticky messages / scheduled messages | ✅ | `/schedule` + persistent `/sticky` messages with automatic refresh |
 
