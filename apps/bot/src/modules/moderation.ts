@@ -92,9 +92,10 @@ export class Moderation implements PlatformModule {
       action: ModerationAction;
       reason: string | null;
       expires_at: Date | null;
+      resolved_at: Date | null;
       created_at: Date;
     }>(
-      `SELECT id,guild_id,target_user_id,moderator_user_id,action,reason,expires_at,created_at
+      `SELECT id,guild_id,target_user_id,moderator_user_id,action,reason,expires_at,resolved_at,created_at
        FROM moderation_cases
        WHERE guild_id=$1 AND target_user_id=$2
        ORDER BY created_at DESC
