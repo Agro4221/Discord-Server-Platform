@@ -445,7 +445,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "security", "temporary-voice", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "starboard", "community-tools", "verification", "welcome"]);
+const PANEL_KEYS = new Set(["moderation", "automod", "security", "temporary-voice", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "starboard", "community-tools", "verification", "welcome"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
