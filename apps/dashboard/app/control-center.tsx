@@ -313,14 +313,28 @@ const MODULE_META: Record<string, ModuleMeta> = {
     icon: "◬",
     accent: "#74c8dc",
     title: "Уведомления",
-    summary: "RSS/Atom feeds и live stream alerts.",
+    summary: "RSS/Atom feeds с безопасной сетевой проверкой.",
     category: "integrations",
-    commands: ["/feed add", "/feed github", "/streamalert create"],
+    commands: ["/feed add", "/feed github"],
     functions: [
       { title: "RSS / Atom", description: "Периодический polling внешнего HTTPS feed." },
-      { title: "Stream alerts", description: "Twitch, YouTube, VK Видео Live и Kick с шаблонами и persistent состоянием." },
       { title: "SSRF protection", description: "Блокировка private, mapped и loopback адресов для внешних feed URL." },
       { title: "Cursor safety", description: "Курсор обновляется только после успешной доставки feed-сообщения." }
+    ],
+    kind: "full"
+  },
+  stream-alerts: {
+    icon: "◉",
+    accent: "#ef7272",
+    title: "Stream Alerts",
+    summary: "Уведомления о начале прямых эфиров.",
+    category: "integrations",
+    commands: ["/streamalert create"],
+    functions: [
+      { title: "Platforms", description: "Twitch, YouTube, VK Видео Live и Kick." },
+      { title: "Templates", description: "Шаблоны сообщения с mention, названием эфира, автором и URL." },
+      { title: "Persistent state", description: "Состояние подписок и последний обнаруженный эфир хранятся в PostgreSQL." },
+      { title: "Provider status", description: "Dashboard показывает, какие API credentials настроены." }
     ],
     kind: "full"
   },
@@ -390,7 +404,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "embed", "roles", "giveaways", "analytics", "automation", "notifications"]);
+const PANEL_KEYS = new Set(["moderation", "embed", "roles", "giveaways", "analytics", "automation", "notifications", "stream-alerts"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1474,7 +1488,7 @@ function ModulePage(props: {
         </section>
       )}
 
-      {props.module?.key === "notifications" && (
+      {props.module?.key === "stream-alerts" && (
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Stream alerts" eyebrow="LIVE INTEGRATIONS" />
           <StreamAlertsPanel
