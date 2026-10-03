@@ -16,6 +16,9 @@ export type NotificationFeedRecord = {
   intervalSeconds: number;
   lastItemKey: string | null;
   lastPolledAt: string | null;
+  messageTemplate: string;
+  includeKeywords: string[];
+  excludeKeywords: string[];
 };
 
 type Feed = {
@@ -25,6 +28,9 @@ type Feed = {
   url: string;
   intervalSeconds: number;
   lastItemKey: string | null;
+  messageTemplate: string;
+  includeKeywords: string[];
+  excludeKeywords: string[];
 };
 
 export class Notifications implements PlatformModule {
@@ -47,8 +53,11 @@ export class Notifications implements PlatformModule {
       interval_seconds: number;
       last_item_key: string | null;
       last_polled_at: string | null;
+      message_template: string;
+      include_keywords: string[];
+      exclude_keywords: string[];
     }>(
-      "SELECT id,guild_id,channel_id,url,enabled,interval_seconds,last_item_key,last_polled_at FROM notification_feeds WHERE guild_id=$1 ORDER BY id DESC",
+      "SELECT id,guild_id,channel_id,url,enabled,interval_seconds,last_item_key,last_polled_at,message_template,include_keywords,exclude_keywords FROM notification_feeds WHERE guild_id=$1 ORDER BY id DESC",
       [guildId]
     );
     return result.rows.map((row) => ({
@@ -59,16 +68,28 @@ export class Notifications implements PlatformModule {
       enabled: row.enabled,
       intervalSeconds: row.interval_seconds,
       lastItemKey: row.last_item_key,
-      lastPolledAt: row.last_polled_at
+      lastPolledAt: row.last_polled_at,
+      messageTemplate: row.message_template,
+      includeKeywords: Array.isArray(row.include_keywords) ? row.include_keywords : [],
+      excludeKeywords: Array.isArray(row.exclude_keywords) ? row.exclude_keywords : []
     }));
   }
 
-  async addFeed(guildId: string, channelId: string, url: string, intervalSeconds: number): Promise<NotificationFeedRecord> {
+  async addFeed(
+    guildId: string,
+    channelId: string,
+    url: string,
+    intervalSeconds: number,
+    options: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[] } = {}
+  ): Promise<NotificationFeedRecord> {
     await assertSafeFeedUrl(url);
     const safeInterval = Math.min(Math.max(Math.trunc(intervalSeconds), 60), 86_400);
+    const messageTemplate = normalizeFeedTemplate(options.messageTemplate);
+    const includeKeywords = normalizeKeywords(options.includeKeywords);
+    const excludeKeywords = normalizeKeywords(options.excludeKeywords);
     const result = await this.db.query<{ id: string }>(
-      "INSERT INTO notification_feeds(guild_id,channel_id,url,interval_seconds,enabled) VALUES($1,$2,$3,$4,true) RETURNING id",
-      [guildId, channelId, url, safeInterval]
+      "INSERT INTO notification_feeds(guild_id,channel_id,url,interval_seconds,enabled,message_template,include_keywords,exclude_keywords) VALUES($1,$2,$3,$4,true,$5,$6,$7) RETURNING id",
+      [guildId, channelId, url, safeInterval, messageTemplate, includeKeywords, excludeKeywords]
     );
     const id = result.rows[0]?.id;
     if (!id) throw new Error("feed_create_failed");
@@ -83,7 +104,15 @@ export class Notifications implements PlatformModule {
     return feed;
   }
 
-  async updateFeed(guildId: string, id: number, patch: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean }): Promise<boolean> {
+  async updateFeed(guildId: string, id: number, patch: {
+    channelId?: string;
+    url?: string;
+    intervalSeconds?: number;
+    enabled?: boolean;
+    messageTemplate?: string;
+    includeKeywords?: string[];
+    excludeKeywords?: string[];
+  }): Promise<boolean> {
     if (patch.url !== undefined) await assertSafeFeedUrl(patch.url);
     const current = (await this.listFeeds(guildId)).find((item) => item.id === id);
     if (!current) return false;
@@ -280,6 +309,18 @@ export class Notifications implements PlatformModule {
       return;
     }
 
+    const title = first.title.toLocaleLowerCase();
+    const matchesInclude = feed.includeKeywords.length === 0 ||
+      feed.includeKeywords.some((keyword) => title.includes(keyword.toLocaleLowerCase()));
+    const matchesExclude = feed.excludeKeywords.some((keyword) => title.includes(keyword.toLocaleLowerCase()));
+    if (!matchesInclude || matchesExclude) {
+      await this.db.query(
+        "UPDATE notification_feeds SET last_item_key=$1,last_polled_at=now(),processing_until=NULL WHERE id=$2",
+        [first.key, feed.id]
+      );
+      return;
+    }
+
     const channel = this.client?.channels.cache.get(feed.channelId);
     if (!channel?.isTextBased() || !("send" in channel)) {
       await this.markPolled(feed.id, "destination unavailable");
@@ -287,11 +328,8 @@ export class Notifications implements PlatformModule {
     }
 
     try {
-      await channel.send(
-        `📡 **Новая запись из feed**
-**${first.title.slice(0, 250)}**
-${first.url}`
-      );
+      const content = renderFeedTemplate(feed.messageTemplate, first);
+      await channel.send(content);
     } catch (error) {
       logger.warn("Feed message failed", { feedId: feed.id, error: String(error) });
       await this.markPolled(feed.id, "destination send failed");
@@ -310,6 +348,27 @@ ${first.url}`
       [id]
     );
   }
+}
+
+function normalizeFeedTemplate(value?: string): string {
+  const template = String(value ?? "📡 **Новая запись из feed**\n**{title}**\n{url}").trim().slice(0, 1800);
+  return template || "📡 **Новая запись из feed**\n**{title}**\n{url}";
+}
+
+function normalizeKeywords(values?: string[]): string[] {
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map((value) => String(value).trim().toLocaleLowerCase())
+    .filter(Boolean)
+    .slice(0, 20)
+    .map((value) => value.slice(0, 80)))];
+}
+
+function renderFeedTemplate(template: string, entry: { title: string; url: string }): string {
+  return template
+    .replaceAll("{title}", entry.title.slice(0, 250))
+    .replaceAll("{url}", entry.url.slice(0, 1800))
+    .replaceAll("{timestamp}", new Date().toISOString())
+    .slice(0, 2000);
 }
 
 function normalizeFeedEntries(document: Record<string, any>): { key: string; title: string; url: string }[] {
