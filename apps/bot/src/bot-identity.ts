@@ -183,38 +183,8 @@ export class BotIdentityRepository {
       [this.identityId, status, guildCount]
     );
   }
-}
 
-export function resolveIdentityEnv(identityId: string): { token: string; clientId: string } {
-  const prefix = identityId.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
-  const tokenEnv = "DISCORD_TOKEN_" + prefix;
-  const clientIdEnv = "DISCORD_CLIENT_ID_" + prefix;
-  const token = process.env[tokenEnv] ?? (identityId === "primary" ? process.env.DISCORD_TOKEN : undefined);
-  const clientId = process.env[clientIdEnv] ?? (identityId === "primary" ? process.env.DISCORD_CLIENT_ID : undefined);
-  if (!token || !clientId) {
-    throw new Error("Missing Discord credentials for identity " + identityId);
-  }
-  return { token, clientId };
-}
-
-export function clampFailoverBatchLimit(value: number): number {
-  if (!Number.isFinite(value)) return 20;
-  return Math.min(Math.max(Math.trunc(value), 1), 100);
-}
-
-export function identityLabel(client: Client): string {
-  return client.user?.tag ?? "unknown-bot";
-}
-
-
-function isUniqueConstraint(error: unknown, constraint: string): boolean {
-  if (!error || typeof error !== "object") return false;
-  const value = error as { code?: unknown; constraint?: unknown };
-  return value.code === "23505" && value.constraint === constraint;
-}
-
-
-  async setFailover(id: string, enabled: boolean): Promise<void> {
+async setFailover(id: string, enabled: boolean): Promise<void> {
     const result = await this.db.query(
       "UPDATE bot_identities SET failover_enabled=$2,updated_at=now() WHERE id=$1 AND enabled=true",
       [id, enabled]
@@ -254,3 +224,33 @@ function isUniqueConstraint(error: unknown, constraint: string): boolean {
       return result.rows.map((row) => row.guild_id);
     });
   }
+
+}
+
+export function resolveIdentityEnv(identityId: string): { token: string; clientId: string } {
+  const prefix = identityId.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+  const tokenEnv = "DISCORD_TOKEN_" + prefix;
+  const clientIdEnv = "DISCORD_CLIENT_ID_" + prefix;
+  const token = process.env[tokenEnv] ?? (identityId === "primary" ? process.env.DISCORD_TOKEN : undefined);
+  const clientId = process.env[clientIdEnv] ?? (identityId === "primary" ? process.env.DISCORD_CLIENT_ID : undefined);
+  if (!token || !clientId) {
+    throw new Error("Missing Discord credentials for identity " + identityId);
+  }
+  return { token, clientId };
+}
+
+export function clampFailoverBatchLimit(value: number): number {
+  if (!Number.isFinite(value)) return 20;
+  return Math.min(Math.max(Math.trunc(value), 1), 100);
+}
+
+export function identityLabel(client: Client): string {
+  return client.user?.tag ?? "unknown-bot";
+}
+
+
+function isUniqueConstraint(error: unknown, constraint: string): boolean {
+  if (!error || typeof error !== "object") return false;
+  const value = error as { code?: unknown; constraint?: unknown };
+  return value.code === "23505" && value.constraint === constraint;
+}
