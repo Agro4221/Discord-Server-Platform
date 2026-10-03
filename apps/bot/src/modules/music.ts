@@ -1210,6 +1210,23 @@ export class Music implements PlatformModule {
       await player.setRepeatMode(mode);
       await this.persistPlayer(player);
       response = `🔁 Repeat: **${mode}**`;
+    } else if (action === "seek-back" || action === "seek-forward") {
+      const track = player.queue.current;
+      if (!track) {
+        await interaction.reply({ content: "Сейчас ничего не играет.", ephemeral: true });
+        return;
+      }
+      const durationMs = Math.max(0, Number(track.info.duration ?? 0));
+      const basePosition = Math.max(0, Number(player.lastPosition ?? 0));
+      const elapsed = player.paused
+        ? 0
+        : Math.max(0, Date.now() - Number(player.lastPositionChange ?? Date.now()));
+      const currentPosition = basePosition + elapsed;
+      const deltaMs = action === "seek-back" ? -15_000 : 30_000;
+      const nextPosition = Math.max(0, Math.min(durationMs > 0 ? Math.max(0, durationMs - 1_000) : currentPosition + deltaMs, currentPosition + deltaMs));
+      await player.seek(nextPosition);
+      await this.persistPlayer(player);
+      response = (deltaMs < 0 ? "⏪ " : "⏩ ") + Math.floor(nextPosition / 1000) + " сек.";
     } else if (action === "volume-down" || action === "volume-up") {
       const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
       if (!await this.canManageMusicMember(interaction.guild.id, member)) {
@@ -1536,6 +1553,8 @@ export class Music implements PlatformModule {
         new ButtonBuilder().setCustomId("dsp:music:stop").setEmoji("⏹️").setLabel("Стоп").setStyle(ButtonStyle.Danger)
       ),
       new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("dsp:music:seek-back").setEmoji("⏪").setLabel("15с").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:seek-forward").setEmoji("⏩").setLabel("30с").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("dsp:music:volume-down").setEmoji("🔉").setLabel("-10").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("dsp:music:volume-up").setEmoji("🔊").setLabel("+10").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("dsp:music:queue").setEmoji("📋").setLabel("Очередь").setStyle(ButtonStyle.Secondary)
