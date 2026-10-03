@@ -309,6 +309,17 @@ export class AutoMod implements PlatformModule {
 
     const content = message.content;
     const mentions = message.mentions.users.size + message.mentions.roles.size;
+    const key = `${message.guild.id}:${message.author.id}`;
+    const now = Date.now();
+    const bucket = this.recent.get(key) ?? [];
+    const cutoff = now - config.repeatedWindowSeconds * 1000;
+    const recent = bucket
+      .filter((item) => item.timestamp >= cutoff)
+      .slice(-19);
+    recent.push({ content: content.toLocaleLowerCase(), timestamp: now });
+    this.recent.set(key, recent);
+    this.inspectedMessages += 1;
+    if (this.inspectedMessages % 100 === 0) this.pruneRecent(now);
 
     const configuredRules = await this.db.query<{
       detector: string;
@@ -352,19 +363,6 @@ export class AutoMod implements PlatformModule {
       });
       return;
     }
-    const key = `${message.guild.id}:${message.author.id}`;
-    const now = Date.now();
-    const bucket = this.recent.get(key) ?? [];
-    const cutoff = now - config.repeatedWindowSeconds * 1000;
-    const recent = bucket
-      .filter((item) => item.timestamp >= cutoff)
-      .slice(-19);
-
-    recent.push({ content: content.toLocaleLowerCase(), timestamp: now });
-    this.recent.set(key, recent);
-    this.inspectedMessages += 1;
-    if (this.inspectedMessages % 100 === 0) this.pruneRecent(now);
-
     const reason = detectAutoModViolation(
       content,
       mentions,
