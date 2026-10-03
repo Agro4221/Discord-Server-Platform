@@ -769,6 +769,24 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addIntegerOption((o) => o.setName("minutes").setDescription("Polling interval").setMinValue(1).setMaxValue(1440))
       ),
     new SlashCommandBuilder()
+      .setName("streamalert")
+      .setDescription("Stream live alerts")
+      .addSubcommand((sub) => sub
+        .setName("create")
+        .setDescription("Create a live notification")
+        .addStringOption((o) => o.setName("platform").setDescription("Platform").addChoices(
+          { name: "Twitch", value: "twitch" },
+          { name: "YouTube", value: "youtube" },
+          { name: "VK Live", value: "vk" },
+          { name: "Kick", value: "kick" }
+        ).setRequired(true))
+        .addStringOption((o) => o.setName("target").setDescription("Channel login, handle, slug or broadcaster ID").setMaxLength(200).setRequired(true))
+        .addChannelOption((o) => o.setName("channel").setDescription("Discord destination").addChannelTypes(ChannelType.GuildText).setRequired(true))
+        .addRoleOption((o) => o.setName("mention-role").setDescription("Optional role to mention"))
+        .addIntegerOption((o) => o.setName("interval").setDescription("Polling interval in seconds").setMinValue(15).setMaxValue(3600))
+      ),
+
+    new SlashCommandBuilder()
       .setName("music")
       .setDescription("Music player")
       .addSubcommand((sub) =>
