@@ -12,6 +12,7 @@ type Alert = {
   mentionRoleId: string | null;
   enabled: boolean;
   intervalSeconds: number;
+  messageTemplate: string;
   lastOnline: boolean;
   lastError: string | null;
 };
@@ -34,6 +35,7 @@ export function StreamAlertsPanel({
   const [channelId, setChannelId] = useState(channels[0]?.id ?? "");
   const [mentionRoleId, setMentionRoleId] = useState("");
   const [intervalSeconds, setIntervalSeconds] = useState(30);
+  const [messageTemplate, setMessageTemplate] = useState("{mention} 🔴 {platform}: **{title}** — {author} {url}");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -65,7 +67,8 @@ export function StreamAlertsPanel({
           target: target.trim(),
           channelId,
           mentionRoleId: mentionRoleId || null,
-          intervalSeconds
+          intervalSeconds,
+          messageTemplate
         })
       });
       const body = await response.json().catch(() => ({}));
@@ -80,7 +83,7 @@ export function StreamAlertsPanel({
     }
   }
 
-  async function patch(alert: Alert, patchData: Partial<Pick<Alert, "channelId" | "mentionRoleId" | "intervalSeconds" | "enabled">>) {
+  async function patch(alert: Alert, patchData: Partial<Pick<Alert, "channelId" | "mentionRoleId" | "intervalSeconds" | "enabled" | "messageTemplate">>) {
     setBusy(true);
     setError("");
     try {
@@ -143,6 +146,7 @@ export function StreamAlertsPanel({
           {roles.map((role) => <option key={role.id} value={role.id}>@{role.name}</option>)}
         </select>
         <input type="number" min={15} max={3600} value={intervalSeconds} onChange={(event) => setIntervalSeconds(Number(event.target.value))} style={inputStyle} />
+        <input value={messageTemplate} onChange={(event) => setMessageTemplate(event.target.value)} placeholder="{mention} {platform} {title} {author} {url}" style={inputStyle} />
         <button type="button" disabled={busy || !providers[platform]} onClick={() => void create()} style={button("primary")}>
           {providers[platform] ? "Добавить" : "Провайдер не настроен"}
         </button>
@@ -163,6 +167,7 @@ export function StreamAlertsPanel({
             {roles.map((role) => <option key={role.id} value={role.id}>@{role.name}</option>)}
           </select>
           <input type="number" min={15} max={3600} value={alert.intervalSeconds} onChange={(event) => void patch(alert, { intervalSeconds: Number(event.target.value) })} style={inputStyle} />
+          <input value={alert.messageTemplate} onChange={(event) => void patch(alert, { messageTemplate: event.target.value })} placeholder="{mention} {platform} {title} {author} {url}" style={inputStyle} />
           <div style={{ display: "flex", gap: 6 }}>
             <button type="button" disabled={busy} onClick={() => void patch(alert, { enabled: !alert.enabled })} style={button("secondary")}>{alert.enabled ? "ON" : "OFF"}</button>
             <button type="button" disabled={busy} onClick={() => void remove(alert)} style={button("danger")}>Удалить</button>
