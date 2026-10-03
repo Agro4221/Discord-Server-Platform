@@ -514,7 +514,7 @@ export class Music implements PlatformModule {
 
     const available = this.manager.nodeManager.leastUsedNodes("playingPlayers")
       .filter((node) => node.id !== failedNodeId && node.connected && Boolean(node.sessionId));
-    if (!available.length) {
+    if (!canFailoverMusicNode(failedNodeId, available.map((node) => node.id))) {
       logger.warn("Music node failover unavailable", {
         identity: this.config.botIdentityId,
         failedNode: failedNodeId
@@ -2197,6 +2197,13 @@ export function shouldAutoplayAfterQueueEnd(
   queuedTrackCount: number
 ): boolean {
   return autoplayEnabled && repeatMode === "off" && queuedTrackCount === 0;
+}
+
+export function canFailoverMusicNode(
+  failedNodeId: string,
+  connectedNodeIds: readonly string[]
+): boolean {
+  return connectedNodeIds.some((nodeId) => nodeId !== failedNodeId);
 }
 
 export function musicNodeHealth(connectedNodeCount: number): "ready" | "degraded" {
