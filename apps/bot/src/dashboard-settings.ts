@@ -65,7 +65,7 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "logChannelId", label: "Канал логов", type: "channel" },
       { key: "codeTtlMinutes", label: "Время действия кода, мин.", type: "number", min: 2, max: 60 },
       { key: "panelTitle", label: "Заголовок панели", type: "text", maxLength: 256 },
-      { key: "panelDescription", label: "Описание панели", type: "textarea" },
+      { key: "panelDescription", label: "Описание панели", type: "textarea", maxLength: 4096 },
       { key: "issueButtonLabel", label: "Кнопка получения кода", type: "text", maxLength: 80 },
       { key: "confirmButtonLabel", label: "Кнопка подтверждения", type: "text", maxLength: 80 }
     ]
@@ -470,7 +470,8 @@ function validateValues(
         }
         result[field.key] = value.map((item) => item.trim()).filter(Boolean);
       } else {
-        if (typeof value !== "string" || value.length > 10_000) throw new Error(`invalid_${field.key}`);
+        const maxLength = field.maxLength ?? 10_000;
+        if (typeof value !== "string" || value.length > maxLength) throw new Error(`invalid_${field.key}`);
         result[field.key] = value;
       }
       continue;
