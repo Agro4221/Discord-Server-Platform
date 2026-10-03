@@ -575,6 +575,7 @@ export class ManagementApiServer {
             if (typeof body.url === "string") input.url = body.url;
             if (typeof body.intervalSeconds === "number") input.intervalSeconds = body.intervalSeconds;
             if (typeof body.enabled === "boolean") input.enabled = body.enabled;
+            if (typeof body.messageTemplate === "string") input.messageTemplate = body.messageTemplate.slice(0, 1000);
 
             if (input.channelId !== undefined) {
               const channel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(input.channelId);
@@ -640,6 +641,7 @@ export class ManagementApiServer {
             const target = typeof body.target === "string" ? body.target.trim() : "";
             const channelId = typeof body.channelId === "string" ? body.channelId : "";
             const mentionRoleId = body.mentionRoleId == null ? null : typeof body.mentionRoleId === "string" ? body.mentionRoleId : "";
+            const messageTemplate = typeof body.messageTemplate === "string" ? body.messageTemplate.slice(0, 1000) : undefined;
             const intervalSeconds = Number(body.intervalSeconds);
             if (!["twitch","youtube","vk"].includes(platform) || !target || target.length > 200 || !/^\d{17,20}$/.test(channelId) || (mentionRoleId && !/^\d{17,20}$/.test(mentionRoleId)) || !Number.isFinite(intervalSeconds)) {
               throw new RequestInputError("invalid_stream_alert", 400);
@@ -650,7 +652,7 @@ export class ManagementApiServer {
             if (mentionRoleId && !guild?.roles.cache.has(mentionRoleId)) throw new RequestInputError("role_not_found", 400);
             const created = await this.options.streamAlerts!.create(guildId, {
               platform: platform as StreamAlertPlatform, target, channelId, mentionRoleId,
-              intervalSeconds: Math.trunc(intervalSeconds), enabled: body.enabled !== false
+              intervalSeconds: Math.trunc(intervalSeconds), enabled: body.enabled !== false, messageTemplate
             });
             await this.options.auditLog.record({ guildId, source: "dashboard", action: "stream-alert.created", targetType: "stream-alert", targetId: String((created as { id?: number }).id ?? "unknown") });
             this.json(res, 200, { ok: true, alert: created });
@@ -665,7 +667,7 @@ export class ManagementApiServer {
               return;
             }
             const body = await readJson(req);
-            const input: { target?: string; channelId?: string; mentionRoleId?: string | null; intervalSeconds?: number; enabled?: boolean } = {};
+            const input: { target?: string; channelId?: string; mentionRoleId?: string | null; intervalSeconds?: number; enabled?: boolean; messageTemplate?: string } = {};
             if (typeof body.target === "string") input.target = body.target.trim();
             if (typeof body.channelId === "string") input.channelId = body.channelId;
             if (body.mentionRoleId === null) input.mentionRoleId = null;
