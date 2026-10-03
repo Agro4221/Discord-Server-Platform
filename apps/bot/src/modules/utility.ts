@@ -342,7 +342,10 @@ export class Utility implements PlatformModule {
       )}): ${row.reason}`
     );
 
-    await message.reply(lines.join("\n")).catch(() => undefined);
+    await message.reply({
+      content: lines.join("\n").slice(0, 1900),
+      allowedMentions: { users: result.rows.map((row) => row.user_id) }
+    }).catch(() => undefined);
   }
 
   private async setAfk(
@@ -359,7 +362,7 @@ export class Utility implements PlatformModule {
       [guildId, userId, normalizedReason]
     );
     this.activeAfk.add(afkKey(guildId, userId));
-    await this.auditLog?.record({
+    await this.audit({
       guildId,
       actorUserId: userId,
       source: "discord",
@@ -377,7 +380,7 @@ export class Utility implements PlatformModule {
     );
     this.activeAfk.delete(afkKey(guildId, userId));
     if (result.rowCount === 1) {
-      await this.auditLog?.record({
+      await this.audit({
         guildId,
         actorUserId: userId,
         source: "discord",
@@ -410,6 +413,14 @@ export class Utility implements PlatformModule {
           createdAt: new Date(row.created_at)
         }
       : null;
+  }
+
+  private async audit(event: import("../audit.js").AuditEvent): Promise<void> {
+    try {
+      await this.auditLog?.record(event);
+    } catch {
+      // Audit persistence must not make a successful user operation fail.
+    }
   }
 
   private async fetchUser(value?: string): Promise<User | null> {
