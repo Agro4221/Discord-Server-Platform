@@ -46,7 +46,7 @@ export class Welcome implements PlatformModule {
 
   async init(context: ModuleContext): Promise<void> {
     const a = context.events.on("member.add", (member) => this.onJoin(member));
-    const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const b = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     const c = context.events.on("member.remove", (member) => this.onLeave(member));
     this.unsubscribe = () => { a(); b(); c(); };
   }
@@ -85,8 +85,8 @@ export class Welcome implements PlatformModule {
     return true;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "welcome") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "welcome") return;
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
       await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
       return;

@@ -52,7 +52,7 @@ export class Utility implements PlatformModule {
     }
     this.unsubscribe = context.events.on(
       "interaction.command",
-      (interaction) => this.handleSlash(interaction)
+      (interaction) => this.executeSlashCommand(interaction)
     );
     this.messageUnsubscribe = context.events.on(
       "message.create",
@@ -183,10 +183,10 @@ export class Utility implements PlatformModule {
     return false;
   }
 
-  private async handleSlash(
+  async executeSlashCommand(
     interaction: ChatInputCommandInteraction
-  ): Promise<void> {
-    if (!interaction.inGuild() || !INFO_COMMANDS.has(interaction.commandName)) {
+  , commandName = commandName): Promise<void> {
+    if (!interaction.inGuild() || !INFO_COMMANDS.has(commandName)) {
       return;
     }
 
@@ -198,7 +198,7 @@ export class Utility implements PlatformModule {
       return;
     }
 
-    switch (interaction.commandName) {
+    switch (commandName) {
       case "serverinfo":
         await interaction.reply({
           embeds: [this.buildServerInfo(interaction.guild!)]

@@ -36,7 +36,7 @@ export class Leveling implements PlatformModule {
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
     const a = context.events.on("message.create", (message) => this.onMessage(message));
-    const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const b = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     this.unsubscribe = () => { a(); b(); };
 
     this.voiceTimer = setInterval(() => {
@@ -55,10 +55,10 @@ export class Leveling implements PlatformModule {
     this.client = undefined;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
     if (!interaction.inGuild()) return;
 
-    if (interaction.commandName === "leveling") {
+    if (commandName === "leveling") {
       const sub = interaction.options.getSubcommand();
       if (sub === "setup") {
         if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
@@ -89,11 +89,11 @@ export class Leveling implements PlatformModule {
       return;
     }
 
-    if (interaction.commandName === "level") {
+    if (commandName === "level") {
       await this.replyRank(interaction, interaction.options.getUser("user") ?? interaction.user);
-    } else if (interaction.commandName === "rank") {
+    } else if (commandName === "rank") {
       await this.replyRank(interaction, interaction.options.getUser("user") ?? interaction.user);
-    } else if (interaction.commandName === "top") {
+    } else if (commandName === "top") {
       await this.replyTop(interaction);
     }
   }

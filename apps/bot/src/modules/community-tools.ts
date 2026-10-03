@@ -75,7 +75,7 @@ export class CommunityTools implements PlatformModule {
     );
     this.unsubscribeCommand = context.events.on(
       "interaction.command",
-      (interaction) => { void this.handleCommand(interaction); }
+      (interaction) => { void this.executeSlashCommand(interaction); }
     );
     this.unsubscribeMessage = context.events.on(
       "message.create",
@@ -179,11 +179,11 @@ export class CommunityTools implements PlatformModule {
     }
   }
 
-  private async handleCommand(
+  async executeSlashCommand(
     interaction: ChatInputCommandInteraction
-  ): Promise<void> {
+  , commandName = commandName): Promise<void> {
     if (!interaction.inGuild()) return;
-    if (!SUPPORTED.has(interaction.commandName)) return;
+    if (!SUPPORTED.has(commandName)) return;
 
     if (!await moduleEnabled(
       this.db,
@@ -198,12 +198,12 @@ export class CommunityTools implements PlatformModule {
       return;
     }
 
-    if (interaction.commandName === "poll") {
+    if (commandName === "poll") {
       await this.createSlashPoll(interaction);
       return;
     }
 
-    if (interaction.commandName === "suggest") {
+    if (commandName === "suggest") {
       await this.createSuggestion(
         interaction,
         interaction.options.getString("text", true)
@@ -211,17 +211,17 @@ export class CommunityTools implements PlatformModule {
       return;
     }
 
-    if (interaction.commandName === "sticky") {
+    if (commandName === "sticky") {
       await this.handleStickySlash(interaction);
       return;
     }
 
-    if (interaction.commandName === "8ball") {
+    if (commandName === "8ball") {
       await interaction.reply(random8BallAnswer());
       return;
     }
 
-    if (interaction.commandName === "choose") {
+    if (commandName === "choose") {
       await interaction.reply(
         chooseFromOptions(
           interaction.options.getString("options", true)
@@ -230,7 +230,7 @@ export class CommunityTools implements PlatformModule {
       return;
     }
 
-    if (interaction.commandName === "roll") {
+    if (commandName === "roll") {
       await interaction.reply(
         formatDiceRoll(
           interaction.options.getString("dice") || "1d20"

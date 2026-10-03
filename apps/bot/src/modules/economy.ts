@@ -27,7 +27,7 @@ export class Economy implements PlatformModule {
 
   async init(context: ModuleContext): Promise<void> {
     this.dashboardClient = context.client;
-    this.unsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    this.unsubscribe = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
   }
 
   async shutdown(): Promise<void> {
@@ -36,15 +36,15 @@ export class Economy implements PlatformModule {
     this.unsubscribe = undefined;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
     if (!interaction.inGuild()) return;
-    if (!["economy","shop"].includes(interaction.commandName)) return;
+    if (!["economy","shop"].includes(commandName)) return;
     const guildId = interaction.guild!.id;
     if (!await moduleEnabled(this.db, guildId, "economy", false)) {
       await interaction.reply({ content: "Модуль Economy выключен.", ephemeral: true });
       return;
     }
-    if (interaction.commandName === "economy") await this.economyCommand(interaction);
+    if (commandName === "economy") await this.economyCommand(interaction);
     else await this.shopCommand(interaction);
   }
 
