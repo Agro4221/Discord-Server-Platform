@@ -115,9 +115,38 @@ export class AutomationEngine implements PlatformModule {
         if (!reaction.message.guildId) return;
         return this.execute({
           type: "reaction.add", guildId: reaction.message.guildId, userId: user.id,
-          channelId: reaction.message.channelId, messageId: reaction.message.id
+          channelId: reaction.message.channelId, messageId: reaction.message.id,
+          content: reaction.emoji.name ?? reaction.emoji.identifier
         });
       }),
+      context.events.on("reaction.remove", ({ reaction, user }) => {
+        if (!reaction.message.guildId) return;
+        return this.execute({
+          type: "reaction.remove", guildId: reaction.message.guildId, userId: user.id,
+          channelId: reaction.message.channelId, messageId: reaction.message.id,
+          content: reaction.emoji.name ?? reaction.emoji.identifier
+        });
+      }),
+      context.events.on("channel.delete", (channel) => {
+        if (!channel.guildId) return;
+        return this.execute({
+          type: "channel.delete",
+          guildId: channel.guildId,
+          channelId: channel.id,
+          content: "name" in channel && typeof channel.name === "string" ? channel.name : undefined
+        });
+      }),
+      context.events.on("role.delete", (role) => this.execute({
+        type: "role.delete",
+        guildId: role.guild.id,
+        roleId: role.id,
+        content: role.name
+      })),
+      context.events.on("member.ban", (event) => this.execute({
+        type: "member.ban",
+        guildId: event.guildId,
+        userId: event.userId
+      })),
       context.events.on("voice.state", ({ oldState, newState }) => this.executeFromVoice(oldState, newState)),
       context.events.on("moderation.case", (event) => this.execute({
         type: "moderation.case",
