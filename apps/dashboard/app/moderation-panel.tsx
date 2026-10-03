@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+type Resource = { id: string; name: string };
 type Escalation = {
   warnCount: number;
   action: "timeout" | "ban";
@@ -10,8 +11,12 @@ type Escalation = {
   enabled: boolean;
 };
 
-export function ModerationPanel({ guildId, onChanged }: { guildId: string; onChanged?: () => void | Promise<void> }) {
+export function ModerationPanel({ guildId, channels, onChanged }: { guildId: string; channels: Resource[]; onChanged?: () => void | Promise<void> }) {
   const [rules, setRules] = useState<Escalation[]>([]);
+  const [cleanupRules, setCleanupRules] = useState<Array<{ id: number; channelId: string; intervalSeconds: number; maxMessages: number; enabled: boolean; lastRunAt: string | null }>>([]);
+  const [cleanupChannelId, setCleanupChannelId] = useState("");
+  const [cleanupIntervalSeconds, setCleanupIntervalSeconds] = useState(3600);
+  const [cleanupMaxMessages, setCleanupMaxMessages] = useState(100);
   const [warnCount, setWarnCount] = useState(3);
   const [action, setAction] = useState<Escalation["action"]>("timeout");
   const [minutes, setMinutes] = useState(60);
@@ -20,10 +25,61 @@ export function ModerationPanel({ guildId, onChanged }: { guildId: string; onCha
   const [error, setError] = useState("");
 
   async function load() {
-    const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/escalations", { cache: "no-store" });
+    const [response, cleanupResponse] = await Promise.all([
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/escalations", { cache: "no-store" }),
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/cleanup", { cache: "no-store" })
+    ]);
     const body = await response.json().catch(() => ({}));
+    const cleanupBody = await cleanupResponse.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.error ?? "escalations_failed");
+    if (!cleanupResponse.ok) throw new Error(cleanupBody.error ?? "cleanup_failed");
     setRules((body.rules ?? []) as Escalation[]);
+    setCleanupRules(cleanupBody.rules ?? []);
+  }
+
+  async function saveCleanup() {
+    if (!cleanupChannelId) {
+      setError("Выбери текстовый канал для autopurge.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/cleanup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          channelId: cleanupChannelId,
+          intervalSeconds: cleanupIntervalSeconds,
+          maxMessages: cleanupMaxMessages,
+          enabled: true
+        })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "cleanup_save_failed");
+      await load();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось сохранить autopurge.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeCleanup(id: number) {
+    if (!window.confirm("Удалить правило scheduled cleanup?")) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/cleanup/" + id, { method: "DELETE" });
+      if (!response.ok) throw new Error("cleanup_remove_failed");
+      await load();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось удалить autopurge.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -88,6 +144,34 @@ export function ModerationPanel({ guildId, onChanged }: { guildId: string; onCha
       <div style={{ color: "#687486", fontSize: 10 }}>
         Timeout требует длительность. Для постоянного бана оставь 0 минут.
       </div>
+
+      <section style={sectionStyle}>
+        <div style={{ fontWeight: 700, fontSize: 13 }}>Scheduled cleanup / Auto-purge</div>
+        <div style={{ color: "#687486", fontSize: 10 }}>
+          Каждые заданное число секунд удаляет до N последних сообщений. Discord сам исключает слишком старые сообщения из bulk cleanup.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 140px 120px auto", gap: 8 }}>
+          <select value={cleanupChannelId} onChange={(e) => setCleanupChannelId(e.target.value)} style={inputStyle}>
+            <option value="">Текстовый канал</option>
+            {channels.map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}
+          </select>
+          <input type="number" min={60} max={604800} value={cleanupIntervalSeconds} onChange={(e) => setCleanupIntervalSeconds(Number(e.target.value))} style={inputStyle} />
+          <input type="number" min={1} max={100} value={cleanupMaxMessages} onChange={(e) => setCleanupMaxMessages(Number(e.target.value))} style={inputStyle} />
+          <button type="button" disabled={busy} onClick={() => void saveCleanup()} style={buttonStyle}>Сохранить</button>
+        </div>
+        <div style={{ color: "#687486", fontSize: 10 }}>Интервал: 60–604800 сек. · за проход: 1–100 сообщений.</div>
+        {cleanupRules.length ? cleanupRules.map((rule) => (
+          <div key={rule.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid #202632" }}>
+            <div>
+              <strong style={{ fontSize: 11 }}>#{channels.find((channel) => channel.id === rule.channelId)?.name ?? rule.channelId}</strong>
+              <div style={{ marginTop: 3, fontSize: 10, color: "#6e7888" }}>
+                каждые {rule.intervalSeconds} сек. · до {rule.maxMessages} · {rule.enabled ? "ON" : "OFF"}
+              </div>
+            </div>
+            <button type="button" disabled={busy} onClick={() => void removeCleanup(rule.id)} style={buttonStyle}>Удалить</button>
+          </div>
+        )) : <div style={{ opacity: 0.42, fontSize: 11 }}>Правил scheduled cleanup пока нет.</div>}
+      </section>
 
       {rules.length ? rules.map((rule) => (
         <div key={rule.warnCount} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "10px 0", borderBottom: "1px solid #202632" }}>
