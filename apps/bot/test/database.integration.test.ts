@@ -31,8 +31,13 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='automation_delayed_jobs' AND column_name='dead_lettered_at'"
     );
     assert.equal(retryColumn.rows.length, 1);
-    assert.equal(Number(version), 71);
-    assert.equal(Number(first.rows[0]?.count), 71);
+    const feedColumns = await db.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='notification_feeds' AND column_name = ANY($1)",
+      [["message_template","include_keywords","exclude_keywords"]]
+    );
+    assert.equal(feedColumns.rows.length, 3);
+    assert.equal(Number(version), 72);
+    assert.equal(Number(first.rows[0]?.count), 72);
   } finally {
     await db.close();
   }
@@ -470,6 +475,30 @@ test("moderation channel locks preserve original send-message state for lockdown
     assert.deepEqual(rows.rows, [{ previous_send_messages: true }]);
   } finally {
     await db.query("DELETE FROM moderation_channel_locks WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.close();
+  }
+});
+
+test("notification feed filters and templates persist with bounded arrays", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345743";
+  try {
+    await migrate(db);
+    await db.query(
+      "INSERT INTO notification_feeds(guild_id,channel_id,url,interval_seconds,enabled,message_template,include_keywords,exclude_keywords) VALUES($1,$2,'https://example.com/feed.xml',300,true,$3,$4,$5)",
+      [guildId,"123456789012345742","**{title}**\n{url}",["release","update"],["spoiler"]]
+    );
+    const result = await db.query<{ message_template: string; include_keywords: string[]; exclude_keywords: string[] }>(
+      "SELECT message_template,include_keywords,exclude_keywords FROM notification_feeds WHERE guild_id=$1",
+      [guildId]
+    );
+    assert.deepEqual(result.rows, [{
+      message_template: "**{title}**\n{url}",
+      include_keywords: ["release","update"],
+      exclude_keywords: ["spoiler"]
+    }]);
+  } finally {
+    await db.query("DELETE FROM notification_feeds WHERE guild_id=$1", [guildId]).catch(() => undefined);
     await db.close();
   }
 });
