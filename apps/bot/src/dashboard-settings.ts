@@ -120,6 +120,14 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
     ]
   },
   {
+    key: "birthdays",
+    title: "Birthdays",
+    fields: [
+      { key: "channelId", label: "Канал поздравлений", type: "channel" },
+      { key: "announcementTemplate", label: "Шаблон поздравления", type: "text", description: "Поддерживаются {user} и {server}." }
+    ]
+  },
+  {
     key: "starboard",
     title: "Starboard",
     fields: [
@@ -235,6 +243,13 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       transcriptChannelId: "transcript_channel_id",
       maxOpenPerUser: "max_open_per_user",
       autoCloseMinutes: "auto_close_minutes"
+    }
+  },
+  birthdays: {
+    table: "birthday_settings",
+    columns: {
+      channelId: "channel_id",
+      announcementTemplate: "announcement_template"
     }
   },
   starboard: {
