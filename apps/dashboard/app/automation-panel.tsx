@@ -26,6 +26,37 @@ type Action =
 
 type Template = { name: string; content: string };
 
+type Diagnostics = {
+  rules: { total: number; enabled: number; byEvent: Record<string, number> };
+  templates: { total: number };
+  delayedJobs: {
+    pending: number;
+    processing: number;
+    withErrors: number;
+    completed24h: number;
+    oldestPendingAt: string | null;
+    recent: Array<{
+      id: string;
+      status: "pending" | "processing" | "completed";
+      ruleId: string | null;
+      attempts: number;
+      availableAt: string;
+      processingUntil: string | null;
+      lastError: string | null;
+      completedAt: string | null;
+      createdAt: string;
+    }>;
+  };
+  runtime: {
+    loadedRules: number;
+    executionCounter: number;
+    cooldownKeys: number;
+    keyedCooldownKeys: number;
+    lastScheduleMinute: number | null;
+  };
+};
+
+
 type Rule = {
   id: string;
   name: string;
@@ -79,18 +110,23 @@ export function AutomationPanel({
   const [testNumeric, setTestNumeric] = useState("{}");
   const [dryRunBusy, setDryRunBusy] = useState(false);
   const [dryRunResult, setDryRunResult] = useState<{ matched: boolean; event: string; renderedActions: Array<{ type: string; preview: string }> } | null>(null);
+  const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
 
   async function load() {
-    const [rulesResponse, templatesResponse] = await Promise.all([
+    const [rulesResponse, templatesResponse, diagnosticsResponse] = await Promise.all([
       fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation", { cache: "no-store" }),
-      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation/templates", { cache: "no-store" })
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation/templates", { cache: "no-store" }),
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation/diagnostics", { cache: "no-store" })
     ]);
     const rulesBody = await rulesResponse.json().catch(() => ({}));
     const templatesBody = await templatesResponse.json().catch(() => ({}));
+    const diagnosticsBody = await diagnosticsResponse.json().catch(() => ({}));
     if (!rulesResponse.ok) throw new Error(rulesBody.error ?? "automation_failed");
     if (!templatesResponse.ok) throw new Error(templatesBody.error ?? "templates_failed");
+    if (!diagnosticsResponse.ok) throw new Error(diagnosticsBody.error ?? "automation_diagnostics_failed");
     setRules(rulesBody.rules ?? []);
     setTemplates(templatesBody.templates ?? []);
+    setDiagnostics(diagnosticsBody.diagnostics ?? null);
   }
 
   useEffect(() => {
@@ -538,6 +574,57 @@ export function AutomationPanel({
         <button type="button" disabled={saving || actions.length >= 10} onClick={() => setActions((current) => [...current, { type: "log", message: "" }])} style={buttonStyle("secondary")}>+ Действие</button>
       </section>
 
+      {diagnostics && (
+        <section style={sectionStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+            <div>
+              <div style={sectionTitle}>Diagnostics · Automation</div>
+              <div style={{ marginTop: 4, fontSize: 11, opacity: 0.5 }}>Состояние правил, cooldown-кэша и отложенных задач. Содержимое событий и actions здесь не показывается.</div>
+            </div>
+            <button
+              type="button"
+              disabled={saving || dryRunBusy}
+              onClick={() => void load().catch(() => setError("Не удалось обновить diagnostics."))}
+              style={buttonStyle("secondary")}
+            >
+              Обновить
+            </button>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 8 }}>
+            <Metric label="Rules" value={String(diagnostics.rules.enabled) + " / " + diagnostics.rules.total} />
+            <Metric label="Templates" value={String(diagnostics.templates.total)} />
+            <Metric label="Delayed pending" value={String(diagnostics.delayedJobs.pending)} />
+            <Metric label="Errors" value={String(diagnostics.delayedJobs.withErrors)} />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
+            <Metric label="Processing" value={String(diagnostics.delayedJobs.processing)} />
+            <Metric label="Done · 24h" value={String(diagnostics.delayedJobs.completed24h)} />
+            <Metric label="Loaded rules" value={String(diagnostics.runtime.loadedRules)} />
+          </div>
+
+          {diagnostics.delayedJobs.oldestPendingAt && (
+            <div style={{ fontSize: 10, opacity: 0.5 }}>
+              Самая старая незавершённая задача: {new Date(diagnostics.delayedJobs.oldestPendingAt).toLocaleString()}
+            </div>
+          )}
+
+          {diagnostics.delayedJobs.recent.length > 0 && (
+            <div style={{ display: "grid", gap: 5 }}>
+              {diagnostics.delayedJobs.recent.map((job) => (
+                <div key={job.id} style={{ display: "grid", gridTemplateColumns: "90px 90px 1fr 80px", gap: 8, alignItems: "center", padding: "7px 8px", borderRadius: 8, background: "#0b1016", border: "1px solid #1c222d", fontSize: 10 }}>
+                  <strong>{job.status}</strong>
+                  <span style={{ opacity: 0.55 }}>#{job.id}</span>
+                  <span style={{ opacity: 0.55, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{job.lastError || ("available " + new Date(job.availableAt).toLocaleString())}</span>
+                  <span style={{ opacity: 0.55, textAlign: "right" }}>attempts: {job.attempts}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       <section style={sectionStyle}>
         <div style={sectionTitle}>Dry run · безопасная проверка</div>
         <div style={{ fontSize: 11, opacity: 0.5 }}>Не выполняет Discord-действия и не вызывает webhook. Проверяет текущее несохранённое правило и показывает ожидаемый результат.</div>
@@ -656,6 +743,15 @@ const sectionStyle = {
   borderRadius: 12,
   background: "#0e1117"
 } as const;
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ padding: "9px 10px", borderRadius: 9, background: "#0b1016", border: "1px solid #1c222d" }}>
+      <div style={{ fontSize: 9, opacity: 0.42, textTransform: "uppercase", letterSpacing: 0.7 }}>{label}</div>
+      <div style={{ marginTop: 3, fontSize: 16, fontWeight: 700 }}>{value}</div>
+    </div>
+  );
+}
 
 const sectionTitle = {
   fontSize: 12,
