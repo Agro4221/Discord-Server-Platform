@@ -68,6 +68,51 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       ),
 
     new SlashCommandBuilder()
+      .setName("poll")
+      .setDescription("Create a community poll")
+      .addStringOption((o) => o.setName("question").setDescription("Question").setMaxLength(240).setRequired(true))
+      .addStringOption((o) => o.setName("option1").setDescription("Option 1").setMaxLength(76).setRequired(true))
+      .addStringOption((o) => o.setName("option2").setDescription("Option 2").setMaxLength(76).setRequired(true))
+      .addStringOption((o) => o.setName("option3").setDescription("Option 3").setMaxLength(76))
+      .addStringOption((o) => o.setName("option4").setDescription("Option 4").setMaxLength(76))
+      .addStringOption((o) => o.setName("option5").setDescription("Option 5").setMaxLength(76))
+      .addIntegerOption((o) => o.setName("minutes").setDescription("Duration in minutes").setMinValue(1).setMaxValue(10080)),
+
+    new SlashCommandBuilder()
+      .setName("suggest")
+      .setDescription("Submit a server suggestion")
+      .addStringOption((o) => o.setName("text").setDescription("Suggestion").setMaxLength(1500).setRequired(true)),
+
+    new SlashCommandBuilder()
+      .setName("sticky")
+      .setDescription("Manage a sticky message")
+      .addSubcommand((sub) =>
+        sub
+          .setName("set")
+          .setDescription("Set a sticky message")
+          .addStringOption((o) => o.setName("text").setDescription("Sticky text").setMaxLength(2000).setRequired(true))
+          .addChannelOption((o) => o.setName("channel").setDescription("Optional target channel").addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+      )
+      .addSubcommand((sub) =>
+        sub.setName("clear").setDescription("Clear sticky from the current channel")
+      ),
+
+    new SlashCommandBuilder()
+      .setName("8ball")
+      .setDescription("Ask the magic 8-ball")
+      .addStringOption((o) => o.setName("question").setDescription("Optional question").setMaxLength(500)),
+
+    new SlashCommandBuilder()
+      .setName("choose")
+      .setDescription("Choose one of several options")
+      .addStringOption((o) => o.setName("options").setDescription("Options separated by | or comma").setMaxLength(1000).setRequired(true)),
+
+    new SlashCommandBuilder()
+      .setName("roll")
+      .setDescription("Roll dice")
+      .addStringOption((o) => o.setName("dice").setDescription("Notation such as 2d6 or 1d20").setMaxLength(20)),
+
+    new SlashCommandBuilder()
       .setName("level")
       .setDescription("Show your leveling rank")
       .addUserOption((o) => o.setName("user").setDescription("Optional user")),

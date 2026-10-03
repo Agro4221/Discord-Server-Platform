@@ -87,3 +87,31 @@ test("utility slash commands are registered with expected options", () => {
   assert.equal(afk?.options?.[0]?.options?.[0]?.required, false);
 });
 
+
+
+test("community tool slash commands preserve required-before-optional ordering", () => {
+  const commands = buildCommands().map((command) => command.toJSON());
+
+  const poll = commands.find((command) => command.name === "poll");
+  assert.deepEqual(
+    poll?.options?.map((option) => ({
+      name: option.name,
+      required: option.required
+    })),
+    [
+      { name: "question", required: true },
+      { name: "option1", required: true },
+      { name: "option2", required: true },
+      { name: "option3", required: false },
+      { name: "option4", required: false },
+      { name: "option5", required: false },
+      { name: "minutes", required: false }
+    ]
+  );
+
+  const sticky = commands.find((command) => command.name === "sticky");
+  assert.deepEqual(
+    sticky?.options?.map((option) => option.name),
+    ["set", "clear"]
+  );
+});

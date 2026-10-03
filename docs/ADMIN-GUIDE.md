@@ -337,3 +337,8 @@ Dashboard является основным способом редактиро�
 - AFK changes are included in durable audit telemetry.
 - AFK responses cap output and only explicitly allow mentions of affected users; stored reasons cannot create mass mentions.
 
+### Community Tools
+- Poll: /poll or !poll question | option1 | option2 | ...; supports 2-5 options and a configurable slash duration.
+- Suggestions: /suggest text or prefix equivalent; moderators can approve or deny from the buttons.
+- Sticky: /sticky set text /sticky clear; slash command also allows selecting a text channel.
+- Fun: /8ball, /choose, /roll and corresponding prefix commands.

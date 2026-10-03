@@ -218,3 +218,9 @@ Never write credentials, tokens or private user data here.
 - Updated `apps/dashboard/package.json` to Next.js `16.3.8`, the patched version identified by the CI audit.
 - The security patch is independent of the Utility/AFK implementation; the final green CI run is required before treating this combined code state as verified.
 
+## 2026-10-03 — Community engagement feature pass
+- Added the Community Tools module with persistent polls, suggestion workflow, sticky messages and lightweight fun commands.
+- Polls support 2-5 options, one vote per user, live result refresh and automatic close/recovery after restart.
+- Suggestions support moderator approval/rejection buttons and durable status history.
+- Sticky messages persist across restart and are re-posted after new user messages in the configured channel.
+- Added migration 41, command-policy entries, prefix routing, Control Center metadata and regression coverage.

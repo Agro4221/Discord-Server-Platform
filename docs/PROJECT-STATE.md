@@ -181,3 +181,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Dashboard dependency `next` was updated from `16.3.3` to `16.3.8` after CI's high-severity dependency audit rejected the previous version.
 - No lockfile is tracked in the repository, so CI's `npm install` will resolve the patched version from the updated workspace manifest.
 
+## 2026-10-03 — Community Tools
+- Core now includes a Community Tools module for polls, suggestions, sticky messages and small fun commands.
+- Poll/suggestion state is persisted in PostgreSQL; poll timers are reconstructed at startup.
+- Community Tools is enabled by default in the catalog and can be disabled per guild like other modules.

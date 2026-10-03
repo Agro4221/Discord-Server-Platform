@@ -671,6 +671,53 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_afk_users_guild ON afk_users(guild_id);"
     ])
+  },
+  {
+    version: 41,
+    name: "community_tools",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS polls (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  message_id text,",
+      "  question text NOT NULL,",
+      "  options jsonb NOT NULL,",
+      "  ends_at timestamptz NOT NULL,",
+      "  closed boolean NOT NULL DEFAULT false,",
+      "  closed_at timestamptz,",
+      "  created_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_polls_guild_active ON polls(guild_id,closed,ends_at);",
+      "CREATE TABLE IF NOT EXISTS poll_votes (",
+      "  poll_id bigint NOT NULL REFERENCES polls(id) ON DELETE CASCADE,",
+      "  user_id text NOT NULL,",
+      "  option_index integer NOT NULL CHECK(option_index BETWEEN 0 AND 4),",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(poll_id,user_id)",
+      ");",
+      "CREATE TABLE IF NOT EXISTS suggestions (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  message_id text,",
+      "  user_id text NOT NULL,",
+      "  content text NOT NULL,",
+      "  status text NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','denied')),",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_suggestions_guild_status ON suggestions(guild_id,status,created_at DESC);",
+      "CREATE TABLE IF NOT EXISTS sticky_messages (",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  message text NOT NULL,",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  last_message_id text,",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,channel_id)",
+      ");"
+    ])
   }
 ] as const;
 

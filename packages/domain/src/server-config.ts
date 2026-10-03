@@ -16,7 +16,8 @@ export type ServerModuleKey =
   | "automation"
   | "music"
   | "analytics"
-  | "utility";
+  | "utility"
+  | "community-tools";
 
 export type ServerModuleConfig = {
   key: ServerModuleKey;

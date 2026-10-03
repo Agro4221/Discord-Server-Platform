@@ -88,7 +88,13 @@ export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
   { name: "membercount", label: "Member count", module: "utility", prefix: true, slash: true },
   { name: "roleinfo", label: "Role info", module: "utility", prefix: true, slash: true },
   { name: "channelinfo", label: "Channel info", module: "utility", prefix: true, slash: true },
-  { name: "afk", label: "AFK", module: "utility", prefix: true, slash: true }
+  { name: "afk", label: "AFK", module: "utility", prefix: true, slash: true },
+  { name: "poll", label: "Polls", module: "community-tools", prefix: true, slash: true },
+  { name: "suggest", label: "Suggestions", module: "community-tools", prefix: true, slash: true },
+  { name: "sticky", label: "Sticky messages", module: "community-tools", requiredPermission: PermissionFlagsBits.ManageMessages, prefix: true, slash: true },
+  { name: "8ball", label: "Magic 8-ball", module: "community-tools", prefix: true, slash: true },
+  { name: "choose", label: "Choose", module: "community-tools", prefix: true, slash: true },
+  { name: "roll", label: "Dice roll", module: "community-tools", prefix: true, slash: true }
 ];
 
 export class CommandPolicyService {

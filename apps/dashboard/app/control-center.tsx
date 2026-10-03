@@ -303,6 +303,21 @@ const MODULE_META: Record<string, ModuleMeta> = {
     ],
     kind: "discord"
   },
+  "community-tools": {
+    icon: "✦",
+    accent: "#e6a86b",
+    title: "Community Tools",
+    summary: "Опросы, предложения, sticky-сообщения и небольшие fun-команды.",
+    category: "community",
+    commands: ["/poll", "/suggest", "/sticky set", "/sticky clear", "/8ball", "/choose", "/roll"],
+    functions: [
+      { title: "Опросы", description: "Интерактивные опросы до пяти вариантов с сохранением голосов и автоматическим завершением." },
+      { title: "Предложения", description: "Публикация предложений с кнопками одобрения/отклонения для модераторов." },
+      { title: "Sticky", description: "Закрепляемое сообщение, которое автоматически возвращается вниз канала после новых сообщений." },
+      { title: "Fun", description: "8-ball, выбор варианта и бросок кубиков без внешних сервисов." }
+    ],
+    kind: "discord"
+  },
   automation: {
     icon: "↯",
     accent: "#9f8cf2",

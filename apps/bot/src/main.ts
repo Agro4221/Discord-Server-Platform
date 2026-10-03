@@ -36,6 +36,7 @@ import { BackupService } from "./backup.js";
 import { CustomCommandService } from "./custom-commands.js";
 import { CommandPolicyService } from "./command-policy.js";
 import { Utility } from "./modules/utility.js";
+import { CommunityTools } from "./modules/community-tools.js";
 
 let fatalCleanup: (() => Promise<void>) | undefined;
 
@@ -97,6 +98,7 @@ async function main(): Promise<void> {
   const economy = new Economy(database);
   const reminders = new Reminders(database);
   const utility = new Utility(database);
+  const communityTools = new CommunityTools(database);
   const starboard = new Starboard(database);
   const automation = new AutomationEngine(database);
   const security = new Security(database);
@@ -166,6 +168,7 @@ async function main(): Promise<void> {
   modules.register(economy);
   modules.register(reminders);
   modules.register(utility);
+  modules.register(communityTools);
   modules.register(starboard);
   modules.register(automation);
   modules.register(security);
