@@ -505,6 +505,16 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       ),
 
     new SlashCommandBuilder()
+      .setName("afk")
+      .setDescription("Set or clear AFK status")
+      .addStringOption((option) =>
+        option
+          .setName("reason")
+          .setDescription("AFK reason; use off/clear to remove")
+          .setMaxLength(500)
+      ),
+
+    new SlashCommandBuilder()
       .setName("schedule")
       .setDescription("Schedule a message in a channel")
       .addIntegerOption((option) =>
