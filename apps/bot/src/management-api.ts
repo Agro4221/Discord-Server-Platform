@@ -179,6 +179,12 @@ type ApiOptions = {
       }
     ) => Promise<unknown>;
     delete: (guildId: string, panelId: number, deleteMessage: (channelId: string, messageId: string) => Promise<void>) => Promise<boolean>;
+    listAutomationRules: (guildId: string) => Promise<unknown[]>;
+    saveAutomationRule: (
+      guildId: string,
+      input: { trigger: "member.join" | "voice.join" | "voice.leave"; channelId?: string; roleId: string; delaySeconds?: number; enabled?: boolean }
+    ) => Promise<void>;
+    deleteAutomationRule: (guildId: string, id: number) => Promise<boolean>;
   };
 };
 
@@ -2257,6 +2263,79 @@ export class ManagementApiServer {
               this.json(res, 200, { guildId, moduleKey, values: saved });
               return;
             }
+          }
+
+          const roleAutomationMatch = path.match(/^\/api\/guilds\/([^/]+)\/role-automation$/);
+          const roleAutomationItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/role-automation\/(\d+)$/);
+
+          if ((roleAutomationMatch || roleAutomationItemMatch) && !this.options.rolePanels) {
+            this.json(res, 500, { error: "roles_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && roleAutomationMatch) {
+            const guildId = roleAutomationMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, rules: await this.options.rolePanels!.listAutomationRules(guildId) });
+            return;
+          }
+
+          if (method === "POST" && roleAutomationMatch) {
+            const guildId = roleAutomationMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const trigger = body.trigger;
+            const roleId = typeof body.roleId === "string" ? body.roleId : "";
+            const channelId = typeof body.channelId === "string" ? body.channelId : undefined;
+            const delaySeconds = body.delaySeconds === undefined ? 0 : Number(body.delaySeconds);
+            if (
+              typeof trigger !== "string" ||
+              !["member.join","voice.join","voice.leave"].includes(trigger) ||
+              !/^\d{17,20}$/.test(roleId) ||
+              !Number.isInteger(delaySeconds) || delaySeconds < 0 || delaySeconds > 604800
+            ) {
+              throw new RequestInputError("invalid_role_automation",400);
+            }
+            await this.options.rolePanels!.saveAutomationRule(guildId,{
+              trigger: trigger as "member.join" | "voice.join" | "voice.leave",
+              channelId,
+              roleId,
+              delaySeconds,
+              enabled: body.enabled !== false
+            });
+            await this.options.auditLog.record({
+              guildId, source:"dashboard", action:"role.automation.saved",
+              targetType:"role", targetId:roleId,
+              metadata:{trigger,channelId,delaySeconds,enabled:body.enabled !== false}
+            });
+            this.json(res,200,{ok:true});
+            return;
+          }
+
+          if (method === "DELETE" && roleAutomationItemMatch) {
+            const guildId = roleAutomationItemMatch[1] ?? "";
+            const id = Number(roleAutomationItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(id) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res,404,{error:"guild_or_role_automation_not_found"});
+              return;
+            }
+            const deleted = await this.options.rolePanels!.deleteAutomationRule(guildId,id);
+            if (!deleted) {
+              this.json(res,404,{error:"role_automation_not_found"});
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId, source:"dashboard", action:"role.automation.deleted",
+              targetType:"role-automation", targetId:String(id)
+            });
+            this.json(res,200,{ok:true});
+            return;
           }
 
           const rolePanelsMatch = path.match(/^\/api\/guilds\/([^/]+)\/role-panels$/);
