@@ -274,6 +274,7 @@ async function main(): Promise<void> {
     commandPolicy,
     giveaways: {
       list: async (guildId) => giveaways.list(guildId),
+      create: async (guildId, input) => giveaways.dashboardCreateGiveaway(guildId, input.channelId, input.hostUserId, input.prize, input.winners, input.minutes),
       end: async (guildId, giveawayId) => giveaways.endGiveaway(giveawayId, guildId),
       reroll: async (guildId, giveawayId) => giveaways.rerollGiveaway(giveawayId, guildId)
     },

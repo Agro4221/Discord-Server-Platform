@@ -561,6 +561,28 @@ export class ManagementApiServer {
             return;
           }
 
+          if (method === "POST" && giveawaysMatch) {
+            const guildId = giveawaysMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const channelId = typeof body.channelId === "string" ? body.channelId : "";
+            const hostUserId = typeof body.hostUserId === "string" ? body.hostUserId : "";
+            const prize = typeof body.prize === "string" ? body.prize : "";
+            const winners = Number(body.winners);
+            const minutes = Number(body.minutes);
+            if (!/^\d{15,25}$/.test(channelId) || !/^\d{15,25}$/.test(hostUserId)) throw new RequestInputError("invalid_giveaway_target", 400);
+            if (!prize.trim() || prize.length > 500) throw new RequestInputError("invalid_giveaway_prize", 400);
+            if (!Number.isSafeInteger(winners) || winners < 1 || winners > 20) throw new RequestInputError("invalid_giveaway_winners", 400);
+            if (!Number.isSafeInteger(minutes) || minutes < 1 || minutes > 10080) throw new RequestInputError("invalid_giveaway_duration", 400);
+            const giveawayId = await this.options.giveaways!.create(guildId, { channelId, hostUserId, prize, winners, minutes });
+            await this.options.auditLog.record({ guildId, source: "dashboard", action: "giveaway.created", targetType: "giveaway", targetId: String(giveawayId) });
+            this.json(res, 201, { ok: true, giveawayId });
+            return;
+          }
+
           if (method === "GET" && giveawaysMatch) {
             const guildId = giveawaysMatch[1] ?? "";
             if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
