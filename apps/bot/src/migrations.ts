@@ -740,8 +740,36 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_logging_settings_enabled ON logging_settings(enabled,guild_id);"
     ])
-  }
-] as const;
+  },
+  {
+    version: 43,
+    name: "security_incident_lifecycle",
+    sql: q([
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS incident_duration_seconds integer NOT NULL DEFAULT 300 CHECK(incident_duration_seconds BETWEEN 60 AND 3600);",
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS auto_quarantine boolean NOT NULL DEFAULT true;",
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS remove_executor_roles boolean NOT NULL DEFAULT true;",
+      "CREATE TABLE IF NOT EXISTS security_incidents (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  event_type text NOT NULL CHECK(event_type IN ('raid','destructive-burst')),",
+      "  started_at timestamptz NOT NULL DEFAULT now(),",
+      "  expires_at timestamptz NOT NULL,",
+      "  resolved_at timestamptz,",
+      "  metadata jsonb NOT NULL DEFAULT '{}'::jsonb",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_security_incidents_guild_active ON security_incidents(guild_id,expires_at DESC) WHERE resolved_at IS NULL;",
+      "CREATE TABLE IF NOT EXISTS security_quarantine_assignments (",
+      "  incident_id bigint NOT NULL REFERENCES security_incidents(id) ON DELETE CASCADE,",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  role_id text NOT NULL,",
+      "  assigned_at timestamptz NOT NULL DEFAULT now(),",
+      "  restored_at timestamptz,",
+      "  PRIMARY KEY(incident_id,user_id,role_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_security_quarantine_assignments_cleanup ON security_quarantine_assignments(incident_id,restored_at,user_id);"
+    ])
+  }] as const;
 
 export async function migrate(db: Database): Promise<void> {
   await db.query(q([

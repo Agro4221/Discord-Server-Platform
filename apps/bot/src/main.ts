@@ -296,7 +296,8 @@ async function main(): Promise<void> {
     actions: {
       "temporary-voice.reconcile": async (guildId) => { await temporaryVoice.reconcileGuild(guildId); return { guildId, ok: true }; },
       "automation.reload": async (guildId) => { await automation.reload(); return { guildId, ok: true }; },
-      "security.check-hierarchy": async (guildId) => security.checkHierarchy(guildId)
+      "security.check-hierarchy": async (guildId) => security.checkHierarchy(guildId),
+      "security.clear-incidents": async (guildId) => ({ cleared: await security.clearIncidents(guildId), active: await security.getActiveIncidents(guildId) })
     }
   });
   await management.start();

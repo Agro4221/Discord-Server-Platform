@@ -89,6 +89,9 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "windowSeconds", label: "Окно Anti-Raid, сек.", type: "number", min: 5, max: 300 },
       { key: "maxDestructiveActions", label: "Destructive actions до тревоги", type: "number", min: 2, max: 100 },
       { key: "destructiveWindowSeconds", label: "Окно destructive actions, сек.", type: "number", min: 5, max: 300 },
+      { key: "incidentDurationSeconds", label: "Длительность инцидента, сек.", type: "number", min: 60, max: 3600 },
+      { key: "autoQuarantine", label: "Автоматический quarantine", type: "boolean" },
+      { key: "removeExecutorRoles", label: "Снимать роли исполнителя при Anti-Nuke", type: "boolean" },
       { key: "quarantineRoleId", label: "Quarantine role", type: "role" },
       { key: "logChannelId", label: "Security log channel", type: "channel" }
     ],
@@ -222,6 +225,9 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       windowSeconds: "window_seconds",
       maxDestructiveActions: "max_destructive_actions",
       destructiveWindowSeconds: "destructive_window_seconds",
+      incidentDurationSeconds: "incident_duration_seconds",
+      autoQuarantine: "auto_quarantine",
+      removeExecutorRoles: "remove_executor_roles",
       quarantineRoleId: "quarantine_role_id",
       logChannelId: "log_channel_id"
     }

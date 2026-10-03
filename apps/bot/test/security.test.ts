@@ -4,7 +4,8 @@ import {
   securityAuditLookbackCutoff,
   shouldTriggerSecurityIncident,
   securityIncidentCooldownUntil,
-  securityResponseThreshold
+  securityResponseThreshold,
+  clampSecurityIncidentDuration
 } from "../src/modules/security.js";
 
 test("Security burst incident is opened only at threshold and outside active window", () => {
@@ -33,4 +34,12 @@ test("Security executor audit lookback honors configured destructive window", ()
   assert.equal(securityAuditLookbackCutoff(100_000, 120), -20_000);
   assert.equal(securityAuditLookbackCutoff(100_000, 1), 95_000);
   assert.equal(securityAuditLookbackCutoff(100_000, 999), -200_000);
+});
+
+
+test("Security incident duration is bounded to safe operator values", () => {
+  assert.equal(clampSecurityIncidentDuration(10), 60);
+  assert.equal(clampSecurityIncidentDuration(300), 300);
+  assert.equal(clampSecurityIncidentDuration(5000), 3600);
+  assert.equal(clampSecurityIncidentDuration(Number.NaN), 300);
 });
