@@ -308,7 +308,6 @@ export class Utility implements PlatformModule {
 
     const ownKey = afkKey(message.guild.id, message.author.id);
     if (this.activeAfk.has(ownKey)) {
-      this.activeAfk.delete(ownKey);
       await this.clearAfk(message.guild.id, message.author.id);
       await message.reply(
         "👋 Ты снова активен — AFK-состояние снято."
