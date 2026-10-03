@@ -176,3 +176,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Planned provider breadth includes Spotify, Apple Music, Deezer, Yandex Music, VK Music, Tidal, Qobuz, yt-dlp and JioSaavn in addition to the already working YouTube/SoundCloud path. Provider readiness requires real adapter/credential validation.
 - Kick stream alerts are implemented but explicitly de-prioritized; the existing Twitch/YouTube/VK stream-alert functionality remains the practical baseline.
 - See `docs/FEATURE-MATRIX.md` for the complete persistent roadmap and `docs/WORK-LOG.md` for the decision record.
+
+
+## 2026-10-03 — Product scope correction
+- Product target is a **full all-in-one Discord platform**, not a music-first bot. Music is a major subsystem alongside Administration, Moderation, AutoMod/Security, Logging, Server utilities, Roles/Onboarding, Tickets/Forms, Automation, Community/Engagement, Notifications/Integrations and Analytics.
+- Premium/mature multipurpose bot capabilities are the broad product benchmark; no artificial Premium wall is planned for the self-hosted product.
+- Music advanced work remains on the roadmap, including emoji controller controls, dedicated Loop One, queue/DJ/fairness features and broad provider support, but Music work must not displace unfinished high-value Discord platform capabilities.
+- Updated release order in docs/FEATURE-MATRIX.md to enforce platform-wide parity before the final advanced Music passes and whole-platform release validation.
+- Recent scope-correction commits: b2770f1c, d2ff12a7, cf2877e0.
