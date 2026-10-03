@@ -3,6 +3,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  type ButtonInteraction,
   type ChatInputCommandInteraction,
   type Client,
   type Interaction,
