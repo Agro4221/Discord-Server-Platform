@@ -21,7 +21,7 @@ const CONFIG_TABLES: ExportTable[] = [
     "max_links","max_emojis","max_line_length","exempt_channel_ids","exempt_role_ids",
     "delete_message","timeout_minutes"
   ]},
-  { table: "welcome_settings", fields: ["enabled","channel_id","message","dm","embed"] },
+  { table: "welcome_settings", fields: ["enabled","channel_id","message","dm","embed","image_url","goodbye_enabled","goodbye_channel_id","goodbye_message","goodbye_embed","goodbye_image_url","starter_role_ids","restore_roles"] },
   { table: "ticket_settings", fields: ["enabled","category_id","staff_role_id","transcript_channel_id","max_open_per_user","auto_close_minutes"] },
   { table: "ticket_sla_settings", fields: ["enabled","first_response_minutes","reminder_minutes","escalation_minutes","escalation_role_id"] },
   { table: "security_settings", fields: [
