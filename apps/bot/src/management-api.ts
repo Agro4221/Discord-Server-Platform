@@ -1196,6 +1196,79 @@ export class ManagementApiServer {
             return;
           }
 
+          const moderationEscalationsMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/escalations$/);
+          const moderationEscalationItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/escalations\/(\d+)$/);
+
+          if ((moderationEscalationsMatch || moderationEscalationItemMatch) && !this.options.moderation) {
+            this.json(res, 500, { error: "moderation_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && moderationEscalationsMatch) {
+            const guildId = moderationEscalationsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, rules: await this.options.moderation!.listEscalations(guildId) });
+            return;
+          }
+
+          if (method === "POST" && moderationEscalationsMatch) {
+            const guildId = moderationEscalationsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const warnCount = Number(body.warnCount);
+            const action = typeof body.action === "string" ? body.action : "";
+            const durationMinutes = Number(body.durationMinutes ?? 0);
+            const reason = typeof body.reason === "string" ? body.reason : "";
+            if (!Number.isInteger(warnCount) || warnCount < 1 || warnCount > 100 ||
+                !["timeout","ban"].includes(action) ||
+                !Number.isInteger(durationMinutes) || durationMinutes < 0 || durationMinutes > 40320 ||
+                !reason.trim()) {
+              throw new RequestInputError("invalid_escalation", 400);
+            }
+            await this.options.moderation!.setEscalation(
+              guildId, warnCount, action as "timeout" | "ban", durationMinutes, reason
+            );
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "moderation.escalation.configured",
+              targetType: "escalation",
+              targetId: String(warnCount),
+              metadata: { action, durationMinutes, reason: reason.trim().slice(0,500) }
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          if (method === "DELETE" && moderationEscalationItemMatch) {
+            const guildId = moderationEscalationItemMatch[1] ?? "";
+            const warnCount = Number(moderationEscalationItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(warnCount) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_escalation_not_found" });
+              return;
+            }
+            const removed = await this.options.moderation!.removeEscalation(guildId, warnCount);
+            if (!removed) {
+              this.json(res, 404, { error: "escalation_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "moderation.escalation.removed",
+              targetType: "escalation",
+              targetId: String(warnCount)
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
           const moderationHistoryMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/history$/);
           if (method === "GET" && moderationHistoryMatch) {
             if (!this.options.moderation) {
