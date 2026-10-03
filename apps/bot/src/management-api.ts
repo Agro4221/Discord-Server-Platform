@@ -110,6 +110,7 @@ type ApiOptions = {
   communityTools?: CommunityTools;
   verification?: Verification;
   security?: Security;
+  temporaryVoice?: TemporaryVoice;
   commandPolicy?: CommandPolicyService;
   rolePanels?: {
     list: (guildId: string) => Promise<unknown[]>;
@@ -378,6 +379,21 @@ export class ManagementApiServer {
 
             const modules = await this.options.moduleSettings.list(guildId);
             this.json(res, 200, { guildId, catalog: MODULE_CATALOG, modules });
+            return;
+          }
+
+          const temporaryVoiceMatch = path.match(/^\/api\/guilds\/([^/]+)\/temporary-voice$/);
+          if (method === "GET" && temporaryVoiceMatch) {
+            const guildId = temporaryVoiceMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (!this.options.temporaryVoice) {
+              this.json(res, 500, { error: "temporary_voice_unavailable" });
+              return;
+            }
+            this.json(res, 200, { guildId, ...(await this.options.temporaryVoice.dashboardSnapshot(guildId)) });
             return;
           }
 

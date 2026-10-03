@@ -24,6 +24,7 @@ import { DiscordDiagnosticsPanel } from "./discord-diagnostics-panel";
 import { CommunityToolsPanel } from "./community-tools-panel";
 import { VerificationPanel } from "./verification-panel";
 import { SecurityPanel } from "./security-panel";
+import { TemporaryVoicePanel } from "./temporary-voice-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -162,7 +163,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
     title: "Temporary Voice",
     summary: "Комнаты, создаваемые при входе в voice-триггер.",
     category: "server",
-    commands: ["/setup temp-voice"],
+    commands: ["/setup temp-voice", "/voice"],
     functions: [
       { title: "Create-on-join", description: "Создание временной комнаты при входе в триггер-канал." },
       { title: "Лимит участников", description: "Задание лимита комнаты по умолчанию." },
@@ -170,7 +171,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Категория", description: "Размещение создаваемых комнат в выбранной категории." },
       { title: "Recovery", description: "Reconciliation после рестарта и очистка освобождённых комнат." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   welcome: {
     icon: "✧",
@@ -442,7 +443,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "security", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "starboard", "community-tools", "verification"]);
+const PANEL_KEYS = new Set(["moderation", "security", "temporary-voice", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "starboard", "community-tools", "verification"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1505,6 +1506,13 @@ function ModulePage(props: {
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Security Center" eyebrow="OPERATIONS" />
           <SecurityPanel guildId={props.guildId} onChanged={props.onAudit} />
+        </section>
+      )}
+
+      {props.module?.key === "temporary-voice" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Temporary Voice Center" eyebrow="OPERATIONS" />
+          <TemporaryVoicePanel guildId={props.guildId} onChanged={props.onAudit} />
         </section>
       )}
 

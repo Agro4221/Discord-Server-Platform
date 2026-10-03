@@ -198,6 +198,35 @@ export class TemporaryVoice implements PlatformModule {
     return target;
   }
 
+  async dashboardSnapshot(guildId: string): Promise<{
+    rooms: Array<{ channelId: string; channelName: string; ownerId: string; memberCount: number; userLimit: number }>;
+  }> {
+    let guild: Guild | undefined;
+    for (const candidate of this.getGuilds()) {
+      if (candidate.id === guildId) {
+        guild = candidate;
+        break;
+      }
+    }
+
+    const rooms = [...this.rooms.entries()]
+      .filter(([, room]) => room.guildId === guildId)
+      .map(([channelId, room]) => {
+        const channel = guild?.channels.cache.get(channelId);
+        if (!channel || channel.type !== ChannelType.GuildVoice) return null;
+        return {
+          channelId,
+          channelName: channel.name,
+          ownerId: room.ownerId,
+          memberCount: channel.members.size,
+          userLimit: channel.userLimit
+        };
+      })
+      .filter((room): room is { channelId: string; channelName: string; ownerId: string; memberCount: number; userLimit: number } => room !== null);
+
+    return { rooms };
+  }
+
   async configure(guildId: string, config: TempVoiceConfig): Promise<void> {
     await this.db.transaction(async (client) => {
       await client.query(

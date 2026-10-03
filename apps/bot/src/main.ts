@@ -272,6 +272,7 @@ async function main(): Promise<void> {
     communityTools,
     verification,
     security,
+    temporaryVoice,
     autoMod,
     commandPolicy,
     giveaways: {
