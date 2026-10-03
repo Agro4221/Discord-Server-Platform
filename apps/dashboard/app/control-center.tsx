@@ -26,7 +26,7 @@ type Field = {
 type ModuleAction = { id: string; label: string; kind?: "safe" | "danger"; confirmation?: string };
 type Schema = { key: string; title: string; fields: Field[]; actions?: ModuleAction[] };
 type Resource = { id: string; name: string; type?: number; position?: number; manageable?: boolean };
-type AuditEvent = { action: string; target_id: string | null; created_at: string };
+type AuditEvent = { action: string; target_id: string | null; created_at: string; metadata?: Record<string, unknown> };
 type CatalogItem = { key: string; title: string; description: string };
 type Health = { status: string; discord: string; database: string } | null;
 
@@ -1423,6 +1423,13 @@ function ModulePage(props: {
         </section>
       )}
 
+      {props.module?.key === "security" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Security incidents" eyebrow="INCIDENTS" />
+          <SecurityIncidentPanel audit={props.audit} />
+        </section>
+      )}
+
       {props.module?.key === "automation" && (
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Automation builder" eyebrow="OPERATIONS" />
@@ -1513,6 +1520,47 @@ function ModulePage(props: {
         {props.audit.slice(0, 7).map((event, index) => <AuditCompact key={index} event={event} last={index === Math.min(6, props.audit.length - 1)} />)}
         {!props.audit.length && <Empty text="Изменений ещё не было." />}
       </section>
+    </div>
+  );
+}
+
+function SecurityIncidentPanel({ audit }: { audit: AuditEvent[] }) {
+  const incidents = audit.filter((event) => event.action.startsWith("security."));
+  const raid = incidents.filter((event) => event.action === "security.raid-detected");
+  const destructive = incidents.filter((event) => event.action === "security.destructive-burst");
+  const responses = incidents.filter((event) => event.action === "security.response-applied");
+  const latest = incidents.slice(0, 8);
+
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
+        <MiniMetric label="Anti-Raid" value={String(raid.length)} />
+        <MiniMetric label="Destructive bursts" value={String(destructive.length)} />
+        <MiniMetric label="Responses" value={String(responses.length)} />
+      </div>
+      {latest.length ? latest.map((event, index) => (
+        <div key={String(index) + event.created_at} style={{ padding: "9px 10px", border: "1px solid #242b36", borderRadius: 10, background: "#0d1219" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+            <strong style={{ fontSize: 11 }}>{event.action}</strong>
+            <span style={{ color: "#697486", fontSize: 9 }}>{new Date(event.created_at).toLocaleString("ru-RU")}</span>
+          </div>
+          <div style={{ marginTop: 4, color: "#737e8f", fontSize: 9 }}>
+            target: {event.target_id ?? "—"}
+            {event.metadata && Object.keys(event.metadata).length ? " · " + JSON.stringify(event.metadata).slice(0, 280) : ""}
+          </div>
+        </div>
+      )) : (
+        <div style={{ color: "#697486", fontSize: 11 }}>Security-событий в последнем окне аудита нет.</div>
+      )}
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ padding: 10, borderRadius: 10, border: "1px solid #232a35", background: "#0e131a" }}>
+      <div style={{ color: "#667184", fontSize: 9 }}>{label}</div>
+      <div style={{ marginTop: 4, fontSize: 17, fontWeight: 750 }}>{value}</div>
     </div>
   );
 }
