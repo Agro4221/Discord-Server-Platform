@@ -22,7 +22,7 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1)",
       [[
         "guild_modules","automod_settings","verification_settings","automation_rules",
-        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules"
+        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs"
       ]]
     );
     assert.equal(tables.rows.length, 15);
@@ -41,8 +41,8 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       [["priority","tags","updated_at"]]
     );
     assert.equal(ticketColumns.rows.length, 3);
-    assert.equal(Number(version), 73);
-    assert.equal(Number(first.rows[0]?.count), 73);
+    assert.equal(Number(version), 74);
+    assert.equal(Number(first.rows[0]?.count), 74);
   } finally {
     await db.close();
   }
@@ -531,6 +531,45 @@ test("ticket priority and tags persist with expected bounds", { skip: !enabled }
     );
   } finally {
     await db.query("DELETE FROM tickets WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.close();
+  }
+});
+
+test("role automation rules and delayed jobs persist with bounded state", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345734";
+  try {
+    await migrate(db);
+    await db.query(
+      "INSERT INTO role_automation_rules(guild_id,trigger,channel_id,role_id,delay_seconds,enabled) VALUES($1,'member.join','',$2,3600,true)",
+      [guildId,"123456789012345733"]
+    );
+    await db.query(
+      "INSERT INTO role_automation_jobs(guild_id,user_id,role_id,add_role,available_at) VALUES($1,$2,$3,true,now()+interval '1 hour')",
+      [guildId,"123456789012345732","123456789012345733"]
+    );
+    const rules = await db.query<{ trigger: string; channel_id: string; role_id: string; delay_seconds: number }>(
+      "SELECT trigger,channel_id,role_id,delay_seconds FROM role_automation_rules WHERE guild_id=$1",
+      [guildId]
+    );
+    const jobs = await db.query<{ user_id: string; role_id: string; attempts: number }>(
+      "SELECT user_id,role_id,attempts FROM role_automation_jobs WHERE guild_id=$1",
+      [guildId]
+    );
+    assert.deepEqual(rules.rows, [{
+      trigger: "member.join",
+      channel_id: "",
+      role_id: "123456789012345733",
+      delay_seconds: 3600
+    }]);
+    assert.deepEqual(jobs.rows, [{
+      user_id: "123456789012345732",
+      role_id: "123456789012345733",
+      attempts: 0
+    }]);
+  } finally {
+    await db.query("DELETE FROM role_automation_jobs WHERE guild_id=$1",[guildId]).catch(() => undefined);
+    await db.query("DELETE FROM role_automation_rules WHERE guild_id=$1",[guildId]).catch(() => undefined);
     await db.close();
   }
 });
