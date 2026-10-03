@@ -350,7 +350,14 @@ export class ConfigTransferService {
       const settings = byKey.get(moduleKey);
       if (!settings) return;
 
-      const values = fields.map((field) => settings[field] ?? defaults[field]);
+      const values = fields.map((field) => {
+        const value = settings[field] ?? defaults[field];
+        if ((table === "analytics_settings" && field === "visible_counters") ||
+            (table === "starboard_settings" && (field === "ignored_channel_ids" || field === "ignored_role_ids"))) {
+          return JSON.stringify(value ?? []);
+        }
+        return value;
+      });
       const columns = ["guild_id", ...fields];
       const placeholders = columns.map((_, index) => `$${index + 1}`);
       const updates = fields.map((field) => `${field}=EXCLUDED.${field}`);
