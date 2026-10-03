@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { currentSession } from "../../../../../../lib/auth";
+import { currentSession } from "../../../../../lib/auth";
 
 export async function GET(_request: Request, context: { params: Promise<{ guildId: string }> }) {
   if (!await currentSession()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
