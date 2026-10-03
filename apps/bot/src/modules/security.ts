@@ -160,7 +160,8 @@ export class Security implements PlatformModule {
           `Anti-Raid: **${joins.length}/${config.maxJoins}** за ${config.windowSeconds} сек. · ${raidUntil > now ? "🚨 активен" : "✅ не активен"}`,
           `Destructive: **${destructive.length}/${config.maxDestructiveActions}** за ${config.destructiveWindowSeconds} сек. · ${destructiveUntil > now ? "🚨 активен" : "✅ не активен"}`,
           `Quarantine role: ${config.quarantineRoleId ? "<@&" + config.quarantineRoleId + ">" : "не настроена"}`,
-          `Log channel: ${config.logChannelId ? "<#" + config.logChannelId + ">" : "не настроен"}`
+          `Log channel: ${config.logChannelId ? "<#" + config.logChannelId + ">" : "не настроен"}`,
+          `Responses: Anti-Raid quarantine=${config.raidQuarantineEnabled ? "on" : "off"} · destructive roles=${config.destructiveRoleRemoval ? "on" : "off"} · destructive quarantine=${config.destructiveQuarantineEnabled ? "on" : "off"}`
         ].join("\n"),
         ephemeral: true
       });
@@ -181,7 +182,10 @@ export class Security implements PlatformModule {
       maxDestructiveActions: interaction.options.getInteger("max-destructive") ?? 5,
       destructiveWindowSeconds: interaction.options.getInteger("destructive-window") ?? 20,
       quarantineRoleId: interaction.options.getRole("quarantine-role")?.id ?? null,
-      logChannelId: logChannel?.id ?? null
+      logChannelId: logChannel?.id ?? null,
+      raidQuarantineEnabled: interaction.options.getBoolean("raid-quarantine") ?? true,
+      destructiveRoleRemoval: interaction.options.getBoolean("destructive-role-removal") ?? true,
+      destructiveQuarantineEnabled: interaction.options.getBoolean("destructive-quarantine") ?? true
     });
     await interaction.reply({ content: "Security настроен и включён.", ephemeral: true });
   }
