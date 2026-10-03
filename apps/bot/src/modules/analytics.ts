@@ -70,7 +70,7 @@ export class Analytics implements PlatformModule {
     );
   }
 
-  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
     if (!interaction.inGuild() || commandName !== "analytics") return;
     if (!await moduleEnabled(this.db, interaction.guild!.id, "analytics", false)) {
       await interaction.reply({ content: "Модуль Analytics выключен.", ephemeral: true });
