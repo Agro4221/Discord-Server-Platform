@@ -19,6 +19,7 @@ import { TicketsPanel } from "./tickets-panel";
 import { LevelingPanel } from "./leveling-panel";
 import { CommandPoliciesPanel } from "./command-policies-panel";
 import { StarboardPanel } from "./starboard-panel";
+import { ServerSettingsPanel } from "./server-settings-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -882,6 +883,9 @@ export function ControlCenter() {
                 }}
                 onToggle={(key, value) => void toggle(key, value)}
                 saving={saving}
+                guildId={guildId}
+                resources={resources}
+                onChanged={reloadAudit}
               />
             )}
 
@@ -1068,6 +1072,9 @@ function Overview(props: {
   onFunctions: () => void;
   onToggle: (key: string, value: boolean) => void;
   saving: boolean;
+  guildId: string;
+  resources: { channels: Resource[]; roles: Resource[] };
+  onChanged: () => void;
 }) {
   const ready = props.health?.status === "ready";
   const enabled = props.catalog.filter((item) => props.modules[item.key]);
@@ -1136,6 +1143,11 @@ function Overview(props: {
             );
           })}
         </div>
+      </section>
+
+      <section style={{ ...panel, padding: 20 }}>
+        <SectionHeader title="Server Settings" eyebrow="CORE CONFIG" />
+        <ServerSettingsPanel guildId={props.guildId} roles={props.resources.roles} channels={props.resources.channels.filter((item) => item.type === 0)} onChanged={props.onChanged} />
       </section>
 
       <section style={{ display: "grid", gridTemplateColumns: "minmax(0,1.35fr) minmax(320px,.85fr)", gap: 14 }}>

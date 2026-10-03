@@ -1540,7 +1540,8 @@ export class ManagementApiServer {
                 timezone: typeof body.timezone === "string" ? body.timezone : undefined,
                 djRoleId: body.djRoleId === null || typeof body.djRoleId === "string" ? body.djRoleId : undefined,
                 moderatorRoleIds: Array.isArray(body.moderatorRoleIds) ? body.moderatorRoleIds.filter((v: unknown): v is string => typeof v === "string") : undefined,
-                defaultLogChannelId: body.defaultLogChannelId === null || typeof body.defaultLogChannelId === "string" ? body.defaultLogChannelId : undefined
+                defaultLogChannelId: body.defaultLogChannelId === null || typeof body.defaultLogChannelId === "string" ? body.defaultLogChannelId : undefined,
+                auditLogEnabled: typeof body.auditLogEnabled === "boolean" ? body.auditLogEnabled : undefined
               });
               await this.options.auditLog.record({
                 guildId,
