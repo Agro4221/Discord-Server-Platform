@@ -121,7 +121,11 @@ type ApiOptions = {
     getCustomization: (guildId: string) => Promise<TicketCustomization>;
     setCustomization: (guildId: string, customization: Partial<TicketCustomization>) => Promise<TicketCustomization>;
   };
-  moderation?: Moderation;
+  moderation?: Moderation & {
+    listCleanupRules?: (guildId: string) => Promise<unknown[]>;
+    saveCleanupRule?: (guildId: string, channelId: string, intervalSeconds: number, maxMessages: number, enabled?: boolean) => Promise<void>;
+    deleteCleanupRule?: (guildId: string, id: number) => Promise<boolean>;
+  };
   music?: Music;
   leveling?: Leveling;
   economy?: Economy;
@@ -1508,6 +1512,68 @@ export class ManagementApiServer {
               metadata: { moderationAction: action, ...(durationMinutes ? { durationMinutes } : {}), ...(reason ? { reason } : {}) }
             });
             this.json(res, 200, { ok: true, result });
+            return;
+          }
+
+          const moderationCleanupMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/cleanup$/);
+          const moderationCleanupItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/cleanup\/(\d+)$/);
+
+          if ((moderationCleanupMatch || moderationCleanupItemMatch) && !this.options.moderation) {
+            this.json(res, 500, { error: "moderation_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && moderationCleanupMatch) {
+            const guildId = moderationCleanupMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, rules: await this.options.moderation!.listCleanupRules(guildId) });
+            return;
+          }
+
+          if (method === "POST" && moderationCleanupMatch) {
+            const guildId = moderationCleanupMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const channelId = typeof body.channelId === "string" ? body.channelId : "";
+            const intervalSeconds = Number(body.intervalSeconds);
+            const maxMessages = Number(body.maxMessages);
+            const enabled = body.enabled !== false;
+            if (!/^\d{17,20}$/.test(channelId) || !Number.isInteger(intervalSeconds) || intervalSeconds < 60 || intervalSeconds > 604800 || !Number.isInteger(maxMessages) || maxMessages < 1 || maxMessages > 100) {
+              throw new RequestInputError("invalid_cleanup_rule", 400);
+            }
+            await this.options.moderation!.saveCleanupRule(guildId, channelId, intervalSeconds, maxMessages, enabled);
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "moderation.autopurge.configured",
+              targetType: "channel", targetId: channelId,
+              metadata: { intervalSeconds, maxMessages, enabled }
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          if (method === "DELETE" && moderationCleanupItemMatch) {
+            const guildId = moderationCleanupItemMatch[1] ?? "";
+            const id = Number(moderationCleanupItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(id) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_cleanup_not_found" });
+              return;
+            }
+            const removed = await this.options.moderation!.deleteCleanupRule(guildId, id);
+            if (!removed) {
+              this.json(res, 404, { error: "cleanup_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "moderation.autopurge.removed",
+              targetType: "cleanup-rule", targetId: String(id)
+            });
+            this.json(res, 200, { ok: true });
             return;
           }
 
