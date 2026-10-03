@@ -200,6 +200,10 @@ export class Polls implements PlatformModule {
       );
       const id = Number(created.rows[0]?.id);
       if (!Number.isSafeInteger(id) || id < 1) throw new Error("suggestion_id_missing");
+      if (!("send" in interaction.channel!)) {
+        await interaction.reply({ content: "Нужен текстовый канал для публикации предложения.", ephemeral: true });
+        return;
+      }
       const message = await interaction.channel!.send({
         embeds: [this.suggestionEmbed(id, content, [], [], "open")],
         components: [this.suggestionRow(id, [], [], false)]
@@ -311,7 +315,7 @@ export class Polls implements PlatformModule {
     );
     const row = result.rows[0];
     if (!row) return null;
-    const updated = { content:row.content, upvotes:Array.isArray(row.upvotes) ? row.upvotes : [], downvotes:Array.isArray(row.downvotes) ? row.downvotes : [], status, reason:row.review_reason };
+    const updated = { id, content:row.content, upvotes:Array.isArray(row.upvotes) ? row.upvotes : [], downvotes:Array.isArray(row.downvotes) ? row.downvotes : [], status, reason:row.review_reason };
     const existing = await this.getSuggestionMessage(guildId, id);
     if (existing) {
       await existing.message.edit({
