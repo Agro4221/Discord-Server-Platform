@@ -23,6 +23,12 @@ import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 
+declare module "lavalink-client" {
+  interface TrackRequester {
+    id?: string;
+  }
+}
+
 type MusicRepeatMode = "off" | "track" | "queue";
 
 const MAX_PLAYLIST_TRACKS = 500;
