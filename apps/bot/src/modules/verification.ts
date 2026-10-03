@@ -34,6 +34,68 @@ export class Verification implements PlatformModule {
     this.codes.clear();
   }
 
+  async handlePrefixCommand(message: import("discord.js").Message, commandName: string, args: string[]): Promise<boolean> {
+    if (commandName !== "verify") return false;
+    if (!message.guild) return false;
+
+    const sub = (args.shift() ?? "setup").toLowerCase();
+    if (sub === "panel") {
+      const channel = message.mentions.channels.first();
+      const target = channel ?? message.guild.channels.cache.get(message.channelId);
+      if (!target || target.type !== 0) {
+        await message.reply("Укажи текстовый канал: !verify panel #канал");
+        return true;
+      }
+      await target.send({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle("✅ Проверка участника")
+            .setDescription("Нажми кнопку, получи одноразовый код и подтверди его через кнопку ниже.")
+        ],
+        components: [
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder().setCustomId("dsp:verify:issue").setLabel("Получить код").setStyle(ButtonStyle.Primary)
+          )
+        ]
+      });
+      await message.reply("Панель Verification опубликована.");
+      return true;
+    }
+
+    if (sub !== "setup") {
+      await message.reply("Использование: !verify setup [#канал] [@verified-role] [@quarantine-role] [#log-channel] [ttl]");
+      return true;
+    }
+
+    const channel = message.mentions.channels.first();
+    const roleMentions = message.mentions.roles.values();
+    const roles = [...roleMentions];
+    const logChannel = message.mentions.channels.at(1) ?? null;
+    const ttlToken = args.find((arg) => /^\d+$/.test(arg));
+    const ttl = ttlToken ? Math.min(Math.max(Number(ttlToken), 2), 60) : 10;
+    const [verifiedRole, quarantineRole] = roles;
+
+    if (verifiedRole && (verifiedRole.managed || (message.guild.members.me?.roles.highest.position ?? 0) <= verifiedRole.position)) {
+      await message.reply("Verified role недоступна из-за role hierarchy.");
+      return true;
+    }
+    if (quarantineRole && (quarantineRole.managed || (message.guild.members.me?.roles.highest.position ?? 0) <= quarantineRole.position)) {
+      await message.reply("Quarantine role недоступна из-за role hierarchy.");
+      return true;
+    }
+
+    await this.configure(message.guild.id, {
+      enabled: true,
+      channelId: channel?.id ?? null,
+      verifiedRoleId: verifiedRole?.id ?? null,
+      quarantineRoleId: quarantineRole?.id ?? null,
+      logChannelId: logChannel?.id ?? null,
+      codeTtlMinutes: ttl
+    });
+    await message.reply("Verification настроен.");
+    return true;
+  }
+
   private async config(guildId: string): Promise<VerificationConfig> {
     const result = await this.db.query<{
       enabled: boolean;
