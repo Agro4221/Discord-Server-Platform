@@ -14,6 +14,12 @@ type ShopItem = {
   enabled: boolean;
 };
 
+type EconomyAccount = {
+  userId: string;
+  balance: string;
+  displayName: string;
+};
+
 type Draft = {
   name: string;
   description: string;
@@ -42,6 +48,9 @@ export function EconomyShopPanel({
   onChanged?: () => void | Promise<void>;
 }) {
   const [items, setItems] = useState<ShopItem[]>([]);
+  const [accounts, setAccounts] = useState<EconomyAccount[]>([]);
+  const [accountUserId, setAccountUserId] = useState("");
+  const [accountBalance, setAccountBalance] = useState("0");
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -49,13 +58,57 @@ export function EconomyShopPanel({
 
   async function load() {
     if (!guildId) return;
-    const response = await fetch(
-      "/api/guilds/" + encodeURIComponent(guildId) + "/economy/items",
-      { cache: "no-store" }
-    );
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(String(body.error ?? "economy_items_failed"));
-    setItems((body.items ?? []) as ShopItem[]);
+    const [itemsResponse, accountsResponse] = await Promise.all([
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/economy/items", { cache: "no-store" }),
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/economy/accounts", { cache: "no-store" })
+    ]);
+    const itemsBody = await itemsResponse.json().catch(() => ({}));
+    const accountsBody = await accountsResponse.json().catch(() => ({}));
+    if (!itemsResponse.ok) throw new Error(String(itemsBody.error ?? "economy_items_failed"));
+    if (!accountsResponse.ok) throw new Error(String(accountsBody.error ?? "economy_accounts_failed"));
+    setItems((itemsBody.items ?? []) as ShopItem[]);
+    setAccounts((accountsBody.accounts ?? []) as EconomyAccount[]);
+  }
+
+  function editAccount(account: EconomyAccount) {
+    setAccountUserId(account.userId);
+    setAccountBalance(account.balance);
+    setError("");
+  }
+
+  async function saveAccount() {
+    const userId = accountUserId.trim();
+    const balance = accountBalance.trim();
+    if (!/^\d{15,25}$/.test(userId)) {
+      setError("Укажи корректный Discord ID пользователя.");
+      return;
+    }
+    if (!/^\d+$/.test(balance)) {
+      setError("Баланс должен быть целым неотрицательным числом.");
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(
+        "/api/guilds/" + encodeURIComponent(guildId) + "/economy/accounts/" + encodeURIComponent(userId),
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ balance })
+        }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(String(body.error ?? "economy_balance_update_failed"));
+      await load();
+      setAccountBalance(String(body.balance ?? balance));
+      await onChanged?.();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось изменить баланс.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -159,8 +212,45 @@ export function EconomyShopPanel({
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ color: "#707b8d", fontSize: 11, lineHeight: 1.55 }}>
-        Управление магазином сервера. Роль товара проходит проверку иерархии на стороне Core перед сохранением.
+        Управление магазином и серверной экономикой. Изменение балансов доступно только из защищённой панели управления.
       </div>
+
+      <section style={sectionBox}>
+        <div style={label}>ECONOMY ACCOUNTS</div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(190px,1fr) 180px auto", gap: 8, marginTop: 9 }}>
+          <input
+            value={accountUserId}
+            onChange={(event) => setAccountUserId(event.target.value)}
+            inputMode="numeric"
+            placeholder="Discord ID пользователя"
+            style={inputStyle}
+          />
+          <input
+            value={accountBalance}
+            onChange={(event) => setAccountBalance(event.target.value)}
+            inputMode="numeric"
+            type="number"
+            min={0}
+            placeholder="Новый баланс"
+            style={inputStyle}
+          />
+          <button type="button" disabled={busy} onClick={() => void saveAccount()} style={button("primary")}>Установить</button>
+        </div>
+
+        <div style={{ display: "grid", gap: 1, marginTop: 10 }}>
+          {accounts.map((account) => (
+            <div key={account.userId} style={rowStyle}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: "#dce2ea", fontSize: 11 }}>{account.displayName}</div>
+                <div style={{ marginTop: 3, color: "#667284", fontSize: 9 }}>{account.userId}</div>
+              </div>
+              <strong style={{ marginLeft: "auto", color: "#e7ebf2" }}>{account.balance} coins</strong>
+              <button type="button" disabled={busy} onClick={() => editAccount(account)} style={button("secondary")}>Изменить</button>
+            </div>
+          ))}
+          {accounts.length === 0 && <div style={muted}>Счетов пока нет.</div>}
+        </div>
+      </section>
 
       {error && (
         <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d", color: "#f0b9be", fontSize: 11 }}>
@@ -289,6 +379,11 @@ export function EconomyShopPanel({
     </div>
   );
 }
+
+const sectionBox = { padding: 14, borderRadius: 14, border: "1px solid #222a35", background: "#0d1219" } as const;
+const rowStyle = { display: "flex", alignItems: "center", gap: 9, padding: "9px 0", borderBottom: "1px solid #1d232d" } as const;
+const label = { color: "#687486", fontSize: 9, letterSpacing: 1.2 } as const;
+const muted = { color: "#687386", fontSize: 10 } as const;
 
 const inputStyle = {
   width: "100%",
