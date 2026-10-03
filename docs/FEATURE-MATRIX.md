@@ -103,7 +103,7 @@
 | Message / role / moderation actions | ✅ |
 | Schedule trigger | ✅ |
 | DM / webhook actions | ✅ | DM + hardened webhook action
-| Conditional branches | 🟡 |
+| Conditional branches | ✅ | Nested if/else action branches up to 2 levels |
 | Delay / queue semantics | 🟡 | Delay implemented; durable queue semantics remain
 | Template variables / reusable snippets | 🟡 |
 | Visual automation builder | ✅ |
