@@ -632,6 +632,8 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       )
       .addSubcommand((sub) => sub.setName("pause").setDescription("Pause playback"))
       .addSubcommand((sub) => sub.setName("resume").setDescription("Resume playback"))
+      .addSubcommand((sub) => sub.setName("previous").setDescription("Play previous track"))
+      .addSubcommand((sub) => sub.setName("lyrics").setDescription("Show lyrics for the current track"))
       .addSubcommand((sub) => sub.setName("skip").setDescription("Skip current track"))
       .addSubcommand((sub) => sub.setName("stop").setDescription("Stop and clear queue"))
       .addSubcommand((sub) => sub.setName("shuffle").setDescription("Shuffle the queue"))
