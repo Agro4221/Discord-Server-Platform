@@ -1257,8 +1257,7 @@ const migrations = [
       "ALTER TABLE welcome_settings ADD COLUMN IF NOT EXISTS image_url text;",
       "ALTER TABLE welcome_settings ADD COLUMN IF NOT EXISTS goodbye_image_url text;"
     ])
-  },
-  },
+  }
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
