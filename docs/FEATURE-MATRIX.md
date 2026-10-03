@@ -370,7 +370,7 @@ Music должен стремиться к функциональности си
 | Interactive buttons/selects/modals toolkit | 🟡 |
 | Custom help/menu pages | 🟡 |
 | Server info / user info / role/channel utility suite | 🟡 |
-| AFK / away system | 🟡 |
+| AFK / away system | ✅ |
 
 #### Roles / onboarding
 | Функция | План |
