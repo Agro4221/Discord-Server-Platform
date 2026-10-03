@@ -120,7 +120,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Kick / Ban / Unban", description: "Модерационные действия с проверкой прав и иерархии." },
       { title: "История", description: "Просмотр последних moderation cases по пользователю." }
     ],
-    kind: "discord"
+    kind: "full"
   },
   automod: {
     icon: "⌁",
@@ -225,7 +225,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Close / archive", description: "Закрытие тикета с обработкой stale-состояний." },
       { title: "Transcripts", description: "Публикация transcript в выделенный канал." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   leveling: {
     icon: "↗",
@@ -240,7 +240,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Rank", description: "Просмотр собственного или чужого ранга." },
       { title: "Leaderboard", description: "Таблица лидеров сервера." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   giveaways: {
     icon: "🎁",
@@ -269,7 +269,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Filtering", description: "Игнорирование собственных реакций и ботов." },
       { title: "Publishing", description: "Безопасная публикация с rollback при ошибке БД." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   economy: {
     icon: "◍",
@@ -284,7 +284,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Leaderboard", description: "Таблица самых богатых участников." },
       { title: "Shop", description: "Магазин с ролями, ценой и ограниченным stock." }
     ],
-    kind: "discord"
+    kind: "full"
   },
   reminders: {
     icon: "◷",
