@@ -1,5 +1,4 @@
 import type { ChatInputCommandInteraction } from "discord.js";
-import type { ChatInputCommandInteraction } from "discord.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
