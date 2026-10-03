@@ -1900,6 +1900,10 @@ export class ManagementApiServer {
             const botMember = guild.members.me;
             if (!channel || channel.type !== 0) throw new RequestInputError("text_channel_required", 400);
             if (!botMember?.permissions.has("ManageRoles")) throw new RequestInputError("bot_missing_manage_roles", 400);
+            const channelPermissions = channel.permissionsFor(botMember);
+            if (!channelPermissions?.has("ViewChannel") || !channelPermissions.has("SendMessages")) {
+              throw new RequestInputError("bot_missing_role_panel_channel_permissions", 400);
+            }
 
             for (const entry of roles) {
               const role = guild.roles.cache.get(entry.roleId);
