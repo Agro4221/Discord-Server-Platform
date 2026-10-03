@@ -96,3 +96,11 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Added slash-command shape coverage for /moderate unban.
 - Added service-level regression coverage for the Discord unban action and moderation-case persistence.
 - Live banned-user/unban behavior remains part of the Discord smoke test.
+
+
+### 2026-10-04 — Command routing / multi-bot snapshot
+- Command policy definitions are now unique and cover all registered top-level slash commands.
+- Prefix allowlist parity is regression-tested in both directions, including the economy/music roots.
+- Secondary bot automatic stale-guild failover is wired into the 15-second fleet maintenance cycle and covered by deterministic repository tests.
+- Passive Event Bus guild filtering is regression-tested for bulk message deletion, channel/role create-update-delete, unban and Security incident events.
+- Final head `6c74c0f68e621ff44d7cbdf0089407f46a5b1301` is awaiting its fresh CI result; live multi-bot Discord behavior remains an environment-dependent acceptance case.

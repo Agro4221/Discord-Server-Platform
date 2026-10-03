@@ -230,3 +230,13 @@ Never write credentials, tokens or private user data here.
 - Events covered: message delete/edit, member join/leave/update, voice joins/leaves/moves, channel deletion, role deletion and ban/unban.
 - Logging is persisted through the existing audit event store and delivered to a configured dedicated Discord channel.
 - Added migration 42, slash/prefix setup, Dashboard settings and Control Center metadata.
+
+
+## 2026-10-04 — Command routing and multi-bot failover hardening
+- Development head for this pass: `6c74c0f68e621ff44d7cbdf0089407f46a5b1301`.
+- Command-policy registry is now unique and covers every registered top-level slash command; the root `/leveling` command was added to policy control.
+- Prefix routing now has bidirectional regression coverage against `COMMAND_DEFINITIONS`; `!economy` and `!music` were added to the built-in router allowlist so all policy-declared prefix commands reach the dispatcher.
+- Custom-command slash aliases now route the root `/leveling` command through the shared dispatcher.
+- Secondary bot identities with `failover_enabled=true` now periodically claim stale guild assignments they are connected to, using the existing atomic `FOR UPDATE SKIP LOCKED` claim path; each fleet cycle refreshes assignments and still attempts the heartbeat when assignment refresh fails.
+- Added regression coverage for failover guard/claim behavior and guild filtering across passive Event Bus events.
+- CI run #1195 on the preceding command-policy/prefix-routing head passed. The final failover/alias head requires its own fresh green CI run before it is marked fully verified.

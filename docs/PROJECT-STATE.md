@@ -40,7 +40,7 @@ Release candidate — code/CI verified, ready for live Discord validation.
 - Full Security response workflow beyond the current anti-raid/quarantine/destructive-burst response.
 - Full Automation condition/action catalog beyond the currently supported safe builder.
 - Music provider breadth and multi-node failover validation beyond the current Lavalink foundation.
-- Full multi-bot fleet orchestration/failover automation beyond persisted assignments and health UI.
+- Full multi-bot fleet orchestration beyond automatic stale-guild failover, persisted assignments and health UI.
 - Full E2E/chaos/soak/security test suite and live Discord validation.
 - VPS installer/reverse-proxy production drill and clean-host acceptance.
 
@@ -189,3 +189,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-03 — Discord event logging
 - Added the Logging module with persistent per-guild settings.
 - Passive Discord events can now be routed to a dedicated log channel while remaining available in durable audit history.
+
+## 2026-10-04 — Command routing / fleet continuity pass
+- Latest development code head: `6c74c0f68e621ff44d7cbdf0089407f46a5b1301`.
+- Added centralized command-policy parity checks, complete prefix allowlist coverage, root `/leveling` alias routing and automatic secondary-identity stale-guild failover.
+- Deterministic regression coverage was added for command registry consistency, failover guard/claim behavior and passive-event guild isolation.
+- CI on the preceding head passed; CI for the latest failover/alias head remains the active verification gate.
