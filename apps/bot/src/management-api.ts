@@ -824,6 +824,14 @@ export class ManagementApiServer {
               userIsBot: typeof body.userIsBot === "boolean" ? body.userIsBot : undefined,
               channelId: typeof body.channelId === "string" ? body.channelId : undefined,
               channelType: typeof body.channelType === "string" ? body.channelType as import("@dsp/domain").AutomationChannelType : undefined,
+              permissions: Array.isArray(body.permissions)
+                ? body.permissions
+                    .filter((v: unknown): v is import("@dsp/domain").AutomationPermission => [
+                      "Administrator","ManageGuild","ManageChannels","ManageRoles",
+                      "ManageMessages","KickMembers","BanMembers","ModerateMembers"
+                    ].includes(v as import("@dsp/domain").AutomationPermission))
+                    .slice(0, 20)
+                : [],
               roleIds: Array.isArray(body.roleIds)
                 ? body.roleIds.filter((v: unknown): v is string => typeof v === "string").slice(0, 20)
                 : [],
