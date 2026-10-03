@@ -171,7 +171,7 @@ type StorageSpec = {
   columns: Record<string, string>;
 };
 
-const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
+export const DASHBOARD_SETTINGS_STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
   "temporary-voice": {
     table: "guild_settings",
     columns: {
@@ -275,12 +275,16 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       channelId: "channel_id",
       messageDelete: "message_delete",
       messageEdit: "message_edit",
+      messageBulkDelete: "message_bulk_delete",
+      reactions: "reactions",
       memberJoin: "member_join",
       memberLeave: "member_leave",
       memberUpdate: "member_update",
       voice: "voice",
       channelDelete: "channel_delete",
+      channelUpdate: "channel_update",
       roleDelete: "role_delete",
+      roleUpdate: "role_update",
       bans: "bans"
     }
   },
@@ -382,7 +386,7 @@ export class DashboardSettingsService {
   }
 
   async get(guildId: string, moduleKey: ModuleKey): Promise<Record<string, unknown>> {
-    const spec = STORAGE[moduleKey];
+    const spec = DASHBOARD_SETTINGS_STORAGE[moduleKey];
     if (!spec) return {};
 
     const columns = Object.values(spec.columns);
@@ -409,7 +413,7 @@ export class DashboardSettingsService {
     values: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
     const schema = DASHBOARD_SETTINGS.find((item) => item.key === moduleKey);
-    const spec = STORAGE[moduleKey];
+    const spec = DASHBOARD_SETTINGS_STORAGE[moduleKey];
     if (!schema || !spec) throw new Error("settings_not_supported");
 
     const current = await this.get(guildId, moduleKey);
