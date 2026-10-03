@@ -29,6 +29,14 @@ export const DEFAULT_TICKET_CUSTOMIZATION: Readonly<TicketCustomization> = {
   closeButtonLabel: "Закрыть"
 };
 
+export type TicketSlaConfig = {
+  enabled: boolean;
+  firstResponseMinutes: number;
+  reminderMinutes: number;
+  escalationMinutes: number;
+  escalationRoleId: string | null;
+};
+
 export type TicketConfig = {
   enabled: boolean;
   categoryId: string | null;
@@ -38,6 +46,7 @@ export type TicketConfig = {
   autoCloseMinutes: number;
   formFields: TicketFormField[];
   customization: TicketCustomization;
+  sla: TicketSlaConfig;
 };
 export const DEFAULT_TICKET_FORM_FIELDS: readonly TicketFormField[] = [
   { id: "subject", label: "Тема", type: "short", required: true, placeholder: "Кратко опиши вопрос", maxLength: 100 },
@@ -62,8 +71,11 @@ export class Tickets implements PlatformModule {
     const m = context.events.on("message.create", (message) => this.onMessage(message));
     this.unsubscribe = () => { a(); b(); m(); };
     this.recoveryTimer = setInterval(() => {
-      void this.recoverStaleClosures().catch((error) => {
-        logger.warn("Ticket stale-closure recovery failed", { error: String(error) });
+      void Promise.all([
+        this.recoverStaleClosures(),
+        this.processSla()
+      ]).catch((error) => {
+        logger.warn("Ticket background maintenance failed", { error: String(error) });
       });
     }, 60_000);
     this.recoveryTimer.unref();
@@ -96,6 +108,18 @@ export class Tickets implements PlatformModule {
       "SELECT enabled,category_id,staff_role_id,transcript_channel_id,max_open_per_user,auto_close_minutes,form_fields,panel_title,panel_description,create_button_label,claim_button_label,close_button_label FROM ticket_settings WHERE guild_id=$1",
       [guildId]
     );
+    const slaResult = await this.db.query<{
+      enabled: boolean;
+      first_response_minutes: number;
+      reminder_minutes: number;
+      escalation_minutes: number;
+      escalation_role_id: string | null;
+    }>(
+      "SELECT enabled,first_response_minutes,reminder_minutes,escalation_minutes,escalation_role_id FROM ticket_sla_settings WHERE guild_id=$1",
+      [guildId]
+    );
+    const sla = slaResult.rows[0];
+
     const row = result.rows[0];
     return {
       enabled: row?.enabled ?? false,
@@ -111,7 +135,14 @@ export class Tickets implements PlatformModule {
         createButtonLabel: row?.create_button_label ?? undefined,
         claimButtonLabel: row?.claim_button_label ?? undefined,
         closeButtonLabel: row?.close_button_label ?? undefined
-      })
+      }),
+      sla: {
+        enabled: sla?.enabled ?? false,
+        firstResponseMinutes: Math.min(Math.max(Number(sla?.first_response_minutes ?? 30), 1), 10080),
+        reminderMinutes: Math.min(Math.max(Number(sla?.reminder_minutes ?? 120), 1), 10080),
+        escalationMinutes: Math.min(Math.max(Number(sla?.escalation_minutes ?? 240), 1), 20160),
+        escalationRoleId: sla?.escalation_role_id ?? null
+      }
     };
   }
 
@@ -124,6 +155,26 @@ export class Tickets implements PlatformModule {
        ON CONFLICT(guild_id) DO UPDATE SET enabled=EXCLUDED.enabled,category_id=EXCLUDED.category_id,staff_role_id=EXCLUDED.staff_role_id,transcript_channel_id=EXCLUDED.transcript_channel_id,max_open_per_user=EXCLUDED.max_open_per_user,auto_close_minutes=EXCLUDED.auto_close_minutes,form_fields=EXCLUDED.form_fields,panel_title=EXCLUDED.panel_title,panel_description=EXCLUDED.panel_description,create_button_label=EXCLUDED.create_button_label,claim_button_label=EXCLUDED.claim_button_label,close_button_label=EXCLUDED.close_button_label,updated_at=now()`,
       [guildId,next.enabled,next.categoryId,next.staffRoleId,next.transcriptChannelId,Math.min(Math.max(Math.trunc(next.maxOpenPerUser),1),10),Math.min(Math.max(Math.trunc(next.autoCloseMinutes),0),43200),JSON.stringify(normalizeFormFields(next.formFields)),normalizeTicketCustomization(next.customization).panelTitle,normalizeTicketCustomization(next.customization).panelDescription,normalizeTicketCustomization(next.customization).createButtonLabel,normalizeTicketCustomization(next.customization).claimButtonLabel,normalizeTicketCustomization(next.customization).closeButtonLabel]
     );
+  async getSlaConfig(guildId: string): Promise<TicketSlaConfig> {
+    return (await this.config(guildId)).sla;
+  }
+
+  async setSlaConfig(guildId: string, input: Partial<TicketSlaConfig>): Promise<TicketSlaConfig> {
+    const current = await this.config(guildId);
+    const next: TicketSlaConfig = {
+      enabled: input.enabled ?? current.sla.enabled,
+      firstResponseMinutes: Math.min(Math.max(Math.trunc(input.firstResponseMinutes ?? current.sla.firstResponseMinutes), 1), 10080),
+      reminderMinutes: Math.min(Math.max(Math.trunc(input.reminderMinutes ?? current.sla.reminderMinutes), 1), 10080),
+      escalationMinutes: Math.min(Math.max(Math.trunc(input.escalationMinutes ?? current.sla.escalationMinutes), 1), 20160),
+      escalationRoleId: input.escalationRoleId !== undefined ? input.escalationRoleId : current.sla.escalationRoleId
+    };
+    await this.db.query(
+      "INSERT INTO ticket_sla_settings(guild_id,enabled,first_response_minutes,reminder_minutes,escalation_minutes,escalation_role_id) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(guild_id) DO UPDATE SET enabled=EXCLUDED.enabled,first_response_minutes=EXCLUDED.first_response_minutes,reminder_minutes=EXCLUDED.reminder_minutes,escalation_minutes=EXCLUDED.escalation_minutes,escalation_role_id=EXCLUDED.escalation_role_id,updated_at=now()",
+      [guildId,next.enabled,next.firstResponseMinutes,next.reminderMinutes,next.escalationMinutes,next.escalationRoleId]
+    );
+    return next;
+  }
+
     await this.db.query(
       `INSERT INTO guild_modules(guild_id,module_key,enabled)
        VALUES($1,'tickets',$2)
@@ -779,6 +830,60 @@ export class Tickets implements PlatformModule {
         error: String(error)
       });
     });
+  }
+
+  private async processSla(): Promise<void> {
+    const settings = await this.db.query<{
+      guild_id: string;
+      enabled: boolean;
+      first_response_minutes: number;
+      reminder_minutes: number;
+      escalation_minutes: number;
+      escalation_role_id: string | null;
+    }>(
+      "SELECT guild_id,enabled,first_response_minutes,reminder_minutes,escalation_minutes,escalation_role_id FROM ticket_sla_settings WHERE enabled=true",
+      []
+    );
+
+    for (const config of settings.rows) {
+      const tickets = await this.db.query<{
+        id: string;
+        channel_id: string;
+        creator_id: string;
+        claimed_by: string | null;
+        created_at: string;
+        last_activity_at: string | null;
+        sla_reminded_at: string | null;
+        sla_escalated_at: string | null;
+      }>(
+        "SELECT id,channel_id,creator_id,claimed_by,created_at,last_activity_at,sla_reminded_at,sla_escalated_at FROM tickets WHERE guild_id=$1 AND status='open' AND (sla_reminded_at IS NULL OR sla_escalated_at IS NULL) ORDER BY created_at ASC LIMIT 100",
+        [config.guild_id]
+      );
+
+      const guild = this.client?.guilds.cache.get(config.guild_id);
+      for (const ticket of tickets.rows) {
+        const channel = guild?.channels.cache.get(ticket.channel_id);
+        if (!channel || !channel.isTextBased() || !("send" in channel)) continue;
+
+        const createdAt = Date.parse(ticket.created_at);
+        const lastActivityAt = ticket.last_activity_at ? Date.parse(ticket.last_activity_at) : createdAt;
+        const ageMinutes = Math.max(0, (Date.now() - createdAt) / 60000);
+        const inactivityMinutes = Math.max(0, (Date.now() - lastActivityAt) / 60000);
+
+        if (!ticket.sla_reminded_at &&
+            (!ticket.claimed_by ? ageMinutes >= Number(config.first_response_minutes) : inactivityMinutes >= Number(config.reminder_minutes))) {
+          const target = ticket.claimed_by ? "<@" + ticket.claimed_by + ">" : (config.escalation_role_id ? "<@&" + config.escalation_role_id + ">" : "staff");
+          await channel.send("⏰ **SLA reminder** · тикет #" + ticket.id + " требует внимания. " + target).catch(() => undefined);
+          await this.db.query("UPDATE tickets SET sla_reminded_at=now(),updated_at=now() WHERE id=$1 AND guild_id=$2 AND sla_reminded_at IS NULL", [ticket.id,config.guild_id]);
+        }
+
+        if (!ticket.sla_escalated_at && ageMinutes >= Number(config.escalation_minutes)) {
+          const target = config.escalation_role_id ? "<@&" + config.escalation_role_id + ">" : "staff";
+          await channel.send("🚨 **SLA escalation** · тикет #" + ticket.id + " превысил SLA. " + target).catch(() => undefined);
+          await this.db.query("UPDATE tickets SET sla_escalated_at=now(),updated_at=now() WHERE id=$1 AND guild_id=$2 AND sla_escalated_at IS NULL", [ticket.id,config.guild_id]);
+        }
+      }
+    }
   }
 
   private async recoverStaleClosures(): Promise<void> {
