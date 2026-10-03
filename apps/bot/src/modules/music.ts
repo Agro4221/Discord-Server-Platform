@@ -1027,30 +1027,39 @@ export class Music implements PlatformModule {
         return true;
       }
 
-      const nextPlayer = player ?? this.manager.createPlayer({
-        guildId: message.guild.id,
-        voiceChannelId,
-        textChannelId: await this.preferredTextChannelId(message.guild.id, message.channelId),
-        volume: await this.defaultVolume(message.guild.id),
-        selfDeaf: true
-      });
+      try {
+        const queued = await this.queueQuery(
+          message.guild.id,
+          voiceChannelId,
+          message.channelId,
+          query,
+          message.author
+        );
+        if (!queued.added) {
+          await message.reply("Ничего не найдено.");
+          return true;
+        }
 
-      if (nextPlayer.voiceChannelId !== voiceChannelId) {
-        await message.reply("Музыкальный бот уже находится в другом голосовом канале.");
-        return true;
+        const suffix = queued.truncated
+          ? " — добавлены первые " + MAX_PLAYLIST_TRACKS + " треков"
+          : "";
+        await message.reply(
+          "🎵 Добавлено в очередь: " + queued.added + ". Первый: " +
+          queued.firstTitle + " — " + queued.firstAuthor + suffix
+        );
+      } catch (error) {
+        const messageText = String(error);
+        await message.reply(
+          messageText.includes("music_player_in_other_voice")
+            ? "Музыкальный бот уже находится в другом голосовом канале."
+            : "Не удалось добавить запрос в очередь."
+        );
+        logger.warn("Music prefix play failed", {
+          guildId: message.guild.id,
+          userId: message.author.id,
+          error: messageText
+        });
       }
-      if (!nextPlayer.connected) await nextPlayer.connect();
-
-      const source = /^https?:\/\//i.test(query) ? undefined : "ytsearch";
-      const result = await nextPlayer.search(source ? { query, source } : { query }, message.author);
-      if (!result.tracks.length) {
-        await message.reply("Ничего не найдено.");
-        return true;
-      }
-
-      nextPlayer.queue.add(result.tracks[0]!);
-      if (!nextPlayer.playing) await nextPlayer.play();
-      await message.reply("🎵 Добавлено: " + result.tracks[0]!.info.title + " — " + result.tracks[0]!.info.author);
       return true;
     }
 
@@ -1107,7 +1116,7 @@ export class Music implements PlatformModule {
           { name: "Repeat", value: player.repeatMode, inline: true },
           { name: "Volume", value: String(player.volume), inline: true }
         );
-      await message.reply({ embeds: [embed] });
+      await message.reply({ embeds: [embed], components: this.buildControllerComponents(player) });
     } else if (action === "repeat") {
       const mode = normalizeMusicRepeatMode((args[0] ?? "").toLowerCase());
       if (!mode) {
