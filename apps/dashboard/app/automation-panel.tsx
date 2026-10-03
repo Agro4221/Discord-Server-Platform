@@ -7,8 +7,11 @@ type Condition =
   | { type: "contains" | "equals"; left: string; right: string }
   | { type: "matches"; left: string; pattern: string }
   | { type: "number-gte" | "number-lte"; left: string; right: number }
-  | { type: "has-role"; userId: string; roleId: string }
+  | { type: "has-role" | "not-has-role"; userId: string; roleId: string }
   | { type: "channel-is"; channelId: string }
+  | { type: "channel-type-is"; channelType: "text" | "announcement" | "forum" | "voice" | "stage" | "category" | "thread" | "other" }
+  | { type: "user-is-bot"; userId: string; value: boolean }
+  | { type: "has-permission"; userId: string; permission: "Administrator" | "ManageGuild" | "ManageChannels" | "ManageRoles" | "ManageMessages" | "KickMembers" | "BanMembers" | "ModerateMembers" }
   | { type: "cooldown-clear"; key: string };
 
 type Action =
@@ -19,6 +22,8 @@ type Action =
   | { type: "warn" | "kick"; userId: string; reason: string }
   | { type: "ban"; userId: string; durationMinutes?: number; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
+  | { type: "set-nickname"; userId: string; nickname: string | null }
+  | { type: "react-message"; channelId: string; messageId: string; emoji: string }
   | { type: "log"; message: string }
   | { type: "delay"; seconds: number }
   | { type: "webhook"; url: string; content: string }
@@ -89,6 +94,8 @@ const EVENTS = [
 
 const TEXT_FIELDS = ["content","userId","moderatorUserId","channelId","roleId","action","reason","messageId","guildId"] as const;
 const NUMBER_FIELDS = ["memberCount","messageLength","mentionCount","previousLength","caseId","ticketId","giveawayId","winnerCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"] as const;
+const CHANNEL_TYPES = ["text","announcement","forum","voice","stage","category","thread","other"] as const;
+const PERMISSIONS = ["Administrator","ManageGuild","ManageChannels","ManageRoles","ManageMessages","KickMembers","BanMembers","ModerateMembers"] as const;
 
 export function AutomationPanel({
   guildId,
@@ -312,7 +319,10 @@ export function AutomationPanel({
       type === "channel-is" ? { type, channelId: "" } :
       type === "matches" ? { type, left: "content", pattern: "" } :
       type === "number-gte" || type === "number-lte" ? { type, left: "memberCount", right: 0 } :
-      type === "has-role" ? { type, userId: "@event", roleId: "" } :
+      type === "has-role" || type === "not-has-role" ? { type, userId: "@event", roleId: "" } :
+      type === "channel-type-is" ? { type, channelType: "text" } :
+      type === "user-is-bot" ? { type, userId: "@event", value: true } :
+      type === "has-permission" ? { type, userId: "@event", permission: "ManageGuild" } :
       type === "cooldown-clear" ? { type, key: "" } :
       { type, left: "content", right: "" };
     const setter = any ? setAnyConditions : setConditions;
@@ -332,6 +342,8 @@ export function AutomationPanel({
       type === "warn" || type === "kick" ? { type, userId: "@event", reason: "" } :
       type === "ban" ? { type, userId: "@event", reason: "" } :
       type === "delete-message" ? { type, channelId: "@event", messageId: "@event" } :
+      type === "set-nickname" ? { type, userId: "@event", nickname: "" } :
+      type === "react-message" ? { type, channelId: "@event", messageId: "@event", emoji: "👍" } :
       type === "delay" ? { type, seconds: 5 } :
       type === "webhook" ? { type, url: "", content: "" } :
       type === "branch" ? {
@@ -444,7 +456,11 @@ export function AutomationPanel({
               <option value="number-gte">number-gte</option>
               <option value="number-lte">number-lte</option>
               <option value="has-role">has-role</option>
+              <option value="not-has-role">not-has-role</option>
               <option value="channel-is">channel-is</option>
+              <option value="channel-type-is">channel-type-is</option>
+              <option value="user-is-bot">user-is-bot</option>
+              <option value="has-permission">has-permission</option>
               <option value="cooldown-clear">cooldown-clear</option>
             </select>
 
@@ -472,7 +488,7 @@ export function AutomationPanel({
               </>
             )}
 
-            {condition.type === "has-role" && (
+            {(condition.type === "has-role" || condition.type === "not-has-role") && (
               <>
                 <input value={condition.userId} onChange={(e) => updateCondition(index, { userId: e.target.value })} placeholder="@event или user ID" style={inputStyle} />
                 <select value={condition.roleId} onChange={(e) => updateCondition(index, { roleId: e.target.value })} style={inputStyle}>
@@ -487,6 +503,31 @@ export function AutomationPanel({
                 <option value="">Канал</option>
                 {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
               </select>
+            )}
+
+            {condition.type === "channel-type-is" && (
+              <select value={condition.channelType} onChange={(e) => updateCondition(index, { channelType: e.target.value as Condition["channelType"] })} style={inputStyle}>
+                {CHANNEL_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
+            )}
+
+            {condition.type === "user-is-bot" && (
+              <>
+                <input value={condition.userId} onChange={(e) => updateCondition(index, { userId: e.target.value })} placeholder="@event или user ID" style={inputStyle} />
+                <select value={String(condition.value)} onChange={(e) => updateCondition(index, { value: e.target.value === "true" })} style={inputStyle}>
+                  <option value="true">bot = true</option>
+                  <option value="false">bot = false</option>
+                </select>
+              </>
+            )}
+
+            {condition.type === "has-permission" && (
+              <>
+                <input value={condition.userId} onChange={(e) => updateCondition(index, { userId: e.target.value })} placeholder="@event или user ID" style={inputStyle} />
+                <select value={condition.permission} onChange={(e) => updateCondition(index, { permission: e.target.value as Condition["permission"] })} style={inputStyle}>
+                  {PERMISSIONS.map((permission) => <option key={permission} value={permission}>{permission}</option>)}
+                </select>
+              </>
             )}
 
             {condition.type === "cooldown-clear" && (
@@ -587,6 +628,8 @@ export function AutomationPanel({
               <option value="kick">kick</option>
               <option value="ban">ban</option>
               <option value="delete-message">delete-message</option>
+              <option value="set-nickname">set-nickname</option>
+              <option value="react-message">react-message</option>
               <option value="log">log</option>
               <option value="delay">delay</option>
               <option value="webhook">webhook</option>
@@ -640,6 +683,24 @@ export function AutomationPanel({
                 <input value={action.userId} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event или user ID" style={inputStyle} />
                 <input type="number" min={1} max={40320} value={action.durationMinutes ?? ""} onChange={(e) => updateAction(index, { durationMinutes: e.target.value ? Number(e.target.value) : undefined })} placeholder="Срок (мин), пусто = навсегда" style={inputStyle} />
                 <input value={action.reason} maxLength={500} onChange={(e) => updateAction(index, { reason: e.target.value })} placeholder="Причина" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "set-nickname" && (
+              <div style={actionGrid}>
+                <input value={action.userId} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event или user ID" style={inputStyle} />
+                <input value={action.nickname ?? ""} maxLength={32} onChange={(e) => updateAction(index, { nickname: e.target.value })} placeholder="Никнейм; пусто = сброс" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "react-message" && (
+              <div style={actionGrid}>
+                <select value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} style={inputStyle}>
+                  <option value="@event">@event channel</option>
+                  {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                </select>
+                <input value={action.messageId} onChange={(e) => updateAction(index, { messageId: e.target.value })} placeholder="@event или message ID" style={inputStyle} />
+                <input value={action.emoji} maxLength={100} onChange={(e) => updateAction(index, { emoji: e.target.value })} placeholder="👍 или <:emoji:id>" style={inputStyle} />
               </div>
             )}
 
