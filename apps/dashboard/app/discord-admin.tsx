@@ -1615,7 +1615,14 @@ function ModerationPanel(props: {
     }
   }
 
-  const [caseHistory, setCaseHistory] = useState<Array<{ id: number; action: string; reason: string | null; createdAt: string; expiresAt: string | null }>>([]);
+  const [caseHistory, setCaseHistory] = useState<Array<{
+    id: number;
+    action: string;
+    reason: string | null;
+    createdAt: string;
+    expiresAt: string | null;
+    resolvedAt: string | null;
+  }>>([]);
 
   useEffect(() => {
     if (!targetId) {
