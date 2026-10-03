@@ -55,6 +55,7 @@ export class CommunityTools implements PlatformModule {
   private client?: Client;
   private auditLog?: AuditLog;
   private unsubscribeInteraction?: () => void;
+  private unsubscribeCommand?: () => void;
   private unsubscribeMessage?: () => void;
   private pollWorker?: NodeJS.Timeout;
   private readonly pollTimers = new Map<number, NodeJS.Timeout>();
@@ -68,7 +69,13 @@ export class CommunityTools implements PlatformModule {
 
     this.unsubscribeInteraction = context.events.on(
       "interaction",
-      (interaction) => { void this.handleInteraction(interaction); }
+      (interaction) => {
+        if (interaction.isButton()) void this.handleInteraction(interaction);
+      }
+    );
+    this.unsubscribeCommand = context.events.on(
+      "interaction.command",
+      (interaction) => { void this.handleCommand(interaction); }
     );
     this.unsubscribeMessage = context.events.on(
       "message.create",
@@ -90,8 +97,10 @@ export class CommunityTools implements PlatformModule {
 
   async shutdown(): Promise<void> {
     this.unsubscribeInteraction?.();
+    this.unsubscribeCommand?.();
     this.unsubscribeMessage?.();
     this.unsubscribeInteraction = undefined;
+    this.unsubscribeCommand = undefined;
     this.unsubscribeMessage = undefined;
 
     if (this.pollWorker) clearInterval(this.pollWorker);
@@ -158,21 +167,22 @@ export class CommunityTools implements PlatformModule {
   private async handleInteraction(
     interaction: import("discord.js").Interaction
   ): Promise<void> {
-    if (interaction.isButton()) {
-      if (interaction.customId.startsWith("poll:")) {
-        await this.handlePollVote(interaction);
-        return;
-      }
+    if (!interaction.isButton()) return;
 
-      if (interaction.customId.startsWith("suggest:")) {
-        await this.handleSuggestionAction(interaction);
-        return;
-      }
-
+    if (interaction.customId.startsWith("poll:")) {
+      await this.handlePollVote(interaction);
       return;
     }
 
-    if (!interaction.isChatInputCommand() || !interaction.inGuild()) return;
+    if (interaction.customId.startsWith("suggest:")) {
+      await this.handleSuggestionAction(interaction);
+    }
+  }
+
+  private async handleCommand(
+    interaction: ChatInputCommandInteraction
+  ): Promise<void> {
+    if (!interaction.inGuild()) return;
     if (!SUPPORTED.has(interaction.commandName)) return;
 
     if (!await moduleEnabled(
