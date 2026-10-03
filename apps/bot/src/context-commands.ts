@@ -11,6 +11,7 @@ import type { CommandPolicyService } from "./command-policy.js";
 import type { Moderation } from "./modules/moderation.js";
 import type { AuditLog } from "./audit.js";
 import type { ModuleContext, PlatformModule } from "./module.js";
+import { logger } from "./logger.js";
 
 export const CONTEXT_COMMAND_NAMES = {
   userInfo: "User Info",
@@ -67,12 +68,35 @@ export class ContextCommandService implements PlatformModule {
   private async handle(
     interaction: import("discord.js").Interaction
   ): Promise<void> {
-    if (interaction.isUserContextMenuCommand()) {
-      await this.handleUser(interaction);
-      return;
-    }
-    if (interaction.isMessageContextMenuCommand()) {
-      await this.handleMessage(interaction);
+    if (!isKnownContextCommand(interaction)) return;
+
+    try {
+      if (interaction.isUserContextMenuCommand()) {
+        await this.handleUser(interaction);
+        return;
+      }
+      if (interaction.isMessageContextMenuCommand()) {
+        await this.handleMessage(interaction);
+      }
+    } catch (error) {
+      logger.error("Context command failed", {
+        command: interaction.isContextMenuCommand() ? interaction.commandName : "unknown",
+        guildId: interaction.guildId,
+        userId: interaction.user.id,
+        error: String(error)
+      });
+
+      if (!interaction.isRepliable()) return;
+
+      const reply = {
+        content: "Не удалось выполнить контекстную команду.",
+        ephemeral: true
+      };
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp(reply).catch(() => undefined);
+      } else {
+        await interaction.reply(reply).catch(() => undefined);
+      }
     }
   }
 
@@ -234,4 +258,12 @@ export class ContextCommandService implements PlatformModule {
 
     await interaction.reply({ embeds: [embed], ephemeral: true });
   }
+}
+
+
+function isKnownContextCommand(
+  interaction: import("discord.js").Interaction
+): interaction is UserContextMenuCommandInteraction | MessageContextMenuCommandInteraction {
+  if (!interaction.isContextMenuCommand()) return false;
+  return (Object.values(CONTEXT_COMMAND_NAMES) as string[]).includes(interaction.commandName);
 }
