@@ -1137,6 +1137,21 @@ const migrations = [
     ])
   },
   {
+    version: 75,
+    name: "moderation_presets",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS moderation_presets (",
+      "  guild_id text NOT NULL,",
+      "  name text NOT NULL,",
+      "  payload jsonb NOT NULL,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,name)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_moderation_presets_guild_updated ON moderation_presets(guild_id,updated_at DESC);"
+    ])
+  },
+  {
     version: 74,
     name: "role_automation_rules_and_jobs",
     sql: q([
