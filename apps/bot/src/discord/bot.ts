@@ -90,7 +90,11 @@ export function wireDiscordEvents(
   });
 
   client.on(Events.MessageReactionAdd, (reaction, user) => {
-    void emitReaction(events, reaction, user);
+    void emitReaction(events, "reaction.add", reaction, user);
+  });
+
+  client.on(Events.MessageReactionRemove, (reaction, user) => {
+    void emitReaction(events, "reaction.remove", reaction, user);
   });
 
   client.on(Events.GuildMemberAdd, (member) => {
@@ -125,6 +129,7 @@ export function wireDiscordEvents(
 
 async function emitReaction(
   events: PlatformEventBus,
+  eventType: "reaction.add" | "reaction.remove",
   reaction: import("discord.js").MessageReaction | import("discord.js").PartialMessageReaction,
   user: import("discord.js").User | import("discord.js").PartialUser
 ): Promise<void> {
@@ -149,7 +154,7 @@ async function emitReaction(
 
   if (!resolvedReaction || !resolvedUser) return;
 
-  await events.emit("reaction.add", {
+  await events.emit(eventType, {
     reaction: resolvedReaction,
     user: resolvedUser
   });
