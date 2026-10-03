@@ -103,6 +103,16 @@ export class Notifications implements PlatformModule {
     return true;
   }
 
+  async setFeedEnabled(guildId: string, id: number, enabled: boolean): Promise<boolean> {
+    const current = (await this.listFeeds(guildId)).find((feed) => feed.id === id);
+    if (!current) return false;
+    await this.db.query(
+      "UPDATE notification_feeds SET enabled=$1,updated_at=now() WHERE id=$2 AND guild_id=$3",
+      [enabled,id,guildId]
+    );
+    return true;
+  }
+
   async deleteFeed(guildId: string, id: number): Promise<boolean> {
     const result = await this.db.query("DELETE FROM notification_feeds WHERE id=$1 AND guild_id=$2", [id,guildId]);
     return result.rowCount === 1;
