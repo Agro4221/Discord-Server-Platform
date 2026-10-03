@@ -166,7 +166,7 @@ export class Reminders implements PlatformModule {
 
     if (interaction.commandName === "afk") {
       const rawReason = interaction.options.getString("reason");
-      const result = await this.setOrClearAfk(interaction.guild!.id, interaction.user.id, rawReason);
+      const result = await this.setOrClearAfk(interaction.guild!.id, interaction.user.id, rawReason?.trim() || null);
       await interaction.reply({
         content: result.cleared
           ? "👋 AFK снят. С возвращением!"
@@ -317,7 +317,7 @@ export class Reminders implements PlatformModule {
       record: {
         userId: row.user_id,
         reason: row.reason,
-        sinceAt: new Date(row.since_at)
+        sinceAt: toAfkDate(row.since_at)
       }
     };
   }
@@ -329,7 +329,7 @@ export class Reminders implements PlatformModule {
     );
     const row = result.rows[0];
     return row
-      ? { userId: row.user_id, reason: row.reason, sinceAt: new Date(row.since_at) }
+      ? { userId: row.user_id, reason: row.reason, sinceAt: toAfkDate(row.since_at) }
       : null;
   }
 
@@ -342,7 +342,7 @@ export class Reminders implements PlatformModule {
     return result.rows.map((row) => ({
       userId: row.user_id,
       reason: row.reason,
-      sinceAt: new Date(row.since_at)
+      sinceAt: toAfkDate(row.since_at)
     }));
   }
 
@@ -353,7 +353,7 @@ export class Reminders implements PlatformModule {
     );
     const row = result.rows[0];
     return row
-      ? { userId: row.user_id, reason: row.reason, sinceAt: new Date(row.since_at) }
+      ? { userId: row.user_id, reason: row.reason, sinceAt: toAfkDate(row.since_at) }
       : null;
   }
 
@@ -503,6 +503,10 @@ export function normalizeAfkReason(value?: string | null): string {
 
 export function isAfkClearRequest(value?: string | null): boolean {
   return /^(off|clear|remove|unset)$/i.test((value ?? "").trim());
+}
+
+function toAfkDate(value: Date | string): Date {
+  return value instanceof Date ? new Date(value.getTime()) : new Date(value);
 }
 
 export function formatAfkNotice(mention: string, reason: string, sinceAt: Date | string): string {
