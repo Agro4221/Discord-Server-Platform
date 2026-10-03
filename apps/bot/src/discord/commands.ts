@@ -504,6 +504,28 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       ),
 
     new SlashCommandBuilder()
+      .setName("sticky")
+      .setDescription("Manage a sticky message")
+      .addSubcommand((sub) =>
+        sub
+          .setName("setup")
+          .setDescription("Create or update a sticky message")
+          .addChannelOption((o) => o.setName("channel").setDescription("Text channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
+          .addStringOption((o) => o.setName("text").setDescription("Sticky content").setMaxLength(2000).setRequired(true))
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName("remove")
+          .setDescription("Remove a sticky message")
+          .addChannelOption((o) => o.setName("channel").setDescription("Text channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName("list")
+          .setDescription("List sticky messages")
+      ),
+
+    new SlashCommandBuilder()
       .setName("starboard")
       .setDescription("Starboard")
       .addSubcommand((sub) =>
