@@ -449,6 +449,9 @@ type ImportedRolePanel = {
   messageId: string | null;
   title: string;
   roles: Array<{ roleId: string; label: string }>;
+  selectionMode: "toggle" | "exclusive" | "max";
+  maxSelections: number;
+  durationMinutes: number;
 };
 
 function normalizeImportedRolePanel(value: unknown): ImportedRolePanel {
@@ -466,7 +469,10 @@ function normalizeImportedRolePanel(value: unknown): ImportedRolePanel {
     object.title.length > 100 ||
     !Array.isArray(object.roles) ||
     object.roles.length < 1 ||
-    object.roles.length > 5
+    object.roles.length > 5 ||
+    (object.selection_mode !== undefined && !["toggle","exclusive","max"].includes(String(object.selection_mode))) ||
+    (object.max_selections !== undefined && (typeof object.max_selections !== "number" || !Number.isInteger(object.max_selections) || object.max_selections < 1 || object.max_selections > 5)) ||
+    (object.duration_minutes !== undefined && (typeof object.duration_minutes !== "number" || !Number.isInteger(object.duration_minutes) || object.duration_minutes < 0 || object.duration_minutes > 43200))
   ) {
     throw new Error("invalid_role_panel");
   }
@@ -492,6 +498,11 @@ function normalizeImportedRolePanel(value: unknown): ImportedRolePanel {
     channelId: object.channel_id,
     messageId: typeof object.message_id === "string" ? object.message_id : null,
     title: object.title.trim().slice(0, 100) || "Выберите роли",
-    roles
+    roles,
+    selectionMode: (typeof object.selection_mode === "string" && ["toggle","exclusive","max"].includes(object.selection_mode)
+      ? object.selection_mode
+      : "toggle") as "toggle" | "exclusive" | "max",
+    maxSelections: typeof object.max_selections === "number" ? Math.min(Math.max(Math.trunc(object.max_selections),1),5) : 1,
+    durationMinutes: typeof object.duration_minutes === "number" ? Math.min(Math.max(Math.trunc(object.duration_minutes),0),43200) : 0
   };
 }
