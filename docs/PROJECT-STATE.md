@@ -284,3 +284,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - The same settings are available through Dashboard generic module settings and `/welcome setup`; configuration transfer preserves them.
 - URL normalization rejects malformed, non-HTTPS and oversized values; empty values disable the image.
 - Added migration 80 and regression tests; live Discord embed rendering remains part of the live release gate.
+
+
+### 2026-10-04 — Welcome preview + Verification panel customization
+- Added a Dashboard action for sending a clearly labeled Welcome preview to the configured channel; it exercises the same message/embed rendering path while using a fake preview identity.
+- Verification panel presentation is now persistent/configurable: title, description, issue-code button and confirmation button labels.
+- Both additions reuse the existing generic settings/action/audit architecture; no second configuration model was introduced.
