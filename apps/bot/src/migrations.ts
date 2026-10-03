@@ -899,6 +899,13 @@ const migrations = [
       "ALTER TABLE giveaways ADD COLUMN IF NOT EXISTS requirements jsonb NOT NULL DEFAULT '{}'::jsonb;",
       "ALTER TABLE giveaways ADD COLUMN IF NOT EXISTS message_template text NOT NULL DEFAULT '🎉 **{prize}**\\n\\nПобедителей: **{winners}**\\nЗавершение: <t:{endsAt}:R>'"
     ])
+  },
+  {
+    version: 56,
+    name: "scheduled_channel_messages",
+    sql: q([
+      "ALTER TABLE reminders ADD COLUMN IF NOT EXISTS target_channel_id text;"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
