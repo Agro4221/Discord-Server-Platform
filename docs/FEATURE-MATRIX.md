@@ -354,7 +354,7 @@ Music должен стремиться к функциональности си
 | Scam / phishing / honeypot detectors | ✅ / расширять |
 | Autoban rules | ✅ | AutoMod rules can directly apply a ban through the existing Moderation case/audit pipeline |
 | Auto-purge / scheduled cleanup | ✅ | Persistent per-channel cleanup schedules with bounded bulk deletion, worker claiming and Dashboard controls |
-| Lockdown presets / incident response playbooks | 🟡 |
+| Lockdown presets / incident response playbooks | ✅ | Manual all-text incident lockdown with persistent restoration state, audit and Dashboard controls |
 | Moderation presets/templates | 🟡 |
 
 #### Server utilities / customisation
