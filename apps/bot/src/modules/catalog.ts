@@ -19,7 +19,8 @@ export type ModuleKey =
   | "analytics"
   | "polls"
   | "reputation"
-  | "birthdays";
+  | "birthdays"
+  | "invite-tracking";
 
 export const MODULE_CATALOG: readonly {
   key: ModuleKey;
@@ -47,5 +48,6 @@ export const MODULE_CATALOG: readonly {
   { key: "analytics", title: "Analytics", description: "Server and module analytics", defaultEnabled: false },
   { key: "polls", title: "Polls & Suggestions", description: "Interactive polls and community suggestions", defaultEnabled: false },
   { key: "reputation", title: "Reputation", description: "Community reputation and social profiles", defaultEnabled: false },
-  { key: "birthdays", title: "Birthdays", description: "Birthday storage and scheduled announcements", defaultEnabled: false }
+  { key: "birthdays", title: "Birthdays", description: "Birthday storage and scheduled announcements", defaultEnabled: false },
+  { key: "invite-tracking", title: "Invite Tracking", description: "Invite attribution and inviter statistics", defaultEnabled: false }
 ];
