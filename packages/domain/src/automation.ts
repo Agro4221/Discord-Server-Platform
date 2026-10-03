@@ -27,8 +27,32 @@ export type AutomationCondition =
   | { type: "number-gte"; left: string; right: number }
   | { type: "number-lte"; left: string; right: number }
   | { type: "has-role"; userId: string; roleId: string }
+  | { type: "not-has-role"; userId: string; roleId: string }
   | { type: "channel-is"; channelId: string }
+  | { type: "channel-type-is"; channelType: AutomationChannelType }
+  | { type: "user-is-bot"; userId: string; value: boolean }
+  | { type: "has-permission"; userId: string; permission: AutomationPermission }
   | { type: "cooldown-clear"; key: string };
+
+export type AutomationChannelType =
+  | "text"
+  | "announcement"
+  | "forum"
+  | "voice"
+  | "stage"
+  | "category"
+  | "thread"
+  | "other";
+
+export type AutomationPermission =
+  | "Administrator"
+  | "ManageGuild"
+  | "ManageChannels"
+  | "ManageRoles"
+  | "ManageMessages"
+  | "KickMembers"
+  | "BanMembers"
+  | "ModerateMembers";
 
 export type AutomationAction =
   | { type: "send-message"; channelId: string; content: string }
@@ -40,6 +64,8 @@ export type AutomationAction =
   | { type: "kick"; userId: string; reason: string }
   | { type: "ban"; userId: string; durationMinutes?: number; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
+  | { type: "set-nickname"; userId: string; nickname: string | null }
+  | { type: "react-message"; channelId: string; messageId: string; emoji: string }
   | { type: "log"; message: string }
   | { type: "delay"; seconds: number }
   | { type: "webhook"; url: string; content: string }
