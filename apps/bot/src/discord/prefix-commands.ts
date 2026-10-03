@@ -16,6 +16,10 @@ import type { Logging } from "../modules/logging.js";
 import type { Welcome } from "../modules/welcome.js";
 import type { Verification } from "../modules/verification.js";
 import type { Security } from "../modules/security.js";
+import type { AutoMod } from "../modules/automod.js";
+import type { Starboard } from "../modules/starboard.js";
+import type { Notifications } from "../modules/notifications.js";
+import type { AutomationEngine } from "../modules/automation-engine.js";
 
 const BUILTIN_PREFIX_COMMANDS = new Set([
   "help",
@@ -24,6 +28,7 @@ const BUILTIN_PREFIX_COMMANDS = new Set([
   "play", "pause", "resume", "skip", "stop", "shuffle",
   "playlist", "queue", "nowplaying", "repeat", "seek", "volume", "autoplay",
   "balance", "daily", "leaderboard", "pay", "shop", "buy", "remind", "ticket", "roles", "giveaway",
+  "automod", "welcome", "security", "verify", "starboard", "feed", "automation",
   "serverinfo", "userinfo", "avatar", "membercount", "roleinfo", "channelinfo", "afk",
   "poll", "suggest", "sticky", "8ball", "choose", "roll", "logging"
 ]);
@@ -46,6 +51,10 @@ export class PrefixCommandRouter {
     private readonly welcome: Welcome,
     private readonly verification: Verification,
     private readonly security: Security,
+    private readonly autoMod: AutoMod,
+    private readonly starboard: Starboard,
+    private readonly notifications: Notifications,
+    private readonly automation: AutomationEngine,
     private readonly tickets: Tickets,
     private readonly rolePanels: RolePanels,
     private readonly giveaways: Giveaways
@@ -103,6 +112,10 @@ export class PrefixCommandRouter {
         if (await this.welcome.handlePrefixCommand(message, commandName, args)) return;
         if (await this.verification.handlePrefixCommand(message, commandName, args)) return;
         if (await this.security.handlePrefixCommand(message, commandName, args)) return;
+        if (await this.autoMod.handlePrefixCommand(message, commandName, args)) return;
+        if (await this.starboard.handlePrefixCommand(message, commandName, args)) return;
+        if (await this.notifications.handlePrefixCommand(message, commandName, args)) return;
+        if (await this.automation.handlePrefixCommand(message, commandName, args)) return;
         if (await this.tickets.handlePrefixCommand(message, commandName)) return;
         if (await this.rolePanels.handlePrefixCommand(message, commandName, args)) return;
         if (await this.giveaways.handlePrefixCommand(message, commandName, args)) return;
@@ -180,6 +193,10 @@ export class PrefixCommandRouter {
         if (await this.welcome.handlePrefixCommand(message, target, args)) return;
         if (await this.verification.handlePrefixCommand(message, target, args)) return;
         if (await this.security.handlePrefixCommand(message, target, args)) return;
+        if (await this.autoMod.handlePrefixCommand(message, target, args)) return;
+        if (await this.starboard.handlePrefixCommand(message, target, args)) return;
+        if (await this.notifications.handlePrefixCommand(message, target, args)) return;
+        if (await this.automation.handlePrefixCommand(message, target, args)) return;
         if (await this.tickets.handlePrefixCommand(message, target)) return;
         if (await this.rolePanels.handlePrefixCommand(message, target, args)) return;
         if (await this.giveaways.handlePrefixCommand(message, target, args)) return;

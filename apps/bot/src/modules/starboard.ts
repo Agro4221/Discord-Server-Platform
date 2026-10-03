@@ -40,6 +40,28 @@ export class Starboard implements PlatformModule {
     };
   }
 
+  async handlePrefixCommand(message: import("discord.js").Message, commandName: string, args: string[]): Promise<boolean> {
+    if (commandName !== "starboard") return false;
+    if (!message.guild) return false;
+
+    const sub = (args.shift() ?? "setup").toLowerCase();
+    if (sub !== "setup") {
+      await message.reply("Использование: !starboard setup #канал [threshold]");
+      return true;
+    }
+
+    const channel = message.mentions.channels.first();
+    const threshold = Number(args.find((token) => /^\d+$/.test(token)) ?? 3);
+    if (!channel || channel.type !== 0) {
+      await message.reply("Укажи текстовый канал: !starboard setup #канал 3");
+      return true;
+    }
+
+    await this.configure(message.guild.id, channel.id, threshold);
+    await message.reply("Starboard настроен и включён.");
+    return true;
+  }
+
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;

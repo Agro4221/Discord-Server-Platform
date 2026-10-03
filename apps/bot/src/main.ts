@@ -339,6 +339,10 @@ async function main(): Promise<void> {
     welcome,
     verification,
     security,
+    autoMod,
+    starboard,
+    notifications,
+    automation,
     tickets,
     rolePanels,
     giveaways

@@ -118,6 +118,47 @@ export class AutomationEngine implements PlatformModule {
     };
   }
 
+  async handlePrefixCommand(message: Message, commandName: string, args: string[]): Promise<boolean> {
+    if (commandName !== "automation") return false;
+    if (!message.guild) return false;
+
+    const sub = (args.shift() ?? "create").toLowerCase();
+    if (sub !== "create") {
+      await message.reply("Использование: !automation create <name> <event> #канал <response> [--channel=#канал] [--match=текст]");
+      return true;
+    }
+
+    const name = args.shift()?.trim();
+    const event = args.shift() as AutomationEvent | undefined;
+    const responseChannel = message.mentions.channels.first();
+    const optionalChannel = [...message.mentions.channels.values()][1] ?? null;
+    const matchToken = args.find((token) => token.startsWith("--match="));
+    const response = args
+      .filter((token) => token !== matchToken && !/^--channel=<#\d{15,25}>$/.test(token) && !/^--channel=\d{15,25}$/.test(token))
+      .join(" ")
+      .trim();
+
+    const supported = new Set<AutomationEvent>(SUPPORTED_EVENTS);
+    const channelToken = args.find((token) => /^--channel=(?:<#\d{15,25}>|\d{15,25})$/.test(token));
+    const eventChannel = optionalChannel ?? (channelToken ? message.guild.channels.cache.get(channelToken.split("=")[1]!.replace(/[<#>]/g, "")) : null);
+    const match = matchToken ? matchToken.slice("--match=".length).trim() : null;
+
+    if (!name || !event || !supported.has(event) || !responseChannel || responseChannel.type !== 0 || !response) {
+      await message.reply("Пример: !automation create welcome member.join #general Добро пожаловать!");
+      return true;
+    }
+
+    const conditions: AutomationCondition[] = [];
+    if (eventChannel) conditions.push({ type: "channel-is", channelId: eventChannel.id });
+    if (match) conditions.push({ type: "contains", left: "content", right: match });
+
+    await this.createRule(message.guild.id, name, event, conditions, [
+      { type: "send-message", channelId: responseChannel.id, content: response.slice(0, 2000) }
+    ]);
+    await message.reply("Automation rule создано.");
+    return true;
+  }
+
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;

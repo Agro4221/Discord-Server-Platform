@@ -60,6 +60,46 @@ export class AutoMod implements PlatformModule {
     this.unsubscribe = () => { a(); b(); };
   }
 
+  async handlePrefixCommand(message: import("discord.js").Message, commandName: string, args: string[]): Promise<boolean> {
+    if (commandName !== "automod") return false;
+    if (!message.guild) return false;
+
+    const sub = (args.shift() ?? "setup").toLowerCase();
+    if (sub !== "setup") {
+      await message.reply("Использование: !automod setup [--words=слово1,слово2] [--mentions=6] [--caps=0.85] [--repeats=5] [--window=10] [--delete|--no-delete] [--timeout=0]");
+      return true;
+    }
+
+    const values = new Map<string, string>();
+    let deleteMessage: boolean | undefined;
+    for (const token of args) {
+      const match = /^--([a-z-]+)=(.+)$/i.exec(token);
+      if (match) values.set(match[1]!.toLowerCase(), match[2]!);
+      else if (token.toLowerCase() === "--delete") deleteMessage = true;
+      else if (token.toLowerCase() === "--no-delete") deleteMessage = false;
+    }
+
+    const blocked = values.get("words");
+    const maxMentions = values.get("mentions");
+    const capsRatio = values.get("caps");
+    const repeats = values.get("repeats");
+    const window = values.get("window");
+    const timeout = values.get("timeout");
+
+    const patch: Partial<AutoModConfig> = { enabled: true };
+    if (blocked !== undefined) patch.blockedWords = blocked.split(/[,\n]/).map((item) => item.trim()).filter(Boolean).slice(0, 500);
+    if (maxMentions !== undefined && Number.isFinite(Number(maxMentions))) patch.maxMentions = Number(maxMentions);
+    if (capsRatio !== undefined && Number.isFinite(Number(capsRatio))) patch.maxCapsRatio = Number(capsRatio);
+    if (repeats !== undefined && Number.isFinite(Number(repeats))) patch.maxRepeatedMessages = Number(repeats);
+    if (window !== undefined && Number.isFinite(Number(window))) patch.repeatedWindowSeconds = Number(window);
+    if (timeout !== undefined && Number.isFinite(Number(timeout))) patch.timeoutMinutes = Number(timeout);
+    if (deleteMessage !== undefined) patch.deleteMessage = deleteMessage;
+
+    await this.configure(message.guild.id, patch);
+    await message.reply("AutoMod настроен и включён.");
+    return true;
+  }
+
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;

@@ -108,6 +108,40 @@ export class Notifications implements PlatformModule {
     return result.rowCount === 1;
   }
 
+  async handlePrefixCommand(message: import("discord.js").Message, commandName: string, args: string[]): Promise<boolean> {
+    if (commandName !== "feed") return false;
+    if (!message.guild) return false;
+
+    if (!await moduleEnabled(this.db, message.guild.id, "notifications", false)) {
+      await message.reply("Модуль Notifications выключен.");
+      return true;
+    }
+
+    const sub = (args.shift() ?? "add").toLowerCase();
+    if (sub !== "add") {
+      await message.reply("Использование: !feed add <https://feed> #канал [minutes]");
+      return true;
+    }
+
+    const url = args.find((token) => /^https:\/\//i.test(token));
+    const channel = message.mentions.channels.first();
+    const minutesToken = args.find((token) => /^\d+$/.test(token));
+    const minutes = minutesToken ? Number(minutesToken) : 5;
+
+    if (!url || !channel || channel.type !== ChannelType.GuildText) {
+      await message.reply("Пример: !feed add https://example.com/feed.xml #news 5");
+      return true;
+    }
+
+    try {
+      await this.addFeed(message.guild.id, channel.id, url, minutes * 60);
+      await message.reply("Feed добавлен. Проверка начнётся автоматически.");
+    } catch (error) {
+      await message.reply("Не удалось добавить feed: " + String(error).replace(/^Error:\s*/i, ""));
+    }
+    return true;
+  }
+
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
     this.identityId = context.identityId;
