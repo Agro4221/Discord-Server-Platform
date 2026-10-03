@@ -82,6 +82,9 @@ type ApiOptions = {
       content?: string;
       userId?: string;
       channelId?: string;
+      channelType?: import("@dsp/domain").AutomationChannelType;
+      userIsBot?: boolean;
+      permissions?: import("@dsp/domain").AutomationPermission[];
       roleIds?: string[];
       numeric?: Record<string, number>;
     }) => Promise<unknown>;
