@@ -797,10 +797,38 @@ export async function handleCommand(
   const subcommand = interaction.options.getSubcommand();
   const target = interaction.options.getUser("user", true);
 
-  if (subcommand === "history") {
+  if (subcommand === "history" || subcommand === "note") {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ModerateMembers) &&
         !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
       await interaction.reply({ content: "Недостаточно прав.", ephemeral: true });
+      return;
+    }
+
+    if (subcommand === "note") {
+      const action = interaction.options.getString("action", true);
+      const noteText = interaction.options.getString("text")?.trim() ?? "";
+      if (action === "add") {
+        if (!noteText) {
+          await interaction.reply({ content: "Для добавления заметки укажи text.", ephemeral: true });
+          return;
+        }
+        const noteId = await moderation.addNote(
+          interaction.guild!.id,
+          target.id,
+          interaction.user.id,
+          noteText
+        );
+        await interaction.reply({ content: `Приватная moderation note #${noteId} сохранена.`, ephemeral: true });
+        return;
+      }
+
+      const notes = await moderation.notes(interaction.guild!.id, target.id, 20);
+      const content = notes.length === 0
+        ? "Приватных заметок нет."
+        : notes.map((item) =>
+            `#${item.id} · <@!${item.moderatorUserId}> · ${item.note} · <t:${Math.floor(item.createdAt.getTime() / 1000)}:R>`
+          ).join("\n");
+      await interaction.reply({ content, ephemeral: true });
       return;
     }
 
