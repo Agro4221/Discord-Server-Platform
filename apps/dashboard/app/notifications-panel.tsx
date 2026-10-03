@@ -25,6 +25,10 @@ export function NotificationsPanel({
   const [url, setUrl] = useState("");
   const [channelId, setChannelId] = useState("");
   const [interval, setInterval] = useState(300);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editUrl, setEditUrl] = useState("");
+  const [editChannelId, setEditChannelId] = useState("");
+  const [editInterval, setEditInterval] = useState(300);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -65,20 +69,59 @@ export function NotificationsPanel({
     }
   }
 
-  async function patch(feed: Feed, enabled: boolean) {
+  function startEdit(feed: Feed) {
+    setEditingId(feed.id);
+    setEditUrl(feed.url);
+    setEditChannelId(feed.channelId);
+    setEditInterval(feed.intervalSeconds);
+    setError("");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditUrl("");
+    setEditChannelId("");
+    setEditInterval(300);
+  }
+
+  async function update(feedId: number) {
+    if (!editUrl.trim() || !editChannelId || !Number.isSafeInteger(editInterval) || editInterval < 60 || editInterval > 86400) {
+      setError("Нужны HTTPS URL, канал и interval 60–86400 секунд.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/feeds/" + feedId, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: editUrl.trim(), channelId: editChannelId, intervalSeconds: editInterval })
+      });
+      if (!response.ok) throw new Error("feed_update_failed");
+      cancelEdit();
+      await load();
+      await onChanged?.();
+    } catch {
+      setError("Не удалось изменить feed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggle(feed: Feed) {
     setBusy(true);
     setError("");
     try {
       const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/feeds/" + feed.id, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ enabled })
+        body: JSON.stringify({ enabled: !feed.enabled })
       });
       if (!response.ok) throw new Error("feed_update_failed");
       await load();
       await onChanged?.();
     } catch {
-      setError("Не удалось изменить feed.");
+      setError("Не удалось изменить состояние feed.");
     } finally {
       setBusy(false);
     }
@@ -122,17 +165,34 @@ export function NotificationsPanel({
       {feeds.length === 0 ? (
         <div style={{ opacity: 0.42, padding: "8px 0" }}>Feed'ов пока нет.</div>
       ) : feeds.map((feed) => (
-        <div key={feed.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: "10px 0", borderBottom: "1px solid #1d212b" }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{feed.url}</div>
-            <div style={{ marginTop: 4, fontSize: 11, opacity: 0.42 }}>
-              #{feed.channelId} · {feed.intervalSeconds}s · {feed.lastPolledAt ? "checked " + new Date(feed.lastPolledAt).toLocaleString() : "not checked"}
+        <div key={feed.id} style={{ padding: "10px 0", borderBottom: "1px solid #1d212b", display: "grid", gap: 8 }}>
+          {editingId === feed.id ? (
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(180px,2fr) minmax(150px,1fr) 120px auto", gap: 8 }}>
+              <input value={editUrl} onChange={(e) => setEditUrl(e.target.value)} style={inputStyle} />
+              <select value={editChannelId} onChange={(e) => setEditChannelId(e.target.value)} style={inputStyle}>
+                {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+              </select>
+              <input type="number" min={60} max={86400} value={editInterval} onChange={(e) => setEditInterval(Number(e.target.value))} style={inputStyle} />
+              <div style={{ display: "flex", gap: 6 }}>
+                <button type="button" disabled={busy} onClick={() => void update(feed.id)} style={buttonStyle("primary")}>Сохранить</button>
+                <button type="button" disabled={busy} onClick={cancelEdit} style={buttonStyle("secondary")}>Отмена</button>
+              </div>
             </div>
-          </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button type="button" disabled={busy} onClick={() => void patch(feed, !feed.enabled)} style={buttonStyle("secondary")}>{feed.enabled ? "ON" : "OFF"}</button>
-            <button type="button" disabled={busy} onClick={() => void remove(feed)} style={buttonStyle("danger")}>Удалить</button>
-          </div>
+          ) : (
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{feed.url}</div>
+                <div style={{ marginTop: 4, fontSize: 11, opacity: 0.42 }}>
+                  #{feed.channelId} · {feed.intervalSeconds}s · {feed.lastPolledAt ? "checked " + new Date(feed.lastPolledAt).toLocaleString() : "not checked"}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button type="button" disabled={busy} onClick={() => startEdit(feed)} style={buttonStyle("secondary")}>Изменить</button>
+                <button type="button" disabled={busy} onClick={() => void toggle(feed)} style={buttonStyle("secondary")}>{feed.enabled ? "ON" : "OFF"}</button>
+                <button type="button" disabled={busy} onClick={() => void remove(feed)} style={buttonStyle("danger")}>Удалить</button>
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
