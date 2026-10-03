@@ -186,9 +186,15 @@ export class Tickets implements PlatformModule {
       if (!Array.isArray(input.tags) || input.tags.length > 10) throw new Error("invalid_ticket_tags");
       if (input.tags.some((tag) => typeof tag !== "string" || !tag.trim() || tag.length > 40)) throw new Error("invalid_ticket_tags");
     }
+    const current = await this.db.query<{ priority: "low" | "normal" | "high" | "urgent"; tags: string[] }>(
+      "SELECT priority,tags FROM tickets WHERE id=$1 AND guild_id=$2",
+      [ticketId,guildId]
+    );
+    const row = current.rows[0];
+    if (!row) return false;
     const result = await this.db.query(
       "UPDATE tickets SET priority=$1,tags=$2,updated_at=now() WHERE id=$3 AND guild_id=$4",
-      [input.priority ?? "normal", input.tags ?? [], ticketId, guildId]
+      [input.priority ?? row.priority, input.tags ?? row.tags, ticketId, guildId]
     );
     return result.rowCount === 1;
   }
