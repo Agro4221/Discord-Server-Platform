@@ -441,7 +441,7 @@ Music должен стремиться к функциональности си
 | Richer condition catalog | 🟡 |
 | Richer action catalog | 🟡 |
 | Workflow retries / dead-letter diagnostics | ✅ | Durable delayed jobs retry with bounded exponential backoff and move to a persistent dead-letter state after five failed attempts; Dashboard diagnostics exposes the state |
-| Reusable workflow presets | 🟡 |
+| Reusable workflow presets | ✅ | Per-guild workflow presets can be saved/loaded/deleted in Dashboard and are included in Config Export/Import |
 | Cross-module actions (tickets, roles, giveaway, moderation, music, notifications) | 🟡 |
 
 #### Notifications / integrations
