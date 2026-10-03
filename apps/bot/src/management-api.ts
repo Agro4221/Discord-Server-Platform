@@ -830,9 +830,9 @@ export class ManagementApiServer {
                         "caseId","ticketId","giveawayId","winnerCount","timestamp",
                         "minute","hour","dayOfWeek","dayOfMonth"
                       ].includes(key) && typeof value === "number" && Number.isFinite(value))
-                  ) as Record<string, number>
                       .slice(0, 20)
                   )
+                  ) as Record<string, number>
                 : {}
             });
             this.json(res, 200, { ok: true, result });
