@@ -767,6 +767,52 @@ export class ManagementApiServer {
             return;
           }
 
+          const analyticsActivityMatch = path.match(/^\/api\/guilds\/([^/]+)\/analytics\/activity$/);
+          const analyticsExportMatch = path.match(/^\/api\/guilds\/([^/]+)\/analytics\/export$/);
+
+          if (analyticsActivityMatch || analyticsExportMatch) {
+            const guildId = (analyticsActivityMatch ?? analyticsExportMatch)?.[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+          }
+
+          if (method === "GET" && analyticsActivityMatch) {
+            const guildId = analyticsActivityMatch[1] ?? "";
+            const limit = Math.min(Math.max(Number.parseInt(url.searchParams.get("limit") ?? "50",10) || 50,1),200);
+            this.json(res, 200, { guildId, activity: await this.options.auditLog.recent(guildId, limit) });
+            return;
+          }
+
+          if (method === "GET" && analyticsExportMatch) {
+            if (!this.options.analytics) {
+              this.json(res, 500, { error: "analytics_unavailable" });
+              return;
+            }
+            const guildId = analyticsExportMatch[1] ?? "";
+            const hours = Number.parseInt(url.searchParams.get("hours") ?? "24",10);
+            if (!Number.isInteger(hours) || hours < 1 || hours > 168) {
+              this.json(res, 400, { error: "invalid_hours" });
+              return;
+            }
+            const report = await this.options.analytics.report(guildId, hours) as { points: Array<{ bucketStart: string; eventType: string; count: number }>; counters: Record<string, number> };
+            const rows = [["bucket_start","event_type","count"], ...report.points.map((point) => [point.bucketStart,point.eventType,String(point.count)])];
+            rows.push(["summary","messageCount",String(report.counters.messageCount ?? 0)]);
+            rows.push(["summary","memberJoins",String(report.counters.memberJoins ?? 0)]);
+            rows.push(["summary","memberLeaves",String(report.counters.memberLeaves ?? 0)]);
+            rows.push(["summary","voiceJoins",String(report.counters.voiceJoins ?? 0)]);
+            rows.push(["summary","voiceLeaves",String(report.counters.voiceLeaves ?? 0)]);
+            rows.push(["summary","voiceMoves",String(report.counters.voiceMoves ?? 0)]);
+            const csv = rows.map((row) => row.map((value) => """ + String(value).replaceAll(""","""") + """).join(",")).join("\n") + "\n";
+            res.writeHead(200, {
+              "content-type": "text/csv; charset=utf-8",
+              "content-disposition": "attachment; filename=\"analytics-" + guildId + "-" + hours + "h.csv\"",
+              "cache-control": "no-store"
+            });
+            res.end(csv);
+            return;
+          }
           const automationMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation$/);
           const automationDryRunMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/dry-run$/);
           const automationDiagnosticsMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/diagnostics$/);
