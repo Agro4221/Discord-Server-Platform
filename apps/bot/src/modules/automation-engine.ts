@@ -236,7 +236,7 @@ export class AutomationEngine implements PlatformModule {
     this.client = undefined;
   }
 
-  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
     if (!interaction.inGuild() || commandName !== "automation") return;
 
     if (!interaction.memberPermissions?.has("ManageGuild")) {
