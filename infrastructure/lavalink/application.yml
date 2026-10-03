@@ -57,6 +57,12 @@ plugins:
 lavalink:
   server:
     password: "${LAVALINK_SERVER_PASSWORD:change-me-local}"
+    sources:
+      soundcloud: true
+      twitch: true
+      vimeo: true
+      bandcamp: true
+      http: true
     resumingEnabled: true
     resumeTimeout: 300
   plugins:
