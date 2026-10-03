@@ -884,6 +884,13 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_invite_events_guild_created ON invite_events(guild_id,created_at DESC);",
       "CREATE INDEX IF NOT EXISTS idx_invite_events_inviter ON invite_events(guild_id,inviter_id,created_at DESC);"
     ])
+  } ,
+  {
+    version: 54,
+    name: "music_queue_access_policy",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS queue_access text NOT NULL DEFAULT 'everyone' CHECK(queue_access IN ('everyone','dj'));"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
