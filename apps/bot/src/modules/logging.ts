@@ -199,7 +199,7 @@ export class Logging implements PlatformModule {
     return true;
   }
 
-  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
     if (!interaction.inGuild() || commandName !== "logging") return;
 
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
