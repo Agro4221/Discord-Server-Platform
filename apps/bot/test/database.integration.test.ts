@@ -22,17 +22,17 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1)",
       [[
         "guild_modules","automod_settings","verification_settings","automation_rules",
-        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets"
+        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets"
       ]]
     );
-    assert.equal(tables.rows.length, 14);
+    assert.equal(tables.rows.length, 15);
     const version = (await db.query("SELECT max(version) AS version FROM schema_migrations")).rows[0]?.version;
     const retryColumn = await db.query(
       "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='automation_delayed_jobs' AND column_name='dead_lettered_at'"
     );
     assert.equal(retryColumn.rows.length, 1);
-    assert.equal(Number(version), 69);
-    assert.equal(Number(first.rows[0]?.count), 69);
+    assert.equal(Number(version), 70);
+    assert.equal(Number(first.rows[0]?.count), 70);
   } finally {
     await db.close();
   }
