@@ -801,6 +801,29 @@ const migrations = [
       "  PRIMARY KEY(guild_id,user_id)",
       ");"
     ])
+  } ,
+  {
+    version: 48,
+    name: "music_twenty_four_seven",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS twenty_four_seven boolean NOT NULL DEFAULT false;"
+    ])
+  },
+  {
+    version: 49,
+    name: "timed_role_panel_assignments",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS role_panel_assignments (",
+      "  guild_id text NOT NULL,",
+      "  panel_id bigint NOT NULL REFERENCES role_panels(id) ON DELETE CASCADE,",
+      "  user_id text NOT NULL,",
+      "  role_id text NOT NULL,",
+      "  expires_at timestamptz NOT NULL,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(panel_id,user_id,role_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_role_panel_assignments_expiry ON role_panel_assignments(expires_at);"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
