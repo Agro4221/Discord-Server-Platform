@@ -358,7 +358,7 @@ Music должен стремиться к функциональности си
 #### Server utilities / customisation
 | Функция | План |
 |---|---|
-| Custom commands | 🟡 |
+| Custom commands | ✅ |
 | Autoresponder / keyword triggers | 🟡 |
 | Reusable tags/templates/snippets | ✅ / расширять |
 | Rich embed builder | ✅ / расширять |
