@@ -81,7 +81,14 @@ export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
   { name: "pay", label: "Pay", module: "economy", prefix: true, slash: false },
   { name: "shop", label: "Shop", module: "economy", prefix: true, slash: false },
   { name: "buy", label: "Buy", module: "economy", prefix: true, slash: false },
-  { name: "automation", label: "Automation", module: "automation", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true }
+  { name: "automation", label: "Automation", module: "automation", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true },
+  { name: "serverinfo", label: "Server info", module: "utility", prefix: true, slash: true },
+  { name: "userinfo", label: "User info", module: "utility", prefix: true, slash: true },
+  { name: "avatar", label: "Avatar", module: "utility", prefix: true, slash: true },
+  { name: "membercount", label: "Member count", module: "utility", prefix: true, slash: true },
+  { name: "roleinfo", label: "Role info", module: "utility", prefix: true, slash: true },
+  { name: "channelinfo", label: "Channel info", module: "utility", prefix: true, slash: true },
+  { name: "afk", label: "AFK", module: "utility", prefix: true, slash: true }
 ];
 
 export class CommandPolicyService {
