@@ -1,3 +1,7 @@
+import {
+  ChannelType,
+  PermissionFlagsBits
+} from "discord.js";
 import type {
   ChatInputCommandInteraction,
   GuildMember,
@@ -28,13 +32,16 @@ type RuntimeEvent = {
   reason?: string;
   content?: string;
   messageId?: string;
+  userIsBot?: boolean;
+  channelType?: import("@dsp/domain").AutomationChannelType;
   numeric?: Record<string, number>;
   roleIds?: string[];
 };
 
 const SUPPORTED_EVENTS: AutomationEvent[] = [
   "member.join","member.leave","member.role.add","member.role.remove",
-  "message.create","message.delete","message.edit","reaction.add",
+  "message.create","message.delete","message.edit","reaction.add","reaction.remove",
+  "channel.delete","role.delete","member.ban",
   "voice.join","voice.leave","voice.move","moderation.case",
   "ticket.create","ticket.close","giveaway.end","schedule"
 ];
@@ -82,7 +89,8 @@ export class AutomationEngine implements PlatformModule {
         this.execute({
           type: "member.join",
           guildId: member.guild.id,
-          userId: member.id
+          userId: member.id,
+          userIsBot: member.user.bot
         })
       ),
       context.events.on("member.remove", (member) =>
@@ -90,6 +98,7 @@ export class AutomationEngine implements PlatformModule {
           type: "member.leave",
           guildId: member.guild.id,
           userId: member.id,
+          userIsBot: member.user.bot,
           numeric: { memberCount: member.guild.memberCount }
         })
       ),
@@ -107,7 +116,9 @@ export class AutomationEngine implements PlatformModule {
         if (!newMessage.guildId) return;
         return this.execute({
           type: "message.edit", guildId: newMessage.guildId, userId: newMessage.author.id,
-          channelId: newMessage.channelId, content: newMessage.content, messageId: newMessage.id,
+          userIsBot: newMessage.author.bot,
+          channelId: newMessage.channelId, channelType: channelTypeName(newMessage.channel.type),
+          content: newMessage.content, messageId: newMessage.id,
           numeric: { messageLength: newMessage.content.length, previousLength: oldMessage.content.length }
         });
       }),
@@ -115,7 +126,9 @@ export class AutomationEngine implements PlatformModule {
         if (!reaction.message.guildId) return;
         return this.execute({
           type: "reaction.add", guildId: reaction.message.guildId, userId: user.id,
-          channelId: reaction.message.channelId, messageId: reaction.message.id,
+          userIsBot: user.bot,
+          channelId: reaction.message.channelId, channelType: channelTypeName(reaction.message.channel?.type),
+          messageId: reaction.message.id,
           content: reaction.emoji.name ?? reaction.emoji.identifier
         });
       }),
@@ -123,7 +136,9 @@ export class AutomationEngine implements PlatformModule {
         if (!reaction.message.guildId) return;
         return this.execute({
           type: "reaction.remove", guildId: reaction.message.guildId, userId: user.id,
-          channelId: reaction.message.channelId, messageId: reaction.message.id,
+          userIsBot: user.bot,
+          channelId: reaction.message.channelId, channelType: channelTypeName(reaction.message.channel?.type),
+          messageId: reaction.message.id,
           content: reaction.emoji.name ?? reaction.emoji.identifier
         });
       }),
@@ -133,6 +148,7 @@ export class AutomationEngine implements PlatformModule {
           type: "channel.delete",
           guildId: channel.guildId,
           channelId: channel.id,
+          channelType: channelTypeName(channel.type),
           content: "name" in channel && typeof channel.name === "string" ? channel.name : undefined
         });
       }),
@@ -758,7 +774,9 @@ export class AutomationEngine implements PlatformModule {
       type: "message.create",
       guildId: message.guild.id,
       userId: message.author.id,
+      userIsBot: message.author.bot,
       channelId: message.channelId,
+      channelType: channelTypeName(message.channel.type),
       content: message.content,
       messageId: message.id,
       numeric: {
@@ -773,12 +791,12 @@ export class AutomationEngine implements PlatformModule {
     const after = new Set(newMember.roles.cache.keys());
     for (const roleId of after) {
       if (!before.has(roleId)) {
-        await this.execute({ type: "member.role.add", guildId: newMember.guild.id, userId: newMember.id, roleId, content: roleId });
+        await this.execute({ type: "member.role.add", guildId: newMember.guild.id, userId: newMember.id, roleId, content: roleId, userIsBot: newMember.user.bot });
       }
     }
     for (const roleId of before) {
       if (!after.has(roleId)) {
-        await this.execute({ type: "member.role.remove", guildId: newMember.guild.id, userId: newMember.id, roleId, content: roleId });
+        await this.execute({ type: "member.role.remove", guildId: newMember.guild.id, userId: newMember.id, roleId, content: roleId, userIsBot: newMember.user.bot });
       }
     }
   }
@@ -812,21 +830,27 @@ export class AutomationEngine implements PlatformModule {
         type: "voice.join",
         guildId: newState.guild.id,
         userId: newState.id,
-        channelId: newState.channelId
+        userIsBot: newState.member?.user.bot ?? false,
+        channelId: newState.channelId,
+        channelType: channelTypeName(newState.channel?.type)
       });
     } else if (!newState.channelId && oldState.channelId) {
       await this.execute({
         type: "voice.leave",
         guildId: newState.guild.id,
         userId: newState.id,
-        channelId: oldState.channelId
+        userIsBot: newState.member?.user.bot ?? false,
+        channelId: oldState.channelId,
+        channelType: channelTypeName(oldState.channel?.type)
       });
     } else if (newState.channelId !== oldState.channelId) {
       await this.execute({
         type: "voice.move",
         guildId: newState.guild.id,
         userId: newState.id,
-        channelId: newState.channelId ?? undefined
+        userIsBot: newState.member?.user.bot ?? false,
+        channelId: newState.channelId ?? undefined,
+        channelType: channelTypeName(newState.channel?.type)
       });
     }
   }
