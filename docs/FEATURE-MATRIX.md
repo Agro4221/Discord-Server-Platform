@@ -79,7 +79,7 @@
 | Invite tracking | ✅ |
 | Server statistics / counters | 🟡 | Live `/stats`; persistent counters remain
 | Embed builder | ✅ | `/embed` с title, description, URL, color, footer, image и thumbnail |
-| Sticky messages / scheduled messages | 🟡 |
+| Sticky messages / scheduled messages | 🟡 | One-time `/schedule` delivery is implemented; sticky persistence remains |
 
 ## Tickets / Support
 
