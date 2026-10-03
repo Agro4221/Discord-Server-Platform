@@ -353,7 +353,7 @@ Music должен стремиться к функциональности си
 | Anti-raid / anti-nuke / quarantine | ✅ / расширять |
 | Scam / phishing / honeypot detectors | ✅ / расширять |
 | Autoban rules | ✅ | AutoMod rules can directly apply a ban through the existing Moderation case/audit pipeline |
-| Auto-purge / scheduled cleanup | 🟡 |
+| Auto-purge / scheduled cleanup | ✅ | Persistent per-channel cleanup schedules with bounded bulk deletion, worker claiming and Dashboard controls |
 | Lockdown presets / incident response playbooks | 🟡 |
 | Moderation presets/templates | 🟡 |
 
