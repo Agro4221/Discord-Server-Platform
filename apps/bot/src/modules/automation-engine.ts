@@ -1350,7 +1350,8 @@ export class AutomationEngine implements PlatformModule {
           if (!this.integrations.music) throw new Error("music_unavailable");
           await this.integrations.music.dashboardControl(event.guildId, action.action, {
             value: action.value,
-            mode: action.mode
+            mode: action.mode,
+            enabled: action.enabled
           });
           continue;
         }
@@ -1489,7 +1490,7 @@ export function validateAutomationRule(
           throw new Error("invalid_music_control_value");
         }
         if (action.action === "volume" && action.value > 200) throw new Error("invalid_music_volume");
-        if (action.action === "autoplay" && typeof action.value !== "number") throw new Error("invalid_music_autoplay_value");
+        if (action.action === "autoplay" && typeof action.enabled !== "boolean") throw new Error("invalid_music_autoplay_value");
         break;
       case "log":
         if (!action.message || action.message.length > 1000) throw new Error("invalid_log_action");
