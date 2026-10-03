@@ -373,6 +373,7 @@ export class Music implements PlatformModule {
     current: { title: string; author: string; durationMs: number; positionMs: number } | null;
     queue: Array<{ title: string; author: string; durationMs: number }>;
     nodeCount: number;
+    providers: Array<{ name: string; enabled: boolean; mode: "direct" | "mirror" }>;
   }> {
     const enabled = await moduleEnabled(this.db, guildId, "music", false);
     const player = this.manager?.players.get(guildId);
@@ -401,7 +402,19 @@ export class Music implements PlatformModule {
         author: track.info.author ?? "Unknown artist",
         durationMs: Number(track.info.duration ?? 0)
       })),
-      nodeCount: this.connectedNodes.size
+      nodeCount: this.connectedNodes.size,
+      providers: [
+        { name: "YouTube", enabled: true, mode: "direct" },
+        { name: "Spotify", enabled: process.env.LAVASRC_SPOTIFY_ENABLED === "true", mode: "mirror" },
+        { name: "Apple Music", enabled: process.env.LAVASRC_APPLEMUSIC_ENABLED === "true", mode: "mirror" },
+        { name: "Deezer", enabled: process.env.LAVASRC_DEEZER_ENABLED === "true", mode: "direct" },
+        { name: "Yandex Music", enabled: process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true", mode: "direct" },
+        { name: "VK Music", enabled: process.env.LAVASRC_VKMUSIC_ENABLED === "true", mode: "direct" },
+        { name: "Tidal", enabled: process.env.LAVASRC_TIDAL_ENABLED === "true", mode: "mirror" },
+        { name: "Qobuz", enabled: process.env.LAVASRC_QOBUZ_ENABLED === "true", mode: "direct" },
+        { name: "yt-dlp", enabled: process.env.LAVASRC_YTDLP_ENABLED === "true", mode: "direct" },
+        { name: "JioSaavn", enabled: process.env.LAVASRC_JIOSAAVN_ENABLED === "true", mode: "direct" }
+      ]
     };
   }
 
@@ -578,6 +591,9 @@ export class Music implements PlatformModule {
         break;
       case "247":
         await this.twentyFourSeven(interaction);
+        break;
+      case "providers":
+        await this.providers(interaction);
         break;
       case "seek":
         await this.seek(interaction);
@@ -1191,6 +1207,29 @@ export class Music implements PlatformModule {
     await player.setRepeatMode(mode);
     await this.persistPlayer(player);
     await interaction.reply({ content: `🔁 Repeat: **${mode}**`, ephemeral: true });
+  }
+
+  private async providers(interaction: ChatInputCommandInteraction): Promise<void> {
+    const providers: Array<[string,string,boolean]> = [
+      ["YouTube","yt",true],
+      ["Spotify","LavaSrc",process.env.LAVASRC_SPOTIFY_ENABLED === "true"],
+      ["Apple Music","LavaSrc",process.env.LAVASRC_APPLEMUSIC_ENABLED === "true"],
+      ["Deezer","LavaSrc",process.env.LAVASRC_DEEZER_ENABLED === "true"],
+      ["Yandex Music","LavaSrc",process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true"],
+      ["VK Music","LavaSrc",process.env.LAVASRC_VKMUSIC_ENABLED === "true"],
+      ["Tidal","LavaSrc",process.env.LAVASRC_TIDAL_ENABLED === "true"],
+      ["Qobuz","LavaSrc",process.env.LAVASRC_QOBUZ_ENABLED === "true"],
+      ["yt-dlp","LavaSrc",process.env.LAVASRC_YTDLP_ENABLED === "true"],
+      ["JioSaavn","LavaSrc",process.env.LAVASRC_JIOSAAVN_ENABLED === "true"]
+    ];
+    const lines = providers.map(([name, source, enabled]) =>
+      (enabled ? "🟢" : "⚪") + " **" + name + "** · " + source
+    );
+    await interaction.reply({
+      content: "🎵 **Music providers**\n" + lines.join("\n") +
+        "\n\n🟡 Spotify/Apple Music могут использовать mirror playback, а не прямой audio source.",
+      ephemeral: true
+    });
   }
 
   private async twentyFourSeven(interaction: ChatInputCommandInteraction): Promise<void> {
