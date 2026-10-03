@@ -9,6 +9,7 @@ import {
   type Role,
   type User
 } from "discord.js";
+import type { AuditLog } from "../audit.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
@@ -33,6 +34,7 @@ export class Utility implements PlatformModule {
   readonly name = "utility";
 
   private client?: Client;
+  private auditLog?: AuditLog;
   private readonly activeAfk = new Set<string>();
   private unsubscribe?: () => void;
   private messageUnsubscribe?: () => void;
@@ -41,6 +43,7 @@ export class Utility implements PlatformModule {
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+    this.auditLog = context.auditLog;
     const existing = await this.db.query<{ guild_id: string; user_id: string }>(
       "SELECT guild_id,user_id FROM afk_users"
     );
@@ -63,6 +66,7 @@ export class Utility implements PlatformModule {
     this.unsubscribe = undefined;
     this.messageUnsubscribe = undefined;
     this.activeAfk.clear();
+    this.auditLog = undefined;
     this.client = undefined;
   }
 
@@ -289,6 +293,7 @@ export class Utility implements PlatformModule {
           content: current
             ? `💤 Ты AFK с <t:${Math.floor(current.createdAt.getTime() / 1000)}:R>. Причина: ${current.reason}`
             : "Сейчас AFK не включён.",
+          allowedMentions: { parse: [] },
           ephemeral: true
         });
         return;
@@ -345,14 +350,24 @@ export class Utility implements PlatformModule {
     userId: string,
     reason: string
   ): Promise<void> {
+    const normalizedReason = normalizeAfkReason(reason);
     await this.db.query(
       `INSERT INTO afk_users(guild_id,user_id,reason,created_at)
        VALUES($1,$2,$3,now())
        ON CONFLICT(guild_id,user_id)
        DO UPDATE SET reason=EXCLUDED.reason,created_at=now()`,
-      [guildId, userId, normalizeAfkReason(reason)]
+      [guildId, userId, normalizedReason]
     );
     this.activeAfk.add(afkKey(guildId, userId));
+    await this.auditLog?.record({
+      guildId,
+      actorUserId: userId,
+      source: "discord",
+      action: "utility.afk.set",
+      targetType: "user",
+      targetId: userId,
+      metadata: { reason: normalizedReason }
+    });
   }
 
   private async clearAfk(guildId: string, userId: string): Promise<boolean> {
@@ -361,6 +376,16 @@ export class Utility implements PlatformModule {
       [guildId, userId]
     );
     this.activeAfk.delete(afkKey(guildId, userId));
+    if (result.rowCount === 1) {
+      await this.auditLog?.record({
+        guildId,
+        actorUserId: userId,
+        source: "discord",
+        action: "utility.afk.clear",
+        targetType: "user",
+        targetId: userId
+      });
+    }
     return result.rowCount === 1;
   }
 
