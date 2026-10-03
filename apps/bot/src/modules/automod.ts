@@ -309,6 +309,49 @@ export class AutoMod implements PlatformModule {
 
     const content = message.content;
     const mentions = message.mentions.users.size + message.mentions.roles.size;
+
+    const configuredRules = await this.db.query<{
+      detector: string;
+      enabled: boolean;
+      threshold: number | null;
+      window_seconds: number | null;
+      action: "delete" | "timeout" | "warn" | "log";
+      timeout_minutes: number;
+      affected_role_ids: string[];
+      ignored_role_ids: string[];
+      affected_channel_ids: string[];
+      ignored_channel_ids: string[];
+      ignore_moderators: boolean;
+      message_template: string;
+    }>(
+      "SELECT detector,enabled,threshold,window_seconds,action,timeout_minutes,affected_role_ids,ignored_role_ids,affected_channel_ids,ignored_channel_ids,ignore_moderators,message_template FROM automod_rules WHERE guild_id=$1 AND enabled=true ORDER BY detector",
+      [message.guild.id]
+    );
+
+    for (const rule of configuredRules.rows) {
+      if (rule.detector === "honeypot" && (!rule.affected_channel_ids || rule.affected_channel_ids.length === 0)) continue;
+      if (rule.affected_channel_ids?.length && !rule.affected_channel_ids.includes(message.channelId)) continue;
+      if (rule.ignored_channel_ids?.includes(message.channelId)) continue;
+      if (message.member) {
+        const memberRoles = message.member.roles.cache;
+        if (rule.affected_role_ids?.length && !rule.affected_role_ids.some((id) => memberRoles.has(id))) continue;
+        if (rule.ignored_role_ids?.some((id) => memberRoles.has(id))) continue;
+        if (rule.ignore_moderators && message.member.permissions.has(PermissionFlagsBits.ManageGuild)) continue;
+      }
+      if (!detectorMatches(
+        { detector: rule.detector, threshold: rule.threshold, windowSeconds: rule.window_seconds },
+        message,
+        recent.map((item) => item.content),
+        config
+      )) continue;
+      await this.applyRule(message, {
+        detector: rule.detector,
+        action: rule.action,
+        timeoutMinutes: rule.timeout_minutes,
+        messageTemplate: rule.message_template
+      });
+      return;
+    }
     const key = `${message.guild.id}:${message.author.id}`;
     const now = Date.now();
     const bucket = this.recent.get(key) ?? [];
