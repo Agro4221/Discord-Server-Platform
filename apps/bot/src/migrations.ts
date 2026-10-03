@@ -1068,6 +1068,26 @@ const migrations = [
     ])
   },
   {
+    version: 71,
+    name: "moderation_scheduled_cleanup",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS moderation_cleanup_rules (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  interval_seconds integer NOT NULL DEFAULT 3600 CHECK(interval_seconds BETWEEN 60 AND 604800),",
+      "  max_messages integer NOT NULL DEFAULT 100 CHECK(max_messages BETWEEN 1 AND 100),",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  last_run_at timestamptz,",
+      "  processing_until timestamptz,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  UNIQUE(guild_id,channel_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_moderation_cleanup_due ON moderation_cleanup_rules(guild_id,enabled,last_run_at,processing_until);"
+    ])
+  },
+  {
     version: 70,
     name: "automation_workflow_presets",
     sql: q([
