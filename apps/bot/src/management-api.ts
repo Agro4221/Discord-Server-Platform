@@ -2397,6 +2397,41 @@ function validateAutomationPayload(
           if (!channel || !channel.isTextBased()) throw new RequestInputError("invalid_react_message_channel", 400);
         }
         break;
+      case "ticket-close":
+        if (typeof item.ticketId !== "string" || (item.ticketId !== "@event" && !/^\d{1,12}$/.test(item.ticketId))) {
+          throw new RequestInputError("invalid_ticket_close_action", 400);
+        }
+        break;
+      case "giveaway-end":
+      case "giveaway-reroll":
+        if (typeof item.giveawayId !== "number" || !Number.isSafeInteger(item.giveawayId) || item.giveawayId < 1) {
+          throw new RequestInputError("invalid_giveaway_action", 400);
+        }
+        break;
+      case "notification-feed-toggle":
+        if (typeof item.feedId !== "number" || !Number.isSafeInteger(item.feedId) || item.feedId < 1 || typeof item.enabled !== "boolean") {
+          throw new RequestInputError("invalid_notification_feed_action", 400);
+        }
+        break;
+      case "music-control": {
+        const validMusicActions = ["pause","resume","skip","stop","shuffle","repeat","seek","volume","autoplay"];
+        if (typeof item.action !== "string" || !validMusicActions.includes(item.action)) {
+          throw new RequestInputError("invalid_music_control_action", 400);
+        }
+        if (item.action === "repeat" && (typeof item.mode !== "string" || !["off","track","queue"].includes(item.mode))) {
+          throw new RequestInputError("invalid_music_repeat_mode", 400);
+        }
+        if (item.action === "autoplay" && typeof item.enabled !== "boolean") {
+          throw new RequestInputError("invalid_music_autoplay", 400);
+        }
+        if (item.action === "seek" && (typeof item.value !== "number" || !Number.isInteger(item.value) || item.value < 0 || item.value > 86400)) {
+          throw new RequestInputError("invalid_music_seek", 400);
+        }
+        if (item.action === "volume" && (typeof item.value !== "number" || !Number.isInteger(item.value) || item.value < 0 || item.value > 200)) {
+          throw new RequestInputError("invalid_music_volume", 400);
+        }
+        break;
+      }
       case "delay":
         if (typeof item.seconds !== "number" || !Number.isInteger(item.seconds) || item.seconds < 1 || item.seconds > 3600) throw new RequestInputError("invalid_delay_action", 400);
         break;
