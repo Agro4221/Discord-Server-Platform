@@ -331,6 +331,7 @@ async function main(): Promise<void> {
     economy,
     reminders,
     utility,
+    communityTools,
     tickets,
     rolePanels,
     giveaways
