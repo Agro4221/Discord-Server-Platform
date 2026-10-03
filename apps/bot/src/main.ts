@@ -101,13 +101,18 @@ async function main(): Promise<void> {
   const economy = new Economy(database);
   const reminders = new Reminders(database);
   const starboard = new Starboard(database);
-  const automation = new AutomationEngine(database, moderation);
   const security = new Security(database);
   const notifications = new Notifications(database);
   const streamAlerts = new StreamAlerts(database, config.streamAlerts, auditLog);
   const verification = new Verification(database);
   const analytics = new Analytics(database);
   const music = new Music(database, config, identities);
+  const automation = new AutomationEngine(database, moderation, {
+    tickets,
+    giveaways,
+    notifications,
+    music
+  });
   const customCommands = new CustomCommandService(database, config);
   const autoResponder = new AutoResponder(database);
   const commandPolicy = new CommandPolicyService(database);
