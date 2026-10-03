@@ -568,6 +568,12 @@ export class Music implements PlatformModule {
       case "nowplaying":
         await this.nowPlaying(interaction);
         break;
+      case "previous":
+        await this.previous(interaction);
+        break;
+      case "lyrics":
+        await this.lyrics(interaction);
+        break;
     }
   }
 
@@ -871,6 +877,92 @@ export class Music implements PlatformModule {
     }
 
     await interaction.reply({ content: "Неизвестное действие playlist.", ephemeral: true });
+  }
+
+  private async previous(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guild!.id);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
+    await this.previousInteraction(player, interaction);
+  }
+
+  private async previousInteraction(player: Player, interaction: ChatInputCommandInteraction | Interaction): Promise<void> {
+    const previous = player.queue.previous;
+    if (!Array.isArray(previous) || previous.length === 0) {
+      await interaction.reply({ content: "⏮️ Предыдущего трека нет.", ephemeral: true });
+      return;
+    }
+    try {
+      await player.queue.shiftPrevious();
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await interaction.reply({ content: "⏮️ Вернулся к предыдущему треку.", ephemeral: true });
+    } catch (error) {
+      logger.warn("Music previous track failed", {
+        guildId: player.guildId,
+        error: String(error)
+      });
+      await interaction.reply({ content: "Не удалось вернуть предыдущий трек.", ephemeral: true });
+    }
+  }
+
+  private async lyrics(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guild!.id);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
+
+    try {
+      const result = await player.getLyrics();
+      if (!result) {
+        await interaction.reply({ content: "📜 Для этого трека текст не найден.", ephemeral: true });
+        return;
+      }
+
+      const textValue = typeof result.text === "string" && result.text.trim()
+        ? result.text.trim()
+        : Array.isArray(result.lines)
+          ? result.lines.map((line) => String(line.line ?? "")).filter(Boolean).join("\n")
+          : "";
+
+      if (!textValue) {
+        await interaction.reply({ content: "📜 Для этого трека текст не найден.", ephemeral: true });
+        return;
+      }
+
+      const chunks: string[] = [];
+      for (let i = 0; i < textValue.length; i += 3800) {
+        chunks.push(textValue.slice(i, i + 3800));
+      }
+
+      await interaction.reply({
+        content: chunks.length === 1
+          ? "📜 **Текст**\n" + chunks[0]
+          : "📜 **Текст, часть 1/" + chunks.length + "**\n" + chunks[0],
+        ephemeral: true
+      });
+
+      for (let i = 1; i < chunks.length; i += 1) {
+        await interaction.followUp({
+          content: "📜 **Текст, часть " + (i + 1) + "/" + chunks.length + "**\n" + chunks[i],
+          ephemeral: true
+        });
+      }
+    } catch (error) {
+      logger.warn("Music lyrics lookup failed", {
+        guildId: interaction.guild!.id,
+        error: String(error)
+      });
+      await interaction.reply({
+        content: "Не удалось получить текст трека. Возможно, для него нет lyrics source.",
+        ephemeral: true
+      });
+    }
   }
 
   private async queueQuery(
@@ -1370,6 +1462,12 @@ export class Music implements PlatformModule {
       await Promise.resolve(player.queue.shuffle());
       await this.persistPlayer(player);
       await message.reply("🔀 Очередь перемешана.");
+    } else if (action === "previous") {
+      await this.previousInteraction(player, interaction);
+      return;
+    } else if (action === "lyrics") {
+      await this.lyrics(interaction);
+      return;
     } else if (action === "queue") {
       const page = this.buildQueuePage(player, 0);
       await message.reply({ content: page.content, components: page.components });
@@ -1823,20 +1921,22 @@ export class Music implements PlatformModule {
     const repeat = player.repeatMode === "off" ? "🔁" : player.repeatMode === "track" ? "🔂" : "🔁";
     return [
       new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("dsp:music:previous").setEmoji("⏮️").setLabel("Назад").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("dsp:music:pause").setEmoji(player.paused ? "▶️" : "⏸️").setLabel(player.paused ? "Продолжить" : "Пауза").setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId("dsp:music:skip").setEmoji("⏭️").setLabel("Следующий").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("dsp:music:shuffle").setEmoji("🔀").setLabel("Shuffle").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("dsp:music:repeat").setEmoji(repeat).setLabel("Repeat").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("dsp:music:stop").setEmoji("⏹️").setLabel("Стоп").setStyle(ButtonStyle.Danger)
+        new ButtonBuilder().setCustomId("dsp:music:repeat").setEmoji(repeat).setLabel("Repeat").setStyle(ButtonStyle.Secondary)
       ),
       new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("dsp:music:stop").setEmoji("⏹️").setLabel("Стоп").setStyle(ButtonStyle.Danger),
         new ButtonBuilder().setCustomId("dsp:music:seek-back").setEmoji("⏪").setLabel("15с").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("dsp:music:seek-forward").setEmoji("⏩").setLabel("30с").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("dsp:music:volume-down").setEmoji("🔉").setLabel("-10").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("dsp:music:volume-up").setEmoji("🔊").setLabel("+10").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("dsp:music:queue").setEmoji("📋").setLabel("Очередь").setStyle(ButtonStyle.Secondary)
+        new ButtonBuilder().setCustomId("dsp:music:volume-up").setEmoji("🔊").setLabel("+10").setStyle(ButtonStyle.Secondary)
       ),
       new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("dsp:music:queue").setEmoji("📋").setLabel("Очередь").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:lyrics").setEmoji("📜").setLabel("Текст").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("dsp:music:favorite").setEmoji("❤️").setLabel("В избранное").setStyle(ButtonStyle.Secondary)
       )
     ];
