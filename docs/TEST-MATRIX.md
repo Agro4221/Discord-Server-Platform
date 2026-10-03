@@ -103,5 +103,6 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-03 — AutoMod rule editor snapshot
 - Dashboard CRUD now exposes the existing persistent AutoMod detector-rule contract with resource pickers for roles/channels.
 - Rule actions support delete, timeout, warn and log; warn is routed through the existing Moderation case/escalation path.
+- Deterministic coverage confirms per-rule cooldown activation boundaries.
 - Backend validation rejects unsupported actions and non-finite/out-of-range per-rule numeric values.
 - Live Discord behavior, role hierarchy and provider/resource failure paths remain release-gate validation.
