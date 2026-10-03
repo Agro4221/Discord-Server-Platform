@@ -506,6 +506,47 @@ export class ManagementApiServer {
             return;
           }
 
+          const ticketsMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets$/);
+          const ticketCloseMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/(\\d+)\/close$/);
+
+          if ((ticketsMatch || ticketCloseMatch) && !this.options.tickets) {
+            this.json(res, 500, { error: "tickets_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && ticketsMatch) {
+            const guildId = ticketsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, tickets: await this.options.tickets!.dashboardList(guildId) });
+            return;
+          }
+
+          if (method === "POST" && ticketCloseMatch) {
+            const guildId = ticketCloseMatch[1] ?? "";
+            const ticketId = Number(ticketCloseMatch[2]);
+            if (!guildId || !Number.isSafeInteger(ticketId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_ticket_not_found" });
+              return;
+            }
+            const closed = await this.options.tickets!.dashboardClose(guildId, ticketId);
+            if (!closed) {
+              this.json(res, 404, { error: "ticket_not_found_or_not_open" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "ticket.closed",
+              targetType: "ticket",
+              targetId: String(ticketId)
+            });
+            this.json(res, 200, { ok: true, ticketId });
+            return;
+          }
+
           const giveawaysMatch = path.match(/^\/api\/guilds\/([^/]+)\/giveaways$/);
           const giveawayActionMatch = path.match(/^\/api\/guilds\/([^/]+)\/giveaways\/(\d+)\/(end|reroll)$/);
 
