@@ -13,6 +13,7 @@ import { RolePanelsEditor } from "./role-panels-editor";
 import { CustomCommandsPanel } from "./custom-commands-panel";
 import { StreamAlertsPanel } from "./stream-alerts-panel";
 import { EconomyShopPanel } from "./economy-shop-panel";
+import { ModerationPanel } from "./moderation-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -431,7 +432,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy"]);
+const PANEL_KEYS = new Set(["moderation", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1442,6 +1443,16 @@ function ModulePage(props: {
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {props.module?.key === "moderation" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Moderation Center" eyebrow="OPERATIONS" />
+          <ModerationPanel
+            guildId={props.guildId}
+            onChanged={props.onAudit}
+          />
         </section>
       )}
 
