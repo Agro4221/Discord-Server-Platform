@@ -165,4 +165,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Existing specialized panels for Role Panels, Giveaways, Analytics, Automation, Notifications, Bot Fleet and Backups remain integrated.
 - Windows launcher `start-local.bat` closes automatically after a successful dashboard launch; failed startup still pauses to preserve diagnostics.
 - CI run #603 on this code state passed all stages: dependency install/audit, source/deployment/observability checks, bot typecheck/tests/build, domain build and Dashboard production build.
-- Live Windows launcher behavior (real browser open + terminal close) still requires validation on Windows; automated CI cannot validate desktop UX.
+- Live Windows launcher behavior (real browser open + terminal close) still requires validation on Windows; automated CI cannot validate desktop UX.## 2026-10-03 — Utility / AFK integration
+- The Core now contains a `utility` module covering server/member information, avatar/role/channel inspection and persistent AFK.
+- AFK state is durable in PostgreSQL and restored into an in-memory active-key cache on startup; normal messages clear the caller's AFK and mentions surface the stored reason.
+- Utility commands are included in the module catalog and command-policy definitions, and Control Center has a dedicated Utility entry under the Community area.
+- Added migration 40 (`persistent_afk`) and regression tests for utility command shapes and AFK helper behavior.
+- This is a feature addition, not a live Discord acceptance result; real Discord behavior still belongs to the live release-gate suite.
+
