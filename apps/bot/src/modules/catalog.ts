@@ -1,5 +1,6 @@
 export type ModuleKey =
   | "moderation"
+  | "custom-commands"
   | "automod"
   | "security"
   | "temporary-voice"
@@ -29,6 +30,7 @@ export const MODULE_CATALOG: readonly {
   defaultEnabled: boolean;
 }[] = [
   { key: "moderation", title: "Moderation", description: "Warnings and moderation actions", defaultEnabled: true },
+  { key: "custom-commands", title: "Custom Commands", description: "Server-defined prefix and slash commands", defaultEnabled: false },
   { key: "automod", title: "AutoMod", description: "Automated content and anti-spam controls", defaultEnabled: false },
   { key: "security", title: "Security", description: "Anti-raid, lockdown and anti-nuke controls", defaultEnabled: false },
   { key: "temporary-voice", title: "Temporary Voice", description: "Temporary voice rooms", defaultEnabled: false },
