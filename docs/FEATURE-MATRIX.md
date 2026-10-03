@@ -48,7 +48,7 @@
 | Auto timeout / delete | ✅ |
 | Anti-raid | ✅ |
 | Anti-nuke / destructive burst | ✅ |
-| Quarantine / lockdown workflow | ✅ |
+| Quarantine / lockdown workflow | ✅ | Response actions can be independently enabled/disabled in persisted Security policy |
 | Scam / phishing heuristics | ✅ |
 | Security incident dashboard | ✅ | `/security status` + Dashboard incident drilldown
 | Honeypot / advanced detectors | ✅ | Configurable rule pipeline now activates honeypot/scam/zalgo/count detectors with scopes and actions |
