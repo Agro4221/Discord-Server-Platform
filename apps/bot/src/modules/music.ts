@@ -1009,6 +1009,7 @@ export class Music implements PlatformModule {
     requester: import("discord.js").User
   ): Promise<{ added: number; truncated: boolean; firstTitle: string; firstAuthor: string }> {
     if (!this.manager) throw new Error("music_manager_unavailable");
+    if (!await this.canQueueMusic(guildId, requester.id)) throw new Error("music_queue_permission_denied");
 
     const existing = this.manager.players.get(guildId);
     const player = existing ?? await this.manager.createPlayer({
@@ -1330,6 +1331,34 @@ export class Music implements PlatformModule {
     return allowed;
   }
 
+  private async queueAccess(guildId: string): Promise<"everyone" | "dj"> {
+    const result = await this.db.query<{ queue_access: "everyone" | "dj" }>("SELECT queue_access FROM music_settings WHERE guild_id=$1",[guildId]);
+    return result.rows[0]?.queue_access === "dj" ? "dj" : "everyone";
+  }
+
+  private async canQueueMusic(guildId: string, userId: string): Promise<boolean> {
+    if (await this.queueAccess(guildId) === "everyone") return true;
+    const guild = this.client?.guilds.cache.get(guildId);
+    const member = guild ? await guild.members.fetch(userId).catch(() => null) : null;
+    return this.canManageMusicMember(guildId, member);
+  }
+
+  private async queuePolicy(interaction: ChatInputCommandInteraction): Promise<void> {
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Queue policy меняется только DJ или Manage Server.", ephemeral: true });
+      return;
+    }
+    const value = interaction.options.getString("mode") as "everyone" | "dj" | null;
+    const current = await this.queueAccess(interaction.guildId!);
+    if (!value) {
+      await interaction.reply({ content: "🎵 Queue access: **" + current + "**", ephemeral: true });
+      return;
+    }
+    await this.db.query("INSERT INTO music_settings(guild_id,queue_access) VALUES($1,$2) ON CONFLICT(guild_id) DO UPDATE SET queue_access=EXCLUDED.queue_access,updated_at=now()", [interaction.guildId!,value]);
+    await interaction.reply({ content: "🎵 Добавлять треки теперь могут: **" + (value === "dj" ? "только DJ / Manage Server" : "все участники") + "**.", ephemeral: true });
+  }
+
   private async djRoleId(guildId: string): Promise<string | null> {
     const result = await this.db.query<{ dj_role_id: string | null }>(
       "SELECT dj_role_id FROM guild_settings WHERE guild_id=$1",
@@ -1352,13 +1381,10 @@ export class Music implements PlatformModule {
       return;
     }
 
-    const tracks = player.queue.tracks.slice(0, 15);
-    const lines = tracks.map((track, index) =>
-      `${index + 1}. **${track.info.title}** — ${track.info.author}`
-    );
-
+    const page = this.buildQueuePage(player, 0);
     await interaction.reply({
-      content: lines.length ? `📋 **Очередь**\n${lines.join("\n")}` : "Очередь пуста.",
+      content: page.content,
+      components: page.components,
       ephemeral: true
     });
   }
@@ -1833,9 +1859,9 @@ export class Music implements PlatformModule {
     return result.rows[0]?.autoplay ?? false;
   }
 
-  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number; twentyFourSeven: boolean }> {
-    const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number; twenty_four_seven: boolean }>(
-      "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds,twenty_four_seven FROM music_settings WHERE guild_id=$1",
+  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number; twentyFourSeven: boolean; queueAccess: "everyone" | "dj" }> {
+    const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number; twenty_four_seven: boolean; queue_access: "everyone" | "dj" }>(
+      "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds,twenty_four_seven,queue_access FROM music_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -1845,7 +1871,8 @@ export class Music implements PlatformModule {
       defaultVolume: Math.min(Math.max(Number(row?.default_volume ?? 100), 0), 200),
       announceTrackStart: row?.announce_track_start ?? true,
       autoLeaveSeconds: Math.min(Math.max(Number(row?.auto_leave_seconds ?? 30), 0), 86400),
-      twentyFourSeven: row?.twenty_four_seven ?? false
+      twentyFourSeven: row?.twenty_four_seven ?? false,
+      queueAccess: row?.queue_access === "dj" ? "dj" : "everyone"
     };
   }
 
