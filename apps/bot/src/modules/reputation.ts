@@ -27,6 +27,10 @@ export class Reputation implements PlatformModule {
     }
     if (interaction.commandName === "profile") {
       await this.handleProfile(interaction);
+      return;
+    }
+    if (interaction.commandName === "achievements") {
+      await this.handleAchievements(interaction);
     }
   }
 
@@ -102,6 +106,46 @@ export class Reputation implements PlatformModule {
     const bio = profile.rows[0]?.bio ?? "Био пока не заполнено.";
     await interaction.reply({
       content: "👤 **Профиль " + target.username + "**\n⭐ Rep: **" + points + "**\n📝 " + bio,
+      ephemeral: false
+    });
+  }
+
+  private async handleAchievements(interaction: ChatInputCommandInteraction): Promise<void> {
+    const guildId = interaction.guild!.id;
+    if (!await moduleEnabled(this.db, guildId, "reputation", false)) {
+      await interaction.reply({ content: "Модуль Reputation выключен.", ephemeral: true });
+      return;
+    }
+
+    const user = interaction.options.getUser("user") ?? interaction.user;
+    const points = await this.getPoints(guildId, user.id);
+    const levelResult = await this.db.query<{ level:number }>(
+      "SELECT level FROM leveling_users WHERE guild_id=$1 AND user_id=$2",
+      [guildId,user.id]
+    );
+    const inviteResult = await this.db.query<{ joins:number }>(
+      "SELECT joins FROM invite_stats WHERE guild_id=$1 AND user_id=$2",
+      [guildId,user.id]
+    );
+    const birthdayResult = await this.db.query<{ user_id:string }>(
+      "SELECT user_id FROM birthdays WHERE guild_id=$1 AND user_id=$2",
+      [guildId,user.id]
+    );
+
+    const level = Number(levelResult.rows[0]?.level ?? 0);
+    const invites = Number(inviteResult.rows[0]?.joins ?? 0);
+    const achievements = [
+      [points >= 1, "⭐ Первый rep"],
+      [points >= 10, "🏆 10 rep"],
+      [level >= 5, "📈 Level 5"],
+      [invites >= 5, "📨 Пригласил 5 участников"],
+      [birthdayResult.rows.length > 0, "🎂 День рождения заполнен"]
+    ];
+
+    const unlocked = achievements.filter(([ok]) => ok).map(([, name]) => String(name));
+    const locked = achievements.filter(([ok]) => !ok).map(([, name]) => "🔒 " + String(name));
+    await interaction.reply({
+      content: "🏅 **Achievements " + user.username + "**\n\n" + [...unlocked, ...locked].join("\n"),
       ephemeral: false
     });
   }
