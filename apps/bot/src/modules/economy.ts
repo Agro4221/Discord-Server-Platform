@@ -36,7 +36,7 @@ export class Economy implements PlatformModule {
     this.unsubscribe = undefined;
   }
 
-  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
     if (!interaction.inGuild()) return;
     if (!["economy","shop"].includes(commandName)) return;
     const guildId = interaction.guild!.id;
