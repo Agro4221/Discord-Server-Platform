@@ -547,6 +547,9 @@ export class Music implements PlatformModule {
       case "favorite":
         await this.favorite(interaction);
         break;
+      case "filter":
+        await this.filter(interaction);
+        break;
       case "queue":
         await this.queue(interaction);
         break;
@@ -619,6 +622,70 @@ export class Music implements PlatformModule {
         sourceName: track.info.sourceName
       }
     };
+  }
+
+  private async filter(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guild!.id);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
+
+    const action = interaction.options.getString("action", true);
+    try {
+      switch (action) {
+        case "clear":
+          await player.filterManager.resetFilters();
+          break;
+        case "bassboost-low":
+          await player.filterManager.setEQPreset("BassboostLow");
+          break;
+        case "bassboost-medium":
+          await player.filterManager.setEQPreset("BassboostMedium");
+          break;
+        case "bassboost-high":
+          await player.filterManager.setEQPreset("BassboostHigh");
+          break;
+        case "rock":
+          await player.filterManager.setEQPreset("Rock");
+          break;
+        case "classic":
+          await player.filterManager.setEQPreset("Classic");
+          break;
+        case "pop":
+          await player.filterManager.setEQPreset("Pop");
+          break;
+        case "electronic":
+          await player.filterManager.setEQPreset("Electronic");
+          break;
+        case "fullsound":
+          await player.filterManager.setEQPreset("FullSound");
+          break;
+        case "gaming":
+          await player.filterManager.setEQPreset("Gaming");
+          break;
+        case "nightcore":
+          await player.filterManager.toggleNightcore();
+          break;
+        case "8d":
+          await player.filterManager.toggleRotation(0.4);
+          break;
+        default:
+          await interaction.reply({ content: "Неизвестный filter action.", ephemeral: true });
+          return;
+      }
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await interaction.reply({ content: "🎚️ Filter применён: **" + action + "**.", ephemeral: true });
+    } catch (error) {
+      logger.warn("Music filter operation failed", {
+        guildId: interaction.guild!.id,
+        action,
+        error: String(error)
+      });
+      await interaction.reply({ content: "Не удалось применить этот filter на текущем Lavalink node.", ephemeral: true });
+    }
   }
 
   private async favorite(interaction: ChatInputCommandInteraction): Promise<void> {
