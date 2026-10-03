@@ -20,6 +20,7 @@ import { LevelingPanel } from "./leveling-panel";
 import { CommandPoliciesPanel } from "./command-policies-panel";
 import { StarboardPanel } from "./starboard-panel";
 import { ServerSettingsPanel } from "./server-settings-panel";
+import { DiscordDiagnosticsPanel } from "./discord-diagnostics-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -469,7 +470,7 @@ export function ControlCenter() {
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [modules, setModules] = useState<ModuleState>({});
   const [schemas, setSchemas] = useState<Schema[]>([]);
-  const [resources, setResources] = useState<{ channels: Resource[]; roles: Resource[] }>({ channels: [], roles: [] });
+  const [resources, setResources] = useState<{ channels: Resource[]; roles: Resource[]; bot: { id: string; tag: string; highestRole: { id: string; name: string; position: number }; permissions: Record<string, boolean> } | null }>({ channels: [], roles: [], bot: null });
   const [selectedModule, setSelectedModule] = useState("");
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [originalValues, setOriginalValues] = useState<Record<string, unknown>>({});
@@ -569,7 +570,8 @@ export function ControlCenter() {
       setModules((moduleResponse?.modules ?? {}) as ModuleState);
       setResources({
         channels: (resourceResponse.channels ?? []) as Resource[],
-        roles: (resourceResponse.roles ?? []) as Resource[]
+        roles: (resourceResponse.roles ?? []) as Resource[],
+        bot: (resourceResponse.bot ?? null) as { id: string; tag: string; highestRole: { id: string; name: string; position: number }; permissions: Record<string, boolean> } | null
       });
       setAudit((auditResponse.events ?? []) as AuditEvent[]);
       setSelectedModule((current) => current || nextCatalog[0]?.key || "");
@@ -1694,7 +1696,7 @@ function ModulePage(props: {
   );
 }
 
-function SystemPage(props: { guildId: string; health: Health; audit: AuditEvent[]; resources: { channels: Resource[]; roles: Resource[] }; onAudit: () => void }) {
+function SystemPage(props: { guildId: string; health: Health; audit: AuditEvent[]; resources: { channels: Resource[]; roles: Resource[]; bot: { id: string; tag: string; highestRole: { id: string; name: string; position: number }; permissions: Record<string, boolean> } | null }; onAudit: () => void }) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <PageHeader eyebrow="SYSTEM" title="Система" description="Операционные инструменты экземпляра: fleet, здоровье Core, backups и аудит." />
