@@ -46,6 +46,7 @@ export class AutomationEngine implements PlatformModule {
   private readonly keyedCooldowns = new Map<string, number>();
   private readonly templates = new Map<string, Map<string, string>>();
   private scheduleTimer?: NodeJS.Timeout;
+  private delayedTimer?: NodeJS.Timeout;
   private identityId = "primary";
   private executionCounter = 0;
   private lastScheduleMinute: number | null = null;
@@ -112,11 +113,15 @@ export class AutomationEngine implements PlatformModule {
 
     this.scheduleTimer = setInterval(() => void this.emitSchedules(), 15_000);
     this.scheduleTimer.unref();
+    this.delayedTimer = setInterval(() => void this.processDelayedJobs(), 5_000);
+    this.delayedTimer.unref();
 
     this.unsubscribe = () => {
       unsubs.forEach((unsubscribe) => unsubscribe());
       if (this.scheduleTimer) clearInterval(this.scheduleTimer);
       this.scheduleTimer = undefined;
+      if (this.delayedTimer) clearInterval(this.delayedTimer);
+      this.delayedTimer = undefined;
     };
   }
 
@@ -605,6 +610,70 @@ export class AutomationEngine implements PlatformModule {
     }
     return true;
   }
+  private async enqueueDelayedJob(event: RuntimeEvent, actions: AutomationAction[], seconds: number): Promise<void> {
+    const safeSeconds = Math.min(Math.max(Math.trunc(seconds), 1), 3600);
+    await this.db.query(
+      "INSERT INTO automation_delayed_jobs(guild_id,event,actions,available_at) VALUES($1,$2::jsonb,$3::jsonb,now()+make_interval(secs => $4))",
+      [event.guildId, JSON.stringify(event), JSON.stringify(actions), safeSeconds]
+    );
+  }
+
+  private async processDelayedJobs(): Promise<void> {
+    const result = await this.db.query<{
+      id: string;
+      guild_id: string;
+      event: RuntimeEvent;
+      actions: AutomationAction[];
+    }>(
+      `UPDATE automation_delayed_jobs aj
+       SET processing_until=now()+interval '2 minutes',
+           attempts=aj.attempts+1
+       FROM (
+         SELECT aj2.id
+         FROM automation_delayed_jobs aj2
+         INNER JOIN guild_bot_assignments ga ON ga.guild_id=aj2.guild_id
+         LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id
+         WHERE aj2.completed_at IS NULL
+           AND aj2.available_at <= now()
+           AND (aj2.processing_until IS NULL OR aj2.processing_until < now())
+           AND (
+             ga.bot_identity_id=$1
+             OR (
+               $1='primary'
+               AND ga.bot_identity_id <> 'primary'
+               AND (bh.last_seen_at IS NULL OR bh.last_seen_at < now()-interval '90 seconds')
+             )
+           )
+         ORDER BY aj2.available_at
+         LIMIT 20
+         FOR UPDATE SKIP LOCKED
+       ) claimed
+       WHERE aj.id=claimed.id
+       RETURNING aj.id,aj.guild_id,aj.event,aj.actions`,
+      [this.identityId]
+    );
+
+    for (const job of result.rows) {
+      try {
+        if (!job.event || !Array.isArray(job.actions) || job.actions.length === 0) {
+          await this.db.query("UPDATE automation_delayed_jobs SET completed_at=now(),processing_until=NULL,last_error='invalid queued job' WHERE id=$1", [job.id]);
+          continue;
+        }
+        await this.perform(job.actions, job.event);
+        await this.db.query(
+          "UPDATE automation_delayed_jobs SET completed_at=now(),processing_until=NULL,last_error=NULL WHERE id=$1 AND completed_at IS NULL",
+          [job.id]
+        );
+      } catch (error) {
+        await this.db.query(
+          "UPDATE automation_delayed_jobs SET processing_until=NULL,last_error=$1 WHERE id=$2",
+          [String(error).slice(0, 1000), job.id]
+        );
+        logger.warn("Automation delayed job failed", { jobId: job.id, guildId: job.guild_id, error: String(error) });
+      }
+    }
+  }
+
   private async renderTemplate(guildId: string, value: string, event: RuntimeEvent): Promise<string> {
     let output = value;
     const guildTemplates = this.templates.get(guildId);
@@ -622,11 +691,15 @@ export class AutomationEngine implements PlatformModule {
   private async perform(actions: AutomationAction[], event: RuntimeEvent): Promise<void> {
     const client = this.client;
 
-    for (const action of actions) {
+    for (let index = 0; index < actions.length; index += 1) {
+      const action = actions[index]!;
       try {
         if (action.type === "delay") {
-          await new Promise((resolve) => setTimeout(resolve, action.seconds * 1000));
-          continue;
+          const remaining = actions.slice(index + 1);
+          if (remaining.length > 0) {
+            await this.enqueueDelayedJob(event, remaining, action.seconds);
+          }
+          return;
         }
 
         if (action.type === "branch") {
