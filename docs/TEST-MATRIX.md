@@ -173,6 +173,11 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Dry-run remains intentionally side-effect-free; live execution is covered by existing runtime pathways and remains part of release-gate validation.
 
 
+## 2026-10-04 — Music history / skip-to gate
+- Migration 79 must create music_history and remain idempotent.
+- Unit test verifies one-based skip-to semantics and leaves the queue unchanged for invalid positions.
+- Live Discord/Lavalink gate must verify skip-to and history against a real playback session.
+
 ## 2026-10-04 — Automation richer conditions/actions gate
 - Unit test must validate all new condition/action variants.
 - Dry-run must evaluate user/bot and channel-type context and render new action previews without side effects.
