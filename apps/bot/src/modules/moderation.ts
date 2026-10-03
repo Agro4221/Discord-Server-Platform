@@ -870,7 +870,7 @@ export class Moderation implements PlatformModule {
     }
   }
 
-  private async audit(
+  async audit(
     action: string,
     guildId: string,
     actorUserId: string,
