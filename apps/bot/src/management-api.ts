@@ -918,7 +918,8 @@ export class ManagementApiServer {
             }
 
             const body = await readJson(req);
-            const action = body.action;
+            const rawAction = body.action;
+            const action = typeof rawAction === "string" ? rawAction : "";
 
             if (action === "poll.close") {
               const pollId = Number(body.id);
@@ -934,7 +935,8 @@ export class ManagementApiServer {
 
             if (action === "suggestion.status") {
               const suggestionId = Number(body.id);
-              const status = body.status;
+              const rawStatus = body.status;
+              const status = typeof rawStatus === "string" ? rawStatus : "";
               if (!Number.isSafeInteger(suggestionId) || suggestionId < 1 || !["approved","denied"].includes(status)) {
                 throw new RequestInputError("invalid_suggestion_status", 400);
               }
