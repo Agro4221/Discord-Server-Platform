@@ -37,6 +37,14 @@ export type PlatformEventMap = {
   "role.delete": import("discord.js").Role;
   "member.ban": { guildId: string; userId: string };
   "member.unban": { guildId: string; userId: string };
+  "security.incident": {
+    guildId: string;
+    incidentId: number;
+    eventType: "raid" | "destructive-burst";
+    actionCount?: number;
+    joinCount?: number;
+    userId?: string;
+  };
 };
 
 type Listener<K extends keyof PlatformEventMap> = (
@@ -139,7 +147,7 @@ function extractGuildId<K extends keyof PlatformEventMap>(
   if (event === "role.create" || event === "role.delete") {
     return (payload as import("discord.js").Role).guild.id;
   }
-  if (event === "member.ban" || event === "member.unban") {
+  if (event === "member.ban" || event === "member.unban" || event === "security.incident") {
     return (payload as { guildId: string }).guildId;
   }
   return null;

@@ -33,6 +33,7 @@ export class Security implements PlatformModule {
   private readonly destructive = new Map<string, { timestamp: number; type: string }[]>();
   private client?: import("discord.js").Client;
   private auditLog?: import("../audit.js").AuditLog;
+  private events?: import("../events.js").PlatformEventBus;
   private incidentTimer?: NodeJS.Timeout;
 
   constructor(private readonly db: Database) {}
@@ -40,6 +41,7 @@ export class Security implements PlatformModule {
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
     this.auditLog = context.auditLog;
+    this.events = context.events;
     await this.restoreActiveIncidents();
     await this.sweepIncidents();
     this.incidentTimer = setInterval(() => void this.sweepIncidents(), 15_000);
@@ -63,6 +65,7 @@ export class Security implements PlatformModule {
     if (this.incidentTimer) clearInterval(this.incidentTimer);
     this.incidentTimer = undefined;
     this.auditLog = undefined;
+    this.events = undefined;
     this.client = undefined;
   }
 
@@ -430,6 +433,12 @@ export class Security implements PlatformModule {
       "security.raid-detected",
       raidMetadata
     );
+    await this.events?.emit("security.incident", {
+      guildId: member.guild.id,
+      incidentId: incident.id,
+      eventType: "raid",
+      joinCount: bucket.length
+    });
     for (const entry of bucket) {
       const target = member.guild.members.cache.get(entry.userId) ?? await member.guild.members.fetch(entry.userId).catch(() => null);
       if (target) await this.trackQuarantine(incident.id, target, config);
@@ -461,6 +470,12 @@ export class Security implements PlatformModule {
       [guildId,JSON.stringify(burstMetadata)]
     );
     await this.audit(guildId, "security.destructive-burst", burstMetadata);
+    await this.events?.emit("security.incident", {
+      guildId,
+      incidentId: incident.id,
+      eventType: "destructive-burst",
+      actionCount: bucket.length
+    });
     const executors = await this.findRecentExecutors(guildId, type, targetUserId, config.destructiveWindowSeconds);
     for (const executor of executors) {
       await this.respondToExecutor(guildId, executor.userId, config, type, executor.count, incident.id);

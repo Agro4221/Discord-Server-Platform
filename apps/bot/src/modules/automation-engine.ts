@@ -39,7 +39,7 @@ export type AutomationRuleRecord = AutomationRule & {
 export class AutomationEngine implements PlatformModule {
   readonly name = "automation";
   private unsubscribe?: () => void;
-  private readonly rules = new Map<string, AutomationRule[]>();
+  private readonly rules = new Map<string, AutomationRuleRecord[]>();
   private client?: import("discord.js").Client;
   private readonly cooldowns = new Map<string, number>();
   private readonly keyedCooldowns = new Map<string, number>();
