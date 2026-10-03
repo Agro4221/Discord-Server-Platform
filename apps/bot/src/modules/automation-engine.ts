@@ -14,6 +14,7 @@ import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
+import { assertSafeFeedUrl } from "./notifications.js";
 
 type RuntimeEvent = {
   type: AutomationEvent;
@@ -540,6 +541,17 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
+        if (action.type === "webhook") {
+          await assertSafeFeedUrl(action.url);
+          await fetch(action.url, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ content: renderTemplate(action.content, event) }),
+            signal: AbortSignal.timeout(5000)
+          });
+          continue;
+        }
+
         if (action.type === "log") {
           await this.db.query(
             "INSERT INTO audit_events(guild_id,source,action,target_type,target_id,metadata) VALUES($1,'system','automation.log','automation',NULL,$2::jsonb)",
@@ -678,6 +690,14 @@ export function validateAutomationRule(
         break;
       case "delay":
         if (!Number.isInteger(action.seconds) || action.seconds < 1 || action.seconds > 3600) throw new Error("invalid_delay_action");
+        break;
+      case "webhook":
+        if (!action.content || action.content.length > 2000) throw new Error("invalid_webhook_content");
+        try {
+          await assertSafeFeedUrl(action.url);
+        } catch {
+          throw new Error("invalid_webhook_url");
+        }
         break;
     }
   }
