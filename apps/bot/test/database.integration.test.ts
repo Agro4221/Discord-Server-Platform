@@ -22,10 +22,10 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1)",
       [[
         "guild_modules","automod_settings","verification_settings","automation_rules",
-        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs"
+        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs","moderation_presets"
       ]]
     );
-    assert.equal(tables.rows.length, 18);
+    assert.equal(tables.rows.length, 19);
     const version = (await db.query("SELECT max(version) AS version FROM schema_migrations")).rows[0]?.version;
     const retryColumn = await db.query(
       "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='automation_delayed_jobs' AND column_name='dead_lettered_at'"
@@ -41,8 +41,8 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       [["priority","tags","updated_at"]]
     );
     assert.equal(ticketColumns.rows.length, 3);
-    assert.equal(Number(version), 74);
-    assert.equal(Number(first.rows[0]?.count), 74);
+    assert.equal(Number(version), 75);
+    assert.equal(Number(first.rows[0]?.count), 75);
   } finally {
     await db.close();
   }
@@ -570,6 +570,34 @@ test("role automation rules and delayed jobs persist with bounded state", { skip
   } finally {
     await db.query("DELETE FROM role_automation_jobs WHERE guild_id=$1",[guildId]).catch(() => undefined);
     await db.query("DELETE FROM role_automation_rules WHERE guild_id=$1",[guildId]).catch(() => undefined);
+    await db.close();
+  }
+});
+
+test("moderation presets persist a complete profile payload", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345731";
+  try {
+    await migrate(db);
+    const payload = {
+      name: "strict",
+      automod: { config: { enabled: true }, rules: [{ detector: "links", action: "ban" }] },
+      security: { enabled: true, maxJoins: 5 },
+      escalations: [{ warnCount: 3, action: "timeout", durationMinutes: 60 }]
+    };
+    await db.query(
+      "INSERT INTO moderation_presets(guild_id,name,payload) VALUES($1,$2,$3::jsonb)",
+      [guildId,payload.name,JSON.stringify(payload)]
+    );
+    const result = await db.query<{ name: string; payload: Record<string, unknown> }>(
+      "SELECT name,payload FROM moderation_presets WHERE guild_id=$1",
+      [guildId]
+    );
+    assert.equal(result.rows.length,1);
+    assert.equal(result.rows[0]?.name,"strict");
+    assert.deepEqual(result.rows[0]?.payload,payload);
+  } finally {
+    await db.query("DELETE FROM moderation_presets WHERE guild_id=$1",[guildId]).catch(() => undefined);
     await db.close();
   }
 });
