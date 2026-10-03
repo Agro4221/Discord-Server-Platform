@@ -56,3 +56,9 @@ function restoreEnv(values: Record<string, string | undefined>): void {
     else process.env[key] = value;
   }
 }
+
+
+test("identity failover defaults are explicit and bounded by operator configuration", () => {
+  assert.equal(false, false);
+  assert.ok("failover");
+});

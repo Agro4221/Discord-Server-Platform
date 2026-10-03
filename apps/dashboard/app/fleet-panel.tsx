@@ -6,6 +6,7 @@ type FleetIdentity = {
   id: string;
   clientId: string;
   enabled: boolean;
+  failoverEnabled: boolean;
   presenceName: string | null;
   connected: boolean;
   status: "starting" | "ready" | "degraded" | "stopped";
@@ -102,6 +103,27 @@ export function FleetPanel({
     }
   }
 
+  async function toggleFailover(enabled: boolean) {
+    if (!selected) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/fleet/" + encodeURIComponent(selected), {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ failoverEnabled: enabled })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "fleet_failover_update_failed");
+      await loadFleet();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось изменить failover.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function assignMusicBot() {
     if (!guildId || !selected || !voiceChannelId) return;
     setMusicBusy(true);
@@ -160,6 +182,16 @@ export function FleetPanel({
             ))}
           </select>
           <button type="button" disabled={busy || !selected} onClick={() => void assignGuild()} style={buttonStyle}>Назначить guild</button>
+          {selected && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void toggleFailover(items.find((item) => item.id === selected)?.failoverEnabled !== true)}
+              style={buttonStyle}
+            >
+              {items.find((item) => item.id === selected)?.failoverEnabled ? "Failover ON" : "Failover OFF"}
+            </button>
+          )}
         </div>
       </div>
 

@@ -769,6 +769,14 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_security_quarantine_assignments_cleanup ON security_quarantine_assignments(incident_id,restored_at,user_id);"
     ])
+  },
+  {
+    version: 44,
+    name: "bot_identity_failover",
+    sql: q([
+      "ALTER TABLE bot_identities ADD COLUMN IF NOT EXISTS failover_enabled boolean NOT NULL DEFAULT false;",
+      "CREATE INDEX IF NOT EXISTS idx_bot_identities_failover ON bot_identities(enabled,failover_enabled);"
+    ])
   }] as const;
 
 export async function migrate(db: Database): Promise<void> {

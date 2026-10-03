@@ -180,6 +180,30 @@ export class ManagementApiServer {
             return;
           }
 
+          const fleetIdentityMatch = path.match(/^\/api\/fleet\/([^/]+)$/);
+          if (method === "PATCH" && fleetIdentityMatch) {
+            if (!this.options.identities) {
+              this.json(res, 500, { error: "fleet_unavailable" });
+              return;
+            }
+            const identityId = decodeURIComponent(fleetIdentityMatch[1] ?? "");
+            const body = await readJson(req);
+            if (!identityId || typeof body.failoverEnabled !== "boolean") {
+              throw new RequestInputError("invalid_fleet_identity_update", 400);
+            }
+            await this.options.identities.setFailover(identityId, body.failoverEnabled);
+            await this.options.auditLog.record({
+              guildId: null,
+              source: "dashboard",
+              action: "fleet.identity.failover.updated",
+              targetType: "bot-identity",
+              targetId: identityId,
+              metadata: { failoverEnabled: body.failoverEnabled }
+            });
+            this.json(res, 200, { ok: true, identityId, failoverEnabled: body.failoverEnabled });
+            return;
+          }
+
           if (method === "POST" && path === "/api/fleet/assign") {
             if (!this.options.identities) {
               this.json(res, 500, { error: "fleet_unavailable" });

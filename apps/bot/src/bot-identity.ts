@@ -5,6 +5,7 @@ export type BotIdentityRecord = {
   id: string;
   clientId: string;
   enabled: boolean;
+  failoverEnabled: boolean;
   presenceName: string | null;
 };
 
@@ -31,7 +32,7 @@ export class BotIdentityRepository {
 
   async list(): Promise<BotIdentityRecord[]> {
     const result = await this.db.query<BotIdentityRecord>(
-      "SELECT id,client_id AS \"clientId\",enabled,presence_name AS \"presenceName\" FROM bot_identities ORDER BY id"
+      "SELECT id,client_id AS \"clientId\",enabled,failover_enabled AS \"failoverEnabled\",presence_name AS \"presenceName\" FROM bot_identities ORDER BY id"
     );
     return result.rows;
   }
@@ -42,11 +43,12 @@ export class BotIdentityRepository {
       client_id: string;
       enabled: boolean;
       presence_name: string | null;
+      failover_enabled: boolean;
       status: BotFleetRecord["status"] | null;
       last_seen_at: string | null;
       guild_count: string;
     }>(
-      `SELECT bi.id,bi.client_id,bi.enabled,bi.presence_name,
+      `SELECT bi.id,bi.client_id,bi.enabled,bi.failover_enabled,bi.presence_name,
               bh.status,bh.last_seen_at,
               COALESCE(bh.guild_count, 0) AS guild_count
          FROM bot_identities bi
@@ -57,6 +59,7 @@ export class BotIdentityRepository {
       id: row.id,
       clientId: row.client_id,
       enabled: row.enabled,
+      failoverEnabled: row.failover_enabled,
       presenceName: row.presence_name,
       connected: row.status === "ready",
       status: row.status ?? "stopped",
@@ -204,3 +207,45 @@ function isUniqueConstraint(error: unknown, constraint: string): boolean {
   const value = error as { code?: unknown; constraint?: unknown };
   return value.code === "23505" && value.constraint === constraint;
 }
+
+
+  async setFailover(id: string, enabled: boolean): Promise<void> {
+    const result = await this.db.query(
+      "UPDATE bot_identities SET failover_enabled=$2,updated_at=now() WHERE id=$1 AND enabled=true",
+      [id, enabled]
+    );
+    if (result.rowCount !== 1) throw new Error("bot_identity_not_available");
+  }
+
+  async claimStaleGuilds(guildIds: string[], limit = 20): Promise<string[]> {
+    if (this.identityId === "primary" || guildIds.length === 0) return [];
+    const identity = await this.db.query<{ failover_enabled: boolean; enabled: boolean }>(
+      "SELECT failover_enabled,enabled FROM bot_identities WHERE id=$1",
+      [this.identityId]
+    );
+    if (!identity.rows[0]?.enabled || !identity.rows[0].failover_enabled) return [];
+
+    const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+    return this.db.transaction(async (client) => {
+      const result = await client.query<{ guild_id: string }>(
+        `WITH candidates AS (
+           SELECT ga.guild_id
+             FROM guild_bot_assignments ga
+             LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id
+            WHERE ga.guild_id = ANY($1::text[])
+              AND ga.bot_identity_id <> $2
+              AND (bh.last_seen_at IS NULL OR bh.last_seen_at < now()-interval '90 seconds')
+            ORDER BY ga.updated_at ASC
+            LIMIT $3
+            FOR UPDATE OF ga SKIP LOCKED
+         )
+         UPDATE guild_bot_assignments ga
+            SET bot_identity_id=$2,updated_at=now()
+           FROM candidates
+          WHERE ga.guild_id=candidates.guild_id
+          RETURNING ga.guild_id`,
+        [guildIds, this.identityId, safeLimit]
+      );
+      return result.rows.map((row) => row.guild_id);
+    });
+  }
