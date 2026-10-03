@@ -40,3 +40,16 @@ test("Automation conditional branches validate nested actions and depth", () => 
     }]
   ), /automation_branch_too_deep/);
 });
+
+
+test("Automation supports moderation punishments", () => {
+  assert.doesNotThrow(() => validateAutomationRule("member.join", [], [
+    { type: "warn", userId: "@event", reason: "automatic warning" },
+    { type: "kick", userId: "@event", reason: "automatic kick" },
+    { type: "ban", userId: "@event", reason: "automatic ban", durationMinutes: 60 }
+  ]));
+});
+
+test("Automation rejects malformed moderation punishment durations", () => {
+  assert.throws(() => validateAutomationRule("member.join", [], [{ type: "ban", userId: "@event", reason: "automatic ban", durationMinutes: 0 }]), /invalid_ban_action/);
+});

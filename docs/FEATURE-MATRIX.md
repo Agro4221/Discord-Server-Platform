@@ -101,7 +101,7 @@
 | Event → conditions → actions | ✅ |
 | ALL / ANY conditions | ✅ |
 | Cooldowns | ✅ |
-| Message / role / moderation actions | ✅ |
+| Message / role / moderation actions | ✅ | Includes warn/kick/ban routed through shared Moderation case + audit pipeline |
 | Schedule trigger | ✅ |
 | DM / webhook actions | ✅ | DM + hardened webhook action
 | Conditional branches | ✅ | Nested if/else action branches up to 2 levels |

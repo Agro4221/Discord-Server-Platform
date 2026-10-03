@@ -353,3 +353,9 @@ Never write credentials, tokens or private user data here.
 - Reused the existing Ticket module, form editor and Management API surface; no second ticket subsystem was introduced.
 - Applied customization to prefix quick-panel plus create/reopen ticket controls.
 - Added migration 68, Dashboard editor, API audit event and deterministic normalization tests.
+
+
+## 2026-10-04 — Automation moderation depth
+- Added warn/kick/ban Automation actions through the shared Moderation service with `automation` as actor.
+- Fixed Management API validation mismatch for Dashboard-supported delay/webhook/branch actions; validation is now recursive.
+- Added regression tests for moderation action validation.

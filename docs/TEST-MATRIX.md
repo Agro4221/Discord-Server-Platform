@@ -156,3 +156,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-04 — Ticket customization
 - Added unit coverage for Ticket customization normalization and a migration gate for version 68.
 - Dashboard/API contract covers panel text and create/claim/close button labels; live Discord component rendering remains release-gate validation.
+
+
+### 2026-10-04 — Automation moderation actions
+- Added regression coverage for warn/kick/ban action validation and invalid ban duration.
+- Management API validation is aligned with delay/webhook/branch actions and nested branch depth.

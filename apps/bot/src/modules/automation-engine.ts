@@ -15,6 +15,7 @@ import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 import { assertSafeFeedUrl } from "./notifications.js";
+import type { Moderation } from "./moderation.js";
 
 type RuntimeEvent = {
   type: AutomationEvent;
@@ -51,7 +52,7 @@ export class AutomationEngine implements PlatformModule {
   private executionCounter = 0;
   private lastScheduleMinute: number | null = null;
 
-  constructor(private readonly db: Database) {}
+  constructor(private readonly db: Database, private readonly moderation: Moderation) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
@@ -774,6 +775,22 @@ export class AutomationEngine implements PlatformModule {
           if (member?.moderatable) {
             await member.timeout(action.durationSeconds * 1000, await this.renderTemplate(event.guildId, action.reason, event));
           }
+          continue;
+        }
+
+        if (action.type === "warn" || action.type === "kick" || action.type === "ban") {
+          const userId = resolveUserReference(action.userId, event.userId);
+          if (!userId) continue;
+          const reason = await this.renderTemplate(event.guildId, action.reason, event);
+          const durationMinutes = action.type === "ban" ? action.durationMinutes : undefined;
+          await this.moderation.dashboardAction(
+            event.guildId,
+            userId,
+            action.type,
+            reason,
+            durationMinutes,
+            "automation"
+          );
           continue;
         }
 

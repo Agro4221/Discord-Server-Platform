@@ -449,3 +449,9 @@ Live validation, требующая пользовательского окру�
 ### 2026-10-04 — Ticket customization
 - Ticket customization is now implemented alongside intake forms: panel title/description and the three primary button labels are persisted and used by Ticket UI flows.
 - Migration 68 is the schema gate; API/Dashboard use the same normalized contract. Live Discord rendering remains release-gate validation.
+
+
+### 2026-10-04 — Automation moderation depth
+- Automation supports warn/kick/ban through the shared Moderation pipeline.
+- Management API validation now covers the full existing Dashboard action catalog, including nested branches.
+- Next automation focus: richer event context/variables and dry-run/test execution.

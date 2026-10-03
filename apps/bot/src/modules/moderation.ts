@@ -167,7 +167,8 @@ export class Moderation implements PlatformModule {
     targetUserId: string,
     action: ModerationAction,
     reason: string,
-    durationMinutes?: number
+    durationMinutes?: number,
+    actorUserId = "dashboard"
   ): Promise<{ caseId: number | null; action: ModerationAction; targetUserId: string }> {
     if (!await this.enabled(guildId)) throw new Error("moderation_disabled");
 
@@ -181,14 +182,14 @@ export class Moderation implements PlatformModule {
       : await guild.members.fetch(targetUserId).catch(() => null);
 
     if (action === "warn") {
-      await this.applyWarn(guildId, "dashboard", targetUser, reason || "Без причины");
+      await this.applyWarn(guildId, actorUserId, targetUser, reason || "Без причины");
       return { caseId: await this.latestCaseId(guildId, targetUserId, "warn"), action, targetUserId };
     }
 
     if (action === "unban") {
       await guild.members.unban(targetUserId, reason || "Без причины");
-      const caseId = await this.recordBestEffort(guildId, targetUserId, "dashboard", "unban", reason || "Без причины");
-      await this.audit("moderation.unban.applied", guildId, "dashboard", targetUserId, { reason: reason || "Без причины" });
+      const caseId = await this.recordBestEffort(guildId, targetUserId, actorUserId, "unban", reason || "Без причины");
+      await this.audit("moderation.unban.applied", guildId, actorUserId, targetUserId, { reason: reason || "Без причины" });
       return { caseId, action, targetUserId };
     }
 
@@ -197,8 +198,8 @@ export class Moderation implements PlatformModule {
     if (action === "kick") {
       if (!member.kickable) throw new Error("member_not_kickable");
       await member.kick(reason || "Без причины");
-      await this.audit("moderation.kick.applied", guildId, "dashboard", targetUserId, { reason: reason || "Без причины" });
-      const caseId = await this.recordBestEffort(guildId, targetUserId, "dashboard", "kick", reason || "Без причины");
+      await this.audit("moderation.kick.applied", guildId, actorUserId, targetUserId, { reason: reason || "Без причины" });
+      const caseId = await this.recordBestEffort(guildId, targetUserId, actorUserId, "kick", reason || "Без причины");
       return { caseId, action, targetUserId };
     }
 
@@ -207,8 +208,8 @@ export class Moderation implements PlatformModule {
       if (!durationMinutes || durationMinutes < 1 || durationMinutes > 40320) throw new Error("invalid_timeout_duration");
       const expiresAt = new Date(Date.now() + durationMinutes * 60_000);
       await member.timeout(durationMinutes * 60_000, reason || "Без причины");
-      await this.audit("moderation.timeout.applied", guildId, "dashboard", targetUserId, { durationMinutes, reason: reason || "Без причины" });
-      const caseId = await this.recordBestEffort(guildId, targetUserId, "dashboard", "timeout", reason || "Без причины", expiresAt);
+      await this.audit("moderation.timeout.applied", guildId, actorUserId, targetUserId, { durationMinutes, reason: reason || "Без причины" });
+      const caseId = await this.recordBestEffort(guildId, targetUserId, actorUserId, "timeout", reason || "Без причины", expiresAt);
       return { caseId, action, targetUserId };
     }
 
@@ -220,11 +221,11 @@ export class Moderation implements PlatformModule {
       throw new Error("invalid_ban_duration");
     }
     await member.ban({ reason: reason || "Без причины" });
-    await this.audit("moderation.ban.applied", guildId, "dashboard", targetUserId, {
+    await this.audit("moderation.ban.applied", guildId, actorUserId, targetUserId, {
       reason: reason || "Без причины",
       ...(expiresAt ? { durationMinutes } : {})
     });
-    const caseId = await this.recordBestEffort(guildId, targetUserId, "dashboard", "ban", reason || "Без причины", expiresAt);
+    const caseId = await this.recordBestEffort(guildId, targetUserId, actorUserId, "ban", reason || "Без причины", expiresAt);
     return { caseId, action, targetUserId };
   }
 

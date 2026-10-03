@@ -233,3 +233,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Configuration is normalized to Discord-safe lengths and applied consistently to the prefix quick-panel and ticket create/reopen controls.
 - Management API and Dashboard now expose the customization contract beside intake-form editing.
 - Migration 68 adds the five ticket customization columns; live Discord rendering remains release-gate validation.
+
+
+## 2026-10-04 — Automation moderation actions and API contract
+- Automation now supports warn/kick/ban through the existing Moderation service, preserving case history, hierarchy checks and audit behavior.
+- Management API validation now accepts and recursively validates the existing Dashboard delay, webhook and branch action catalog.
+- Added `@event` user references and bounded ban durations.
