@@ -145,6 +145,12 @@ type ApiOptions = {
       input: { priority?: "low" | "normal" | "high" | "urgent"; tags?: string[] }
     ) => Promise<boolean>;
   };
+  moderationPresets?: {
+    list: (guildId: string) => Promise<unknown[]>;
+    saveCurrent: (guildId: string, name: string) => Promise<void>;
+    apply: (guildId: string, name: string) => Promise<void>;
+    delete: (guildId: string, name: string) => Promise<boolean>;
+  };
   moderation?: Moderation & {
     listCleanupRules?: (guildId: string) => Promise<unknown[]>;
     saveCleanupRule?: (guildId: string, channelId: string, intervalSeconds: number, maxMessages: number, enabled?: boolean) => Promise<void>;
@@ -1684,6 +1690,89 @@ export class ManagementApiServer {
             await this.options.auditLog.record({
               guildId, source: "dashboard", action: "moderation.autopurge.removed",
               targetType: "cleanup-rule", targetId: String(id)
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const moderationPresetsMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/presets$/);
+          const moderationPresetItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/presets\/([^/]+)$/);
+
+          if ((moderationPresetsMatch || moderationPresetItemMatch) && !this.options.moderationPresets) {
+            this.json(res, 500, { error: "moderation_presets_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && moderationPresetsMatch) {
+            const guildId = moderationPresetsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, presets: await this.options.moderationPresets!.list(guildId) });
+            return;
+          }
+
+          if (method === "POST" && moderationPresetsMatch) {
+            const guildId = moderationPresetsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const name = typeof body.name === "string" ? body.name.trim() : "";
+            if (!/^[a-z0-9_-]{1,40}$/i.test(name)) {
+              throw new RequestInputError("invalid_moderation_preset_name", 400);
+            }
+            await this.options.moderationPresets!.saveCurrent(guildId, name);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "moderation.preset.saved",
+              targetType: "moderation-preset",
+              targetId: name.toLowerCase()
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          if (method === "POST" && moderationPresetItemMatch) {
+            const guildId = moderationPresetItemMatch[1] ?? "";
+            const name = decodeURIComponent(moderationPresetItemMatch[2] ?? "").toLowerCase();
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            await this.options.moderationPresets!.apply(guildId, name);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "moderation.preset.applied",
+              targetType: "moderation-preset",
+              targetId: name
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          if (method === "DELETE" && moderationPresetItemMatch) {
+            const guildId = moderationPresetItemMatch[1] ?? "";
+            const name = decodeURIComponent(moderationPresetItemMatch[2] ?? "").toLowerCase();
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const deleted = await this.options.moderationPresets!.delete(guildId, name);
+            if (!deleted) {
+              this.json(res, 404, { error: "moderation_preset_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "moderation.preset.deleted",
+              targetType: "moderation-preset",
+              targetId: name
             });
             this.json(res, 200, { ok: true });
             return;
