@@ -282,7 +282,14 @@ async function main(): Promise<void> {
       reroll: async (guildId, giveawayId) => giveaways.rerollGiveaway(giveawayId, guildId)
     },
     analytics: {
-      report: async (guildId, hours) => analytics.report(guildId, hours)
+      report: async (guildId, hours) => analytics.report(guildId, hours),
+      getSettings: async (guildId) => analytics.getSettings(guildId),
+      setSettings: async (guildId, input) => analytics.setSettings(guildId, {
+        retentionDays: typeof input.retentionDays === "number" ? input.retentionDays : undefined,
+        visibleCounters: Array.isArray(input.visibleCounters) ? input.visibleCounters.filter((value): value is import("./modules/analytics.js").AnalyticsSettings["visibleCounters"][number] =>
+          ["message","member_join","member_leave","voice_join","voice_leave","voice_move"].includes(String(value))
+        ) as import("./modules/analytics.js").AnalyticsSettings["visibleCounters"] : undefined
+      })
     },
     notifications: {
       list: async (guildId) => notifications.listFeeds(guildId),
