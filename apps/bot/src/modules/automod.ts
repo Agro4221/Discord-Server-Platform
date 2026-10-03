@@ -46,6 +46,7 @@ export class AutoMod implements PlatformModule {
   readonly name = "automod";
   private unsubscribe?: () => void;
   private readonly recent = new Map<string, { content: string; timestamp: number }[]>();
+  private readonly ruleCooldowns = new Map<string, number>();
   private inspectedMessages = 0;
   private auditLog?: AuditLog;
 
@@ -62,6 +63,7 @@ export class AutoMod implements PlatformModule {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.recent.clear();
+    this.ruleCooldowns.clear();
     this.inspectedMessages = 0;
     this.auditLog = undefined;
   }
@@ -367,12 +369,29 @@ export class AutoMod implements PlatformModule {
         recent.map((item) => item.content),
         config
       )) continue;
-      await this.applyRule(message, {
+
+      if (rule.window_seconds && !this.ruleRateLimitAvailable(
+        message.guild.id,
+        message.author.id,
+        rule.detector,
+        rule.window_seconds,
+        now
+      )) {
+        continue;
+      }
+
+      const applied = await this.applyRule(message, {
         detector: rule.detector,
         action: rule.action,
         timeoutMinutes: rule.timeout_minutes,
         messageTemplate: rule.message_template
       });
+      if (applied && rule.window_seconds && rule.window_seconds > 0) {
+        this.ruleCooldowns.set(
+          this.ruleCooldownKey(message.guild.id, message.author.id, rule.detector),
+          now + rule.window_seconds * 1000
+        );
+      }
       return;
     }
     const reason = detectAutoModViolation(
@@ -466,6 +485,26 @@ export class AutoMod implements PlatformModule {
     }
   }
 
+  private ruleCooldownKey(guildId: string, userId: string, detector: string): string {
+    return guildId + ":" + userId + ":" + detector;
+  }
+
+  private ruleRateLimitAvailable(
+    guildId: string,
+    userId: string,
+    detector: string,
+    windowSeconds: number,
+    now: number
+  ): boolean {
+    const key = this.ruleCooldownKey(guildId, userId, detector);
+    const until = this.ruleCooldowns.get(key) ?? 0;
+    if (until <= now) {
+      this.ruleCooldowns.delete(key);
+      return true;
+    }
+    return false;
+  }
+
   private async applyRule(
     message: Message,
     rule: {
@@ -545,6 +584,10 @@ export class AutoMod implements PlatformModule {
 
   private pruneRecent(now: number): void {
     const cutoff = now - 120_000;
+    for (const [key, until] of this.ruleCooldowns) {
+      if (until <= now) this.ruleCooldowns.delete(key);
+    }
+
     for (const [key, entries] of this.recent) {
       const latest = entries.at(-1)?.timestamp ?? 0;
       if (latest < cutoff) this.recent.delete(key);
