@@ -1553,6 +1553,17 @@ function ModerationPanel(props: {
   const [reason, setReason] = useState("Нарушение правил");
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState<AuditEvent[]>([]);
+  const [recentCases, setRecentCases] = useState<Array<{
+    id: number;
+    targetUserId: string;
+    moderatorUserId: string;
+    action: string;
+    reason: string | null;
+    expiresAt: string | null;
+    resolvedAt: string | null;
+    createdAt: string;
+  }>>([]);
+  const [caseFilter, setCaseFilter] = useState("");
 
   async function loadMembers(query = "") {
     const response = await fetch(
@@ -1564,7 +1575,21 @@ function ModerationPanel(props: {
     setMembers((body.members ?? []) as Member[]);
   }
 
-  useEffect(() => { void loadMembers().catch(() => undefined); }, [props.guildId]);
+  async function loadRecentCases() {
+    const suffix = caseFilter ? "&action=" + encodeURIComponent(caseFilter) : "";
+    const response = await fetch(
+      "/api/guilds/" + encodeURIComponent(props.guildId) + "/moderation/history?limit=100" + suffix,
+      { cache: "no-store" }
+    );
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(String(body.error ?? "moderation_history_failed"));
+    setRecentCases((body.cases ?? []) as typeof recentCases);
+  }
+
+  useEffect(() => {
+    void loadMembers().catch(() => undefined);
+    void loadRecentCases().catch(() => undefined);
+  }, [props.guildId, caseFilter]);
 
   async function execute() {
     if (!targetId) return;
@@ -1583,7 +1608,7 @@ function ModerationPanel(props: {
       if (!response.ok) throw new Error(String(result.error ?? "moderation_failed"));
       setTargetId("");
       setReason("Нарушение правил");
-      await loadMembers(search);
+      await Promise.all([loadMembers(search), loadRecentCases()]);
       props.onChanged();
     } finally {
       setBusy(false);
@@ -1652,15 +1677,58 @@ function ModerationPanel(props: {
       </section>
 
       <section style={{ ...panelStyle, padding: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10 }}>История кейсов</div>
-        {!target && <div style={{ color: "#687486", fontSize: 10 }}>Выбери участника, чтобы увидеть историю.</div>}
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700 }}>Последние moderation cases</div>
+            <div style={{ color: "#5f6b7b", fontSize: 9, marginTop: 3 }}>Общий журнал действий модерации по серверу.</div>
+          </div>
+          <select value={caseFilter} onChange={(event) => setCaseFilter(event.target.value)} style={{ ...inputStyle, width: 150 }}>
+            <option value="">Все действия</option>
+            {["warn", "timeout", "kick", "ban", "unban"].map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </div>
+        {!recentCases.length && <div style={{ color: "#687486", fontSize: 10 }}>Кейсов пока нет.</div>}
+        <div style={{ display: "grid", gap: 5 }}>
+          {recentCases.map((item) => (
+            <div key={item.id} style={{ display: "grid", gridTemplateColumns: "52px 90px minmax(130px,180px) 1fr 150px auto", gap: 8, alignItems: "center", padding: "9px 0", borderBottom: "1px solid #202733", fontSize: 9 }}>
+              <span style={{ color: "#c8ced8" }}>#{item.id}</span>
+              <span style={{ fontWeight: 700 }}>{item.action}</span>
+              <span><code>{item.targetUserId}</code></span>
+              <span style={{ color: "#667486", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.reason ?? "Без причины"}</span>
+              <span style={{ color: "#596576" }}>{new Date(item.createdAt).toLocaleString()}</span>
+              {item.resolvedAt
+                ? <span style={{ color: "#79b98e" }}>✓ закрыт</span>
+                : <button
+                    type="button"
+                    onClick={() => void fetch(
+                      "/api/guilds/" + encodeURIComponent(props.guildId) + "/moderation/cases/" + item.id,
+                      { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ resolved: true }) }
+                    ).then(async (response) => {
+                      const body = await response.json().catch(() => ({}));
+                      if (!response.ok) throw new Error(String(body.error ?? "case_resolve_failed"));
+                      await loadRecentCases();
+                      props.onChanged();
+                    })}
+                    style={button("secondary")}
+                  >Закрыть</button>}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={{ ...panelStyle, padding: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10 }}>
+          История {target ? target.displayName : "выбранного участника"}
+        </div>
+        {!target && <div style={{ color: "#687486", fontSize: 10 }}>Выбери участника, чтобы увидеть его историю.</div>}
         {target && !caseHistory.length && <div style={{ color: "#687486", fontSize: 10 }}>Кейсов нет.</div>}
         {caseHistory.map((item) => (
-          <div key={item.id} style={{ display: "grid", gridTemplateColumns: "70px 110px 1fr 150px", gap: 8, padding: "9px 0", borderBottom: "1px solid #202733", fontSize: 9 }}>
+          <div key={item.id} style={{ display: "grid", gridTemplateColumns: "70px 110px 1fr 150px 80px", gap: 8, padding: "9px 0", borderBottom: "1px solid #202733", fontSize: 9 }}>
             <span style={{ color: "#c8ced8" }}>#{item.id}</span>
             <span>{item.action}</span>
             <span style={{ color: "#667486" }}>{item.reason ?? "Без причины"}</span>
             <span style={{ color: "#596576" }}>{new Date(item.createdAt).toLocaleString()}</span>
+            <span style={{ color: item.resolvedAt ? "#79b98e" : "#c8a56a" }}>{item.resolvedAt ? "закрыт" : "активен"}</span>
           </div>
         ))}
       </section>
