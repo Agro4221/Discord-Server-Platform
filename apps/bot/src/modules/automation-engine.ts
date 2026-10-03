@@ -142,7 +142,35 @@ export class AutomationEngine implements PlatformModule {
       return;
     }
 
-    if (interaction.options.getSubcommand() !== "create") return;
+    const subcommand = interaction.options.getSubcommand();
+    if (subcommand === "template") {
+      const action = interaction.options.getString("action", true);
+      if (action === "list") {
+        const templates = await this.listTemplates(interaction.guild!.id);
+        await interaction.reply({
+          content: templates.length
+            ? "**Automation templates**\n" + templates.map((item) => "```" + item.name + " → " + item.content + "```").join("\n").slice(0,3900)
+            : "Шаблонов пока нет.",
+          ephemeral: true
+        });
+        return;
+      }
+      const name = interaction.options.getString("name", true);
+      if (action === "delete") {
+        const deleted = await this.deleteTemplate(interaction.guild!.id, name);
+        await interaction.reply({
+          content: deleted ? "Шаблон **" + name.trim().toLowerCase() + "** удалён." : "Такого шаблона нет.",
+          ephemeral: true
+        });
+        return;
+      }
+      const content = interaction.options.getString("content", true);
+      await this.setTemplate(interaction.guild!.id, name, content);
+      await interaction.reply({ content: "✅ Шаблон **" + name.trim().toLowerCase() + "** сохранён.", ephemeral: true });
+      return;
+    }
+
+    if (subcommand !== "create") return;
 
     const event = interaction.options.getString("event", true) as AutomationEvent;
     const responseChannelOption = interaction.options.getChannel("response-channel", true);
