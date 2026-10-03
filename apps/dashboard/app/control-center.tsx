@@ -326,7 +326,9 @@ const MODULE_META: Record<string, ModuleMeta> = {
     commands: ["/music play", "/music pause", "/music resume", "/music skip", "/music stop", "/music shuffle", "/music repeat", "/music autoplay", "/music seek", "/music queue", "/music nowplaying", "/music volume"],
     functions: [
       { title: "Playback", description: "Play, pause, resume, skip, stop и seek." },
-      { title: "Queue", description: "Очередь, shuffle и повтор трека/очереди." },
+      { title: "Queue", description: "Очередь, shuffle и повтор трека/очереди, теперь с постраничным просмотром." },
+      { title: "Saved state", description: "Личные favorites и сохранённые playlists до 500 треков." },
+      { title: "Filters", description: "Bassboost, Rock, Pop, Electronic, Gaming, Nightcore и 8D." },
       { title: "Autoplay", description: "Автоматическое продолжение после окончания очереди." },
       { title: "Request channel", description: "Можно писать песню, исполнителя, URL или плейлист прямо в выделенный текстовый канал." },
       { title: "Controller", description: "Постоянный panel с pause, skip, shuffle, repeat, stop, volume и queue." },
