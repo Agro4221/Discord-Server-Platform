@@ -266,7 +266,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           )
           .addUserOption((option) => option.setName("user").setDescription("User").setRequired(true))
           .addStringOption((option) => option.setName("text").setDescription("Note text").setMaxLength(1000))
-      ),
+      )
       .addSubcommand((sub) =>
         sub
           .setName("escalation")
@@ -755,7 +755,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addStringOption((o) => o.setName("url").setDescription("HTTPS feed URL").setMaxLength(2000).setRequired(true))
           .addChannelOption((o) => o.setName("channel").setDescription("Destination channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
           .addIntegerOption((o) => o.setName("minutes").setDescription("Polling interval").setMinValue(1).setMaxValue(1440))
-      ),
+      )
       .addSubcommand((sub) =>
         sub
           .setName("github")
@@ -897,7 +897,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           ).setRequired(true))
           .addStringOption((o) => o.setName("name").setDescription("Template name, e.g. welcome").setMaxLength(40))
           .addStringOption((o) => o.setName("content").setDescription("Template content").setMaxLength(2000))
-      ),
+      )
       .addSubcommand((sub) =>
         sub
           .setName("create")
@@ -987,15 +987,15 @@ export async function handleCommand(
       await interaction.reply({ content: "Укажи хотя бы title, description, footer, image или thumbnail.", ephemeral: true });
       return;
     }
-    if (url && !/^https?:\\/\\//i.test(url)) {
+    if (url && !/^https?:\/\//i.test(url)) {
       await interaction.reply({ content: "URL должен начинаться с http:// или https://.", ephemeral: true });
       return;
     }
-    if (image && !/^https?:\\/\\//i.test(image)) {
+    if (image && !/^https?:\/\//i.test(image)) {
       await interaction.reply({ content: "Image URL должен начинаться с http:// или https://.", ephemeral: true });
       return;
     }
-    if (thumbnail && !/^https?:\\/\\//i.test(thumbnail)) {
+    if (thumbnail && !/^https?:\/\//i.test(thumbnail)) {
       await interaction.reply({ content: "Thumbnail URL должен начинаться с http:// или https://.", ephemeral: true });
       return;
     }
