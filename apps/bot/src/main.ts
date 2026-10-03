@@ -254,7 +254,9 @@ async function main(): Promise<void> {
       getCustomization: async (guildId) => tickets.getCustomization(guildId),
       setCustomization: async (guildId, customization) => tickets.setCustomization(guildId, customization),
       listTickets: async (guildId, status) => tickets.listTickets(guildId, status),
-      updateTicketMetadata: async (guildId, ticketId, input) => tickets.updateTicketMetadata(guildId, ticketId, input)
+      updateTicketMetadata: async (guildId, ticketId, input) => tickets.updateTicketMetadata(guildId, ticketId, input),
+      getSlaConfig: async (guildId) => tickets.getSlaConfig(guildId),
+      setSlaConfig: async (guildId, input) => tickets.setSlaConfig(guildId, input)
     },
     moderation,
     moderationPresets: {
