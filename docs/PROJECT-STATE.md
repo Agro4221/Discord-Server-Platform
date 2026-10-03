@@ -18,7 +18,7 @@ Release candidate — code/CI verified, ready for live Discord validation.
 - Schema-driven Next.js Control Center with session auth, functional-area navigation, capability/function index, module toggles, Discord channel/role selectors, grouped settings forms, import/export, backup management, module actions and specialized admin panels.
 - Moderation with case history.
 - Temporary Voice with idempotency, ownership and reconciliation.
-- AutoMod with persistent baseline settings plus Dashboard-managed detector rules, per-rule actions/scopes and audit logging.
+- AutoMod with persistent baseline settings plus Dashboard-managed detector rules, per-rule actions/scopes and audit logging. Per-rule cooldown windows and warning escalation are included.
 - Tickets with modal intake, staff claim, close and transcript.
 - Role Panels with role hierarchy/tamper checks and Dashboard CRUD/publishing editor.
 - Giveaways with durable entries, scheduled finishing, Dashboard history/end/reroll operations.
