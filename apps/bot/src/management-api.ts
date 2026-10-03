@@ -1690,7 +1690,7 @@ export class ManagementApiServer {
               this.json(res, 404, { error: "guild_not_found" });
               return;
             }
-            this.json(res, 200, { guildId, ...(await this.options.moderation!.lockdownStatus()) });
+            this.json(res, 200, { guildId, ...(await this.options.moderation!.lockdownStatus(guildId)) });
             return;
           }
 
