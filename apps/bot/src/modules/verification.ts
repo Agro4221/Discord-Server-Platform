@@ -136,7 +136,11 @@ export class Verification implements PlatformModule {
         verifiedRoleId: role?.id ?? null,
         quarantineRoleId: quarantineRole?.id ?? null,
         logChannelId: logChannel?.id ?? null,
-        codeTtlMinutes: interaction.options.getInteger("ttl") ?? 10
+        codeTtlMinutes: interaction.options.getInteger("ttl") ?? 10,
+        panelTitle: interaction.options.getString("panel-title") ?? undefined,
+        panelDescription: interaction.options.getString("panel-description") ?? undefined,
+        issueButtonLabel: interaction.options.getString("issue-button") ?? undefined,
+        confirmButtonLabel: interaction.options.getString("confirm-button") ?? undefined
       });
       await interaction.reply({ content: "Verification настроен.", ephemeral: true });
       return;
