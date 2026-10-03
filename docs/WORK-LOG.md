@@ -238,3 +238,14 @@ Never write credentials, tokens or private user data here.
 - Provider expansion is explicitly a product requirement: Spotify, Apple Music, Deezer, **Yandex Music**, VK Music, Tidal, Qobuz, yt-dlp and JioSaavn are tracked as Music work, with the existing YouTube/SoundCloud path preserved. Provider readiness must be based on actual source-adapter/credential validation, not merely configuration presence.
 - Product principle recorded: bring premium-like Music capabilities into the common self-hosted product without an artificial Premium wall; do not divert the roadmap into provider-count vanity work or unrelated integrations.
 - Documentation update commit: `7dd1faaa3cb5b9c812a77acfe29e931f0f451c6b`.
+
+
+## 2026-10-03 — Product scope correction: all-in-one Discord platform, not music-first
+- Corrected the roadmap direction: Music is a major module, but it is **not** the product's center of gravity.
+- The actual product target is a self-hosted all-in-one Discord platform intended to cover the practical capabilities of premium/mature multipurpose bots across administration, moderation, AutoMod/Security, logging, custom commands/autoresponders, roles/onboarding, tickets/forms, automation, community/engagement, notifications/integrations, analytics and Music.
+- Current public Dyno/Carl-bot materials confirm the benchmark is broader than Music: AutoMod, action logging, autoroles, custom commands/autoresponders, automessages/autopurge, forms, tickets, embeds, reaction roles, feeds, leveling and related server-management tooling are part of the mature all-in-one feature set, with some features/limits placed behind commercial tiers. 
+- Updated `docs/FEATURE-MATRIX.md` with a master all-in-one backlog spanning Administration, Moderation/AutoMod/Security, Server utilities, Roles/Onboarding, Tickets/Forms, Community, Automation, Notifications/Integrations and Analytics, while retaining the detailed Music roadmap as one module.
+- Release order is now platform-wide: core/admin -> moderation/security -> utilities/roles/onboarding -> tickets/automation -> community -> notifications/analytics -> advanced Music -> Music providers/saved state -> whole-platform E2E/chaos/soak -> stable release.
+- Product principle: reproduce useful premium-grade functionality as common self-hosted features without an artificial Premium wall; do not optimize for provider count or turn the project into a music-only bot.
+- This correction is based on the current project direction and public competitor feature documentation, not on copying proprietary code or closed implementation details.
+- Commits for this correction: `b2770f1c`, `d2ff12a7`.
