@@ -3,6 +3,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  PermissionFlagsBits,
   type ChatInputCommandInteraction,
   type Message
 } from "discord.js";
