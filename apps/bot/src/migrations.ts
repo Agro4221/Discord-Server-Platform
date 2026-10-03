@@ -906,6 +906,20 @@ const migrations = [
     sql: q([
       "ALTER TABLE reminders ADD COLUMN IF NOT EXISTS target_channel_id text;"
     ])
+  },
+  {
+    version: 57,
+    name: "sticky_messages",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS sticky_messages (",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  content text NOT NULL,",
+      "  message_id text,",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,channel_id)",
+      ");"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
