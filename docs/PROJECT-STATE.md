@@ -228,3 +228,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-04 — Temporary Voice controls verified
 - Development head `9a442b65c77a3cabc497f94635ef4efc6bfd6527` passed CI run **#1249**.
 - Temporary Voice now supports user-facing room management through the Discord command surface while server setup remains Dashboard-configured.
+
+## 2026-10-04 — Temporary Voice Control Center verified
+- Development head `076a56031ca692f19b22fe98b7d91188c16a1541` passed CI run **#1253**.
+- Temporary Voice is now a full Control Center module plus Discord `/voice` room-control commands.
+- The local panel exposes active-room visibility and manual reconciliation; the runtime remains the source of truth for room ownership/state.

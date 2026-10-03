@@ -135,3 +135,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-04 — Temporary Voice verification
 - CI run **#1249** passed the full automated matrix after adding `/voice` and prefix room-control routing.
 - Command registration and required option ordering are covered by the command contract tests; live Discord permission behavior remains an acceptance check.
+
+## 2026-10-04 — Temporary Voice Control Center verification
+- CI run **#1253** passed the full automated matrix, including bot typecheck, **78 passing tests**, domain/bot builds and Dashboard production build.
+- Slash command registration coverage includes the `/voice` owner-control subcommands and required option ordering.
+- Live Discord voice permissions, overwrites and member movement remain environment-dependent acceptance checks.

@@ -281,3 +281,9 @@ Never write credentials, tokens or private user data here.
 - CI run **#1249** (`37151439742`) passed on development head `9a442b65c77a3cabc497f94635ef4efc6bfd6527`.
 - Temporary Voice now exposes `/voice` and prefix controls for room info, lock/unlock, user limit, rename, ownership transfer and permit/reject access.
 - Command policy and prefix routing include the new `voice` command; slash command contract coverage was added.
+
+## 2026-10-04 — Temporary Voice Control Center verified
+- CI run **#1253** (`37151805934`) passed on development head `076a56031ca692f19b22fe98b7d91188c16a1541`.
+- Temporary Voice Control Center now shows active tracked rooms, owners and occupancy, and exposes manual reconciliation from the local Control Center.
+- Fixed the Dashboard JSX rendering of owner mentions; the production Dashboard build now passes.
+- Backend verification included **78/78 tests passing**, domain build and bot build.
