@@ -15,6 +15,7 @@ import type { Music } from "./modules/music.js";
 import type { Leveling } from "./modules/leveling.js";
 import type { Economy } from "./modules/economy.js";
 import type { AutoMod } from "./modules/automod.js";
+import type { Tickets } from "./modules/tickets.js";
 import { CommandPolicyService, COMMAND_DEFINITIONS } from "./command-policy.js";
 import type { StreamAlertPlatform } from "./modules/stream-alerts.js";
 import { BotIdentityRepository } from "./bot-identity.js";
@@ -93,6 +94,7 @@ type ApiOptions = {
   leveling?: Leveling;
   economy?: Economy;
   autoMod?: AutoMod;
+  tickets?: Tickets;
   commandPolicy?: CommandPolicyService;
   rolePanels?: {
     list: (guildId: string) => Promise<unknown[]>;
