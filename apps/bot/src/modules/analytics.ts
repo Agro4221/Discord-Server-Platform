@@ -14,6 +14,14 @@ export class Analytics implements PlatformModule {
     hours: number;
     totals: Record<string, number>;
     points: Array<{ bucketStart: string; eventType: string; count: number }>;
+    counters: {
+      messageCount: number;
+      memberJoins: number;
+      memberLeaves: number;
+      voiceJoins: number;
+      voiceLeaves: number;
+      voiceMoves: number;
+    };
   }> {
     const boundedHours = Math.min(Math.max(Math.trunc(hours), 1), 168);
     const result = await this.db.query<{
@@ -40,14 +48,17 @@ export class Analytics implements PlatformModule {
       };
     });
 
-    return { hours: boundedHours, totals, points };
+    const counters = await this.snapshot(guildId);
+    return { hours: boundedHours, totals, points, counters };
   }
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
-    const a = context.events.on("member.add", (member) => this.count(member.guild.id, "member_join"));
-    const b = context.events.on("member.remove", (member) => this.count(member.guild.id, "member_leave"));
-    const c = context.events.on("message.create", (message) => message.guild ? this.count(message.guild.id, "message") : undefined);
+    const a = context.events.on("member.add", (member) => void this.count(member.guild.id, "member_join"));
+    const b = context.events.on("member.remove", (member) => void this.count(member.guild.id, "member_leave"));
+    const c = context.events.on("message.create", (message) => {
+      if (message.guild) void this.count(message.guild.id, "message");
+    });
     const d = context.events.on("voice.state", ({ oldState, newState }) => {
       const event = newState.channelId ? (oldState.channelId ? "voice_move" : "voice_join") : "voice_leave";
       void this.count(newState.guild.id, event);
@@ -63,6 +74,22 @@ export class Analytics implements PlatformModule {
   }
 
   private async count(guildId: string, eventType: string): Promise<void> {
+    const counterColumns: Record<string, string> = {
+      message: "message_count",
+      member_join: "member_joins",
+      member_leave: "member_leaves",
+      voice_join: "voice_joins",
+      voice_leave: "voice_leaves",
+      voice_move: "voice_moves"
+    };
+    const column = counterColumns[eventType];
+    if (column) {
+      await this.db.query(
+        "INSERT INTO server_counters(guild_id," + column + ") VALUES($1,1) " +
+        "ON CONFLICT(guild_id) DO UPDATE SET " + column + "=server_counters." + column + "+1,updated_at=now()",
+        [guildId]
+      );
+    }
     if (!await moduleEnabled(this.db, guildId, "analytics", false)) return;
     await this.db.query(
       `INSERT INTO analytics_events(guild_id,event_type,bucket_start,count)
@@ -71,6 +98,36 @@ export class Analytics implements PlatformModule {
        DO UPDATE SET count=analytics_events.count+1`,
       [guildId,eventType]
     );
+  }
+
+  async snapshot(guildId: string): Promise<{
+    messageCount: number;
+    memberJoins: number;
+    memberLeaves: number;
+    voiceJoins: number;
+    voiceLeaves: number;
+    voiceMoves: number;
+  }> {
+    const result = await this.db.query<{
+      message_count: string;
+      member_joins: string;
+      member_leaves: string;
+      voice_joins: string;
+      voice_leaves: string;
+      voice_moves: string;
+    }>(
+      "SELECT message_count,member_joins,member_leaves,voice_joins,voice_leaves,voice_moves FROM server_counters WHERE guild_id=$1",
+      [guildId]
+    );
+    const row = result.rows[0];
+    return {
+      messageCount: Number(row?.message_count ?? 0),
+      memberJoins: Number(row?.member_joins ?? 0),
+      memberLeaves: Number(row?.member_leaves ?? 0),
+      voiceJoins: Number(row?.voice_joins ?? 0),
+      voiceLeaves: Number(row?.voice_leaves ?? 0),
+      voiceMoves: Number(row?.voice_moves ?? 0)
+    };
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -86,6 +143,7 @@ export class Analytics implements PlatformModule {
       const voiceChannels = guild.channels.cache.filter((channel) => channel.isVoiceBased() && channel.type === 2).size;
       const categories = guild.channels.cache.filter((channel) => channel.type === 4).size;
       const activeVoiceUsers = [...guild.voiceStates.cache.values()].filter((state) => Boolean(state.channelId)).length;
+      const counters = await this.snapshot(guild.id);
       await interaction.reply({
         content: [
           "📊 **Статистика сервера**",
@@ -93,7 +151,10 @@ export class Analytics implements PlatformModule {
           "💬 Текстовых каналов: **" + textChannels + "**",
           "🔊 Voice-каналов: **" + voiceChannels + "**",
           "🗂️ Категорий: **" + categories + "**",
-          "🎧 Сейчас в voice: **" + activeVoiceUsers + "**"
+          "🎧 Сейчас в voice: **" + activeVoiceUsers + "**",
+          "📈 Сообщений всего: **" + String(counters.messageCount) + "**",
+          "↗️ Входов: **" + String(counters.memberJoins) + "** · выходов: **" + String(counters.memberLeaves) + "**",
+          "🔊 Voice: **" + String(counters.voiceJoins) + "** входов · **" + String(counters.voiceLeaves) + "** выходов · **" + String(counters.voiceMoves) + "** перемещений"
         ].join("\n")
       });
       return;
