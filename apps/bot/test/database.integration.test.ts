@@ -22,10 +22,10 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1)",
       [[
         "guild_modules","automod_settings","verification_settings","automation_rules",
-        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs","moderation_presets","ticket_sla_settings"
+        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs","moderation_presets","ticket_sla_settings","help_pages"
       ]]
     );
-    assert.equal(tables.rows.length, 20);
+    assert.equal(tables.rows.length, 21);
     const version = (await db.query("SELECT max(version) AS version FROM schema_migrations")).rows[0]?.version;
     const retryColumn = await db.query(
       "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='automation_delayed_jobs' AND column_name='dead_lettered_at'"
@@ -46,9 +46,27 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       [["sla_reminded_at","sla_escalated_at"]]
     );
     assert.equal(slaColumns.rows.length, 2);
-    assert.equal(Number(version), 76);
-    assert.equal(Number(first.rows[0]?.count), 76);
+    assert.equal(Number(version), 77);
+    assert.equal(Number(first.rows[0]?.count), 77);
   } finally {
+    await db.close();
+  }
+});
+
+test("custom help pages persist with normalized slugs", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345757";
+  const help = new (await import("../src/help-pages.js")).HelpPages(db);
+  try {
+    await migrate(db);
+    const saved = await help.save(guildId, " Rules ", "Server Rules", "No spam.", true);
+    assert.equal(saved.slug, "rules");
+    const restored = await help.get(guildId, "rules");
+    assert.equal(restored?.title, "Server Rules");
+    assert.equal(restored?.content, "No spam.");
+    assert.equal((await help.list(guildId)).length, 1);
+  } finally {
+    await db.query("DELETE FROM help_pages WHERE guild_id=$1", [guildId]).catch(() => undefined);
     await db.close();
   }
 });
