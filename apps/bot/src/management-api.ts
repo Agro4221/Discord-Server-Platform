@@ -44,8 +44,26 @@ type ApiOptions = {
   };
   notifications?: {
     list: (guildId: string) => Promise<unknown[]>;
-    create: (guildId: string, channelId: string, url: string, intervalSeconds: number) => Promise<unknown>;
-    update: (guildId: string, feedId: number, input: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean; messageTemplate?: string }) => Promise<boolean>;
+    create: (
+      guildId: string,
+      channelId: string,
+      url: string,
+      intervalSeconds: number,
+      options?: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[] }
+    ) => Promise<unknown>;
+    update: (
+      guildId: string,
+      feedId: number,
+      input: {
+        channelId?: string;
+        url?: string;
+        intervalSeconds?: number;
+        enabled?: boolean;
+        messageTemplate?: string;
+        includeKeywords?: string[];
+        excludeKeywords?: string[];
+      }
+    ) => Promise<boolean>;
     delete: (guildId: string, feedId: number) => Promise<boolean>;
   };
   streamAlerts?: {
@@ -604,18 +622,49 @@ export class ManagementApiServer {
               }
               const channel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(body.channelId);
               if (!channel || channel.type !== 0) throw new RequestInputError("text_channel_required", 400);
-              const result = await this.options.notifications!.create(guildId, body.channelId, body.url, Math.trunc(body.intervalSeconds));
+              const includeKeywords = Array.isArray(body.includeKeywords)
+                ? body.includeKeywords.filter((value: unknown): value is string => typeof value === "string").slice(0,20)
+                : [];
+              const excludeKeywords = Array.isArray(body.excludeKeywords)
+                ? body.excludeKeywords.filter((value: unknown): value is string => typeof value === "string").slice(0,20)
+                : [];
+              const messageTemplate = typeof body.messageTemplate === "string" ? body.messageTemplate.slice(0,1800) : undefined;
+              const result = await this.options.notifications!.create(
+                guildId,
+                body.channelId,
+                body.url,
+                Math.trunc(body.intervalSeconds),
+                { messageTemplate, includeKeywords, excludeKeywords }
+              );
               await this.options.auditLog.record({ guildId, source: "dashboard", action: "feed.created", targetType: "feed", targetId: String((result as { id?: number })?.id ?? "unknown") });
               this.json(res, 200, { ok: true, feed: result });
               return;
             }
 
-            const input: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean; messageTemplate?: string } = {};
+            const input: {
+              channelId?: string;
+              url?: string;
+              intervalSeconds?: number;
+              enabled?: boolean;
+              messageTemplate?: string;
+              includeKeywords?: string[];
+              excludeKeywords?: string[];
+            } = {};
             if (typeof body.channelId === "string") input.channelId = body.channelId;
             if (typeof body.url === "string") input.url = body.url;
             if (typeof body.intervalSeconds === "number") input.intervalSeconds = body.intervalSeconds;
             if (typeof body.enabled === "boolean") input.enabled = body.enabled;
-            if (typeof body.messageTemplate === "string") input.messageTemplate = body.messageTemplate.slice(0, 1000);
+            if (typeof body.messageTemplate === "string") input.messageTemplate = body.messageTemplate.slice(0, 1800);
+            if (Array.isArray(body.includeKeywords)) {
+              input.includeKeywords = body.includeKeywords
+                .filter((value: unknown): value is string => typeof value === "string")
+                .slice(0,20);
+            }
+            if (Array.isArray(body.excludeKeywords)) {
+              input.excludeKeywords = body.excludeKeywords
+                .filter((value: unknown): value is string => typeof value === "string")
+                .slice(0,20);
+            }
 
             if (input.channelId !== undefined) {
               const channel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(input.channelId);
