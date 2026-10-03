@@ -756,6 +756,18 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addChannelOption((o) => o.setName("channel").setDescription("Destination channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
           .addIntegerOption((o) => o.setName("minutes").setDescription("Polling interval").setMinValue(1).setMaxValue(1440))
       ),
+      .addSubcommand((sub) =>
+        sub
+          .setName("github")
+          .setDescription("Track a GitHub repository")
+          .addStringOption((o) => o.setName("repo").setDescription("owner/repository").setMaxLength(200).setRequired(true))
+          .addStringOption((o) => o.setName("type").setDescription("Event feed").addChoices(
+            { name: "Releases", value: "releases" },
+            { name: "Commits", value: "commits" }
+          ).setRequired(true))
+          .addChannelOption((o) => o.setName("channel").setDescription("Destination channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
+          .addIntegerOption((o) => o.setName("minutes").setDescription("Polling interval").setMinValue(1).setMaxValue(1440))
+      ),
     new SlashCommandBuilder()
       .setName("music")
       .setDescription("Music player")
