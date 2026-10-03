@@ -986,6 +986,14 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_automation_delayed_available ON automation_delayed_jobs(completed_at,available_at);"
     ])
+  },
+  {
+    version: 62,
+    name: "kick_stream_alerts",
+    sql: q([
+      "ALTER TABLE stream_alerts DROP CONSTRAINT IF EXISTS stream_alerts_platform_check;",
+      "ALTER TABLE stream_alerts ADD CONSTRAINT stream_alerts_platform_check CHECK(platform IN ('twitch','youtube','vk','kick')); "
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
