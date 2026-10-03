@@ -920,6 +920,22 @@ const migrations = [
       "  PRIMARY KEY(guild_id,channel_id)",
       ");"
     ])
+  },
+  {
+    version: 58,
+    name: "persistent_server_counters",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS server_counters (",
+      "  guild_id text PRIMARY KEY,",
+      "  message_count bigint NOT NULL DEFAULT 0 CHECK(message_count >= 0),",
+      "  member_joins bigint NOT NULL DEFAULT 0 CHECK(member_joins >= 0),",
+      "  member_leaves bigint NOT NULL DEFAULT 0 CHECK(member_leaves >= 0),",
+      "  voice_joins bigint NOT NULL DEFAULT 0 CHECK(voice_joins >= 0),",
+      "  voice_leaves bigint NOT NULL DEFAULT 0 CHECK(voice_leaves >= 0),",
+      "  voice_moves bigint NOT NULL DEFAULT 0 CHECK(voice_moves >= 0),",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
