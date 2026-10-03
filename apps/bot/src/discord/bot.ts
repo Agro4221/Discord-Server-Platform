@@ -89,8 +89,24 @@ export function wireDiscordEvents(
     }
   });
 
+  client.on("messageDeleteBulk", (messages) => {
+    const values = [...messages.values()];
+    const guildId = values.find((message) => message.guildId)?.guildId;
+    const channelId = values[0]?.channelId;
+    if (!guildId || !channelId) return;
+    void events.emit("message.bulk-delete", {
+      guildId,
+      channelId,
+      messages: values.filter((message) => !message.partial)
+    });
+  });
+
   client.on(Events.MessageReactionAdd, (reaction, user) => {
-    void emitReaction(events, reaction, user);
+    void emitReaction(events, reaction, user, "reaction.add");
+  });
+
+  client.on("messageReactionRemove", (reaction, user) => {
+    void emitReaction(events, reaction, user, "reaction.remove");
   });
 
   client.on(Events.GuildMemberAdd, (member) => {
@@ -125,6 +141,18 @@ export function wireDiscordEvents(
     void events.emit("role.delete", role);
   });
 
+  client.on("channelUpdate", (oldChannel, newChannel) => {
+    if (!("guildId" in oldChannel) || !("guildId" in newChannel) || !oldChannel.guildId || !newChannel.guildId) return;
+    void events.emit("channel.update", {
+      oldChannel: oldChannel as import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel,
+      newChannel: newChannel as import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel
+    });
+  });
+
+  client.on("roleUpdate", (oldRole, newRole) => {
+    void events.emit("role.update", { oldRole, newRole });
+  });
+
   client.on("guildBanAdd", (ban) => {
     void events.emit("member.ban", {
       guildId: ban.guild.id,
@@ -143,7 +171,8 @@ export function wireDiscordEvents(
 async function emitReaction(
   events: PlatformEventBus,
   reaction: import("discord.js").MessageReaction | import("discord.js").PartialMessageReaction,
-  user: import("discord.js").User | import("discord.js").PartialUser
+  user: import("discord.js").User | import("discord.js").PartialUser,
+  event: "reaction.add" | "reaction.remove"
 ): Promise<void> {
   const resolvedReaction = reaction.partial
     ? await reaction.fetch().catch((error) => {
@@ -166,7 +195,7 @@ async function emitReaction(
 
   if (!resolvedReaction || !resolvedUser) return;
 
-  await events.emit("reaction.add", {
+  await events.emit(event, {
     reaction: resolvedReaction,
     user: resolvedUser
   });

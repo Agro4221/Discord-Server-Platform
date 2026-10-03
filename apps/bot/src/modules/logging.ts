@@ -16,12 +16,16 @@ type LoggingConfig = {
   channelId: string | null;
   messageDelete: boolean;
   messageEdit: boolean;
+  messageBulkDelete: boolean;
+  reactions: boolean;
   memberJoin: boolean;
   memberLeave: boolean;
   memberUpdate: boolean;
   voice: boolean;
   channelDelete: boolean;
+  channelUpdate: boolean;
   roleDelete: boolean;
+  roleUpdate: boolean;
   bans: boolean;
 };
 
@@ -30,12 +34,16 @@ const DEFAULTS: LoggingConfig = {
   channelId: null,
   messageDelete: true,
   messageEdit: true,
+  messageBulkDelete: true,
+  reactions: true,
   memberJoin: true,
   memberLeave: true,
   memberUpdate: true,
   voice: true,
   channelDelete: true,
+  channelUpdate: true,
   roleDelete: true,
+  roleUpdate: true,
   bans: true
 };
 
@@ -54,14 +62,19 @@ export class Logging implements PlatformModule {
     const unsubs = [
       context.events.on("message.delete", (message) => { void this.onMessageDelete(message); }),
       context.events.on("message.update", ({ oldMessage, newMessage }) => { void this.onMessageUpdate(oldMessage, newMessage); }),
+      context.events.on("message.bulk-delete", ({ guildId, channelId, messages }) => { void this.onMessageBulkDelete(guildId, channelId, messages); }),
+      context.events.on("reaction.add", ({ reaction, user }) => { void this.onReaction(reaction, user, "add"); }),
+      context.events.on("reaction.remove", ({ reaction, user }) => { void this.onReaction(reaction, user, "remove"); }),
       context.events.on("member.add", (member) => { void this.onMemberJoin(member); }),
       context.events.on("member.remove", (member) => { void this.onMemberLeave(member); }),
       context.events.on("member.update", ({ oldMember, newMember }) => { void this.onMemberUpdate(oldMember, newMember); }),
       context.events.on("voice.state", ({ oldState, newState }) => { void this.onVoice(oldState, newState); }),
       context.events.on("channel.create", (channel) => { void this.onChannelCreate(channel); }),
       context.events.on("channel.delete", (channel) => { void this.onChannelDelete(channel); }),
+      context.events.on("channel.update", ({ oldChannel, newChannel }) => { void this.onChannelUpdate(oldChannel, newChannel); }),
       context.events.on("role.create", (role) => { void this.onRoleCreate(role); }),
       context.events.on("role.delete", (role) => { void this.onRoleDelete(role); }),
+      context.events.on("role.update", ({ oldRole, newRole }) => { void this.onRoleUpdate(oldRole, newRole); }),
       context.events.on("member.ban", ({ guildId, userId }) => { void this.onBan(guildId, userId); }),
       context.events.on("member.unban", ({ guildId, userId }) => { void this.onUnban(guildId, userId); }),
       context.events.on("interaction.command", (interaction) => { void this.onCommand(interaction); })
@@ -82,21 +95,25 @@ export class Logging implements PlatformModule {
     const next = { ...current, ...patch };
 
     await this.db.query(
-      "INSERT INTO logging_settings(guild_id,enabled,channel_id,message_delete,message_edit,member_join,member_leave,member_update,voice,channel_delete,role_delete,bans) " +
-      "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) " +
-      "ON CONFLICT(guild_id) DO UPDATE SET enabled=EXCLUDED.enabled,channel_id=EXCLUDED.channel_id,message_delete=EXCLUDED.message_delete,message_edit=EXCLUDED.message_edit,member_join=EXCLUDED.member_join,member_leave=EXCLUDED.member_leave,member_update=EXCLUDED.member_update,voice=EXCLUDED.voice,channel_delete=EXCLUDED.channel_delete,role_delete=EXCLUDED.role_delete,bans=EXCLUDED.bans,updated_at=now()",
+      "INSERT INTO logging_settings(guild_id,enabled,channel_id,message_delete,message_edit,message_bulk_delete,reactions,member_join,member_leave,member_update,voice,channel_delete,channel_update,role_delete,role_update,bans) " +
+      "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) " +
+      "ON CONFLICT(guild_id) DO UPDATE SET enabled=EXCLUDED.enabled,channel_id=EXCLUDED.channel_id,message_delete=EXCLUDED.message_delete,message_edit=EXCLUDED.message_edit,message_bulk_delete=EXCLUDED.message_bulk_delete,reactions=EXCLUDED.reactions,member_join=EXCLUDED.member_join,member_leave=EXCLUDED.member_leave,member_update=EXCLUDED.member_update,voice=EXCLUDED.voice,channel_delete=EXCLUDED.channel_delete,channel_update=EXCLUDED.channel_update,role_delete=EXCLUDED.role_delete,role_update=EXCLUDED.role_update,bans=EXCLUDED.bans,updated_at=now()",
       [
         guildId,
         next.enabled,
         next.channelId,
         next.messageDelete,
         next.messageEdit,
+        next.messageBulkDelete,
+        next.reactions,
         next.memberJoin,
         next.memberLeave,
         next.memberUpdate,
         next.voice,
         next.channelDelete,
+        next.channelUpdate,
         next.roleDelete,
+        next.roleUpdate,
         next.bans
       ]
     );
@@ -116,15 +133,19 @@ export class Logging implements PlatformModule {
       channel_id: string | null;
       message_delete: boolean;
       message_edit: boolean;
+      message_bulk_delete: boolean;
+      reactions: boolean;
       member_join: boolean;
       member_leave: boolean;
       member_update: boolean;
       voice: boolean;
       channel_delete: boolean;
+      channel_update: boolean;
       role_delete: boolean;
+      role_update: boolean;
       bans: boolean;
     }>(
-      "SELECT enabled,channel_id,message_delete,message_edit,member_join,member_leave,member_update,voice,channel_delete,role_delete,bans FROM logging_settings WHERE guild_id=$1",
+      "SELECT enabled,channel_id,message_delete,message_edit,message_bulk_delete,reactions,member_join,member_leave,member_update,voice,channel_delete,channel_update,role_delete,role_update,bans FROM logging_settings WHERE guild_id=$1",
       [guildId]
     );
 
@@ -136,12 +157,16 @@ export class Logging implements PlatformModule {
       channelId: row.channel_id,
       messageDelete: row.message_delete,
       messageEdit: row.message_edit,
+      messageBulkDelete: row.message_bulk_delete,
+      reactions: row.reactions,
       memberJoin: row.member_join,
       memberLeave: row.member_leave,
       memberUpdate: row.member_update,
       voice: row.voice,
       channelDelete: row.channel_delete,
+      channelUpdate: row.channel_update,
       roleDelete: row.role_delete,
+      roleUpdate: row.role_update,
       bans: row.bans
     };
   }
@@ -275,6 +300,46 @@ export class Logging implements PlatformModule {
     );
   }
 
+  private async onMessageBulkDelete(guildId: string, channelId: string, messages: Message[]): Promise<void> {
+    const config = await this.getConfig(guildId);
+    if (!config.messageBulkDelete) return;
+
+    const preview = messages
+      .slice(0, 25)
+      .map((message) => message.content ? "<@" + message.author.id + ">: " + message.content : "#" + message.id)
+      .join("\n");
+
+    await this.emit(
+      guildId,
+      "logging.message.bulk-delete",
+      "🧹 Массовое удаление сообщений",
+      "Канал: <#" + channelId + ">\nУдалено: " + messages.length + (preview ? "\n\n" + preview : ""),
+      { channelId, count: messages.length, messageIds: messages.slice(0, 100).map((message) => message.id) }
+    );
+  }
+
+  private async onReaction(
+    reaction: import("discord.js").MessageReaction,
+    user: import("discord.js").User,
+    action: "add" | "remove"
+  ): Promise<void> {
+    const guildId = reaction.message.guildId;
+    if (!guildId) return;
+
+    const config = await this.getConfig(guildId);
+    if (!config.reactions) return;
+
+    const emoji = reaction.emoji.name ?? reaction.emoji.id ?? "emoji";
+    const label = action === "add" ? "добавил" : "снял";
+    await this.emit(
+      guildId,
+      "logging.reaction." + action,
+      action === "add" ? "👍 Реакция добавлена" : "👎 Реакция снята",
+      "Пользователь: <@" + user.id + ">\nСообщение: <https://discord.com/channels/" + guildId + "/" + reaction.message.channelId + "/" + reaction.message.id + ">\nEmoji: " + emoji + "\nПользователь " + label + " реакцию.",
+      { userId: user.id, messageId: reaction.message.id, channelId: reaction.message.channelId, emoji: reaction.emoji.id ?? reaction.emoji.name ?? "unknown", count: reaction.count ?? 0 }
+    );
+  }
+
   private async onMemberJoin(member: import("discord.js").GuildMember): Promise<void> {
     const config = await this.getConfig(member.guild.id);
     if (!config.memberJoin) return;
@@ -383,6 +448,30 @@ export class Logging implements PlatformModule {
     );
   }
 
+  private async onChannelUpdate(
+    oldChannel: import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel,
+    newChannel: import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel
+  ): Promise<void> {
+    if (!newChannel.guildId) return;
+    const config = await this.getConfig(newChannel.guildId);
+    if (!config.channelUpdate) return;
+
+    const before = oldChannel as typeof oldChannel & { name?: string | null; parentId?: string | null };
+    const after = newChannel as typeof newChannel & { name?: string | null; parentId?: string | null };
+    const changes: string[] = [];
+    if (before.name !== after.name) changes.push("Название: " + (before.name ?? "—") + " → " + (after.name ?? "—"));
+    if (before.parentId !== after.parentId) changes.push("Категория: " + (before.parentId ? "<#" + before.parentId + ">" : "—") + " → " + (after.parentId ? "<#" + after.parentId + ">" : "—"));
+    if (!changes.length) return;
+
+    await this.emit(
+      newChannel.guildId,
+      "logging.channel.update",
+      "✏️ Канал изменён",
+      "Канал: <#" + newChannel.id + ">\n" + changes.join("\n"),
+      { channelId: newChannel.id, changes }
+    );
+  }
+
   private async onRoleCreate(
     role: import("discord.js").Role
   ): Promise<void> {
@@ -409,6 +498,27 @@ export class Logging implements PlatformModule {
       "🎭 Роль удалена",
       "Роль: " + role.name + "\\nID: " + role.id,
       { roleId: role.id, roleName: role.name }
+    );
+  }
+
+  private async onRoleUpdate(oldRole: import("discord.js").Role, newRole: import("discord.js").Role): Promise<void> {
+    const config = await this.getConfig(newRole.guild.id);
+    if (!config.roleUpdate) return;
+
+    const changes: string[] = [];
+    if (oldRole.name !== newRole.name) changes.push("Название: " + oldRole.name + " → " + newRole.name);
+    if (oldRole.position !== newRole.position) changes.push("Позиция: " + oldRole.position + " → " + newRole.position);
+    if (String(oldRole.permissions.bitfield) !== String(newRole.permissions.bitfield)) changes.push("Permissions изменены");
+    if (oldRole.hoist !== newRole.hoist) changes.push("Hoist: " + oldRole.hoist + " → " + newRole.hoist);
+    if (oldRole.mentionable !== newRole.mentionable) changes.push("Mentionable: " + oldRole.mentionable + " → " + newRole.mentionable);
+    if (!changes.length) return;
+
+    await this.emit(
+      newRole.guild.id,
+      "logging.role.update",
+      "✏️ Роль изменена",
+      "Роль: <@&" + newRole.id + ">\n" + changes.join("\n"),
+      { roleId: newRole.id, changes }
     );
   }
 

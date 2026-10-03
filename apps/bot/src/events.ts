@@ -20,7 +20,9 @@ export type PlatformEventMap = {
   "message.create": Message;
   "message.delete": Message;
   "message.update": { oldMessage: Message; newMessage: Message };
+  "message.bulk-delete": { guildId: string; channelId: string; messages: Message[] };
   "reaction.add": { reaction: MessageReaction; user: User };
+  "reaction.remove": { reaction: MessageReaction; user: User };
   "member.add": GuildMember;
   "member.remove": GuildMember;
   "member.update": { oldMember: GuildMember; newMember: GuildMember };
@@ -33,8 +35,13 @@ export type PlatformEventMap = {
   "schedule": { guildId: string; timestamp: number };
   "channel.create": import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel;
   "channel.delete": import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel;
+  "channel.update": {
+    oldChannel: import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel;
+    newChannel: import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel;
+  };
   "role.create": import("discord.js").Role;
   "role.delete": import("discord.js").Role;
+  "role.update": { oldRole: import("discord.js").Role; newRole: import("discord.js").Role };
   "member.ban": { guildId: string; userId: string };
   "member.unban": { guildId: string; userId: string };
   "security.incident": {
@@ -125,10 +132,13 @@ function extractGuildId<K extends keyof PlatformEventMap>(
   if (event === "message.create" || event === "message.delete") {
     return (payload as Message).guildId;
   }
+  if (event === "message.bulk-delete") {
+    return (payload as { guildId: string }).guildId;
+  }
   if (event === "message.update") {
     return (payload as { newMessage: Message }).newMessage.guildId;
   }
-  if (event === "reaction.add") {
+  if (event === "reaction.add" || event === "reaction.remove") {
     return (payload as { reaction: MessageReaction }).reaction.message.guildId;
   }
   if (event === "member.add" || event === "member.remove" || event === "member.update") {
@@ -144,8 +154,14 @@ function extractGuildId<K extends keyof PlatformEventMap>(
   if (event === "channel.create" || event === "channel.delete") {
     return (payload as { guildId: string | null }).guildId;
   }
+  if (event === "channel.update") {
+    return (payload as { newChannel: { guildId: string | null } }).newChannel.guildId;
+  }
   if (event === "role.create" || event === "role.delete") {
     return (payload as import("discord.js").Role).guild.id;
+  }
+  if (event === "role.update") {
+    return (payload as { newRole: import("discord.js").Role }).newRole.guild.id;
   }
   if (event === "member.ban" || event === "member.unban" || event === "security.incident") {
     return (payload as { guildId: string }).guildId;

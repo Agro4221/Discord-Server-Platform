@@ -777,6 +777,16 @@ const migrations = [
       "ALTER TABLE bot_identities ADD COLUMN IF NOT EXISTS failover_enabled boolean NOT NULL DEFAULT false;",
       "CREATE INDEX IF NOT EXISTS idx_bot_identities_failover ON bot_identities(enabled,failover_enabled);"
     ])
+  },
+  {
+    version: 45,
+    name: "logging_extended_events",
+    sql: q([
+      "ALTER TABLE logging_settings ADD COLUMN IF NOT EXISTS message_bulk_delete boolean NOT NULL DEFAULT true;",
+      "ALTER TABLE logging_settings ADD COLUMN IF NOT EXISTS reactions boolean NOT NULL DEFAULT true;",
+      "ALTER TABLE logging_settings ADD COLUMN IF NOT EXISTS channel_update boolean NOT NULL DEFAULT true;",
+      "ALTER TABLE logging_settings ADD COLUMN IF NOT EXISTS role_update boolean NOT NULL DEFAULT true;"
+    ])
   }] as const;
 
 export async function migrate(db: Database): Promise<void> {

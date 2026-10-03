@@ -344,10 +344,11 @@ const MODULE_META: Record<string, ModuleMeta> = {
     category: "system",
     commands: ["/logging setup", "!logging setup"],
     functions: [
-      { title: "Message logs", description: "Удаление и редактирование сообщений." },
+      { title: "Message logs", description: "Удаление, редактирование и массовое удаление сообщений." },
+      { title: "Reaction logs", description: "Добавление и снятие реакций с сообщениями." },
       { title: "Member logs", description: "Вход, выход и изменения участников." },
       { title: "Voice logs", description: "Входы, выходы и перемещения в voice." },
-      { title: "Server structure", description: "Удаление каналов и ролей." },
+      { title: "Server structure", description: "Создание, удаление и изменение каналов и ролей." },
       { title: "Ban / Unban", description: "События блокировки и снятия блокировки." }
     ],
     kind: "settings"

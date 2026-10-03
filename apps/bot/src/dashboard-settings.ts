@@ -140,12 +140,16 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "channelId", label: "Канал логов", type: "channel" },
       { key: "messageDelete", label: "Удаление сообщений", type: "boolean" },
       { key: "messageEdit", label: "Изменение сообщений", type: "boolean" },
+      { key: "messageBulkDelete", label: "Массовое удаление сообщений", type: "boolean" },
+      { key: "reactions", label: "Добавление/снятие реакций", type: "boolean" },
       { key: "memberJoin", label: "Вход участников", type: "boolean" },
       { key: "memberLeave", label: "Выход участников", type: "boolean" },
       { key: "memberUpdate", label: "Изменение участников", type: "boolean" },
       { key: "voice", label: "Voice activity", type: "boolean" },
       { key: "channelDelete", label: "Удаление каналов", type: "boolean" },
+      { key: "channelUpdate", label: "Изменение каналов", type: "boolean" },
       { key: "roleDelete", label: "Удаление ролей", type: "boolean" },
+      { key: "roleUpdate", label: "Изменение ролей", type: "boolean" },
       { key: "bans", label: "Ban / Unban", type: "boolean" }
     ]
   },
