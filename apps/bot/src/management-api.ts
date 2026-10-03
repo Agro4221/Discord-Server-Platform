@@ -141,6 +141,7 @@ type ApiOptions = {
   };
   customCommands?: CustomCommandService;
   autoResponder?: AutoResponder;
+  welcome?: { preview: (guildId: string) => Promise<unknown> };
   tickets?: {
     getFormFields: (guildId: string) => Promise<TicketFormField[]>;
     setFormFields: (guildId: string, fields: TicketFormField[]) => Promise<TicketFormField[]>;
