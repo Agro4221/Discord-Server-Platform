@@ -119,3 +119,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Added contract coverage through the production Dashboard TypeScript build path by ensuring every current `GiveawaysPanel` call site supplies the required channel resources.
 - Added the missing Giveaway panel label style constant.
 - CI remains the automated gate; this checkpoint is not a substitute for live Discord permission/publication acceptance.
+
+## 2026-10-04 — CI verification
+- CI run **#1239** passed the full automated matrix on the Control Center giveaway wiring checkpoint, including Dashboard production TypeScript/build validation.
+- Automated verification is green; live Discord permission, hierarchy, publication and interaction behavior remain environment-dependent acceptance checks.

@@ -260,3 +260,8 @@ Never write credentials, tokens or private user data here.
 - The same atomic change keeps the Dashboard capability metadata aligned with the existing AutoMod and Music operational panels.
 - CI run #1237 on the previous head failed only in Dashboard TypeScript/build validation because these exact Giveaway props/label contracts were not updated at all call sites; bot typecheck, 76 bot tests, domain build and bot build were successful.
 - The new atomic head is the next automated verification target. No live Discord acceptance is implied by CI.
+
+## 2026-10-04 — Control Center giveaway wiring verified
+- CI run **#1239** (`37150661360`) on development head `1007677fc855a8ea6b62ff1fa8274294a9db96d0` passed all automated stages.
+- Verified: dependency audit, source/deployment/observability checks, bot typecheck, **76/76 bot tests**, domain build, bot build and Dashboard production build.
+- The Giveaway panel prop/label fixes are therefore CI-verified; this still does not replace live Discord acceptance with real permissions and messages.

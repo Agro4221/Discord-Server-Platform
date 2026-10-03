@@ -211,3 +211,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - AutoMod and Music capability metadata is aligned with their already-existing operational UI.
 - The preceding CI build failure was isolated to Dashboard TypeScript contracts around Giveaway panel props and a missing local style constant; backend typecheck/tests remained green.
 - Fresh CI verification is pending for the atomic checkpoint head.
+
+## 2026-10-04 — Control Center wiring verified
+- Development head `1007677fc855a8ea6b62ff1fa8274294a9db96d0` passed CI run **#1239** across the full verification pipeline.
+- Giveaway Control Center wiring is now confirmed by the production Dashboard build.
+- Backend regression suite remains at 76 passing tests.
