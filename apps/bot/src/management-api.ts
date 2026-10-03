@@ -127,6 +127,7 @@ type ApiOptions = {
     deleteCleanupRule?: (guildId: string, id: number) => Promise<boolean>;
     applyLockdown?: (guildId: string, actorUserId: string) => Promise<{ locked: number; failed: number }>;
     releaseLockdown?: (guildId: string, actorUserId: string) => Promise<{ restored: number; failed: number }>;
+    lockdownStatus?: (guildId: string) => Promise<{ active: boolean; lockedChannels: number }>;
   };
   music?: Music;
   leveling?: Leveling;
@@ -1592,8 +1593,7 @@ export class ManagementApiServer {
               this.json(res, 404, { error: "guild_not_found" });
               return;
             }
-            const rows = await this.options.settings.dbQuery<{ count: string }>("SELECT count(*)::text AS count FROM moderation_channel_locks WHERE guild_id=$1",[guildId]);
-            this.json(res, 200, { guildId, active: Number(rows.rows[0]?.count ?? 0) > 0, lockedChannels: Number(rows.rows[0]?.count ?? 0) });
+            this.json(res, 200, { guildId, ...(await this.options.moderation!.lockdownStatus()) });
             return;
           }
 
