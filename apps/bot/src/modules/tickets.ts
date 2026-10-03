@@ -100,7 +100,7 @@ export class Tickets implements PlatformModule {
     return true;
   }
 
-  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
     if (!interaction.inGuild() || commandName !== "ticket") return;
     const sub = interaction.options.getSubcommand();
 
