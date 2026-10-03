@@ -13,6 +13,7 @@ import { buildCommands, handleCommand } from "./commands.js";
 import { TemporaryVoice } from "../modules/temporary-voice.js";
 import { Moderation } from "../modules/moderation.js";
 import type { PlatformEventBus } from "../events.js";
+import type { HelpPages } from "../help-pages.js";
 
 export function createDiscordClient(): Client {
   return new Client({
