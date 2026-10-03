@@ -188,3 +188,21 @@ test("AutoMod exemption parser accepts whitespace- and comma-separated IDs", () 
     ["channel-1", "channel-2", "channel-3", "channel-4"]
   );
 });
+
+
+test("AutoMod rule upsert rejects unsupported detectors before database writes", async () => {
+  let writes = 0;
+  const db = {
+    async query<T>(text: string, _values: readonly unknown[] = []) {
+      if (/INSERT INTO|UPDATE|DELETE/i.test(text)) writes += 1;
+      return { rows: [], rowCount: 0 } as { rows: T[]; rowCount: number };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const automod = new AutoMod(db);
+  await assert.rejects(
+    () => automod.upsertRule("guild-1", { detector: "content" }),
+    /unsupported_automod_detector/
+  );
+  assert.equal(writes, 0);
+});

@@ -14,9 +14,10 @@ type Rule = {
 
 const DETECTORS = [
   ["bad-words", "Запрещённые слова"], ["links", "Ссылки"], ["invites", "Discord invites"],
-  ["scam", "Scam patterns"], ["caps", "CAPS"], ["mentions", "Упоминания"],
-  ["emoji-count", "Emoji count"], ["line-length", "Длина строки"], ["link-count", "Количество ссылок"],
-  ["zalgo", "Zalgo"], ["honeypot", "Honeypot"], ["repeated-text", "Повторы"], ["content", "Контент"]
+  ["scam", "Scam patterns"], ["repeated-text", "Повторы"], ["caps", "CAPS"],
+  ["emotes", "Эмоты"], ["mentions", "Упоминания"], ["zalgo", "Zalgo"], ["honeypot", "Honeypot"],
+  ["line-length", "Длина строки"], ["link-count", "Количество ссылок"],
+  ["mention-count", "Количество упоминаний"], ["emoji-count", "Количество эмодзи"]
 ];
 
 const ACTIONS: Array<[Rule["action"], string]> = [
@@ -32,6 +33,8 @@ export function AutoModRulesPanel(props: {
   const [rules, setRules] = useState<Rule[]>([]);
   const [detector, setDetector] = useState("bad-words");
   const [action, setAction] = useState<Rule["action"]>("delete");
+  const [enabled, setEnabled] = useState(true);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [threshold, setThreshold] = useState("");
   const [windowSeconds, setWindowSeconds] = useState("");
   const [timeoutMinutes, setTimeoutMinutes] = useState("0");
@@ -41,7 +44,7 @@ export function AutoModRulesPanel(props: {
   const [ignoredRoleIds, setIgnoredRoleIds] = useState<string[]>([]);
   const [ignoreModerators, setIgnoreModerators] = useState(true);
   const [messageTemplate, setMessageTemplate] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function load() {
@@ -54,7 +57,7 @@ export function AutoModRulesPanel(props: {
   useEffect(() => { void load().catch(() => setError("Не удалось загрузить AutoMod rules.")); }, [props.guildId]);
 
   async function save() {
-    setSaving(true); setError("");
+    setBusy(true); setError("");
     try {
       const payload = {
         detector, action,
@@ -73,11 +76,11 @@ export function AutoModRulesPanel(props: {
       props.onChanged();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось сохранить rule.");
-    } finally { setSaving(false); }
+    } finally { setBusy(false); }
   }
 
   async function remove(id: number) {
-    setSaving(true); setError("");
+    setBusy(true); setError("");
     try {
       const response = await fetch("/api/guilds/" + encodeURIComponent(props.guildId) + "/automod/rules/" + id, { method: "DELETE" });
       const body = await response.json().catch(() => ({}));
@@ -85,7 +88,7 @@ export function AutoModRulesPanel(props: {
       await load(); props.onChanged();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось удалить rule.");
-    } finally { setSaving(false); }
+    } finally { setBusy(false); }
   }
 
   function toggleSelection(current: string[], id: string, setter: (value: string[]) => void) {
@@ -96,6 +99,11 @@ export function AutoModRulesPanel(props: {
     <div style={{ display: "grid", gap: 14 }}>
       {error && <div style={{ padding: 9, borderRadius: 9, background: "#32191b", color: "#ffb1b1", fontSize: 10 }}>{error}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 10 }}>
+        {editingId !== null && (
+          <div style={{ padding: 9, borderRadius: 9, background: "#161d28", border: "1px solid #2b3544", color: "#9eabc0", fontSize: 10 }}>
+            Редактирование правила #{editingId}
+          </div>
+        )}
         <label style={boxStyle}><span>Detector</span><select value={detector} onChange={(e) => setDetector(e.target.value)} style={inputStyle}>
           {DETECTORS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
@@ -105,6 +113,7 @@ export function AutoModRulesPanel(props: {
         <label style={boxStyle}><span>Threshold</span><input value={threshold} onChange={(e) => setThreshold(e.target.value)} type="number" style={inputStyle} placeholder="Авто по detector" /></label>
         <label style={boxStyle}><span>Окно, сек.</span><input value={windowSeconds} onChange={(e) => setWindowSeconds(e.target.value)} type="number" style={inputStyle} placeholder="Необязательно" /></label>
         <label style={boxStyle}><span>Timeout, минут</span><input value={timeoutMinutes} onChange={(e) => setTimeoutMinutes(e.target.value)} type="number" min={0} max={40320} style={inputStyle} /></label>
+        <label style={{ ...boxStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}><span>Rule enabled</span><input checked={enabled} onChange={(e) => setEnabled(e.target.checked)} type="checkbox" /></label>
         <label style={{ ...boxStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}><span>Игнорировать модераторов</span><input checked={ignoreModerators} onChange={(e) => setIgnoreModerators(e.target.checked)} type="checkbox" /></label>
         <MultiSelect label="Затронутые каналы" values={affectedChannelIds} resources={props.channels} onToggle={(id) => toggleSelection(affectedChannelIds, id, setAffectedChannelIds)} />
         <MultiSelect label="Игнорировать каналы" values={ignoredChannelIds} resources={props.channels} onToggle={(id) => toggleSelection(ignoredChannelIds, id, setIgnoredChannelIds)} />
@@ -112,16 +121,21 @@ export function AutoModRulesPanel(props: {
         <MultiSelect label="Игнорировать роли" values={ignoredRoleIds} resources={props.roles} onToggle={(id) => toggleSelection(ignoredRoleIds, id, setIgnoredRoleIds)} />
       </div>
       <label style={boxStyle}><span>Response / template</span><textarea value={messageTemplate} onChange={(e) => setMessageTemplate(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} placeholder="{mention} ..." /></label>
-      <button type="button" disabled={saving} onClick={() => void save()} style={buttonStyle}>{saving ? "Сохраняем…" : "Добавить / обновить rule"}</button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button type="button" disabled={busy} onClick={() => void save()} style={buttonStyle}>{busy ? "Сохраняем…" : editingId !== null ? "Сохранить изменения" : "Создать rule"}</button>
+        {editingId !== null && <button type="button" disabled={busy} onClick={resetForm} style={buttonStyleSecondary}>Отмена</button>}
+      </div>
 
       <div style={{ display: "grid", gap: 8 }}>
         {rules.map((rule) => (
           <div key={rule.id} style={ruleCard}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <strong style={{ fontSize: 11 }}>{rule.detector}</strong><span style={pill}>{rule.action}</span><span style={pill}>#{rule.id}</span>
+              <strong style={{ fontSize: 11 }}>{rule.detector}</strong><span style={pill}>{rule.action}</span><span style={pill}>#{rule.id}</span><span style={pill}>{rule.enabled ? "enabled" : "disabled"}</span>
               {rule.threshold !== null && <span style={pill}>threshold {rule.threshold}</span>}
               {rule.timeoutMinutes > 0 && <span style={pill}>timeout {rule.timeoutMinutes}m</span>}
-              <button type="button" disabled={saving} onClick={() => void remove(rule.id)} style={deleteButton}>Удалить</button>
+              <button type="button" disabled={busy} onClick={() => editRule(rule)} style={buttonStyleSecondary}>Изменить</button>
+              <button type="button" disabled={busy} onClick={() => void toggleRule(rule)} style={buttonStyleSecondary}>{rule.enabled ? "Выключить" : "Включить"}</button>
+              <button type="button" disabled={busy} onClick={() => void removeRule(rule.id)} style={deleteButton}>Удалить</button>
             </div>
             <div style={{ marginTop: 6, color: "#6d7888", fontSize: 9 }}>
               Каналы: {rule.affectedChannelIds.length ? rule.affectedChannelIds.length : "все"} · роли: {rule.affectedRoleIds.length ? rule.affectedRoleIds.length : "все"} · {rule.ignoreModerators ? "mods ignored" : "mods included"}
@@ -148,4 +162,5 @@ const boxStyle = { display: "grid", gap: 5, color: "#798496", fontSize: 9 };
 const buttonStyle = { border: "1px solid #5865f2", background: "#5865f2", color: "#fff", borderRadius: 9, padding: "9px 12px", cursor: "pointer", fontSize: 10, fontWeight: 650 };
 const pill = { padding: "3px 6px", borderRadius: 6, background: "#161c24", border: "1px solid #29313c", color: "#738095", fontSize: 8 };
 const ruleCard = { padding: 11, borderRadius: 10, border: "1px solid #222a35", background: "#0d1219" };
-const deleteButton = { marginLeft: "auto", border: "1px solid #6d3038", background: "#2c171b", color: "#ffb1b1", borderRadius: 7, padding: "5px 8px", cursor: "pointer", fontSize: 8 };
+const buttonStyleSecondary = { border: "1px solid #303846", background: "#141922", color: "#dce2eb", borderRadius: 7, padding: "5px 8px", cursor: "pointer", fontSize: 8 };
+const deleteButton = { border: "1px solid #6d3038", background: "#2c171b", color: "#ffb1b1", borderRadius: 7, padding: "5px 8px", cursor: "pointer", fontSize: 8 };
