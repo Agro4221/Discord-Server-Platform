@@ -74,7 +74,7 @@
 | Starboard | ✅ |
 | Economy / shop / ledger | ✅ |
 | Reputation / social profiles | ✅ |
-| Polls / suggestions | ✅ | Polls implemented; suggestions remain
+| Polls / suggestions | ✅ | Polls + Suggestions implemented
 | Birthdays / achievements | 🟡 |
 | Invite tracking | 🟡 |
 | Server statistics / counters | 🟡 |
@@ -171,13 +171,13 @@ LavaSrc уже подключён. Следующий этап — включа�
 | Buttons: pause / skip / shuffle / repeat / stop | ✅, Music v2 |
 | Buttons: volume / queue | ✅, Music v2 |
 | Queue pagination | ✅ |
-| Previous track | 🟡 |
+| Previous track | ✅ |
 | Interactive seek | 🟡 |
 | Saved playlists | 🟡 |
 | Favorites | 🟡 |
 | Per-user queue permissions | 🟡 |
 | DJ role policy | ✅ |
-| Lyrics | 🟡 | Provider/node lyrics support remains to be wired into UX
+| Lyrics | ✅ | LavaLyrics plugin + current-track lookup
 | Filters / equalizer / 8D / nightcore / bassboost | 🟡 |
 | 24/7 mode | 🟡 |
 | Multi-node failover validation | 🟡 |
