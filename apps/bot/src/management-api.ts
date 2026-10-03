@@ -2320,7 +2320,7 @@ function validateAutomationPayload(
   const guild = client.guilds.cache.get(guildId);
   if (!guild) throw new RequestInputError("guild_not_found", 404);
 
-  const stringFields = new Set(["content","userId","moderatorUserId","channelId","roleId","action","reason","messageId","guildId"]);
+  const stringFields = new Set(["content","userId","moderatorUserId","channelId","roleId","action","reason","messageId","guildId","channelType"]);
   const numericFields = new Set(["memberCount","messageLength","mentionCount","previousLength","caseId","ticketId","giveawayId","winnerCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"]);
 
   for (const condition of conditions) validateAutomationCondition(condition, guild, stringFields, numericFields);
@@ -2368,6 +2368,22 @@ function validateAutomationPayload(
           if (!channel || !channel.isTextBased()) throw new RequestInputError("invalid_delete_message_channel", 400);
         }
         break;
+      case "set-nickname":
+        if (!isAutomationUserRef(item.userId) ||
+            (item.nickname !== null && (typeof item.nickname !== "string" || item.nickname.length > 32))) {
+          throw new RequestInputError("invalid_set_nickname_action", 400);
+        }
+        break;
+      case "react-message":
+        if (!isAutomationResourceRef(item.channelId) || !isAutomationResourceRef(item.messageId) ||
+            typeof item.emoji !== "string" || !item.emoji.trim() || item.emoji.length > 100) {
+          throw new RequestInputError("invalid_react_message_action", 400);
+        }
+        if (item.channelId !== "@event") {
+          const channel = guild.channels.cache.get(item.channelId as string);
+          if (!channel || !channel.isTextBased()) throw new RequestInputError("invalid_react_message_channel", 400);
+        }
+        break;
       case "delay":
         if (typeof item.seconds !== "number" || !Number.isInteger(item.seconds) || item.seconds < 1 || item.seconds > 3600) throw new RequestInputError("invalid_delay_action", 400);
         break;
@@ -2391,6 +2407,10 @@ function validateAutomationPayload(
   }
 
   function isAutomationUserRef(value: unknown): value is string {
+    return typeof value === "string" && (value === "@event" || /^\d{17,20}$/.test(value));
+  }
+
+  function isAutomationResourceRef(value: unknown): value is string {
     return typeof value === "string" && (value === "@event" || /^\d{17,20}$/.test(value));
   }
 
@@ -2422,8 +2442,26 @@ function validateAutomationPayload(
         if (typeof item.left !== "string" || !allowedNumericFields.has(item.left) || typeof item.right !== "number" || !Number.isFinite(item.right)) throw new RequestInputError("invalid_numeric_condition", 400);
         break;
       case "has-role":
-        if (typeof item.userId !== "string" || !/^\d{17,20}$/.test(item.userId) ||
+      case "not-has-role":
+        if (!isAutomationUserRef(item.userId) ||
             typeof item.roleId !== "string" || !/^\d{17,20}$/.test(item.roleId) || !currentGuild.roles.cache.has(item.roleId)) throw new RequestInputError("invalid_role_condition", 400);
+        break;
+      case "channel-type-is":
+        if (typeof item.channelType !== "string" ||
+            !["text","announcement","forum","voice","stage","category","thread","other"].includes(item.channelType)) {
+          throw new RequestInputError("invalid_channel_type_condition", 400);
+        }
+        break;
+      case "user-is-bot":
+        if (!isAutomationUserRef(item.userId) || typeof item.value !== "boolean") {
+          throw new RequestInputError("invalid_user_bot_condition", 400);
+        }
+        break;
+      case "has-permission":
+        if (!isAutomationUserRef(item.userId) || typeof item.permission !== "string" ||
+            !["Administrator","ManageGuild","ManageChannels","ManageRoles","ManageMessages","KickMembers","BanMembers","ModerateMembers"].includes(item.permission)) {
+          throw new RequestInputError("invalid_permission_condition", 400);
+        }
         break;
       case "cooldown-clear":
         if (typeof item.key !== "string" || !item.key.trim() || item.key.length > 100) throw new RequestInputError("invalid_cooldown_key", 400);
