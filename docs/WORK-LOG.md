@@ -373,6 +373,15 @@ Never write credentials, tokens or private user data here.
 - No Discord mutation, webhook call or database write is performed by dry-run.
 
 
+## 2026-10-04 — Automation retries and dead-letter
+- Added migration 69 with durable dead-letter state for automation_delayed_jobs.
+- Delayed jobs now execute in fail-fast mode so actual action exceptions leave the job eligible for retry instead of being marked completed.
+- Retry policy uses bounded exponential backoff (5s, 10s, 20s, 40s, then dead-letter on the fifth failed attempt).
+- Delayed jobs preserve originating rule_id across delay chaining for diagnostics.
+- Invalid queued payloads are quarantined directly into dead-letter state.
+- Dashboard diagnostics now surface dead-letter counts/status alongside pending, processing and error counts.
+- Existing immediate Automation execution remains tolerant of individual action failures; retry behavior is scoped to durable delayed jobs.
+
 ## 2026-10-04 — Automation operational diagnostics
 - Added AutomationEngine.diagnostics(guildId) over the existing automation_delayed_jobs and rule/template persistence.
 - Diagnostics expose rule totals/event distribution, delayed-job pending/processing/error/completed-24h counts, oldest pending timestamp, recent job metadata and in-memory runtime counters.
