@@ -33,11 +33,12 @@ type Diagnostics = {
     pending: number;
     processing: number;
     withErrors: number;
+    deadLettered: number;
     completed24h: number;
     oldestPendingAt: string | null;
     recent: Array<{
       id: string;
-      status: "pending" | "processing" | "completed";
+      status: "pending" | "processing" | "completed" | "dead-lettered";
       ruleId: string | null;
       attempts: number;
       availableAt: string;
@@ -596,6 +597,7 @@ export function AutomationPanel({
             <Metric label="Templates" value={String(diagnostics.templates.total)} />
             <Metric label="Delayed pending" value={String(diagnostics.delayedJobs.pending)} />
             <Metric label="Errors" value={String(diagnostics.delayedJobs.withErrors)} />
+            <Metric label="Dead letter" value={String(diagnostics.delayedJobs.deadLettered)} />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
