@@ -253,3 +253,10 @@ Never write credentials, tokens or private user data here.
 - Added Verification Center panel publishing from Control Center.
 - Current development head: `ab1f67805e8a164782e935c2422724a55f1c221f`.
 - Automated CI remains the verification gate for the latest head; live Discord behavior, real bot permissions, hierarchy and PostgreSQL failure injection remain environment-dependent acceptance tests.
+
+## 2026-10-04 — Control Center build-fix checkpoint
+- Atomic development head: `486e82260afa751c74bdcc305eea0a923f26c7eb`.
+- Fixed Giveaway Control Center wiring after Dashboard production-build validation: all existing `GiveawaysPanel` call sites now provide the text-channel resource list, and the panel label style is defined locally.
+- The same atomic change keeps the Dashboard capability metadata aligned with the existing AutoMod and Music operational panels.
+- CI run #1237 on the previous head failed only in Dashboard TypeScript/build validation because these exact Giveaway props/label contracts were not updated at all call sites; bot typecheck, 76 bot tests, domain build and bot build were successful.
+- The new atomic head is the next automated verification target. No live Discord acceptance is implied by CI.

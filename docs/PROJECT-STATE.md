@@ -204,3 +204,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Verification now has a dedicated operational panel for publishing the verification message; user verification itself remains an end-user Discord interaction.
 - Giveaway creation is now available without Discord command entry; administrative giveaway lifecycle operations remain audited through Management API/Core.
 - Current development head: `ab1f67805e8a164782e935c2422724a55f1c221f`.
+
+## 2026-10-04 — Giveaway Dashboard wiring checkpoint
+- Development head: `486e82260afa751c74bdcc305eea0a923f26c7eb`.
+- Giveaway Control Center creation flow now has consistent channel-resource wiring across all Dashboard entrypoints.
+- AutoMod and Music capability metadata is aligned with their already-existing operational UI.
+- The preceding CI build failure was isolated to Dashboard TypeScript contracts around Giveaway panel props and a missing local style constant; backend typecheck/tests remained green.
+- Fresh CI verification is pending for the atomic checkpoint head.

@@ -114,3 +114,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Giveaway creation includes DB-to-Discord publication rollback logic; live publication failure injection remains a release-gate test.
 - Verification panel publication checks bot/channel permissions; live Discord interaction flow remains a release-gate case.
 - Latest recorded development head: `ab1f67805e8a164782e935c2422724a55f1c221f`.
+
+## 2026-10-04 — Giveaway Control Center wiring
+- Added contract coverage through the production Dashboard TypeScript build path by ensuring every current `GiveawaysPanel` call site supplies the required channel resources.
+- Added the missing Giveaway panel label style constant.
+- CI remains the automated gate; this checkpoint is not a substitute for live Discord permission/publication acceptance.
