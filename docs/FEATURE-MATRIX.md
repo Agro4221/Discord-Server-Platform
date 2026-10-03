@@ -170,7 +170,7 @@ LavaSrc уже подключён. Следующий этап — включа�
 | Persistent player message | ✅ |
 | Buttons: pause / skip / shuffle / repeat / stop | ✅, Music v2 |
 | Buttons: volume / queue | ✅, Music v2 |
-| Queue pagination | 🟡 |
+| Queue pagination | ✅ |
 | Previous track | 🟡 |
 | Interactive seek | 🟡 |
 | Saved playlists | 🟡 |
