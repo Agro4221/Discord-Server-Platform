@@ -51,7 +51,7 @@
 | Quarantine / lockdown workflow | ✅ |
 | Scam / phishing heuristics | ✅ |
 | Security incident dashboard | ✅ | `/security status` + Dashboard incident drilldown
-| Honeypot / advanced detectors | 🟡 |
+| Honeypot / advanced detectors | ✅ | Configurable rule pipeline now activates honeypot/scam/zalgo/count detectors with scopes and actions |
 
 ## Community
 
