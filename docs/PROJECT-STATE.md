@@ -216,3 +216,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Development head `1007677fc855a8ea6b62ff1fa8274294a9db96d0` passed CI run **#1239** across the full verification pipeline.
 - Giveaway Control Center wiring is now confirmed by the production Dashboard build.
 - Backend regression suite remains at 76 passing tests.
+
+## 2026-10-04 — AutoMod CRUD verified
+- Development head `0e79a64ab1cb0aa2c70ead8ae98b4950f2764b2a` passed CI run **#1242**.
+- AutoMod is now a full Control Center surface: list, create/update, enable/disable and delete rules, with audit coverage for Dashboard deletion.

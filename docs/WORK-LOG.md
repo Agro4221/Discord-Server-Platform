@@ -265,3 +265,9 @@ Never write credentials, tokens or private user data here.
 - CI run **#1239** (`37150661360`) on development head `1007677fc855a8ea6b62ff1fa8274294a9db96d0` passed all automated stages.
 - Verified: dependency audit, source/deployment/observability checks, bot typecheck, **76/76 bot tests**, domain build, bot build and Dashboard production build.
 - The Giveaway panel prop/label fixes are therefore CI-verified; this still does not replace live Discord acceptance with real permissions and messages.
+
+## 2026-10-04 — AutoMod Control Center CRUD verified
+- CI run **#1242** (`37150878597`) passed on development head `0e79a64ab1cb0aa2c70ead8ae98b4950f2764b2a`.
+- AutoMod Rule Builder now supports rule editing, enable/disable toggles, validated threshold/window/timeout input and the complete detector set supported by Core.
+- Dashboard deletion of AutoMod rules now creates a durable `automod.rule.deleted` audit event.
+- Added regression coverage that unsupported rule detectors are rejected before database writes.

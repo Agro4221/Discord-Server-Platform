@@ -123,3 +123,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-04 — CI verification
 - CI run **#1239** passed the full automated matrix on the Control Center giveaway wiring checkpoint, including Dashboard production TypeScript/build validation.
 - Automated verification is green; live Discord permission, hierarchy, publication and interaction behavior remain environment-dependent acceptance checks.
+
+## 2026-10-04 — AutoMod CRUD verification
+- CI run **#1242** passed the full automated matrix after the AutoMod Control Center CRUD pass.
+- Regression coverage includes unsupported-detector rejection before SQL writes; production Dashboard build also validates the new editor UI contracts.
