@@ -469,7 +469,7 @@ Music должен стремиться к функциональности си
 | Music/Lavalink health | ✅ |
 | Audit/activity timeline | ✅ | Dashboard exposes recent audit activity with timestamps/source and scoped targets |
 | Configurable metrics/counters | 🟡 |
-| Exportable analytics | 🟡 |
+| Exportable analytics | ✅ | Dashboard provides authenticated CSV export for selected analytics window |
 | Retention/history settings | 🟡 |
 
 #### Music
