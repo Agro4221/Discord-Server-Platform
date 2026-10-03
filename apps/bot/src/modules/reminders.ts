@@ -11,13 +11,21 @@ export class Reminders implements PlatformModule {
   private client?: Client;
   private running = false;
   private identityId = "primary";
+  private readonly sticky = new Map<string, { guildId: string; channelId: string; content: string; messageId: string | null }>();
+  private readonly stickyBusy = new Set<string>();
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
     this.identityId = context.identityId;
-    this.unsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    await this.loadSticky();
+    const commandUnsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const messageUnsubscribe = context.events.on("message.create", (message) => {
+      if (!message.guild || message.author.bot) return;
+      void this.refreshSticky(message.guild.id, message.channelId);
+    });
+    this.unsubscribe = () => { commandUnsubscribe(); messageUnsubscribe(); };
     this.timer = setInterval(() => void this.deliver(), 5_000);
     this.timer.unref();
   }
@@ -29,12 +37,49 @@ export class Reminders implements PlatformModule {
     this.timer = undefined;
     this.client = undefined;
     this.running = false;
+    this.sticky.clear();
+    this.stickyBusy.clear();
   }
 
   async handlePrefixCommand(message: Message, commandName: string, args: string[]): Promise<boolean> {
-    if (!message.guild || message.author.bot || (commandName !== "remind" && commandName !== "schedule")) return false;
+    if (!message.guild || message.author.bot || !["remind","schedule","sticky"].includes(commandName)) return false;
     if (!await moduleEnabled(this.db, message.guild.id, "reminders", false)) {
       await message.reply("Модуль Reminders выключен.");
+      return true;
+    }
+
+    if (commandName === "sticky") {
+      if (!message.member?.permissions.has("ManageGuild")) {
+        await message.reply("Для sticky message нужны права Manage Server.");
+        return true;
+      }
+      const sub = (args.shift() ?? "setup").toLowerCase();
+      if (sub === "list") {
+        const rows = [...this.sticky.values()].filter((item) => item.guildId === message.guild!.id);
+        await message.reply(rows.length
+          ? "📌 **Sticky messages**\n" + rows.map((item) => "<#" + item.channelId + "> — " + item.content).join("\n").slice(0, 3900)
+          : "Sticky messages не настроены.");
+        return true;
+      }
+      const channelToken = args.shift() ?? "";
+      const channelId = channelToken.replace(/[<#>]/g, "") || message.channelId;
+      const channel = message.guild.channels.cache.get(channelId);
+      if (!/^\d{17,20}$/.test(channelId) || channel?.type !== 0) {
+        await message.reply("Укажи текстовый канал: !sticky setup #канал <текст>.");
+        return true;
+      }
+      if (sub === "remove") {
+        await this.removeSticky(message.guild.id, channelId);
+        await message.reply("📌 Sticky message удалён.");
+        return true;
+      }
+      const content = args.join(" ").trim();
+      if (!content) {
+        await message.reply("Использование: !sticky setup #канал <текст>.");
+        return true;
+      }
+      await this.saveSticky(message.guild.id, channelId, content);
+      await message.reply("📌 Sticky message настроен в <#" + channelId + ">.");
       return true;
     }
 
@@ -97,7 +142,7 @@ export class Reminders implements PlatformModule {
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || (interaction.commandName !== "remind" && interaction.commandName !== "schedule")) return;
+    if (!interaction.inGuild() || !["remind","schedule","sticky"].includes(interaction.commandName)) return;
     if (!await moduleEnabled(this.db, interaction.guild!.id, "reminders", false)) {
       await interaction.reply({ content: "Модуль Reminders выключен.", ephemeral: true });
       return;
@@ -105,6 +150,42 @@ export class Reminders implements PlatformModule {
 
     const minutes = interaction.options.getInteger("minutes", true);
     const text = interaction.options.getString("text", true);
+
+    if (interaction.commandName === "sticky") {
+      if (!interaction.memberPermissions?.has("ManageGuild")) {
+        await interaction.reply({ content: "Для sticky message нужны права Manage Server.", ephemeral: true });
+        return;
+      }
+      const sub = interaction.options.getSubcommand();
+      if (sub === "list") {
+        const rows = [...this.sticky.values()].filter((item) => item.guildId === interaction.guild!.id);
+        await interaction.reply({
+          content: rows.length
+            ? "📌 **Sticky messages**\n" + rows.map((item) => "<#" + item.channelId + "> — " + item.content).join("\n").slice(0,3900)
+            : "Sticky messages не настроены.",
+          ephemeral: true
+        });
+        return;
+      }
+      const channel = interaction.options.getChannel("channel", true);
+      if (channel.type !== 0) {
+        await interaction.reply({ content: "Нужен текстовый канал.", ephemeral: true });
+        return;
+      }
+      if (sub === "remove") {
+        await this.removeSticky(interaction.guild!.id, channel.id);
+        await interaction.reply({ content: "📌 Sticky message удалён.", ephemeral: true });
+        return;
+      }
+      const text = interaction.options.getString("text", true).trim();
+      if (!text) {
+        await interaction.reply({ content: "Текст sticky message не может быть пустым.", ephemeral: true });
+        return;
+      }
+      await this.saveSticky(interaction.guild!.id, channel.id, text);
+      await interaction.reply({ content: "📌 Sticky message настроен в <#" + channel.id + ">.", ephemeral: true });
+      return;
+    }
 
     if (interaction.commandName === "schedule") {
       if (!interaction.memberPermissions?.has("ManageGuild")) {
@@ -141,6 +222,68 @@ export class Reminders implements PlatformModule {
       content: `⏰ Напоминание #${result.rows[0]?.id ?? "?"}: <t:${Math.floor(dueAt.getTime()/1000)}:R>`,
       ephemeral: true
     });
+  }
+
+
+  private async loadSticky(): Promise<void> {
+    const result = await this.db.query<{ guild_id: string; channel_id: string; content: string; message_id: string | null }>(
+      "SELECT guild_id,channel_id,content,message_id FROM sticky_messages"
+    );
+    this.sticky.clear();
+    for (const row of result.rows) {
+      this.sticky.set(row.guild_id + ":" + row.channel_id, {
+        guildId: row.guild_id,
+        channelId: row.channel_id,
+        content: row.content,
+        messageId: row.message_id
+      });
+    }
+  }
+
+  private async saveSticky(guildId: string, channelId: string, content: string): Promise<void> {
+    const normalized = content.slice(0, 2000);
+    await this.db.query(
+      "INSERT INTO sticky_messages(guild_id,channel_id,content) VALUES($1,$2,$3) ON CONFLICT(guild_id,channel_id) DO UPDATE SET content=EXCLUDED.content,message_id=NULL,updated_at=now()",
+      [guildId,channelId,normalized]
+    );
+    this.sticky.set(guildId + ":" + channelId, { guildId, channelId, content: normalized, messageId: null });
+    await this.refreshSticky(guildId, channelId);
+  }
+
+  private async removeSticky(guildId: string, channelId: string): Promise<void> {
+    const key = guildId + ":" + channelId;
+    const item = this.sticky.get(key);
+    const channel = this.client?.channels.cache.get(channelId);
+    if (item?.messageId && channel?.isTextBased() && "messages" in channel) {
+      await channel.messages.delete(item.messageId).catch(() => undefined);
+    }
+    await this.db.query("DELETE FROM sticky_messages WHERE guild_id=$1 AND channel_id=$2", [guildId,channelId]);
+    this.sticky.delete(key);
+  }
+
+  private async refreshSticky(guildId: string, channelId: string): Promise<void> {
+    const key = guildId + ":" + channelId;
+    const item = this.sticky.get(key);
+    if (!item || this.stickyBusy.has(key) || !this.client) return;
+    const channel = this.client.channels.cache.get(channelId);
+    if (!channel?.isTextBased() || !("send" in channel) || !("messages" in channel)) return;
+
+    this.stickyBusy.add(key);
+    try {
+      if (item.messageId) {
+        await channel.messages.delete(item.messageId).catch(() => undefined);
+      }
+      const sent = await channel.send(item.content);
+      item.messageId = sent.id;
+      await this.db.query(
+        "UPDATE sticky_messages SET message_id=$1,updated_at=now() WHERE guild_id=$2 AND channel_id=$3",
+        [sent.id,guildId,channelId]
+      );
+    } catch (error) {
+      logger.warn("Sticky message refresh failed", { guildId, channelId, error: String(error) });
+    } finally {
+      this.stickyBusy.delete(key);
+    }
   }
 
   private async deliver(): Promise<void> {
