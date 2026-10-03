@@ -1,5 +1,6 @@
 import {
   ChannelType,
+  EmbedBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
@@ -22,6 +23,17 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
     new SlashCommandBuilder()
       .setName("ping")
       .setDescription("Check platform health"),
+
+    new SlashCommandBuilder()
+      .setName("embed")
+      .setDescription("Create an embed message")
+      .addStringOption((o) => o.setName("title").setDescription("Embed title").setMaxLength(256))
+      .addStringOption((o) => o.setName("description").setDescription("Embed description").setMaxLength(4096))
+      .addStringOption((o) => o.setName("url").setDescription("Optional URL").setMaxLength(2000))
+      .addStringOption((o) => o.setName("color").setDescription("Hex color, e.g. #5865F2").setMaxLength(7))
+      .addStringOption((o) => o.setName("footer").setDescription("Footer text").setMaxLength(2048))
+      .addStringOption((o) => o.setName("image").setDescription("Image URL").setMaxLength(2000))
+      .addStringOption((o) => o.setName("thumbnail").setDescription("Thumbnail URL").setMaxLength(2000)),
 
     new SlashCommandBuilder()
       .setName("level")
@@ -855,6 +867,62 @@ export async function handleCommand(
       custom.rows.length ? "\n**Custom Commands**\n" + custom.rows.map((row) => `/${row.name} — ${row.description || "custom command"}`).join("\n") : ""
     ].filter(Boolean).join("\n");
     await interaction.reply({ content: text.slice(0, 3900), ephemeral: true });
+    return;
+  }
+
+  if (interaction.commandName === "embed") {
+    if (!interaction.inGuild() || !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+      await interaction.reply({ content: "Нужны права Manage Server и серверный канал.", ephemeral: true });
+      return;
+    }
+
+    const title = interaction.options.getString("title");
+    const description = interaction.options.getString("description");
+    const url = interaction.options.getString("url");
+    const color = interaction.options.getString("color");
+    const footer = interaction.options.getString("footer");
+    const image = interaction.options.getString("image");
+    const thumbnail = interaction.options.getString("thumbnail");
+
+    if (!title && !description && !footer && !image && !thumbnail) {
+      await interaction.reply({ content: "Укажи хотя бы title, description, footer, image или thumbnail.", ephemeral: true });
+      return;
+    }
+    if (url && !/^https?:\\/\\//i.test(url)) {
+      await interaction.reply({ content: "URL должен начинаться с http:// или https://.", ephemeral: true });
+      return;
+    }
+    if (image && !/^https?:\\/\\//i.test(image)) {
+      await interaction.reply({ content: "Image URL должен начинаться с http:// или https://.", ephemeral: true });
+      return;
+    }
+    if (thumbnail && !/^https?:\\/\\//i.test(thumbnail)) {
+      await interaction.reply({ content: "Thumbnail URL должен начинаться с http:// или https://.", ephemeral: true });
+      return;
+    }
+
+    const embed = new EmbedBuilder();
+    if (title) embed.setTitle(title);
+    if (description) embed.setDescription(description);
+    if (url) embed.setURL(url);
+    if (color) {
+      if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+        await interaction.reply({ content: "Color укажи в формате #RRGGBB.", ephemeral: true });
+        return;
+      }
+      embed.setColor(parseInt(color.slice(1), 16));
+    }
+    if (footer) embed.setFooter({ text: footer });
+    if (image) embed.setImage(image);
+    if (thumbnail) embed.setThumbnail(thumbnail);
+
+    if (!interaction.channel || !interaction.channel.isTextBased() || !("send" in interaction.channel)) {
+      await interaction.reply({ content: "Текущий канал не поддерживает отправку сообщений.", ephemeral: true });
+      return;
+    }
+
+    await interaction.channel.send({ embeds: [embed] });
+    await interaction.reply({ content: "✅ Embed опубликован.", ephemeral: true });
     return;
   }
 
