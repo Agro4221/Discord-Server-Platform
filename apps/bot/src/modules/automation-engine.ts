@@ -134,7 +134,12 @@ export class AutomationEngine implements PlatformModule {
     const optionalChannel = [...message.mentions.channels.values()][1] ?? null;
     const matchToken = args.find((token) => token.startsWith("--match="));
     const response = args
-      .filter((token) => token !== matchToken && !/^--channel=<#\d{15,25}>$/.test(token) && !/^--channel=\d{15,25}$/.test(token))
+      .filter((token) =>
+        token !== matchToken &&
+        !/^<#\d{15,25}>$/.test(token) &&
+        !/^--channel=<#\d{15,25}>$/.test(token) &&
+        !/^--channel=\d{15,25}$/.test(token)
+      )
       .join(" ")
       .trim();
 
