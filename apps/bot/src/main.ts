@@ -287,7 +287,10 @@ async function main(): Promise<void> {
           enabled: input.enabled
         }
       ),
-      delete: async (guildId, ruleId) => automation.deleteRule(guildId, ruleId)
+      delete: async (guildId, ruleId) => automation.deleteRule(guildId, ruleId),
+      listTemplates: async (guildId) => automation.listTemplates(guildId),
+      setTemplate: async (guildId, name, content) => automation.setTemplate(guildId, name, content),
+      deleteTemplate: async (guildId, name) => automation.deleteTemplate(guildId, name)
     },
     rolePanels: {
       list: async (guildId) => rolePanels.list(guildId),
