@@ -121,7 +121,7 @@
 | Reddit / TikTok / Kick adapters | 🟡 |
 | GitHub notifications | ✅ | `/feed github` для releases и commits через существующий RSS/Atom worker |
 | Twitch / YouTube / VK stream alerts | ✅ | Dashboard + persistent polling |
-| Kick stream alerts | ✅ | Kick OAuth client-credentials + public channel API |
+| Kick stream alerts | 🟡 | Реализовано, но интеграция сознательно не является приоритетом следующего Music/Discord инкремента |
 | Secure feed validation / SSRF protection | ✅ |
 
 ## Music
@@ -132,7 +132,7 @@
 |---|---|
 | YouTube playback | ✅ |
 | Queue persistence | ✅ |
-| Playlist loading | ✅, Music v2: до 500 треков за запрос |
+| Playlist loading до 500 треков | ✅ |
 | Pause / resume / skip / stop | ✅ |
 | Shuffle | ✅ |
 | Repeat off / track / queue | ✅ |
@@ -140,49 +140,137 @@
 | Seek | ✅ |
 | Volume | ✅ |
 | Now Playing | ✅ |
-| Emoji controller | ✅, Music v2 |
-| Dedicated request/controller channel | ✅, Music v2 |
+| Persistent player/controller message | ✅ |
+| Emoji-based player controls + emoji labels | ✅ | Controller actions use emojis; visual labels must remain compact and understandable |
+| Dedicated request/controller channel | ✅ |
 | Per-voice bot identity routing | ✅ |
 | Lavalink node health / reconnect | ✅ |
+| Multi-node failover fallback | ✅ | Built-in autoMove + explicit migration fallback; live outage drill remains release validation |
 
-### Provider expansion
+### Mandatory next Music roadmap
 
-LavaSrc уже подключён. Следующий этап — включать и проверять провайдеры по одному, не ломая YouTube-only default:
+Это приоритетный продуктовый backlog. Эти функции должны развивать существующий Music v2, а не заменяться новыми интеграциями ради количества галочек.
+
+#### Search / queue UX
+
+| Функция | План |
+|---|---|
+| Multi-result search picker | 🟡 | Search returns several candidates with buttons/select instead of silently choosing the first result |
+| Queue remove by track | 🟡 |
+| Queue remove by range | 🟡 |
+| Queue move/reorder | 🟡 |
+| Queue insert / add to front | 🟡 |
+| Skip-to track | 🟡 |
+| Clear queue without destroying player | 🟡 |
+| Queue history / recently played | 🟡 |
+| Show requester per queued track | 🟡 |
+| Queue export / share | 🟡 |
+| Save current queue as playlist | 🟡 |
+| Load playlist with optional shuffle | 🟡 |
+
+#### Player / controller
+
+| Функция | План |
+|---|---|
+| Emoji-only compact controls where appropriate | 🟡 |
+| Explicit **Loop One / Зациклить трек** button | 🟡 | Separate controller button; must clearly distinguish from queue repeat |
+| Visual progress / elapsed time in controller | 🟡 |
+| Previous / rewind / forward controls | ✅ |
+| Queue / lyrics / favorite controls | ✅ |
+| Filters / FX quick-access button | 🟡 |
+| Save queue button | 🟡 |
+| Radio/autoplay button | 🟡 |
+| Controller state refresh after every action | 🟡 |
+
+#### DJ / permissions / anti-abuse
+
+| Функция | План |
+|---|---|
+| Separate permissions for play / skip / stop / seek / volume / filters | 🟡 |
+| Separate queue add / remove / move permissions | 🟡 |
+| DJ role policy | ✅ |
+| Vote skip | 🟡 |
+| Per-user request cooldown | 🟡 |
+| Per-user queued-track limit | 🟡 |
+| Fair queue / requester rotation | 🟡 |
+| Max guild queue size | 🟡 |
+| Optional approval/moderation mode for requests | 🟡 |
+
+#### Playlists / saved state
+
+| Функция | План |
+|---|---|
+| Favorites | ✅ |
+| Personal saved playlists | ✅ |
+| Server/shared playlists | 🟡 |
+| Playlist add/remove/reorder individual tracks | 🟡 |
+| Import playlists from supported URLs | 🟡 |
+| Save queue as playlist | 🟡 |
+| Play favorites / play playlist shortcuts | 🟡 |
+| Playlist pagination and richer management UI | 🟡 |
+
+#### Audio effects
+
+| Функция | План |
+|---|---|
+| EQ presets | ✅ |
+| Bassboost / Rock / Pop / Classic / Electronic / FullSound / Gaming | ✅ |
+| Nightcore | ✅ |
+| 8D rotation | ✅ |
+| Karaoke | 🟡 |
+| Pitch control | 🟡 |
+| Speed control | 🟡 |
+| Tremolo / rotation / other Lavalink effects | 🟡 |
+| Custom EQ editor | 🟡 |
+| Named effect profiles | 🟡 | e.g. Gaming / Anime / Chill / Party |
+| Persist and restore effect state | 🟡 |
+
+#### Autoplay / radio
+
+| Функция | План |
+|---|---|
+| Current simple autoplay | ✅ |
+| Duplicate/recent-track avoidance | 🟡 |
+| Artist-aware / similar-track autoplay | 🟡 |
+| Radio mode by artist/genre/search seed | 🟡 |
+| Playlist continuation after queue end | 🟡 |
+| Autoplay profile/settings in Dashboard | 🟡 |
+
+#### Lyrics
+
+| Функция | План |
+|---|---|
+| Current-track lyrics lookup | ✅ |
+| Paginated lyrics UI | 🟡 |
+| Lyrics navigation buttons | 🟡 |
+| Synced lyrics when source provides timing | 🟡 |
+| Lyrics source/status diagnostics | 🟡 |
+
+### Music provider expansion
+
+Другие музыкальные источники — **обязательная часть Music roadmap**, а не случайные отдельные интеграции. Нельзя ломать работающий YouTube default ради provider expansion.
 
 | Источник | План |
 |---|---|
+| YouTube / YouTube Music | ✅ |
+| SoundCloud | ✅ |
 | Spotify | 🟡 |
 | Apple Music | 🟡 |
 | Deezer | 🟡 |
-| Yandex Music | 🟡 |
+| **Yandex Music** | 🟡 |
 | VK Music | 🟡 |
 | Tidal | 🟡 |
 | Qobuz | 🟡 |
 | yt-dlp | 🟡 |
 | JioSaavn | 🟡 |
-| SoundCloud | ✅ |
 
-Важно: часть сервисов используется как metadata/search source и зеркалирование в другой источник, а часть умеет прямое воспроизведение. Это зависит от LavaSrc/source manager и конкретной конфигурации.
+Важно: часть сервисов может использоваться как metadata/search/mirror источник, а часть — как прямой audio source. Реальную поддержку проверяем по конкретному LavaSrc/source adapter и credentials; не считаем provider готовым только потому, что он появился в списке конфигурации.
 
-### Music UX
+### Music product principle
 
-| Функция | План |
-|---|---|
-| Message → play by text/URL | ✅, Music v2 |
-| Persistent player message | ✅ |
-| Buttons: pause / skip / shuffle / repeat / stop | ✅, Music v2 |
-| Buttons: volume / queue | ✅, Music v2 |
-| Queue pagination | ✅ |
-| Previous track | ✅ |
-| Interactive seek | ✅ |
-| Saved playlists | ✅ |
-| Favorites | ✅ |
-| Per-user queue permissions | ✅ | `everyone` / `dj` policy enforced for queue requests
-| DJ role policy | ✅ |
-| Lyrics | ✅ | LavaLyrics plugin + current-track lookup
-| Filters / equalizer / 8D / nightcore / bassboost | ✅ |
-| 24/7 mode | ✅ |
-| Multi-node failover validation | ✅ | Built-in autoMove plus explicit fallback migration on node disconnect/destroy; live outage drill remains release validation |
+Music должен стремиться к функциональности сильных платных музыкальных ботов без искусственного Premium wall: расширенное управление очередью, DJ permissions, vote-skip, полноценный controller, loop-one, фильтры, autoplay/radio, lyrics, saved/shared playlists, fairness/anti-spam и широкая поддержка музыкальных источников относятся к общему продукту.
+
+Новые музыкальные функции должны проходить через общие permissions, persistence, audit/diagnostics и Dashboard contract.
 
 ## Dashboard
 
@@ -233,11 +321,12 @@ LavaSrc уже подключён. Следующий этап — включа�
 
 1. **Music v2 foundation** — текущий инкремент.
 2. **Moderation / roles / tickets / automation depth** — текущий рабочий инкремент.
-3. **Music provider validation** — Spotify/Apple/Deezer/Yandex/VK/Tidal/Qobuz, затем остальные.
-4. **Music saved state** — favorites/playlists/queue pagination/lyrics/filters.
-5. **Community expansion** — polls/suggestions, birthdays, invites, counters, richer embeds.
-6. **Notifications / analytics expansion**.
-7. **Full E2E / chaos / soak / clean-host validation**.
-8. **Stable release**.
+3. **Music advanced UX** — search picker, queue management, detailed DJ permissions, vote-skip/fair queue, controller overhaul и loop-one.
+4. **Music provider expansion** — Spotify/Apple/Deezer/**Yandex Music**/VK/Tidal/Qobuz, затем остальные.
+5. **Music saved state / effects / autoplay 2.0** — shared playlists, save queue, custom effects, radio, improved autoplay and lyrics.
+6. **Community expansion** — polls/suggestions, birthdays, invites, counters, richer embeds.
+7. **Notifications / analytics expansion**.
+8. **Full E2E / chaos / soak / clean-host validation**.
+9. **Stable release**.
 
 Основное правило: уже работающие функции не переписываем ради красивой архитектуры. Новая функциональность должна проходить через общие permissions, persistence, audit и Dashboard contract.
