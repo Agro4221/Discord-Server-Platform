@@ -835,6 +835,13 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .addSubcommand((sub) => sub.setName("previous").setDescription("Play previous track"))
       .addSubcommand((sub) => sub.setName("lyrics").setDescription("Show lyrics for the current track"))
       .addSubcommand((sub) => sub.setName("skip").setDescription("Skip current track"))
+      .addSubcommand((sub) =>
+        sub
+          .setName("skip-to")
+          .setDescription("Skip to a queued track")
+          .addIntegerOption((o) => o.setName("position").setDescription("Queue position").setMinValue(1).setMaxValue(500).setRequired(true))
+      )
+      .addSubcommand((sub) => sub.setName("history").setDescription("Show recently played tracks"))
       .addSubcommand((sub) => sub.setName("stop").setDescription("Stop and clear queue"))
       .addSubcommand((sub) => sub.setName("shuffle").setDescription("Shuffle the queue"))
       .addSubcommand((sub) =>
@@ -896,8 +903,6 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addIntegerOption((o) => o.setName("end").setDescription("End position for range remove").setMinValue(1).setMaxValue(500))
       )
       .addSubcommand((sub) => sub.setName("nowplaying").setDescription("Show current track"))
-      .addSubcommand((sub) => sub.setName("previous").setDescription("Play previous track"))
-      .addSubcommand((sub) => sub.setName("lyrics").setDescription("Show lyrics for the current track"))
       .addSubcommand((sub) =>
         sub
           .setName("volume")
