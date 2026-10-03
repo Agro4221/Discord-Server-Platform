@@ -32,9 +32,9 @@
 | Slowmode | ✅ |
 | Lock / unlock | ✅ |
 | Mod notes | ✅ |
-| Escalation rules | 🟡 |
+| Escalation rules | ✅ | Warning thresholds can trigger timeout/ban automatically |
 | Permission / role hierarchy diagnostics | ✅ |
-| Moderation dashboard | 🟡 |
+| Moderation dashboard | ✅ | Moderation operations + escalation rules in Control Center |
 
 ## AutoMod / Security
 
