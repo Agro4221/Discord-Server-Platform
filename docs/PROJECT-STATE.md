@@ -277,3 +277,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Dashboard shows rules/templates, delayed pending/processing/error/completed-24h counts, oldest pending job and recent job attempts/errors.
 - Diagnostics deliberately omit event payloads and action bodies; runtime execution remains unchanged.
 - Regression coverage was added for aggregation/status mapping.
+
+
+### 2026-10-04 — Welcome/goodbye image customization
+- Extended the existing Welcome module with optional HTTPS embed images for welcome and goodbye messages.
+- The same settings are available through Dashboard generic module settings and `/welcome setup`; configuration transfer preserves them.
+- URL normalization rejects malformed, non-HTTPS and oversized values; empty values disable the image.
+- Added migration 80 and regression tests; live Discord embed rendering remains part of the live release gate.
