@@ -7,6 +7,7 @@ import { AutomationPanel } from "./automation-panel";
 import { BackupPanel } from "./backup-panel";
 import { CommandPolicyPanel } from "./command-policy-panel";
 import { FleetPanel } from "./fleet-panel";
+import { EmbedBuilderPanel } from "./embed-builder-panel";
 import { GiveawaysPanel } from "./giveaways-panel";
 import { ModerationPanel } from "./moderation-panel";
 import { NotificationsPanel } from "./notifications-panel";
@@ -387,7 +388,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "roles", "giveaways", "analytics", "automation", "notifications"]);
+const PANEL_KEYS = new Set(["moderation", "embed", "roles", "giveaways", "analytics", "automation", "notifications"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1405,6 +1406,13 @@ function ModulePage(props: {
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Escalation rules" eyebrow="OPERATIONS" />
           <ModerationPanel guildId={props.guildId} onChanged={props.onAudit} />
+        </section>
+      )}
+
+      {props.module?.key === "embed" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Embed Builder" eyebrow="OPERATIONS" />
+          <EmbedBuilderPanel guildId={props.guildId} channels={props.resources.channels.filter((item) => item.type === 0)} onChanged={props.onAudit} />
         </section>
       )}
 
