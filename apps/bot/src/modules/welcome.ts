@@ -45,8 +45,11 @@ const defaultConfig: WelcomeConfig = {
 export class Welcome implements PlatformModule {
   readonly name = "welcome";
   private unsubscribe?: () => void;
+  private guildResolver?: (guildId: string) => import("discord.js").Guild | undefined;
 
-  constructor(private readonly db: Database) {}
+  constructor(private readonly db: Database, guildResolver?: (guildId: string) => import("discord.js").Guild | undefined) {
+    this.guildResolver = guildResolver;
+  }
 
   async init(context: ModuleContext): Promise<void> {
     const a = context.events.on("member.add", (member) => this.onJoin(member));
@@ -163,6 +166,39 @@ export class Welcome implements PlatformModule {
        ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=now()`,
       [guildId, next.enabled]
     );
+  }
+
+  async sendPreview(guildId: string): Promise<{ channelId: string; messageId: string }> {
+    const guild = this.clientGuild(guildId);
+    const config = await this.getConfig(guildId);
+    if (!config.enabled || !config.channelId) throw new Error("welcome_preview_not_configured");
+    const channel = guild.channels.cache.get(config.channelId);
+    if (!channel?.isTextBased() || !("send" in channel)) throw new Error("welcome_preview_channel_unavailable");
+
+    const content = renderTemplate(config.message, {
+      mention: "@preview-user",
+      user: "preview-user",
+      server: guild.name
+    });
+
+    if (config.embed) {
+      const embed = new EmbedBuilder()
+        .setTitle("Добро пожаловать на " + guild.name)
+        .setDescription(content)
+        .setFooter({ text: "Vexa Welcome preview — реальный участник не затронут" });
+      if (config.imageUrl) embed.setImage(config.imageUrl);
+      const message = await channel.send({ embeds: [embed] });
+      return { channelId: channel.id, messageId: message.id };
+    }
+
+    const message = await channel.send("🔎 Welcome preview\n" + content);
+    return { channelId: channel.id, messageId: message.id };
+  }
+
+  private clientGuild(guildId: string): import("discord.js").Guild {
+    const guild = this.lastGuilds.get(guildId);
+    if (!guild) throw new Error("guild_not_available");
+    return guild;
   }
 
   private async onJoin(member: GuildMember): Promise<void> {
