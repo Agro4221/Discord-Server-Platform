@@ -838,6 +838,29 @@ const migrations = [
     sql: q([
       "ALTER TABLE stream_alerts ADD COLUMN IF NOT EXISTS message_template text NOT NULL DEFAULT '{mention} 🔴 {platform}: **{title}** — {author} {url}';"
     ])
+  } ,
+  {
+    version: 52,
+    name: "birthdays",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS birthday_settings (",
+      "  guild_id text PRIMARY KEY,",
+      "  channel_id text,",
+      "  announcement_template text NOT NULL DEFAULT '🎂 С днём рождения, {user}!',",
+      "  last_run_date date,",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE TABLE IF NOT EXISTS birthdays (",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  month smallint NOT NULL CHECK(month BETWEEN 1 AND 12),",
+      "  day smallint NOT NULL CHECK(day BETWEEN 1 AND 31),",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,user_id)"
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_birthdays_date ON birthdays(guild_id,month,day);"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
