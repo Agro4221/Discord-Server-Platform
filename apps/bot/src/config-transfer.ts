@@ -265,7 +265,7 @@ export class ConfigTransferService {
         }
       }
 
-      const helpModule = data.modules.find((module) => module.key === "custom-commands" || module.key === "automation");
+      const helpModule = data.modules.find((module) => module.key === "automation");
       const helpPages = helpModule?.settings.help_pages;
       if (helpPages !== undefined && !Array.isArray(helpPages)) {
         throw new Error("invalid_help_pages");
