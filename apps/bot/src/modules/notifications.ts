@@ -145,7 +145,7 @@ export class Notifications implements PlatformModule {
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
     this.identityId = context.identityId;
-    this.unsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    this.unsubscribe = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     this.timer = setInterval(() => void this.pollAll(), 30_000);
     this.timer.unref();
   }
@@ -158,8 +158,8 @@ export class Notifications implements PlatformModule {
     this.client = undefined;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "feed") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "feed") return;
     if (!await moduleEnabled(this.db, interaction.guild!.id, "notifications", false)) {
       await interaction.reply({ content: "Модуль Notifications выключен.", ephemeral: true });
       return;

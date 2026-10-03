@@ -47,7 +47,7 @@ export class Security implements PlatformModule {
     this.incidentTimer = setInterval(() => void this.sweepIncidents(), 15_000);
     this.incidentTimer.unref();
     const a = context.events.on("member.add", (member) => this.onJoin(member));
-    const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const b = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     const c = context.events.on("channel.delete", (channel) => this.onDestructive(channel.guildId, "channel.delete"));
     const d = context.events.on("role.delete", (role) => this.onDestructive(role.guild.id, "role.delete"));
     const e = context.events.on("member.ban", ({ guildId, userId }) => this.onDestructive(guildId, "member.ban", userId));
@@ -394,8 +394,8 @@ export class Security implements PlatformModule {
     );
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "security") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "security") return;
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
       await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
       return;

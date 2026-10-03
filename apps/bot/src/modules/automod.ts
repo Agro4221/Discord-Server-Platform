@@ -56,7 +56,7 @@ export class AutoMod implements PlatformModule {
     this.auditLog = context.auditLog;
     this.events = context.events;
     const a = context.events.on("message.create", (message) => this.inspect(message));
-    const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const b = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     this.unsubscribe = () => { a(); b(); };
   }
 
@@ -109,8 +109,8 @@ export class AutoMod implements PlatformModule {
     this.events = undefined;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "automod") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "automod") return;
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
       await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
       return;

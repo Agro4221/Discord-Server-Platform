@@ -31,7 +31,7 @@ export class Starboard implements PlatformModule {
       this.onReaction(reaction, user)
     );
     const b = context.events.on("interaction.command", (interaction) =>
-      this.onCommand(interaction)
+      this.executeSlashCommand(interaction)
     );
 
     this.unsubscribe = () => {
@@ -67,8 +67,8 @@ export class Starboard implements PlatformModule {
     this.unsubscribe = undefined;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "starboard") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "starboard") return;
 
     if (!interaction.memberPermissions?.has("ManageGuild")) {
       await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });

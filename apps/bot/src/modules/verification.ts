@@ -23,7 +23,7 @@ export class Verification implements PlatformModule {
 
   async init(context: ModuleContext): Promise<void> {
     const a = context.events.on("member.add", (member) => this.onJoin(member));
-    const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const b = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     const c = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
     this.unsubscribe = () => { a(); b(); c(); };
   }
@@ -139,8 +139,8 @@ export class Verification implements PlatformModule {
     );
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "verify") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "verify") return;
     const sub = interaction.options.getSubcommand();
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
       await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });

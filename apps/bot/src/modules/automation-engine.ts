@@ -59,7 +59,7 @@ export class AutomationEngine implements PlatformModule {
     await this.reload();
 
     const unsubs = [
-      context.events.on("interaction.command", (interaction) => this.onCommand(interaction)),
+      context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction)),
       context.events.on("member.add", (member) =>
         this.execute({
           type: "member.join",
@@ -236,8 +236,8 @@ export class AutomationEngine implements PlatformModule {
     this.client = undefined;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "automation") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "automation") return;
 
     if (!interaction.memberPermissions?.has("ManageGuild")) {
       await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
