@@ -361,7 +361,11 @@ export class AutomationEngine implements PlatformModule {
           output.push({ type: action.type, preview: "delete-message → " + action.channelId + "/" + action.messageId });
           break;
         case "set-nickname":
-          output.push({ type: action.type, preview: "set-nickname → " + action.userId + ": " + (action.nickname ?? "(reset)") });
+          output.push({
+            type: action.type,
+            preview: "set-nickname → " + action.userId + ": " +
+              (action.nickname === null ? "(reset)" : await this.renderTemplate(event.guildId, action.nickname, event))
+          });
           break;
         case "react-message":
           output.push({ type: action.type, preview: "react-message → " + action.channelId + "/" + action.messageId + " with " + action.emoji });
