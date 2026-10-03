@@ -305,10 +305,10 @@ export class AutoMod implements PlatformModule {
     const config = await this.getConfig(message.guild.id);
     if (!config.enabled) return;
 
-    const exemptChannels = new Set(config.exemptChannelIds.split(/[\\s,\\n]+/).map((id) => id.trim()).filter(Boolean));
+    const exemptChannels = new Set(config.exemptChannelIds.split(/[\s,\n]+/).map((id) => id.trim()).filter(Boolean));
     if (exemptChannels.has(message.channelId)) return;
 
-    const exemptRoles = new Set(config.exemptRoleIds.split(/[\\s,\\n]+/).map((id) => id.trim()).filter(Boolean));
+    const exemptRoles = new Set(config.exemptRoleIds.split(/[\s,\n]+/).map((id) => id.trim()).filter(Boolean));
     if (message.member && [...exemptRoles].some((roleId) => message.member!.roles.cache.has(roleId))) return;
 
     const content = message.content;
@@ -370,8 +370,14 @@ export class AutoMod implements PlatformModule {
         message.member?.permissions.has(PermissionFlagsBits.ManageMessages)
       ) continue;
 
+      const normalizedRule = {
+        detector: rule.detector,
+        threshold: rule.threshold === null ? null : Number(rule.threshold),
+        windowSeconds: rule.window_seconds
+      };
+
       if (!detectorMatches(
-        rule,
+        normalizedRule,
         message,
         recent.map((item) => item.content),
         config
@@ -379,7 +385,12 @@ export class AutoMod implements PlatformModule {
         continue;
       }
 
-      await this.applyRule(message, rule);
+      await this.applyRule(message, {
+        detector: rule.detector,
+        action: rule.action,
+        timeoutMinutes: rule.timeout_minutes,
+        messageTemplate: rule.message_template
+      });
       return;
     }
 
@@ -626,6 +637,7 @@ function detectorMatches(
     case "mention-count":
       return (message.mentions.users.size + message.mentions.roles.size) > Number(rule.threshold ?? 6);
     case "emoji-count":
+    case "emotes":
       return ((content.match(/<a?:\w+:\d+>|\p{Extended_Pictographic}/gu) ?? []).length) > Number(rule.threshold ?? 20);
     case "line-length":
       return Math.max(0,...content.split(/\r?\n/).map((line) => line.length)) > Number(rule.threshold ?? 1000);
