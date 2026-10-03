@@ -20,6 +20,7 @@ import type { Starboard } from "./modules/starboard.js";
 import type { CommunityTools } from "./modules/community-tools.js";
 import type { Verification } from "./modules/verification.js";
 import type { Security } from "./modules/security.js";
+import type { TemporaryVoice } from "./modules/temporary-voice.js";
 import { CommandPolicyService, COMMAND_DEFINITIONS } from "./command-policy.js";
 import type { StreamAlertPlatform } from "./modules/stream-alerts.js";
 import { BotIdentityRepository } from "./bot-identity.js";
