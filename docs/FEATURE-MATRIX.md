@@ -453,8 +453,8 @@ Music должен стремиться к функциональности си
 | GitHub feeds | ✅ |
 | Secure feed validation / SSRF protection | ✅ |
 | Additional social feeds | 🟡 |
-| Per-feed filters / keywords | 🟡 |
-| Rich notification templates / embeds | 🟡 |
+| Per-feed filters / keywords | ✅ | Include/exclude title keyword filters with bounded persisted lists and Dashboard controls |
+| Rich notification templates / embeds | ✅ | Persisted feed templates support {title}, {url} and {timestamp}; embed composer remains outside this increment |
 | Multiple credentials/providers per guild | 🟡 |
 | Integration test/diagnostics UI | 🟡 |
 
