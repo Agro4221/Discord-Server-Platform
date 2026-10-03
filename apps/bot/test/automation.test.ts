@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AutomationEngine, validateAutomationRule } from "../src/modules/automation-engine.js";
+import { AutomationEngine, automationRetryDelaySeconds, validateAutomationRule } from "../src/modules/automation-engine.js";
 
 test("Automation conditional branches validate nested actions and depth", () => {
   assert.doesNotThrow(() => validateAutomationRule(
@@ -122,6 +122,7 @@ test("Automation diagnostics expose safe rule and delayed-job health", async () 
             pending: "2",
             processing: "1",
             with_errors: "1",
+            dead_lettered: "1",
             completed_24h: "4",
             oldest_pending_at: "2026-10-04T00:00:00.000Z"
           }]
@@ -136,6 +137,7 @@ test("Automation diagnostics expose safe rule and delayed-job health", async () 
             available_at: "2026-10-04T00:00:00.000Z",
             processing_until: new Date(Date.now() + 60_000).toISOString(),
             last_error: "provider failed",
+            dead_lettered_at: null,
             completed_at: null,
             created_at: "2026-10-04T00:00:00.000Z"
           }, {
@@ -145,7 +147,8 @@ test("Automation diagnostics expose safe rule and delayed-job health", async () 
             available_at: "2026-10-03T23:00:00.000Z",
             processing_until: null,
             last_error: null,
-            completed_at: "2026-10-04T00:30:00.000Z",
+            dead_lettered_at: "2026-10-04T00:30:00.000Z",
+            completed_at: null,
             created_at: "2026-10-03T23:00:00.000Z"
           }]
         };
@@ -171,6 +174,13 @@ test("Automation diagnostics expose safe rule and delayed-job health", async () 
   assert.equal(diagnostics.delayedJobs.recent[0]?.status, "processing");
   assert.equal(diagnostics.delayedJobs.recent[0]?.attempts, 3);
   assert.equal(diagnostics.delayedJobs.recent[0]?.lastError, "provider failed");
+  assert.equal(diagnostics.delayedJobs.recent[1]?.status, "dead-lettered");
   assert.equal(diagnostics.runtime.loadedRules, 0);
 });
 
+test("Automation retry backoff is bounded and dead-letters after five attempts", () => {
+  assert.equal(automationRetryDelaySeconds(1), 5);
+  assert.equal(automationRetryDelaySeconds(2), 10);
+  assert.equal(automationRetryDelaySeconds(5), 80);
+  assert.equal(automationRetryDelaySeconds(20), 300);
+});
