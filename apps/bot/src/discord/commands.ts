@@ -724,7 +724,7 @@ export async function handleCommand(
   db: Database,
   temporaryVoice: TemporaryVoice,
   moderation: Moderation,
-  commandName = commandName
+  commandName = interaction.commandName
 ): Promise<void> {
   if (commandName === "help") {
     const rows = await db.query<{ command_name: string; help_visible: boolean }>(
