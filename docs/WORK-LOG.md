@@ -249,3 +249,15 @@ Never write credentials, tokens or private user data here.
 - Product principle: reproduce useful premium-grade functionality as common self-hosted features without an artificial Premium wall; do not optimize for provider count or turn the project into a music-only bot.
 - This correction is based on the current project direction and public competitor feature documentation, not on copying proprietary code or closed implementation details.
 - Commits for this correction: `b2770f1c`, `d2ff12a7`.
+
+
+## 2026-10-03 — Premium benchmark broadened across the Discord bot ecosystem
+- Corrected the benchmark methodology: the project must not optimize against Carl-bot alone or treat one bot's Premium catalog as the definition of parity.
+- `docs/FEATURE-MATRIX.md` now records a multi-bot benchmark set spanning MEE6, JuniperBot, ProBot, Dyno and Jockie Music, plus specialized bots where a focused module has deeper capabilities.
+- MEE6 is used as a reference for broad plugin coverage including automations, moderator, custom commands, welcome/goodbye, levels, economy, giveaways, polls, invite tracking, reaction roles, social alerts, AI and Bot Maker. citeturn368099search1turn368099search17turn368099search11
+- JuniperBot is used as a reference for deep AutoMod filters/exemptions/templates, custom commands/message templates, ranking, subscriptions, audit/logging, welcome/role restore and forms/components. citeturn510043search0turn510043search2turn510043search5
+- ProBot is used as a reference for protection/anti-raid, logging, variables, autoroles/self-roles, starboard, server statistics, Twitch/YouTube notifications and custom-bot capabilities. citeturn410738search3turn410738search6
+- Dyno is used as a reference for configurable AutoMod, custom commands, autoresponders, automessages, autodelete, forms, tickets, giveaways, reaction roles, embedder, feeds, AFK and larger/expanded module limits. citeturn410738search0turn410738search4turn410738search1
+- Jockie Music is used specifically for advanced music architecture: multiple dedicated music bots, deep queue/collection handling, permission/session ownership, Spotify/Apple Music support, large collections and 24/7 behavior. citeturn410738search2turn410738search7
+- Product principle: combine the strongest useful capabilities across these ecosystems while keeping one coherent permission/persistence/audit/Dashboard architecture. Premium parity means broad and deep functionality, not reproducing any single vendor's monetization model or copying proprietary code.
+- Documentation commit for the broadened benchmark: `3569375679263c235be134696174146dec0e32e8`.
