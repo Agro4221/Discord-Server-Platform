@@ -23,7 +23,7 @@ Release candidate — code/CI verified, ready for live Discord validation.
 - Role Panels with role hierarchy/tamper checks and Dashboard CRUD/publishing editor.
 - Giveaways with durable entries, scheduled finishing, Dashboard history/end/reroll operations.
 - Economy with daily/pay/leaderboard, shop and transaction ledger.
-- Reminders with retry/lease semantics.
+- Reminders with retry/lease semantics, sticky messages and persistent AFK/away state.
 - Starboard.
 - Automation engine with persisted rules/cooldowns and a constrained Dashboard builder.
 - Security/Anti-Raid and destructive burst detection.
