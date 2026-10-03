@@ -10,6 +10,9 @@ type Feed = {
   enabled: boolean;
   intervalSeconds: number;
   lastPolledAt: string | null;
+  messageTemplate: string;
+  includeKeywords: string[];
+  excludeKeywords: string[];
 };
 
 export function NotificationsPanel({
@@ -25,6 +28,9 @@ export function NotificationsPanel({
   const [url, setUrl] = useState("");
   const [channelId, setChannelId] = useState("");
   const [interval, setInterval] = useState(300);
+  const [messageTemplate, setMessageTemplate] = useState("📡 **Новая запись из feed**\\n**{title}**\\n{url}");
+  const [includeKeywords, setIncludeKeywords] = useState("");
+  const [excludeKeywords, setExcludeKeywords] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -51,7 +57,14 @@ export function NotificationsPanel({
       const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/feeds", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: url.trim(), channelId, intervalSeconds: interval })
+        body: JSON.stringify({
+          url: url.trim(),
+          channelId,
+          intervalSeconds: interval,
+          messageTemplate,
+          includeKeywords: includeKeywords.split(",").map((value) => value.trim()).filter(Boolean),
+          excludeKeywords: excludeKeywords.split(",").map((value) => value.trim()).filter(Boolean)
+        })
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? "feed_create_failed");
@@ -109,7 +122,9 @@ export function NotificationsPanel({
 
       {error && <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d" }}>{error}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(180px,1fr) 140px auto", gap: 8 }}>
+      <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(180px,1fr) 140px auto", gap: 8 }}>
+
         <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/feed.xml" style={inputStyle} />
         <select value={channelId} onChange={(e) => setChannelId(e.target.value)} style={inputStyle}>
           <option value="">Канал назначения</option>
@@ -117,6 +132,12 @@ export function NotificationsPanel({
         </select>
         <input type="number" min={60} max={86400} value={interval} onChange={(e) => setInterval(Number(e.target.value))} style={inputStyle} />
         <button type="button" disabled={busy} onClick={() => void create()} style={buttonStyle("primary")}>Добавить</button>
+        </div>
+        <input value={messageTemplate} maxLength={1800} onChange={(e) => setMessageTemplate(e.target.value)} placeholder="Template: {title} {url} {timestamp}" style={inputStyle} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <input value={includeKeywords} onChange={(e) => setIncludeKeywords(e.target.value)} placeholder="Include keywords, через запятую" style={inputStyle} />
+          <input value={excludeKeywords} onChange={(e) => setExcludeKeywords(e.target.value)} placeholder="Exclude keywords, через запятую" style={inputStyle} />
+        </div>
       </div>
 
       {feeds.length === 0 ? (
@@ -126,7 +147,7 @@ export function NotificationsPanel({
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{feed.url}</div>
             <div style={{ marginTop: 4, fontSize: 11, opacity: 0.42 }}>
-              #{feed.channelId} · {feed.intervalSeconds}s · {feed.lastPolledAt ? "checked " + new Date(feed.lastPolledAt).toLocaleString() : "not checked"}
+              #{feed.channelId} · {feed.intervalSeconds}s · {feed.includeKeywords.length ? "include: " + feed.includeKeywords.join("|") + " · " : ""}{feed.excludeKeywords.length ? "exclude: " + feed.excludeKeywords.join("|") + " · " : ""}{feed.lastPolledAt ? "checked " + new Date(feed.lastPolledAt).toLocaleString() : "not checked"}
             </div>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
