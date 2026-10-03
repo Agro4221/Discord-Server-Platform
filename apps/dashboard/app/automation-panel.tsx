@@ -692,7 +692,7 @@ export function AutomationPanel({
             {action.type === "set-nickname" && (
               <div style={actionGrid}>
                 <input value={action.userId} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event или user ID" style={inputStyle} />
-                <input value={action.nickname ?? ""} maxLength={32} onChange={(e) => updateAction(index, { nickname: e.target.value })} placeholder="Никнейм; пусто = сброс" style={inputStyle} />
+                <input value={action.nickname ?? ""} maxLength={32} onChange={(e) => updateAction(index, { nickname: e.target.value || null })} placeholder="Никнейм; пусто = сброс" style={inputStyle} />
               </div>
             )}
 
