@@ -11,6 +11,7 @@ import { EmbedBuilderPanel } from "./embed-builder-panel";
 import { GiveawaysPanel } from "./giveaways-panel";
 import { ModerationPanel } from "./moderation-panel";
 import { NotificationsPanel } from "./notifications-panel";
+import { StreamAlertsPanel } from "./stream-alerts-panel";
 import { RolePanelsEditor } from "./role-panels-editor";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
@@ -312,13 +313,14 @@ const MODULE_META: Record<string, ModuleMeta> = {
     icon: "◬",
     accent: "#74c8dc",
     title: "Уведомления",
-    summary: "RSS/Atom feeds с безопасной сетевой проверкой.",
+    summary: "RSS/Atom feeds и live stream alerts.",
     category: "integrations",
-    commands: ["/feed add"],
+    commands: ["/feed add", "/feed github", "/streamalert create"],
     functions: [
       { title: "RSS / Atom", description: "Периодический polling внешнего HTTPS feed." },
-      { title: "SSRF protection", description: "Блокировка private, mapped и loopback адресов." },
-      { title: "Cursor safety", description: "Курсор обновляется только после успешной доставки." }
+      { title: "Stream alerts", description: "Twitch, YouTube, VK Видео Live и Kick с шаблонами и persistent состоянием." },
+      { title: "SSRF protection", description: "Блокировка private, mapped и loopback адресов для внешних feed URL." },
+      { title: "Cursor safety", description: "Курсор обновляется только после успешной доставки feed-сообщения." }
     ],
     kind: "full"
   },
@@ -1467,6 +1469,18 @@ function ModulePage(props: {
           <NotificationsPanel
             guildId={props.guildId}
             channels={props.resources.channels.filter((item) => item.type === 0)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "notifications" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Stream alerts" eyebrow="LIVE INTEGRATIONS" />
+          <StreamAlertsPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            roles={props.resources.roles.filter((item) => item.manageable !== false)}
             onChanged={props.onAudit}
           />
         </section>
