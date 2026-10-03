@@ -831,7 +831,6 @@ export class ManagementApiServer {
                         "minute","hour","dayOfWeek","dayOfMonth"
                       ].includes(key) && typeof value === "number" && Number.isFinite(value))
                       .slice(0, 20)
-                  )
                   ) as Record<string, number>
                 : {}
             });
