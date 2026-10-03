@@ -63,7 +63,11 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "verifiedRoleId", label: "Verified role", type: "role" },
       { key: "quarantineRoleId", label: "Quarantine role", type: "role" },
       { key: "logChannelId", label: "Канал логов", type: "channel" },
-      { key: "codeTtlMinutes", label: "Время действия кода, мин.", type: "number", min: 2, max: 60 }
+      { key: "codeTtlMinutes", label: "Время действия кода, мин.", type: "number", min: 2, max: 60 },
+      { key: "panelTitle", label: "Заголовок панели", type: "text", maxLength: 256 },
+      { key: "panelDescription", label: "Описание панели", type: "textarea" },
+      { key: "issueButtonLabel", label: "Кнопка получения кода", type: "text", maxLength: 80 },
+      { key: "confirmButtonLabel", label: "Кнопка подтверждения", type: "text", maxLength: 80 }
     ]
   },
   {
@@ -201,7 +205,11 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       verifiedRoleId: "verified_role_id",
       quarantineRoleId: "quarantine_role_id",
       logChannelId: "log_channel_id",
-      codeTtlMinutes: "code_ttl_minutes"
+      codeTtlMinutes: "code_ttl_minutes",
+      panelTitle: "panel_title",
+      panelDescription: "panel_description",
+      issueButtonLabel: "issue_button_label",
+      confirmButtonLabel: "confirm_button_label"
     }
   },
   welcome: {
