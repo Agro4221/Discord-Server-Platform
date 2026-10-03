@@ -1,4 +1,4 @@
-import type { Client, ChatInputCommandInteraction } from "discord.js";
+import type { Client, ChatInputCommandInteraction, Message } from "discord.js";
 import type { Database } from "./database.js";
 import type { TemporaryVoice } from "./modules/temporary-voice.js";
 import type { Moderation } from "./modules/moderation.js";
@@ -49,6 +49,70 @@ export class CommandDispatcher {
     private readonly music: Music,
     private readonly analytics: Analytics
   ) {}
+
+  async executePrefix(message: Message, target: string, args: string[]): Promise<boolean> {
+    if (!message.guild || message.author.bot) return false;
+    if (!await this.commandPolicy.checkMessage(message, target)) return true;
+
+    if (["history","clear","slowmode","lock","unlock","ban","unban","kick","timeout","warn"].includes(target)) {
+      if (target === "history") {
+        const selected = message.mentions.users.first() ?? message.author;
+        const cases = await this.moderation.history(message.guild.id, selected.id, 10);
+        const lines = cases.map((item) => "#" + item.id + " · " + item.action + " · " + (item.reason ?? "Без причины"));
+        await message.reply(lines.length
+          ? "📋 Moderation history for <@" + selected.id + ">\n" + lines.join("\n")
+          : "История модерации пуста.");
+        return true;
+      }
+      if (["ban","unban","kick","timeout","warn"].includes(target)) {
+        await this.handleModeration(message, target, args);
+        return true;
+      }
+      if (target === "clear") {
+        await this.moderation.purgeFromMessage(message, Number(args[0] ?? ""));
+        return true;
+      }
+      if (target === "slowmode") {
+        await this.moderation.slowmodeFromMessage(message, Number(args[0] ?? ""));
+        return true;
+      }
+      if (target === "lock") {
+        await this.moderation.lockChannelFromMessage(message);
+        return true;
+      }
+      await this.moderation.unlockChannelFromMessage(message);
+      return true;
+    }
+
+    const executor = this.prefixExecutorFor(target);
+    if (!executor) return false;
+    return executor(message, target, args);
+  }
+
+  private prefixExecutorFor(
+    target: string
+  ): ((message: Message, commandName: string, args: string[]) => Promise<boolean>) | null {
+    if (["level","rank","top"].includes(target)) return (message, commandName, args) => this.leveling.handlePrefixCommand(message, commandName, args);
+    if (["economy","shop","balance","daily","leaderboard","pay","buy"].includes(target)) return (message, commandName, args) => this.economy.handlePrefixCommand(message, commandName, args);
+    if (target === "remind") return (message, commandName, args) => this.reminders.handlePrefixCommand(message, commandName, args);
+    if (["serverinfo","userinfo","avatar","membercount","roleinfo","channelinfo","afk"].includes(target)) return (message, commandName, args) => this.utility.handlePrefixCommand(message, commandName, args);
+    if (["poll","suggest","sticky","8ball","choose","roll"].includes(target)) return (message, commandName, args) => this.communityTools.handlePrefixCommand(message, commandName, args);
+    if (target === "logging") return (message, commandName, args) => this.logging.handlePrefixCommand(message, commandName, args);
+    if (target === "welcome") return (message, commandName, args) => this.welcome.handlePrefixCommand(message, commandName, args);
+    if (target === "verify") return (message, commandName, args) => this.verification.handlePrefixCommand(message, commandName, args);
+    if (target === "security") return (message, commandName, args) => this.security.handlePrefixCommand(message, commandName, args);
+    if (target === "automod") return (message, commandName, args) => this.autoMod.handlePrefixCommand(message, commandName, args);
+    if (target === "starboard") return (message, commandName, args) => this.starboard.handlePrefixCommand(message, commandName, args);
+    if (target === "feed") return (message, commandName, args) => this.notifications.handlePrefixCommand(message, commandName, args);
+    if (target === "automation") return (message, commandName, args) => this.automation.handlePrefixCommand(message, commandName, args);
+    if (target === "ticket") return (message, commandName) => this.tickets.handlePrefixCommand(message, commandName);
+    if (target === "roles") return (message, commandName, args) => this.rolePanels.handlePrefixCommand(message, commandName, args);
+    if (target === "giveaway") return (message, commandName, args) => this.giveaways.handlePrefixCommand(message, commandName, args);
+    if (["music","play","pause","resume","skip","stop","shuffle","playlist","queue","nowplaying","repeat","seek","volume","autoplay"].includes(target)) {
+      return (message, commandName, args) => this.music.handlePrefixCommand(message, commandName, args);
+    }
+    return null;
+  }
 
   async executeSlash(
     interaction: ChatInputCommandInteraction,
@@ -111,6 +175,83 @@ export class CommandDispatcher {
     }
     if (target === "analytics") return (interaction, commandName) => this.analytics.executeSlashCommand(interaction, commandName);
     return null;
+  }
+
+  private async handleModeration(message: Message, commandName: string, args: string[]): Promise<void> {
+    const targetId = message.mentions.users.first()?.id ?? args.find((token) => /^\d{15,25}$/.test(token));
+    if (!targetId) {
+      await message.reply("Укажи пользователя: @user или ID.");
+      return;
+    }
+    if (commandName === "unban") {
+      const reason = this.remainingArgs(args, targetId).join(" ").trim() || "Без причины";
+      await this.moderation.unbanFromMessage(message, targetId, reason);
+      return;
+    }
+    const member = await message.guild!.members.fetch(targetId).catch(() => null);
+    if (!member) {
+      await message.reply("Пользователь не найден среди участников сервера.");
+      return;
+    }
+    if (commandName === "warn" || commandName === "kick") {
+      const reason = this.stripFlags(this.remainingArgs(args, targetId)).join(" ").trim() || "Без причины";
+      if (commandName === "warn") await this.moderation.warnFromMessage(message, member.user, reason);
+      else await this.moderation.kickFromMessage(message, member, reason);
+      return;
+    }
+    const rawDuration = this.extractDuration(args) ?? (commandName === "timeout" ? this.firstPositionalDuration(args, targetId) : null);
+    const durationProvided = Boolean(rawDuration);
+    const durationMinutes = durationProvided ? parseDurationMinutes(rawDuration!) : null;
+    if (commandName === "timeout" && durationMinutes === null) {
+      await message.reply("Укажи срок timeout: 10m, 2h или 7d.");
+      return;
+    }
+    if (commandName === "ban" && durationProvided && durationMinutes === null) {
+      await message.reply("Некорректный срок бана. Пример: -t 10m, -t 2h или -t 7d.");
+      return;
+    }
+    const reason = this.stripFlags(this.removeDurationTokens(this.remainingArgs(args, targetId))).join(" ").trim() || "Без причины";
+    if (commandName === "timeout") {
+      if (durationMinutes === null) throw new Error("timeout_duration_required");
+      await this.moderation.timeoutFromMessage(message, member, durationMinutes, reason);
+    } else {
+      await this.moderation.banFromMessage(message, member, reason, durationMinutes ?? undefined);
+    }
+  }
+
+  private remainingArgs(args: string[], userId: string): string[] {
+    const mentionIndex = args.findIndex((token) => token.includes(userId));
+    if (mentionIndex >= 0) return args.slice(mentionIndex + 1);
+    return args.filter((token) => token !== userId);
+  }
+
+  private extractDuration(args: string[]): string | null {
+    for (let i = 0; i < args.length; i += 1) {
+      const token = args[i]!.toLowerCase();
+      if (token === "-t" || token === "--time") return args[i + 1] ?? null;
+      if (token.startsWith("-t=") || token.startsWith("--time=")) return token.split("=", 2)[1] ?? null;
+    }
+    return null;
+  }
+
+  private firstPositionalDuration(args: string[], userId: string): string | null {
+    return this.remainingArgs(args, userId).find((token) => /^\d+\s*(m|min|h|d|w)$/i.test(token)) ?? null;
+  }
+
+  private removeDurationTokens(args: string[]): string[] {
+    const output: string[] = [];
+    for (let i = 0; i < args.length; i += 1) {
+      const token = args[i]!.toLowerCase();
+      if (token === "-t" || token === "--time") { i += 1; continue; }
+      if (token.startsWith("-t=") || token.startsWith("--time=")) continue;
+      if (/^\d+\s*(m|min|h|d|w)$/i.test(token)) continue;
+      output.push(args[i]!);
+    }
+    return output;
+  }
+
+  private stripFlags(args: string[]): string[] {
+    return args.filter((token) => !token.startsWith("--") && token !== "-t");
   }
 
   private isCore(commandName: string): boolean {
