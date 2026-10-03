@@ -197,6 +197,11 @@ export function resolveIdentityEnv(identityId: string): { token: string; clientI
   return { token, clientId };
 }
 
+export function clampFailoverBatchLimit(value: number): number {
+  if (!Number.isFinite(value)) return 20;
+  return Math.min(Math.max(Math.trunc(value), 1), 100);
+}
+
 export function identityLabel(client: Client): string {
   return client.user?.tag ?? "unknown-bot";
 }
@@ -225,7 +230,7 @@ function isUniqueConstraint(error: unknown, constraint: string): boolean {
     );
     if (!identity.rows[0]?.enabled || !identity.rows[0].failover_enabled) return [];
 
-    const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+    const safeLimit = clampFailoverBatchLimit(limit);
     return this.db.transaction(async (client) => {
       const result = await client.query<{ guild_id: string }>(
         `WITH candidates AS (

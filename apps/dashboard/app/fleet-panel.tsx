@@ -171,7 +171,7 @@ export function FleetPanel({
       <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center" }}>
         <div>
           <div style={{ fontWeight: 700 }}>Bot Fleet</div>
-          <div style={{ marginTop: 3, opacity: 0.45, fontSize: 11 }}>Распределение guild и Music voice-каналов по отдельным bot-процессам.</div>
+          <div style={{ marginTop: 3, opacity: 0.45, fontSize: 11 }}>Распределение guild, Music voice-каналов и опциональный автоматический failover по heartbeat.</div>
         </div>
         <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
           <select value={selected} onChange={(event) => setSelected(event.target.value)} style={inputStyle}>
@@ -182,7 +182,7 @@ export function FleetPanel({
             ))}
           </select>
           <button type="button" disabled={busy || !selected} onClick={() => void assignGuild()} style={buttonStyle}>Назначить guild</button>
-          {selected && (
+          {selected && selected !== "primary" && (
             <button
               type="button"
               disabled={busy}
@@ -253,7 +253,7 @@ export function FleetPanel({
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
           {items.map((item) => (
             <span key={item.id} style={{ padding: "5px 8px", borderRadius: 999, border: "1px solid #2a2f3a", fontSize: 11, opacity: item.enabled ? 0.82 : 0.42 }}>
-              {item.id}: {item.status}{item.lastSeenAt ? " · " + new Date(item.lastSeenAt).toLocaleTimeString() : ""}
+              {item.id}: {item.status}{item.failoverEnabled ? " · failover" : ""}{item.lastSeenAt ? " · " + new Date(item.lastSeenAt).toLocaleTimeString() : ""}
             </span>
           ))}
         </div>

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveIdentityEnv } from "../src/bot-identity.js";
+import { clampFailoverBatchLimit, resolveIdentityEnv } from "../src/bot-identity.js";
 
 test("primary may use legacy Discord credentials", () => {
   const old = {
@@ -56,9 +56,10 @@ function restoreEnv(values: Record<string, string | undefined>): void {
     else process.env[key] = value;
   }
 }
-
-
-test("identity failover defaults are explicit and bounded by operator configuration", () => {
-  assert.equal(false, false);
-  assert.ok("failover");
+ 
+test("failover claim batch limit is bounded", () => {
+  assert.equal(clampFailoverBatchLimit(Number.NaN), 20);
+  assert.equal(clampFailoverBatchLimit(0), 1);
+  assert.equal(clampFailoverBatchLimit(20), 20);
+  assert.equal(clampFailoverBatchLimit(1000), 100);
 });

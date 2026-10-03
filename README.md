@@ -24,7 +24,10 @@ Self-hosted Discord server platform for administration, moderation, community fe
 - Notifications with HTTPS feed validation and SSRF protections.
 - Analytics with durable minute buckets and dashboard reporting.
 - Music/Lavalink foundation with persistent queue state.
-- Multi-bot identity persistence and per-voice Music routing.
+- Multi-bot identity persistence, per-voice Music routing and optional atomic guild failover.
+- Custom Commands with prefix/slash configuration, aliases, role actions and Dashboard CRUD.
+- Community Tools with polls, suggestions, sticky messages and fun commands.
+- Stream Alerts Dashboard operations for Twitch, YouTube and VK Video Live.
 - Config import/export and compressed local backups.
 - Docker Compose plus Dockerfiles for local-to-VPS topology.
 - Native Windows startup scripts for a low-overhead local runtime.
@@ -33,9 +36,9 @@ Self-hosted Discord server platform for administration, moderation, community fe
 
 | Area | Status | What is missing |
 |---|---|---|
-| AutoMod | 🟡 | Richer rule editor and response policies |
-| Security | 🟡 | Full quarantine/response workflow |
-| Automation | 🟡 | Wider condition/action catalog |
+| AutoMod | ✅ | Rule builder and persisted rule execution implemented; live Discord validation remains |
+| Security | ✅ | Persistent incident lifecycle, quarantine recovery and manual clear implemented; live validation remains |
+| Automation | ✅ | Expanded event catalog and bounded execution guard implemented; live validation remains |
 | Music | 🟡 | More providers and multi-node failover validation |
 | Multi-bot fleet | 🟡 | Full automated orchestration/failover |
 | E2E / chaos / soak | 🟡 | Full live and long-running validation |
