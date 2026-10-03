@@ -287,3 +287,9 @@ Never write credentials, tokens or private user data here.
 - Temporary Voice Control Center now shows active tracked rooms, owners and occupancy, and exposes manual reconciliation from the local Control Center.
 - Fixed the Dashboard JSX rendering of owner mentions; the production Dashboard build now passes.
 - Backend verification included **78/78 tests passing**, domain build and bot build.
+
+## 2026-10-04 — Welcome Control Center verified
+- CI run **#1256** (`37152023248`) passed on development head `b9d3ac96021adc3f5c45dd9c81c1a34c327beacd`.
+- Welcome now has a dedicated Control Center panel with Welcome/Goodbye template preview and test delivery to a selected or configured text channel.
+- Test delivery validates bot `ViewChannel`, `SendMessages` and `EmbedLinks` permissions and records `welcome.test.sent` in the audit log.
+- Preview/test placeholders use `@example-user`, so the test path does not ping a real member.

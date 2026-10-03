@@ -233,3 +233,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Development head `076a56031ca692f19b22fe98b7d91188c16a1541` passed CI run **#1253**.
 - Temporary Voice is now a full Control Center module plus Discord `/voice` room-control commands.
 - The local panel exposes active-room visibility and manual reconciliation; the runtime remains the source of truth for room ownership/state.
+
+## 2026-10-04 — Welcome Control Center verified
+- Development head `b9d3ac96021adc3f5c45dd9c81c1a34c327beacd` passed CI run **#1256**.
+- Welcome is now a full Control Center module while its Discord `/welcome setup` command remains the fallback/user-facing configuration path.

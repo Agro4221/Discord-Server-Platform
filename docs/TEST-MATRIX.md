@@ -140,3 +140,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - CI run **#1253** passed the full automated matrix, including bot typecheck, **78 passing tests**, domain/bot builds and Dashboard production build.
 - Slash command registration coverage includes the `/voice` owner-control subcommands and required option ordering.
 - Live Discord voice permissions, overwrites and member movement remain environment-dependent acceptance checks.
+
+## 2026-10-04 — Welcome Control Center verification
+- CI run **#1256** passed the full automated matrix, including bot typecheck/tests, domain and bot builds, and Dashboard production build.
+- Welcome test delivery is covered by the Management API/route type and build path; live Discord permission and message-delivery behavior remains environment-dependent acceptance.
