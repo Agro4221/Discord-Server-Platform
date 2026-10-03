@@ -9,6 +9,7 @@ import type { AppConfig } from "./config.js";
 import type { Database } from "./database.js";
 import type { ModuleContext, PlatformModule } from "./module.js";
 import { buildCommands } from "./discord/commands.js";
+import { moduleEnabled } from "./module-utils.js";
 import { logger } from "./logger.js";
 
 export type CustomCommandAction = "response" | "alias" | "add_role" | "remove_role" | "toggle_role";
@@ -83,6 +84,7 @@ export class CustomCommandService implements PlatformModule {
   }
 
   async findPrefix(guildId: string, name: string): Promise<CustomCommandRecord | null> {
+    if (!await moduleEnabled(this.db, guildId, "custom-commands", true)) return null;
     const normalized = normalizeName(name);
     const result = await this.db.query<Record<string, unknown>>(
       `SELECT id,guild_id,name,aliases,description,enabled,prefix_enabled,slash_enabled,
@@ -345,6 +347,7 @@ export class CustomCommandService implements PlatformModule {
   }
 
   private async findSlash(guildId: string, name: string): Promise<CustomCommandRecord | null> {
+    if (!await moduleEnabled(this.db, guildId, "custom-commands", true)) return null;
     const result = await this.db.query<Record<string, unknown>>(
       `SELECT id,guild_id,name,aliases,description,enabled,prefix_enabled,slash_enabled,
               action_type,response,alias_target,allowed_role_ids,allowed_channel_ids,

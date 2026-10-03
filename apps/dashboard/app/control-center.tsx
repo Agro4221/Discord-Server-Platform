@@ -10,6 +10,7 @@ import { FleetPanel } from "./fleet-panel";
 import { GiveawaysPanel } from "./giveaways-panel";
 import { NotificationsPanel } from "./notifications-panel";
 import { RolePanelsEditor } from "./role-panels-editor";
+import { CustomCommandsPanel } from "./custom-commands-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -304,6 +305,21 @@ const MODULE_META: Record<string, ModuleMeta> = {
     ],
     kind: "discord"
   },
+  "custom-commands": {
+    icon: "⌘",
+    accent: "#9cb6f4",
+    title: "Custom Commands",
+    summary: "Пользовательские команды, aliases, role actions и ограничения по каналам/ролям.",
+    category: "automation",
+    commands: ["custom commands", "prefix / slash"],
+    functions: [
+      { title: "Ответы", description: "Собственные команды с шаблонами {user}, {mention}, {server}, {channel}, {args}." },
+      { title: "Aliases", description: "Псевдонимы для существующих команд с единым доступом через prefix/slash." },
+      { title: "Role actions", description: "Выдача, снятие и toggle роли с проверкой иерархии." },
+      { title: "Ограничения", description: "Разрешённые роли, каналы и cooldown для каждой команды." }
+    ],
+    kind: "full"
+  },
   logging: {
     icon: "▤",
     accent: "#d3a4f0",
@@ -397,7 +413,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["roles", "giveaways", "analytics", "automation", "notifications"]);
+const PANEL_KEYS = new Set(["roles", "giveaways", "analytics", "automation", "notifications", "custom-commands"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1446,6 +1462,18 @@ function ModulePage(props: {
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Analytics" eyebrow="OPERATIONS" />
           <AnalyticsPanel guildId={props.guildId} />
+        </section>
+      )}
+
+      {props.module?.key === "custom-commands" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Custom Commands" eyebrow="OPERATIONS" />
+          <CustomCommandsPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            roles={props.resources.roles}
+            onChanged={props.onAudit}
+          />
         </section>
       )}
 

@@ -14,3 +14,10 @@ test("dashboard setting keys are unique within a module", () => {
     assert.equal(new Set(keys).size, keys.length, schema.key);
   }
 });
+
+
+test("custom commands module is catalogued and enabled by default", () => {
+  const custom = MODULE_CATALOG.find((module) => module.key === "custom-commands");
+  assert.ok(custom);
+  assert.equal(custom.defaultEnabled, true);
+});
