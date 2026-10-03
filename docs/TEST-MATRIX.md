@@ -134,3 +134,9 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-03 — Utility info suite
 - Command schema coverage verifies all four utility commands.
 - Live Discord rendering/resource resolution remains release-gate validation.
+
+
+### 2026-10-04 — Function-level command permission editor
+- Dashboard now exposes all persisted command-policy scope fields: allowed/denied roles and channels, cooldown, Prefix/Slash, enabled and help visibility.
+- Backend already persists and enforces these fields through the shared command-policy guard and Management API.
+- CI remains the static/build gate; live browser edits plus real Discord permission/scope behavior remain release-gate validation.

@@ -17,6 +17,35 @@ type Policy = {
   helpVisible: boolean;
 };
 
+function PolicyIdsInput({
+  label,
+  value,
+  disabled,
+  onChange,
+  onBlur
+}: {
+  label: string;
+  value: string[];
+  disabled: boolean;
+  onChange: (value: string[]) => void;
+  onBlur: (value: string[]) => void;
+}) {
+  const parse = (raw: string) => raw.split(/[\s,]+/).filter(Boolean);
+  return (
+    <label style={{ display: "grid", gap: 3, minWidth: 0 }}>
+      <span style={{ color: "#697486", fontSize: 8 }}>{label}</span>
+      <input
+        value={value.join(" ")}
+        disabled={disabled}
+        onChange={(e) => onChange(parse(e.target.value))}
+        onBlur={(e) => onBlur(parse(e.target.value))}
+        placeholder="IDs через пробел"
+        style={wideInputStyle}
+      />
+    </label>
+  );
+}
+
 export function CommandPolicyPanel({ guildId }: { guildId: string }) {
   const [items, setItems] = useState<Policy[]>([]);
   const [saving, setSaving] = useState("");
@@ -103,22 +132,45 @@ export function CommandPolicyPanel({ guildId }: { guildId: string }) {
             style={inputStyle}
             title="Cooldown seconds"
           />
-          <input
-            value={item.allowedRoleIds.join(" ")}
-            disabled={saving === item.commandName}
-            onChange={(e) => setItems((current) => current.map((x) => x.commandName === item.commandName ? { ...x, allowedRoleIds: e.target.value.split(/[\s,]+/).filter(Boolean) } : x))}
-            onBlur={(e) => void patch(item.commandName, { allowedRoleIds: e.target.value.split(/[\s,]+/).filter(Boolean) })}
-            placeholder="allowed roles"
-            style={wideInputStyle}
-          />
-          <input
-            value={item.deniedChannelIds.join(" ")}
-            disabled={saving === item.commandName}
-            onChange={(e) => setItems((current) => current.map((x) => x.commandName === item.commandName ? { ...x, deniedChannelIds: e.target.value.split(/[\s,]+/).filter(Boolean) } : x))}
-            onBlur={(e) => void patch(item.commandName, { deniedChannelIds: e.target.value.split(/[\s,]+/).filter(Boolean) })}
-            placeholder="denied channels"
-            style={wideInputStyle}
-          />
+          <label style={checkStyle}>
+            <input
+              type="checkbox"
+              checked={item.helpVisible}
+              disabled={saving === item.commandName}
+              onChange={(e) => void patch(item.commandName, { helpVisible: e.target.checked })}
+            />
+            Help
+          </label>
+          <div style={scopeGridStyle}>
+            <PolicyIdsInput
+              label="Allowed roles"
+              value={item.allowedRoleIds}
+              disabled={saving === item.commandName}
+              onChange={(value) => setItems((current) => current.map((x) => x.commandName === item.commandName ? { ...x, allowedRoleIds: value } : x))}
+              onBlur={(value) => void patch(item.commandName, { allowedRoleIds: value })}
+            />
+            <PolicyIdsInput
+              label="Denied roles"
+              value={item.deniedRoleIds}
+              disabled={saving === item.commandName}
+              onChange={(value) => setItems((current) => current.map((x) => x.commandName === item.commandName ? { ...x, deniedRoleIds: value } : x))}
+              onBlur={(value) => void patch(item.commandName, { deniedRoleIds: value })}
+            />
+            <PolicyIdsInput
+              label="Allowed channels"
+              value={item.allowedChannelIds}
+              disabled={saving === item.commandName}
+              onChange={(value) => setItems((current) => current.map((x) => x.commandName === item.commandName ? { ...x, allowedChannelIds: value } : x))}
+              onBlur={(value) => void patch(item.commandName, { allowedChannelIds: value })}
+            />
+            <PolicyIdsInput
+              label="Denied channels"
+              value={item.deniedChannelIds}
+              disabled={saving === item.commandName}
+              onChange={(value) => setItems((current) => current.map((x) => x.commandName === item.commandName ? { ...x, deniedChannelIds: value } : x))}
+              onBlur={(value) => void patch(item.commandName, { deniedChannelIds: value })}
+            />
+          </div>
         </div>
       ))}
       {!items.length && !error && <div style={{ opacity: 0.4, fontSize: 11 }}>Command policies пока не загружены.</div>}
@@ -128,10 +180,8 @@ export function CommandPolicyPanel({ guildId }: { guildId: string }) {
 
 const rowStyle = {
   display: "grid",
-  gridTemplateColumns: "minmax(180px,1.4fr) auto auto auto 90px minmax(170px,1fr) minmax(170px,1fr)",
   gap: 8,
-  alignItems: "center",
-  padding: "9px 0",
+  padding: "10px 0",
   borderBottom: "1px solid #202632"
 } as const;
 
@@ -155,6 +205,12 @@ const inputStyle = {
 } as const;
 
 const wideInputStyle = { ...inputStyle };
+
+const scopeGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(140px, 1fr))",
+  gap: 8
+} as const;
 
 const errorStyle = {
   padding: 10,

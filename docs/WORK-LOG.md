@@ -327,3 +327,10 @@ Never write credentials, tokens or private user data here.
 - Added `serverinfo`, `userinfo`, `roleinfo` and `channelinfo` to the shared command policy.
 - Added Slash and Prefix implementations using Discord-native member, role and channel resolution.
 - Added command-schema coverage and updated the product matrix.
+
+
+## 2026-10-04 — Function-level command permission editor
+- Expanded apps/dashboard/app/command-policy-panel.tsx from partial policy controls to the complete persisted command-policy surface.
+- Added allowed-role, denied-role, allowed-channel and denied-channel editors plus help visibility; retained Prefix/Slash, enabled and cooldown controls.
+- Kept the existing command_policies backend and shared guard; no duplicate permission architecture or migration added.
+- Updated Feature Matrix / Project State / Test Matrix / Handoff for cross-chat continuity.

@@ -208,3 +208,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Tickets now have a dedicated Dashboard Intake Form editor with persistent form fields and ticket answer storage.
 
 - Utility info suite (`serverinfo/userinfo/roleinfo/channelinfo`) is available through Prefix/Slash and the shared command policy.
+
+
+## 2026-10-04 — Function-level command permissions
+- Expanded the existing Command Policy Dashboard editor to expose the full persisted policy scope: enable/Prefix/Slash, cooldown, allowed/denied roles, allowed/denied channels and help visibility.
+- Reused the existing command_policies API and policy guard; no new permission model or migration was introduced.
+- Browser editing and live Discord authorization remain release-gate validation; CI validates TypeScript/build contracts.

@@ -327,7 +327,7 @@ Music должен стремиться к функциональности си
 |---|---|
 | Полный module/function catalog | ✅ / расширять |
 | Единые permissions per command/action | ✅ |
-| Function-level permission editor | 🟡 |
+| Function-level permission editor | ✅ | Full command-level allow/deny scopes for roles/channels, Prefix/Slash, cooldown and help visibility in Dashboard |
 | Dashboard previews и test actions | 🟡 |
 | Permission / hierarchy diagnostics | ✅ |
 | Audit trail всех административных действий | 🟡 |
