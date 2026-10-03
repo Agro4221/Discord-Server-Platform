@@ -2219,7 +2219,8 @@ function validateAutomationPayload(
 ): void {
   const supportedEvents = new Set([
     "member.join","member.leave","member.role.add","member.role.remove",
-    "message.create","message.delete","message.edit","reaction.add",
+    "message.create","message.delete","message.edit","reaction.add","reaction.remove",
+    "channel.delete","role.delete","member.ban",
     "voice.join","voice.leave","voice.move","moderation.case",
     "ticket.create","ticket.close","giveaway.end","schedule"
   ]);
