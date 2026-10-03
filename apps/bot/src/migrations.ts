@@ -857,7 +857,7 @@ const migrations = [
       "  day smallint NOT NULL CHECK(day BETWEEN 1 AND 31),",
       "  created_at timestamptz NOT NULL DEFAULT now(),",
       "  updated_at timestamptz NOT NULL DEFAULT now(),",
-      "  PRIMARY KEY(guild_id,user_id)"
+      "  PRIMARY KEY(guild_id,user_id)",
       ");",
       "CREATE INDEX IF NOT EXISTS idx_birthdays_date ON birthdays(guild_id,month,day);"
     ])
