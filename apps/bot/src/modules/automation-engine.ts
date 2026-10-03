@@ -315,6 +315,123 @@ export class AutomationEngine implements PlatformModule {
     return output;
   }
 
+  async diagnostics(guildId: string): Promise<{
+    guildId: string;
+    rules: { total: number; enabled: number; byEvent: Record<string, number> };
+    templates: { total: number };
+    delayedJobs: {
+      pending: number;
+      processing: number;
+      withErrors: number;
+      completed24h: number;
+      oldestPendingAt: string | null;
+      recent: Array<{
+        id: string;
+        status: "pending" | "processing" | "completed";
+        ruleId: string | null;
+        attempts: number;
+        availableAt: string;
+        processingUntil: string | null;
+        lastError: string | null;
+        completedAt: string | null;
+        createdAt: string;
+      }>;
+    };
+    runtime: {
+      loadedRules: number;
+      executionCounter: number;
+      cooldownKeys: number;
+      keyedCooldownKeys: number;
+      lastScheduleMinute: number | null;
+    };
+  }> {
+    const [rules, templates, summary] = await Promise.all([
+      this.listRules(guildId),
+      this.listTemplates(guildId),
+      this.db.query<{
+        pending: string;
+        processing: string;
+        with_errors: string;
+        completed_24h: string;
+        oldest_pending_at: string | null;
+      }>(
+        "SELECT " +
+        "COUNT(*) FILTER (WHERE completed_at IS NULL) AS pending, " +
+        "COUNT(*) FILTER (WHERE completed_at IS NULL AND processing_until IS NOT NULL AND processing_until >= now()) AS processing, " +
+        "COUNT(*) FILTER (WHERE completed_at IS NULL AND last_error IS NOT NULL) AS with_errors, " +
+        "COUNT(*) FILTER (WHERE completed_at IS NOT NULL AND completed_at >= now()-interval '24 hours') AS completed_24h, " +
+        "MIN(available_at) FILTER (WHERE completed_at IS NULL) AS oldest_pending_at " +
+        "FROM automation_delayed_jobs WHERE guild_id=$1",
+        [guildId]
+      )
+    ]);
+
+    const recentResult = await this.db.query<{
+      id: string;
+      rule_id: string | null;
+      attempts: string | number;
+      available_at: string;
+      processing_until: string | null;
+      last_error: string | null;
+      completed_at: string | null;
+      created_at: string;
+    }>(
+      "SELECT id::text,rule_id,attempts,available_at,processing_until,last_error,completed_at,created_at " +
+      "FROM automation_delayed_jobs WHERE guild_id=$1 ORDER BY created_at DESC LIMIT 25",
+      [guildId]
+    );
+
+    const byEvent: Record<string, number> = {};
+    let enabled = 0;
+    for (const rule of rules) {
+      if (rule.enabled) enabled += 1;
+      byEvent[rule.event] = (byEvent[rule.event] ?? 0) + 1;
+    }
+
+    const row = summary.rows[0];
+    const now = Date.now();
+    const recent = recentResult.rows.map((job) => {
+      const processingUntilMs = job.processing_until ? Date.parse(job.processing_until) : Number.NaN;
+      const status: "pending" | "processing" | "completed" = job.completed_at
+        ? "completed"
+        : Number.isFinite(processingUntilMs) && processingUntilMs >= now
+          ? "processing"
+          : "pending";
+      return {
+        id: job.id,
+        status,
+        ruleId: job.rule_id,
+        attempts: Number(job.attempts) || 0,
+        availableAt: job.available_at,
+        processingUntil: job.processing_until,
+        lastError: job.last_error,
+        completedAt: job.completed_at,
+        createdAt: job.created_at
+      };
+    });
+
+    return {
+      guildId,
+      rules: { total: rules.length, enabled, byEvent },
+      templates: { total: templates.length },
+      delayedJobs: {
+        pending: Number(row?.pending) || 0,
+        processing: Number(row?.processing) || 0,
+        withErrors: Number(row?.with_errors) || 0,
+        completed24h: Number(row?.completed_24h) || 0,
+        oldestPendingAt: row?.oldest_pending_at ?? null,
+        recent
+      },
+      runtime: {
+        loadedRules: [...this.rules.values()].reduce((total, items) => total + items.length, 0),
+        executionCounter: this.executionCounter,
+        cooldownKeys: this.cooldowns.size,
+        keyedCooldownKeys: this.keyedCooldowns.size,
+        lastScheduleMinute: this.lastScheduleMinute
+      }
+    };
+  }
+
   async listRules(guildId: string): Promise<AutomationRuleRecord[]> {
     const result = await this.db.query<{
       id: string;
