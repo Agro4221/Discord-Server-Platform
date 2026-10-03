@@ -2,6 +2,7 @@ import { PermissionFlagsBits, type ChatInputCommandInteraction, type Message } f
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import type { AuditLog } from "../audit.js";
+import type { Moderation } from "./moderation.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 
@@ -48,7 +49,7 @@ export class AutoMod implements PlatformModule {
   private inspectedMessages = 0;
   private auditLog?: AuditLog;
 
-  constructor(private readonly db: Database) {}
+  constructor(private readonly db: Database, private readonly moderation?: Moderation) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.auditLog = context.auditLog;
@@ -487,6 +488,28 @@ export class AutoMod implements PlatformModule {
           detector: rule.detector,
           error: String(error)
         });
+      }
+    }
+
+    let warned = false;
+    if (rule.action === "warn" && this.moderation) {
+      const target = await message.client.users.fetch(message.author.id).catch(() => null);
+      if (target) {
+        try {
+          await this.moderation.applyAutomodWarn(
+            message.guild!.id,
+            target,
+            "AutoMod: " + rule.detector
+          );
+          warned = true;
+        } catch (error) {
+          logger.warn("AutoMod warning action failed", {
+            guildId: message.guild!.id,
+            userId: message.author.id,
+            detector: rule.detector,
+            error: String(error)
+          });
+        }
       }
     }
 
