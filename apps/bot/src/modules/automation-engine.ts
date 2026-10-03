@@ -295,6 +295,8 @@ export class AutomationEngine implements PlatformModule {
     userId?: string;
     channelId?: string;
     roleIds?: string[];
+    userIsBot?: boolean;
+    channelType?: import("@dsp/domain").AutomationChannelType;
     numeric?: Record<string, number>;
   }): Promise<{
     matched: boolean;
@@ -308,7 +310,9 @@ export class AutomationEngine implements PlatformModule {
       guildId: input.guildId,
       content: input.content?.slice(0, 2000),
       userId: input.userId,
+      userIsBot: input.userIsBot,
       channelId: input.channelId,
+      channelType: input.channelType,
       roleIds: Array.isArray(input.roleIds) ? input.roleIds.slice(0, 20) : [],
       numeric: Object.fromEntries(
         Object.entries(input.numeric ?? {})
