@@ -1,5 +1,6 @@
 import { EmbedBuilder, PermissionFlagsBits, type ChatInputCommandInteraction, type Client } from "discord.js";
 import type { Database } from "../database.js";
+import type { AuditLog } from "../audit.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
@@ -37,7 +38,7 @@ export class StreamAlerts implements PlatformModule {
   private twitchToken:{value:string;expiresAt:number}|null=null;
   private kickToken:{value:string;expiresAt:number}|null=null;
 
-  constructor(private readonly db:Database,private readonly config:StreamAlertsConfig){}
+  constructor(private readonly db:Database,private readonly config:StreamAlertsConfig,private readonly auditLog?:AuditLog){}
 
   async init(context:ModuleContext):Promise<void>{
     this.client=context.client;
@@ -86,7 +87,7 @@ export class StreamAlerts implements PlatformModule {
     const role=interaction.options.getRole("mention-role");
     const intervalSeconds=interaction.options.getInteger("interval")??30;
     try{
-      await this.create(interaction.guild!.id,{platform,target,channelId:channel.id,mentionRoleId:role?.id??null,intervalSeconds});
+      await this.create(interaction.guild!.id,{platform,target,channelId:channel.id,mentionRoleId:role?.id??null,intervalSeconds},interaction.user.id);
       await interaction.reply({content:"✅ Stream alert создан.",ephemeral:true});
     }catch(error){
       await interaction.reply({content:"Не удалось создать stream alert: `"+String(error instanceof Error?error.message:error).slice(0,180)+"`",ephemeral:true});
@@ -108,7 +109,7 @@ export class StreamAlerts implements PlatformModule {
     }));
   }
 
-  async create(guildId:string,input:{platform:StreamAlertPlatform;target:string;channelId:string;mentionRoleId?:string|null;intervalSeconds:number;enabled?:boolean;messageTemplate?:string}):Promise<StreamAlertRecord>{
+  async create(guildId:string,input:{platform:StreamAlertPlatform;target:string;channelId:string;mentionRoleId?:string|null;intervalSeconds:number;enabled?:boolean;messageTemplate?:string},actorUserId?:string):Promise<StreamAlertRecord>{
     if(!this.providers()[input.platform])throw new Error("stream_alert_provider_not_configured");
     const target=normalizeTarget(input.platform,input.target);
     const r=await this.db.query<{id:string}>(
@@ -123,6 +124,17 @@ export class StreamAlerts implements PlatformModule {
     );
     const created=(await this.list(guildId)).find(item=>item.id===Number(id));
     if(!created)throw new Error("stream_alert_create_failed");
+    if(actorUserId){
+      await this.auditLog?.record({
+        guildId,
+        actorUserId,
+        source:"discord",
+        action:"stream-alert.created",
+        targetType:"stream-alert",
+        targetId:String(created.id),
+        metadata:{platform:created.platform,target:created.target,channelId:created.channelId}
+      });
+    }
     return created;
   }
 
