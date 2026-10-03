@@ -198,7 +198,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Verification panel", description: "Публикация пользовательского verification-панели." },
       { title: "Логи", description: "Отдельный канал для событий verification." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   roles: {
     icon: "♢",
@@ -377,7 +377,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Sticky", description: "Закрепляемое сообщение, которое автоматически возвращается вниз канала после новых сообщений." },
       { title: "Fun", description: "8-ball, выбор варианта и бросок кубиков без внешних сервисов." }
     ],
-    kind: "discord"
+    kind: "full"
   },
   automation: {
     icon: "↯",
