@@ -1068,6 +1068,15 @@ const migrations = [
     ])
   },
   {
+    version: 72,
+    name: "notification_feed_filters_and_templates",
+    sql: q([
+      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS message_template text NOT NULL DEFAULT '📡 **Новая запись из feed**\\n**{title}**\\n{url}';",
+      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS include_keywords text[] NOT NULL DEFAULT '{}';",
+      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS exclude_keywords text[] NOT NULL DEFAULT '{}';"
+    ])
+  },
+  {
     version: 71,
     name: "moderation_scheduled_cleanup",
     sql: q([
