@@ -44,3 +44,15 @@ test("Security response policy defaults preserve quarantine and role removal", (
     destructiveQuarantine: true
   });
 });
+
+test("Security response policy preserves explicit disabled actions", () => {
+  assert.deepEqual(securityResponsePolicy({
+    raidQuarantine: false,
+    destructiveRoleRemoval: false,
+    destructiveQuarantine: false
+  }), {
+    raidQuarantine: false,
+    destructiveRoleRemoval: false,
+    destructiveQuarantine: false
+  });
+});
