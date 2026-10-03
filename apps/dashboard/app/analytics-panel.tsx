@@ -3,7 +3,19 @@
 import { useEffect, useMemo, useState } from "react";
 
 type AnalyticsPoint = { bucketStart: string; eventType: string; count: number };
-type AnalyticsReport = { hours: number; totals: Record<string, number>; points: AnalyticsPoint[] };
+type AnalyticsReport = {
+  hours: number;
+  totals: Record<string, number>;
+  points: AnalyticsPoint[];
+  counters: {
+    messageCount: number;
+    memberJoins: number;
+    memberLeaves: number;
+    voiceJoins: number;
+    voiceLeaves: number;
+    voiceMoves: number;
+  };
+};
 
 export function AnalyticsPanel({ guildId }: { guildId: string }) {
   const [report, setReport] = useState<AnalyticsReport | null>(null);
@@ -52,6 +64,14 @@ export function AnalyticsPanel({ guildId }: { guildId: string }) {
 
       {!loading && events.length === 0 && <div style={{ opacity: 0.42 }}>Данных пока нет или Analytics выключен.</div>}
 
+      {!loading && report && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
+          <Metric label="Сообщений всего" value={formatNumber(report.counters.messageCount)} />
+          <Metric label="Входов / выходов" value={formatNumber(report.counters.memberJoins) + " / " + formatNumber(report.counters.memberLeaves)} />
+          <Metric label="Voice событий" value={formatNumber(report.counters.voiceJoins + report.counters.voiceLeaves + report.counters.voiceMoves)} />
+        </div>
+      )}
+
       {!loading && events.length > 0 && (
         <div style={{ display: "grid", gap: 9 }}>
           {events.map(([event, value]) => (
@@ -78,3 +98,17 @@ const inputStyle = {
   borderRadius: 10,
   padding: "9px 10px"
 } as const;
+
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ padding: 10, borderRadius: 10, border: "1px solid #232a35", background: "#0e131a" }}>
+      <div style={{ opacity: 0.45, fontSize: 9 }}>{label}</div>
+      <div style={{ marginTop: 4, fontSize: 16, fontWeight: 750 }}>{value}</div>
+    </div>
+  );
+}
+
+function formatNumber(value: number): string {
+  return Number.isFinite(value) ? value.toLocaleString("ru-RU") : "0";
+}
