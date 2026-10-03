@@ -21,6 +21,7 @@ import { CommandPoliciesPanel } from "./command-policies-panel";
 import { StarboardPanel } from "./starboard-panel";
 import { ServerSettingsPanel } from "./server-settings-panel";
 import { DiscordDiagnosticsPanel } from "./discord-diagnostics-panel";
+import { CommunityToolsPanel } from "./community-tools-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -439,7 +440,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "starboard"]);
+const PANEL_KEYS = new Set(["moderation", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "starboard", "community-tools"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1483,6 +1484,17 @@ function ModulePage(props: {
           <StarboardPanel
             guildId={props.guildId}
             channels={props.resources.channels.filter((item) => item.type === 0)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "community-tools" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Community Tools Center" eyebrow="OPERATIONS" />
+          <CommunityToolsPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0 || item.type === 5)}
             onChanged={props.onAudit}
           />
         </section>

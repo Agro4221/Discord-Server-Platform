@@ -17,6 +17,7 @@ import type { Economy } from "./modules/economy.js";
 import type { AutoMod } from "./modules/automod.js";
 import type { Tickets } from "./modules/tickets.js";
 import type { Starboard } from "./modules/starboard.js";
+import type { CommunityTools } from "./modules/community-tools.js";
 import { CommandPolicyService, COMMAND_DEFINITIONS } from "./command-policy.js";
 import type { StreamAlertPlatform } from "./modules/stream-alerts.js";
 import { BotIdentityRepository } from "./bot-identity.js";
@@ -97,6 +98,7 @@ type ApiOptions = {
   autoMod?: AutoMod;
   tickets?: Tickets;
   starboard?: Starboard;
+  communityTools?: CommunityTools;
   commandPolicy?: CommandPolicyService;
   rolePanels?: {
     list: (guildId: string) => Promise<unknown[]>;
@@ -894,6 +896,78 @@ export class ManagementApiServer {
             });
             this.json(res, 200, { ok: true });
             return;
+          }
+
+          const communityToolsMatch = path.match(/^\/api\/guilds\/([^/]+)\/community-tools$/);
+
+          if (communityToolsMatch && !this.options.communityTools) {
+            this.json(res, 500, { error: "community_tools_unavailable" });
+            return;
+          }
+
+          if ((method === "GET" || method === "POST") && communityToolsMatch) {
+            const guildId = communityToolsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+
+            if (method === "GET") {
+              this.json(res, 200, { guildId, snapshot: await this.options.communityTools!.dashboardSnapshot(guildId) });
+              return;
+            }
+
+            const body = await readJson(req);
+            const action = body.action;
+
+            if (action === "poll.close") {
+              const pollId = Number(body.id);
+              if (!Number.isSafeInteger(pollId) || pollId < 1) throw new RequestInputError("invalid_poll", 400);
+              if (!await this.options.communityTools!.dashboardClosePoll(guildId, pollId)) {
+                this.json(res, 404, { error: "poll_not_found_or_already_closed" });
+                return;
+              }
+              await this.options.auditLog.record({ guildId, source: "dashboard", action: "poll.closed", targetType: "poll", targetId: String(pollId) });
+              this.json(res, 200, { ok: true });
+              return;
+            }
+
+            if (action === "suggestion.status") {
+              const suggestionId = Number(body.id);
+              const status = body.status;
+              if (!Number.isSafeInteger(suggestionId) || suggestionId < 1 || !["approved","denied"].includes(status)) {
+                throw new RequestInputError("invalid_suggestion_status", 400);
+              }
+              if (!await this.options.communityTools!.dashboardSetSuggestionStatus(guildId, suggestionId, status as "approved" | "denied")) {
+                this.json(res, 404, { error: "suggestion_not_found_or_already_processed" });
+                return;
+              }
+              await this.options.auditLog.record({ guildId, source: "dashboard", action: "suggestion." + status, targetType: "suggestion", targetId: String(suggestionId) });
+              this.json(res, 200, { ok: true });
+              return;
+            }
+
+            if (action === "sticky.set") {
+              const channelId = typeof body.channelId === "string" ? body.channelId : "";
+              const message = typeof body.message === "string" ? body.message : "";
+              await this.options.communityTools!.dashboardSetSticky(guildId, channelId, message);
+              await this.options.auditLog.record({ guildId, source: "dashboard", action: "sticky.updated", targetType: "channel", targetId: channelId });
+              this.json(res, 200, { ok: true });
+              return;
+            }
+
+            if (action === "sticky.clear") {
+              const channelId = typeof body.channelId === "string" ? body.channelId : "";
+              if (!await this.options.communityTools!.dashboardClearSticky(guildId, channelId)) {
+                this.json(res, 404, { error: "sticky_not_found" });
+                return;
+              }
+              await this.options.auditLog.record({ guildId, source: "dashboard", action: "sticky.cleared", targetType: "channel", targetId: channelId });
+              this.json(res, 200, { ok: true });
+              return;
+            }
+
+            throw new RequestInputError("invalid_community_tools_action", 400);
           }
 
           const starboardMatch = path.match(/^\/api\/guilds\/([^/]+)\/starboard$/);

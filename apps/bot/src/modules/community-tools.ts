@@ -113,6 +113,120 @@ export class CommunityTools implements PlatformModule {
     this.auditLog = undefined;
   }
 
+  async dashboardSnapshot(guildId: string): Promise<{
+    polls: Array<{ id: number; channelId: string; messageId: string | null; question: string; options: string[]; endsAt: Date; closed: boolean }>;
+    suggestions: Array<{ id: number; channelId: string; messageId: string | null; userId: string; content: string; status: SuggestionStatus }>;
+    stickies: Array<{ channelId: string; message: string; lastMessageId: string | null; enabled: boolean }>;
+  }> {
+    const [polls, suggestions, stickies] = await Promise.all([
+      this.db.query<{
+        id: string; channel_id: string; message_id: string | null;
+        question: string; options: unknown; ends_at: Date | string; closed: boolean;
+      }>(
+        "SELECT id,channel_id,message_id,question,options,ends_at,closed FROM polls WHERE guild_id=$1 ORDER BY ends_at DESC LIMIT 100",
+        [guildId]
+      ),
+      this.db.query<{
+        id: string; channel_id: string; message_id: string | null;
+        user_id: string; content: string; status: SuggestionStatus;
+      }>(
+        "SELECT id,channel_id,message_id,user_id,content,status FROM suggestions WHERE guild_id=$1 ORDER BY id DESC LIMIT 100",
+        [guildId]
+      ),
+      this.db.query<{
+        channel_id: string; message: string; last_message_id: string | null; enabled: boolean;
+      }>(
+        "SELECT channel_id,message,last_message_id,enabled FROM sticky_messages WHERE guild_id=$1 ORDER BY channel_id",
+        [guildId]
+      )
+    ]);
+
+    const parseOptions = (value: unknown): string[] => {
+      if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+      if (typeof value !== "string") return [];
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+      } catch {
+        return [];
+      }
+    };
+
+    return {
+      polls: polls.rows.map((row) => ({
+        id: Number(row.id),
+        channelId: row.channel_id,
+        messageId: row.message_id,
+        question: row.question,
+        options: parseOptions(row.options),
+        endsAt: new Date(row.ends_at),
+        closed: row.closed
+      })),
+      suggestions: suggestions.rows.map((row) => ({
+        id: Number(row.id),
+        channelId: row.channel_id,
+        messageId: row.message_id,
+        userId: row.user_id,
+        content: row.content,
+        status: row.status
+      })),
+      stickies: stickies.rows.map((row) => ({
+        channelId: row.channel_id,
+        message: row.message,
+        lastMessageId: row.last_message_id,
+        enabled: row.enabled
+      }))
+    };
+  }
+
+  async dashboardClosePoll(guildId: string, pollId: number): Promise<boolean> {
+    if (!Number.isSafeInteger(pollId) || pollId < 1) throw new Error("invalid_poll");
+    const poll = await this.getPoll(pollId);
+    if (!poll || poll.guildId !== guildId) return false;
+    await this.closePoll(pollId);
+    return true;
+  }
+
+  async dashboardSetSuggestionStatus(guildId: string, suggestionId: number, status: "approved" | "denied"): Promise<boolean> {
+    if (!Number.isSafeInteger(suggestionId) || suggestionId < 1) throw new Error("invalid_suggestion");
+    const suggestion = await this.getSuggestion(suggestionId);
+    if (!suggestion || suggestion.guildId !== guildId || suggestion.status !== "pending") return false;
+
+    const result = await this.db.query(
+      "UPDATE suggestions SET status=$2,updated_at=now() WHERE id=$1 AND guild_id=$3 AND status='pending'",
+      [suggestionId, status, guildId]
+    );
+    if (result.rowCount !== 1) return false;
+    await this.refreshSuggestionMessage(suggestionId);
+    return true;
+  }
+
+  async dashboardSetSticky(guildId: string, channelId: string, message: string): Promise<boolean> {
+    if (!/^\d{15,25}$/.test(channelId)) throw new Error("invalid_channel");
+    if (!message.trim() || message.length > 2000) throw new Error("invalid_sticky");
+    const channel = this.client?.guilds.cache.get(guildId)?.channels.cache.get(channelId);
+    if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) {
+      throw new Error("text_channel_required");
+    }
+    if (!this.client?.guilds.cache.get(guildId)?.members.me?.permissions.has(PermissionFlagsBits.SendMessages)) {
+      throw new Error("bot_missing_send_messages");
+    }
+    await this.setSticky(guildId, channelId, message);
+    await this.repostSticky(guildId, channelId);
+    return true;
+  }
+
+  async dashboardClearSticky(guildId: string, channelId: string): Promise<boolean> {
+    if (!/^\d{15,25}$/.test(channelId)) throw new Error("invalid_channel");
+    const existing = await this.db.query(
+      "SELECT channel_id FROM sticky_messages WHERE guild_id=$1 AND channel_id=$2",
+      [guildId, channelId]
+    );
+    if (!existing.rows[0]) return false;
+    await this.clearSticky(guildId, channelId);
+    return true;
+  }
+
   async handlePrefixCommand(
     message: Message,
     commandName: string,

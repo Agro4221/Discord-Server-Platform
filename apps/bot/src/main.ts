@@ -269,6 +269,7 @@ async function main(): Promise<void> {
     music,
     leveling,
     tickets,
+    communityTools,
     autoMod,
     commandPolicy,
     giveaways: {
