@@ -387,7 +387,7 @@ Music должен стремиться к функциональности си
 | Voice-role links | 🟡 |
 | Delayed autoroles | 🟡 |
 | Onboarding / verification flow builder | 🟡 |
-| Welcome/goodbye customization and images | 🟡 |
+| Welcome/goodbye customization and images | ✅ |
 
 #### Tickets / Support / Forms
 | Функция | План |
