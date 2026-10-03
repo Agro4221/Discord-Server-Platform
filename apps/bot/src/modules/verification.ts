@@ -17,11 +17,13 @@ type VerificationConfig = {
 export class Verification implements PlatformModule {
   readonly name = "verification";
   private unsubscribe?: () => void;
+  private client?: import("discord.js").Client;
   private readonly codes = new Map<string, { hash: string; expiresAt: number; attempts: number }>();
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
+    this.client = context.client;
     const a = context.events.on("member.add", (member) => this.onJoin(member));
     const b = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     const c = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
@@ -31,6 +33,7 @@ export class Verification implements PlatformModule {
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    this.client = undefined;
     this.codes.clear();
   }
 
