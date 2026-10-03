@@ -21,6 +21,8 @@ export type AppConfig = {
     twitchClientId?: string;
     twitchClientSecret?: string;
     youtubeApiKey?: string;
+    kickClientId?: string;
+    kickClientSecret?: string;
     vkApiBaseUrl: string;
     pollIntervalSeconds: number;
   };
