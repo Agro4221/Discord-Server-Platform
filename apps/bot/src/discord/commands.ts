@@ -363,6 +363,24 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
               .setMinValue(1)
               .setMaxValue(100)
           )
+          .addRoleOption((option) =>
+            option
+              .setName("required-role")
+              .setDescription("Role required to participate")
+          )
+          .addIntegerOption((option) =>
+            option
+              .setName("min-level")
+              .setDescription("Minimum server level required")
+              .setMinValue(0)
+              .setMaxValue(1000)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("template")
+              .setDescription("Optional announcement template")
+              .setMaxLength(1000)
+          )
       )
       .addSubcommand((sub) => sub
         .setName("end")
