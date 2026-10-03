@@ -1327,7 +1327,8 @@ export class AutomationEngine implements PlatformModule {
           if (!this.integrations.giveaways) throw new Error("giveaways_unavailable");
           const giveawayId = Number(action.giveawayId);
           if (!Number.isSafeInteger(giveawayId) || giveawayId < 1) throw new Error("invalid_giveaway_id");
-          await this.integrations.giveaways.endGiveaway(giveawayId, event.guildId);
+          const ended = await this.integrations.giveaways.endGiveaway(giveawayId, event.guildId);
+          if (!ended) throw new Error("giveaway_not_found_or_not_running");
           continue;
         }
 
