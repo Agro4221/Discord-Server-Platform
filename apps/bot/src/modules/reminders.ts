@@ -4,6 +4,12 @@ import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 
+export type AfkRecord = {
+  userId: string;
+  reason: string;
+  sinceAt: Date;
+};
+
 export class Reminders implements PlatformModule {
   readonly name = "reminders";
   private unsubscribe?: () => void;
@@ -23,6 +29,7 @@ export class Reminders implements PlatformModule {
     const commandUnsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const messageUnsubscribe = context.events.on("message.create", (message) => {
       if (!message.guild || message.author.bot) return;
+      void this.handleMessageActivity(message);
       void this.refreshSticky(message.guild.id, message.channelId);
     });
     this.unsubscribe = () => { commandUnsubscribe(); messageUnsubscribe(); };
@@ -42,9 +49,18 @@ export class Reminders implements PlatformModule {
   }
 
   async handlePrefixCommand(message: Message, commandName: string, args: string[]): Promise<boolean> {
-    if (!message.guild || message.author.bot || !["remind","schedule","sticky"].includes(commandName)) return false;
+    if (!message.guild || message.author.bot || !["remind","schedule","sticky","afk"].includes(commandName)) return false;
     if (!await moduleEnabled(this.db, message.guild.id, "reminders", false)) {
       await message.reply("Модуль Reminders выключен.");
+      return true;
+    }
+
+    if (commandName === "afk") {
+      const rawReason = args.join(" ").trim();
+      const result = await this.setOrClearAfk(message.guild.id, message.author.id, rawReason || null);
+      await message.reply(result.cleared
+        ? "👋 AFK снят. С возвращением!"
+        : "💤 AFK включён: " + result.record!.reason);
       return true;
     }
 
@@ -142,9 +158,21 @@ export class Reminders implements PlatformModule {
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || !["remind","schedule","sticky"].includes(interaction.commandName)) return;
+    if (!interaction.inGuild() || !["remind","schedule","sticky","afk"].includes(interaction.commandName)) return;
     if (!await moduleEnabled(this.db, interaction.guild!.id, "reminders", false)) {
       await interaction.reply({ content: "Модуль Reminders выключен.", ephemeral: true });
+      return;
+    }
+
+    if (interaction.commandName === "afk") {
+      const rawReason = interaction.options.getString("reason");
+      const result = await this.setOrClearAfk(interaction.guild!.id, interaction.user.id, rawReason);
+      await interaction.reply({
+        content: result.cleared
+          ? "👋 AFK снят. С возвращением!"
+          : "💤 AFK включён: " + result.record!.reason,
+        ephemeral: true
+      });
       return;
     }
 
@@ -224,6 +252,110 @@ export class Reminders implements PlatformModule {
     });
   }
 
+
+  private async handleMessageActivity(message: Message): Promise<void> {
+    if (!message.guild || message.author.bot) return;
+    if (!await moduleEnabled(this.db, message.guild.id, "reminders", false)) return;
+
+    try {
+      const mentions = [...message.mentions.users.values()]
+        .filter((user) => !user.bot && user.id !== message.author.id)
+        .map((user) => user.id)
+        .slice(0, 25);
+
+      if (mentions.length) {
+        const afkUsers = await this.listAfk(message.guild.id, mentions);
+        if (afkUsers.length) {
+          const notices = afkUsers.map((entry) =>
+            formatAfkNotice("<@" + entry.userId + ">", entry.reason, entry.sinceAt)
+          );
+          await message.reply("💬 " + notices.join("\n").slice(0, 1900));
+        }
+      }
+
+      const cleared = await this.clearAfk(message.guild.id, message.author.id);
+      if (cleared) {
+        const reply = await message.reply("👋 С возвращением! Твой AFK-статус снят.");
+        setTimeout(() => {
+          void reply.delete().catch(() => undefined);
+        }, 8_000).unref();
+      }
+    } catch (error) {
+      logger.warn("AFK message handling failed", {
+        guildId: message.guild.id,
+        userId: message.author.id,
+        error: String(error)
+      });
+    }
+  }
+
+  private async setOrClearAfk(
+    guildId: string,
+    userId: string,
+    rawReason: string | null
+  ): Promise<{ cleared: boolean; record?: AfkRecord }> {
+    if (isAfkClearRequest(rawReason) || (rawReason === null && await this.getAfk(guildId, userId))) {
+      const cleared = await this.clearAfk(guildId, userId);
+      return { cleared: Boolean(cleared) };
+    }
+
+    const reason = normalizeAfkReason(rawReason);
+    const result = await this.db.query<{ user_id: string; reason: string; since_at: Date | string }>(
+      `INSERT INTO afk_users(guild_id,user_id,reason,since_at,updated_at)
+       VALUES($1,$2,$3,now(),now())
+       ON CONFLICT(guild_id,user_id) DO UPDATE SET
+         reason=EXCLUDED.reason,
+         since_at=now(),
+         updated_at=now()
+       RETURNING user_id,reason,since_at`,
+      [guildId, userId, reason]
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error("afk_write_failed");
+    return {
+      cleared: false,
+      record: {
+        userId: row.user_id,
+        reason: row.reason,
+        sinceAt: new Date(row.since_at)
+      }
+    };
+  }
+
+  private async getAfk(guildId: string, userId: string): Promise<AfkRecord | null> {
+    const result = await this.db.query<{ user_id: string; reason: string; since_at: Date | string }>(
+      "SELECT user_id,reason,since_at FROM afk_users WHERE guild_id=$1 AND user_id=$2",
+      [guildId, userId]
+    );
+    const row = result.rows[0];
+    return row
+      ? { userId: row.user_id, reason: row.reason, sinceAt: new Date(row.since_at) }
+      : null;
+  }
+
+  private async listAfk(guildId: string, userIds: string[]): Promise<AfkRecord[]> {
+    if (!userIds.length) return [];
+    const result = await this.db.query<{ user_id: string; reason: string; since_at: Date | string }>(
+      "SELECT user_id,reason,since_at FROM afk_users WHERE guild_id=$1 AND user_id=ANY($2::text[]) ORDER BY since_at ASC",
+      [guildId, userIds]
+    );
+    return result.rows.map((row) => ({
+      userId: row.user_id,
+      reason: row.reason,
+      sinceAt: new Date(row.since_at)
+    }));
+  }
+
+  private async clearAfk(guildId: string, userId: string): Promise<AfkRecord | null> {
+    const result = await this.db.query<{ user_id: string; reason: string; since_at: Date | string }>(
+      "DELETE FROM afk_users WHERE guild_id=$1 AND user_id=$2 RETURNING user_id,reason,since_at",
+      [guildId, userId]
+    );
+    const row = result.rows[0];
+    return row
+      ? { userId: row.user_id, reason: row.reason, sinceAt: new Date(row.since_at) }
+      : null;
+  }
 
   private async loadSticky(): Promise<void> {
     const result = await this.db.query<{ guild_id: string; channel_id: string; content: string; message_id: string | null }>(
@@ -362,6 +494,21 @@ export class Reminders implements PlatformModule {
       this.running = false;
     }
   }
+}
+
+export function normalizeAfkReason(value?: string | null): string {
+  const trimmed = (value ?? "").trim().slice(0, 500);
+  return trimmed || "Отошёл ненадолго.";
+}
+
+export function isAfkClearRequest(value?: string | null): boolean {
+  return /^(off|clear|remove|unset)$/i.test((value ?? "").trim());
+}
+
+export function formatAfkNotice(mention: string, reason: string, sinceAt: Date | string): string {
+  const timestamp = new Date(sinceAt).getTime();
+  const unix = Number.isFinite(timestamp) ? Math.floor(timestamp / 1000) : Math.floor(Date.now() / 1000);
+  return `${mention} AFK: ${reason} · с <t:${unix}:R>`;
 }
 
 function parseReminderMinutes(value: string): number | null {
