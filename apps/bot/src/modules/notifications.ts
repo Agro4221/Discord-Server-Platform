@@ -362,7 +362,7 @@ function normalizeFeedTemplate(value?: string): string {
   return template || "📡 **Новая запись из feed**\n**{title}**\n{url}";
 }
 
-function normalizeKeywords(values?: string[]): string[] {
+export function normalizeKeywords(values?: string[]): string[] {
   return [...new Set((Array.isArray(values) ? values : [])
     .map((value) => String(value).trim().toLocaleLowerCase())
     .filter(Boolean)
@@ -370,7 +370,7 @@ function normalizeKeywords(values?: string[]): string[] {
     .map((value) => value.slice(0, 80)))];
 }
 
-function renderFeedTemplate(template: string, entry: { title: string; url: string }): string {
+export function renderFeedTemplate(template: string, entry: { title: string; url: string }): string {
   return template
     .replaceAll("{title}", entry.title.slice(0, 250))
     .replaceAll("{url}", entry.url.slice(0, 1800))
