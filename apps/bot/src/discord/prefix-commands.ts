@@ -13,6 +13,9 @@ import type { Giveaways } from "../modules/giveaways.js";
 import type { Utility } from "../modules/utility.js";
 import type { CommunityTools } from "../modules/community-tools.js";
 import type { Logging } from "../modules/logging.js";
+import type { Welcome } from "../modules/welcome.js";
+import type { Verification } from "../modules/verification.js";
+import type { Security } from "../modules/security.js";
 
 const BUILTIN_PREFIX_COMMANDS = new Set([
   "help",
@@ -40,6 +43,9 @@ export class PrefixCommandRouter {
     private readonly utility: Utility,
     private readonly communityTools: CommunityTools,
     private readonly logging: Logging,
+    private readonly welcome: Welcome,
+    private readonly verification: Verification,
+    private readonly security: Security,
     private readonly tickets: Tickets,
     private readonly rolePanels: RolePanels,
     private readonly giveaways: Giveaways
@@ -94,6 +100,9 @@ export class PrefixCommandRouter {
         if (await this.utility.handlePrefixCommand(message, commandName, args)) return;
         if (await this.communityTools.handlePrefixCommand(message, commandName, args)) return;
         if (await this.logging.handlePrefixCommand(message, commandName, args)) return;
+        if (await this.welcome.handlePrefixCommand(message, commandName, args)) return;
+        if (await this.verification.handlePrefixCommand(message, commandName, args)) return;
+        if (await this.security.handlePrefixCommand(message, commandName, args)) return;
         if (await this.tickets.handlePrefixCommand(message, commandName)) return;
         if (await this.rolePanels.handlePrefixCommand(message, commandName, args)) return;
         if (await this.giveaways.handlePrefixCommand(message, commandName, args)) return;
@@ -167,6 +176,10 @@ export class PrefixCommandRouter {
         if (await this.reminders.handlePrefixCommand(message, target, args)) return;
         if (await this.utility.handlePrefixCommand(message, target, args)) return;
         if (await this.communityTools.handlePrefixCommand(message, target, args)) return;
+        if (await this.logging.handlePrefixCommand(message, target, args)) return;
+        if (await this.welcome.handlePrefixCommand(message, target, args)) return;
+        if (await this.verification.handlePrefixCommand(message, target, args)) return;
+        if (await this.security.handlePrefixCommand(message, target, args)) return;
         if (await this.tickets.handlePrefixCommand(message, target)) return;
         if (await this.rolePanels.handlePrefixCommand(message, target, args)) return;
         if (await this.giveaways.handlePrefixCommand(message, target, args)) return;
