@@ -96,10 +96,10 @@ export class ContextCommandService implements PlatformModule {
       return;
     }
 
-    const member = await interaction.guild.members.fetch(interaction.targetUser.id).catch(() => null);
+    const member = await interaction.guild!.members.fetch(interaction.targetUser.id).catch(() => null);
 
     if (interaction.commandName === CONTEXT_COMMAND_NAMES.moderationHistory) {
-      const cases = await this.moderation.history(interaction.guild.id, interaction.targetUser.id, 10);
+      const cases = await this.moderation.history(interaction.guild!.id, interaction.targetUser.id, 10);
       if (!cases.length) {
         await interaction.reply({
           content: `📋 У ${interaction.targetUser} нет зарегистрированных moderation cases.`,
@@ -184,7 +184,7 @@ export class ContextCommandService implements PlatformModule {
     if (interaction.commandName === CONTEXT_COMMAND_NAMES.deleteMessage) {
       await message.delete();
       await this.auditLog?.record({
-        guildId: interaction.guild.id,
+        guildId: interaction.guild!.id,
         actorUserId: interaction.user.id,
         source: "discord",
         action: "moderation.context.delete_message",
