@@ -57,6 +57,46 @@ export class Security implements PlatformModule {
     this.client = undefined;
   }
 
+  async handlePrefixCommand(message: import("discord.js").Message, commandName: string, args: string[]): Promise<boolean> {
+    if (commandName !== "security") return false;
+    if (!message.guild) return false;
+
+    const sub = (args.shift() ?? "setup").toLowerCase();
+    if (sub !== "setup") {
+      await message.reply("Использование: !security setup <max-joins> <window> [max-destructive] [destructive-window] [@quarantine-role] [#log-channel]");
+      return true;
+    }
+
+    const numeric = args.filter((arg) => /^\d+$/.test(arg)).map(Number);
+    const maxJoins = numeric[0];
+    const windowSeconds = numeric[1];
+    if (!Number.isFinite(maxJoins) || !Number.isFinite(windowSeconds)) {
+      await message.reply("Пример: !security setup 10 20 5 20 @Quarantine #security-log");
+      return true;
+    }
+
+    const roles = [...message.mentions.roles.values()];
+    const channels = [...message.mentions.channels.values()];
+    const botPosition = message.guild.members.me?.roles.highest.position ?? 0;
+    const quarantineRole = roles[0] ?? null;
+    if (quarantineRole && (quarantineRole.managed || quarantineRole.position >= botPosition)) {
+      await message.reply("Quarantine role недоступна из-за role hierarchy.");
+      return true;
+    }
+
+    await this.configure(message.guild.id, {
+      enabled: true,
+      maxJoins,
+      windowSeconds,
+      maxDestructiveActions: numeric[2] ?? 5,
+      destructiveWindowSeconds: numeric[3] ?? 20,
+      quarantineRoleId: quarantineRole?.id ?? null,
+      logChannelId: channels[0]?.id ?? null
+    });
+    await message.reply("Security настроен и включён.");
+    return true;
+  }
+
   private async config(guildId: string): Promise<SecurityConfig> {
     const result = await this.db.query<{ enabled: boolean; max_joins: number; window_seconds: number; max_destructive_actions: number; destructive_window_seconds: number; quarantine_role_id: string | null; log_channel_id: string | null }>(
       "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id FROM security_settings WHERE guild_id=$1",
