@@ -33,6 +33,10 @@ export function nextMusicRepeatMode(mode: MusicRepeatMode): MusicRepeatMode {
   return "off";
 }
 
+export function nextMusicQueueRepeatMode(mode: MusicRepeatMode): MusicRepeatMode {
+  return mode === "queue" ? "off" : "queue";
+}
+
 export function clampMusicVolume(value: number): number {
   return Math.min(200, Math.max(0, Math.round(value)));
 }
@@ -1422,6 +1426,72 @@ export class Music implements PlatformModule {
       return;
     }
 
+    const action = interaction.options.getString("action") ?? "view";
+    if (action !== "view") {
+      const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+      if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+        await interaction.reply({ content: "Изменять очередь могут пользователи с DJ-ролью или Manage Server.", ephemeral: true });
+        return;
+      }
+      const queue = player.queue.tracks;
+      const position = interaction.options.getInteger("position");
+      const to = interaction.options.getInteger("to");
+      const from = interaction.options.getInteger("from");
+      const end = interaction.options.getInteger("end");
+      if (action === "clear") {
+        queue.splice(0, queue.length);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await interaction.reply({ content: "🧹 Очередь очищена. Текущий трек не остановлен.", ephemeral: true });
+        return;
+      }
+      if (action === "remove") {
+        if (!position || position > queue.length) {
+          await interaction.reply({ content: "Укажи существующую позицию трека.", ephemeral: true });
+          return;
+        }
+        const removed = queue.splice(position - 1, 1)[0];
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await interaction.reply({ content: "🗑️ Удалён трек #" + position + ": **" + removed?.info.title + "**", ephemeral: true });
+        return;
+      }
+      if (action === "remove-range") {
+        const startPosition = from ?? position;
+        const finish = end ?? to;
+        if (!startPosition || !finish || startPosition > finish || startPosition < 1 || finish > queue.length) {
+          await interaction.reply({ content: "Укажи корректный диапазон from/end.", ephemeral: true });
+          return;
+        }
+        const removed = queue.splice(startPosition - 1, finish - startPosition + 1);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await interaction.reply({ content: "🗑️ Удалено треков: **" + removed.length + "** (#" + startPosition + "–" + finish + ").", ephemeral: true });
+        return;
+      }
+      if (action === "move" || action === "front") {
+        if (!position || position > queue.length) {
+          await interaction.reply({ content: "Укажи существующую позицию трека.", ephemeral: true });
+          return;
+        }
+        const destination = action === "front" ? 1 : (to ?? 0);
+        if (destination < 1 || destination > queue.length) {
+          await interaction.reply({ content: "Укажи корректную destination position.", ephemeral: true });
+          return;
+        }
+        const moved = queue.splice(position - 1, 1)[0];
+        if (!moved) {
+          await interaction.reply({ content: "Трек не найден.", ephemeral: true });
+          return;
+        }
+        queue.splice(destination - 1, 0, moved);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await interaction.reply({ content: "↕️ Трек перемещён: **" + moved.info.title + "** → #" + destination, ephemeral: true });
+        return;
+      }
+      return;
+    }
     const page = this.buildQueuePage(player, 0);
     await interaction.reply({
       content: page.content,
@@ -1429,7 +1499,6 @@ export class Music implements PlatformModule {
       ephemeral: true
     });
   }
-
   private async volume(interaction: ChatInputCommandInteraction): Promise<void> {
     const player = this.manager?.players.get(interaction.guildId!);
     if (!player) {
@@ -1468,6 +1537,11 @@ export class Music implements PlatformModule {
       .setTitle("🎵 Сейчас играет")
       .setDescription(`**${track.info.title}**\n${track.info.author}`)
       .addFields(
+        {
+          name: "Прогресс",
+          value: formatTrackProgress(player, track),
+          inline: true
+        },
         {
           name: "Состояние",
           value: player.paused ? "⏸️ Пауза" : "▶️ Играет",
@@ -1736,10 +1810,15 @@ export class Music implements PlatformModule {
       await this.persistPlayer(player);
       response = "🔀 Очередь перемешана.";
     } else if (action === "repeat") {
-      const mode = nextMusicRepeatMode(player.repeatMode);
+      const mode = nextMusicQueueRepeatMode(player.repeatMode);
       await player.setRepeatMode(mode);
       await this.persistPlayer(player);
-      response = `🔁 Repeat: **${mode}**`;
+      response = "🔁 Queue Loop: **" + (mode === "queue" ? "on" : "off") + "**";
+    } else if (action === "loop-one") {
+      const mode = player.repeatMode === "track" ? "off" : "track";
+      await player.setRepeatMode(mode);
+      await this.persistPlayer(player);
+      response = "🔂 Loop One: **" + (mode === "track" ? "on" : "off") + "**";
     } else if (action === "seek-back" || action === "seek-forward") {
       const track = player.queue.current;
       if (!track) {
@@ -2056,9 +2135,10 @@ export class Music implements PlatformModule {
     const page = Math.min(Math.max(Math.trunc(requestedPage), 0), totalPages - 1);
     const start = page * pageSize;
     const tracks = player.queue.tracks.slice(start, start + pageSize);
-    const lines = tracks.map((track, index) =>
-      `${start + index + 1}. **${track.info.title}** — ${track.info.author ?? "Unknown artist"}`
-    );
+    const lines = tracks.map((track, index) => {
+      const requester = typeof track.requester?.id === "string" ? " · <@" + track.requester.id + ">" : "";
+      return `${start + index + 1}. **${track.info.title}** — ${track.info.author ?? "Unknown artist"}${requester}`;
+    });
 
     const components = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
@@ -2091,7 +2171,8 @@ export class Music implements PlatformModule {
         new ButtonBuilder().setCustomId("dsp:music:pause").setEmoji(player.paused ? "▶️" : "⏸️").setLabel(player.paused ? "Продолжить" : "Пауза").setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId("dsp:music:skip").setEmoji("⏭️").setLabel("Следующий").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("dsp:music:shuffle").setEmoji("🔀").setLabel("Shuffle").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("dsp:music:repeat").setEmoji(repeat).setLabel("Repeat").setStyle(ButtonStyle.Secondary)
+        new ButtonBuilder().setCustomId("dsp:music:repeat").setEmoji(repeat).setLabel("Queue Loop").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:loop-one").setEmoji("🔂").setLabel("Loop One").setStyle(player.repeatMode === "track" ? ButtonStyle.Primary : ButtonStyle.Secondary)
       ),
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId("dsp:music:stop").setEmoji("⏹️").setLabel("Стоп").setStyle(ButtonStyle.Danger),
@@ -2138,6 +2219,7 @@ export class Music implements PlatformModule {
         ? `**${current.info.title}**\n${current.info.author ?? "Unknown artist"}`
         : "Сейчас ничего не играет.")
       .addFields(
+        ...(current ? [{ name: "Прогресс", value: formatTrackProgress(player, current), inline: true }] : []),
         { name: "Состояние", value: player.paused ? "⏸ Пауза" : "▶ Играет", inline: true },
         { name: "Повтор", value: player.repeatMode, inline: true },
         { name: "Громкость", value: String(player.volume), inline: true },
@@ -2187,6 +2269,27 @@ export function canControlMusic(
 }
 
 
+function formatTrackProgress(player: Player, track: Track | null): string {
+  if (!track) return "—";
+  const durationMs = Math.max(0, Number(track.info.duration ?? 0));
+  const basePosition = Math.max(0, Number(player.lastPosition ?? 0));
+  const elapsedMs = player.paused
+    ? basePosition
+    : basePosition + Math.max(0, Date.now() - Number(player.lastPositionChange ?? Date.now()));
+  const safeElapsed = durationMs > 0 ? Math.min(elapsedMs, durationMs) : elapsedMs;
+  const elapsed = Math.floor(safeElapsed / 1000);
+  const total = Math.floor(durationMs / 1000);
+  return total > 0
+    ? "`" + formatDurationSeconds(elapsed) + " / " + formatDurationSeconds(total) + "`"
+    : "`" + formatDurationSeconds(elapsed) + " / live`";
+}
+
+function formatDurationSeconds(totalSeconds: number): string {
+  const safe = Math.max(0, Math.trunc(totalSeconds));
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return minutes + ":" + String(seconds).padStart(2, "0");
+}
 export function normalizeMusicRepeatMode(value: string): MusicRepeatMode | null {
   return value === "off" || value === "track" || value === "queue" ? value : null;
 }
