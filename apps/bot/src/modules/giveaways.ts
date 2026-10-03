@@ -32,6 +32,8 @@ export class Giveaways implements PlatformModule {
     endsAt: string;
     status: string;
     selectedWinners: string[];
+    requirements: GiveawayRequirements;
+    messageTemplate: string;
     createdAt: string;
     finishedAt: string | null;
   }>> {
@@ -208,10 +210,6 @@ export class Giveaways implements PlatformModule {
     if (!id) throw new Error("giveaway id missing");
     await this.db.query(
       "UPDATE giveaways SET requirements=$1::jsonb,message_template=$2,updated_at=now() WHERE id=$3 AND guild_id=$4",
-      [JSON.stringify(requirements), messageTemplate, id, interaction.guild!.id]
-    );
-    await this.db.query(
-      "UPDATE giveaways SET requirements=$1::jsonb,message_template=$2,updated_at=now() WHERE id=$3 AND guild_id=$4",
       [JSON.stringify({ requiredRoleIds: [], minLevel: 0 }), defaultGiveawayTemplate(), id, message.guild.id]
     );
 
@@ -223,7 +221,7 @@ export class Giveaways implements PlatformModule {
         embeds: [
           new EmbedBuilder()
             .setTitle("🎉 Giveaway")
-            .setDescription(`**Приз:** ${prize}\n**Победителей:** 1\n**До:** <t:${Math.floor(endsAt.getTime()/1000)}:R>`)
+            .setDescription(renderGiveawayTemplate(defaultGiveawayTemplate(), { id:Number(id), prize, winners:1, endsAt }))
         ],
         components: [
           new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -291,6 +289,10 @@ export class Giveaways implements PlatformModule {
     );
     const id = created.rows[0]?.id;
     if (!id) throw new Error("giveaway id missing");
+    await this.db.query(
+      "UPDATE giveaways SET requirements=$1::jsonb,message_template=$2,updated_at=now() WHERE id=$3 AND guild_id=$4",
+      [JSON.stringify(requirements), messageTemplate, id, interaction.guild!.id]
+    );
 
     let message: Message | undefined;
     let publishedMessageId: string | undefined;
@@ -299,7 +301,7 @@ export class Giveaways implements PlatformModule {
       embeds: [
         new EmbedBuilder()
           .setTitle("🎉 Giveaway")
-          .setDescription(`**Приз:** ${prize}\n**Победителей:** ${winners}\n**До:** <t:${Math.floor(endsAt.getTime()/1000)}:R>`)
+          .setDescription(renderGiveawayTemplate(messageTemplate, { id:Number(id), prize, winners, endsAt }))
       ],
       components: [
         new ActionRowBuilder<ButtonBuilder>().addComponents(
