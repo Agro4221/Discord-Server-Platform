@@ -277,3 +277,10 @@ Never write credentials, tokens or private user data here.
 - Added command-policy registration so AFK is visible/configurable in the existing Dashboard command policy editor without introducing a second permissions model.
 - Added deterministic helper/command-schema regressions.
 - Live Discord and restart validation remain release-gate checks.
+## 2026-10-03 — AutoMod rule editor
+- Exposed the existing `automod_rules` backend through a dedicated Dashboard editor instead of creating a parallel configuration model.
+- Added CRUD UI for detector, action, threshold, window, timeout, role/channel scopes, moderator exemption and response template.
+- Hardened per-rule validation for supported actions and numeric ranges; Dashboard deletions now write audit events.
+- AutoMod `warn` now creates a real moderation warning through the existing warning/escalation pipeline.
+- Activated the `emotes` detector alias so it behaves consistently with emoji-count detection.
+- CI is the release gate for this increment; live Discord/resource hierarchy remains environment-dependent.
