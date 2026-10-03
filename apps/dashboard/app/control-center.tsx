@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { AnalyticsPanel } from "./analytics-panel";
+import { HelpPagesPanel } from "./help-pages-panel";
 import { AutoModRulesPanel } from "./automod-rules-panel";
 import { AutomationPanel } from "./automation-panel";
 import { BackupPanel } from "./backup-panel";
@@ -1474,10 +1475,16 @@ function ModulePage(props: {
       )}
 
       {props.module?.key === "custom-commands" && (
-        <section style={{ ...panel, padding: 20 }}>
-          <SectionHeader title="Custom Commands" eyebrow="COMMAND BUILDER" />
-          <CustomCommandsPanel guildId={props.guildId} roles={props.resources.roles} onChanged={props.onAudit} />
-        </section>
+        <>
+          <section style={{ ...panel, padding: 20 }}>
+            <SectionHeader title="Custom Commands" eyebrow="COMMAND BUILDER" />
+            <CustomCommandsPanel guildId={props.guildId} roles={props.resources.roles} onChanged={props.onAudit} />
+          </section>
+          <section style={{ ...panel, padding: 20 }}>
+            <SectionHeader title="Custom Help / Menu pages" eyebrow="SERVER UX" />
+            <HelpPagesPanel guildId={props.guildId} onChanged={props.onAudit} />
+          </section>
+        </>
       )}
 
       {props.module?.key === "automod" && (
