@@ -53,8 +53,8 @@ Release candidate — code/CI verified, ready for live Discord validation.
 - Discord live E2E requires user-owned Discord test credentials and has not been run here.
 
 ## Continuity
-Read docs/WORK-LOG.md before continuing work in a new chat.
-Read docs/TEST-MATRIX.md before declaring a subsystem complete.
+**First read `docs/PROJECT-HANDOFF.md` in full.** It is the canonical cross-chat project context and records the product goal, benchmark, implemented baseline, backlog, priorities and anti-drift rules.
+Then read `docs/PROJECT-STATE.md`, recent `docs/WORK-LOG.md` entries and `docs/TEST-MATRIX.md` before declaring a subsystem complete.
 Never commit credentials, bot tokens, provider secrets or private user data.
 
 
@@ -190,3 +190,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Functional coverage is evaluated across administration, moderation/AutoMod/security, logging, custom commands and templates, roles/onboarding, tickets/forms, automation, community/engagement, notifications/integrations, analytics and Music.
 - The benchmark also considers feature depth, configurable limits, permissions, UX, persistence, integrations and cross-module automation hooks rather than a simple checkbox list.
 - Official/current references used for this benchmark include MEE6 Support, JuniperBot Documentation, ProBot Premium, Dyno Documentation/Premium and Jockie Music FAQ/site. This is an external product benchmark; no proprietary implementation or closed code is being copied.
+
+
+## 2026-10-03 — Canonical handoff protocol
+- `docs/PROJECT-HANDOFF.md` is now the first-read continuity source for new chats.
+- It exists specifically so development can continue without repeatedly re-explaining the project's all-in-one goal, benchmark set, completed capabilities, backlog, Music requirements, priorities and accepted architectural/product decisions.
+- `docs/WORK-LOG.md` remains the chronological engineering record; `docs/PROJECT-STATE.md` remains the current-state summary; `docs/TEST-MATRIX.md` remains the validation gate reference.
