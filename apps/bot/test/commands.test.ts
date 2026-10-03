@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildCommands } from "../src/discord/commands.js";
 import { COMMAND_DEFINITIONS } from "../src/command-policy.js";
+import { BUILTIN_PREFIX_COMMANDS } from "../src/discord/prefix-commands.js";
 
 function assertRequiredOptionsFirst(node: unknown, path: string): void {
   if (!node || typeof node !== "object") return;
@@ -147,4 +148,20 @@ test("command policy names are unique and cover every top-level slash command", 
     definitionNames.length,
     "duplicate command policy definition"
   );
+});
+
+
+test("prefix command allowlist covers all policy-defined prefix commands", () => {
+  const policyPrefixNames = COMMAND_DEFINITIONS
+    .filter((definition) => definition.prefix)
+    .map((definition) => definition.name);
+
+  for (const name of policyPrefixNames) {
+    assert.ok(BUILTIN_PREFIX_COMMANDS.has(name), "Missing built-in prefix routing for " + name);
+  }
+
+  for (const name of BUILTIN_PREFIX_COMMANDS) {
+    const definition = COMMAND_DEFINITIONS.find((item) => item.name === name);
+    assert.ok(definition?.prefix, "Prefix allowlist contains non-prefix command " + name);
+  }
 });

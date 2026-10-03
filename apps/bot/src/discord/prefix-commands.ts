@@ -5,14 +5,14 @@ import type { CommandPolicyService } from "../command-policy.js";
 import type { CommandDispatcher } from "../command-dispatcher.js";
 
 
-const BUILTIN_PREFIX_COMMANDS = new Set([
+export const BUILTIN_PREFIX_COMMANDS = new Set([
   "help",
   "level", "rank", "top",
   "ban", "unban", "kick", "timeout", "warn", "history", "clear", "slowmode", "lock", "unlock",
   "play", "pause", "resume", "skip", "stop", "shuffle",
   "playlist", "queue", "nowplaying", "repeat", "seek", "volume", "autoplay",
   "balance", "daily", "leaderboard", "pay", "shop", "buy", "remind", "ticket", "roles", "giveaway",
-  "automod", "welcome", "security", "verify", "starboard", "feed", "automation",
+  "automod", "welcome", "security", "verify", "starboard", "feed", "automation", "economy", "music",
   "serverinfo", "userinfo", "avatar", "membercount", "roleinfo", "channelinfo", "afk",
   "poll", "suggest", "sticky", "8ball", "choose", "roll", "logging"
 ]);
