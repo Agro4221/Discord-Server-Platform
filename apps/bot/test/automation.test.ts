@@ -184,3 +184,11 @@ test("Automation retry backoff is bounded and dead-letters after five attempts",
   assert.equal(automationRetryDelaySeconds(5), 80);
   assert.equal(automationRetryDelaySeconds(20), 300);
 });
+
+test("Automation accepts expanded Discord trigger catalog", () => {
+  for (const event of ["reaction.remove", "channel.delete", "role.delete", "member.ban"] as const) {
+    assert.doesNotThrow(() =>
+      validateAutomationRule(event, [], [{ type: "log", message: "expanded trigger" }])
+    );
+  }
+});
