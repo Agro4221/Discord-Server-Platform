@@ -106,6 +106,9 @@ type ApiOptions = {
     listTemplates: (guildId: string) => Promise<unknown[]>;
     setTemplate: (guildId: string, name: string, content: string) => Promise<void>;
     deleteTemplate: (guildId: string, name: string) => Promise<boolean>;
+    listPresets: (guildId: string) => Promise<unknown[]>;
+    savePreset: (guildId: string, name: string, event: string, conditions: unknown[], anyConditions: unknown[], actions: unknown[], cooldownSeconds: number) => Promise<void>;
+    deletePreset: (guildId: string, name: string) => Promise<boolean>;
   };
   customCommands?: CustomCommandService;
   autoResponder?: AutoResponder;
@@ -917,6 +920,93 @@ export class ManagementApiServer {
               action: "automation.deleted",
               targetType: "automation-rule",
               targetId: ruleId
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const automationPresetsMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/presets$/);
+          const automationPresetItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/presets\/([^/]+)$/);
+
+          if ((automationPresetsMatch || automationPresetItemMatch) && !this.options.automation) {
+            this.json(res, 500, { error: "automation_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && automationPresetsMatch) {
+            const guildId = automationPresetsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, presets: await this.options.automation!.listPresets(guildId) });
+            return;
+          }
+
+          if (method === "POST" && automationPresetsMatch) {
+            const guildId = automationPresetsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const name = typeof body.name === "string" ? body.name.trim() : "";
+            const event = typeof body.event === "string" ? body.event : "";
+            const conditions = body.conditions;
+            const anyConditions = body.anyConditions ?? [];
+            const actions = body.actions;
+            const cooldownSeconds = typeof body.cooldownSeconds === "number" ? body.cooldownSeconds : 0;
+
+            if (
+              !name || name.length > 40 ||
+              !Array.isArray(conditions) || conditions.length > 10 ||
+              !Array.isArray(anyConditions) || anyConditions.length > 10 ||
+              conditions.length + anyConditions.length > 10 ||
+              !Array.isArray(actions) || actions.length < 1 || actions.length > 10 ||
+              !Number.isFinite(cooldownSeconds) || cooldownSeconds < 0 || cooldownSeconds > 86400
+            ) {
+              throw new RequestInputError("invalid_automation_preset", 400);
+            }
+
+            validateAutomationPayload(this.options.client, guildId, event, [...conditions, ...anyConditions], actions);
+            await this.options.automation!.savePreset(
+              guildId,
+              name,
+              event,
+              conditions,
+              anyConditions,
+              actions,
+              cooldownSeconds
+            );
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "automation.preset.saved",
+              targetType: "automation-preset",
+              targetId: name.toLowerCase()
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          if (method === "DELETE" && automationPresetItemMatch) {
+            const guildId = automationPresetItemMatch[1] ?? "";
+            const name = decodeURIComponent(automationPresetItemMatch[2] ?? "").toLowerCase();
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const deleted = await this.options.automation!.deletePreset(guildId, name);
+            if (!deleted) {
+              this.json(res, 404, { error: "automation_preset_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "automation.preset.deleted",
+              targetType: "automation-preset",
+              targetId: name
             });
             this.json(res, 200, { ok: true });
             return;
