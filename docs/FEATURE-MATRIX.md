@@ -437,7 +437,7 @@ Music должен стремиться к функциональности си
 | Branches / if-else | ✅ |
 | Templates | ✅ |
 | Visual automation builder | ✅ |
-| Richer trigger catalog | 🟡 |
+| Richer trigger catalog | ✅ | Added reaction.remove, channel.delete, role.delete and member.ban triggers through the existing PlatformEventBus |
 | Richer condition catalog | 🟡 |
 | Richer action catalog | 🟡 |
 | Workflow retries / dead-letter diagnostics | ✅ | Durable delayed jobs retry with bounded exponential backoff and move to a persistent dead-letter state after five failed attempts; Dashboard diagnostics exposes the state |
