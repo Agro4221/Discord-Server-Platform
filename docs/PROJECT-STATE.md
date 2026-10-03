@@ -258,6 +258,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Delayed execution propagates action errors instead of swallowing them, while non-delayed event execution retains its existing per-action best-effort behavior.
 - Rule IDs are preserved on delayed jobs and diagnostics distinguish pending, processing, completed and dead-lettered jobs.
 
+## 2026-10-04 — Automation richer conditions/actions
+- Automation conditions now cover role absence, bot identity, channel type and Discord permission checks.
+- Actions now include managed nickname updates and message reactions, with dry-run previews and Dashboard controls.
+- Runtime uses live GuildMember/permissions data when a dry-run context is not provided.
 ## 2026-10-04 — Automation workflow presets
 - Automation now supports reusable per-guild workflow presets alongside text templates.
 - Presets persist full workflow definitions and can be saved, loaded into the Dashboard Builder, deleted and transferred through Config Export/Import.
