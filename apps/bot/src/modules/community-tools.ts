@@ -1371,7 +1371,7 @@ export function formatDiceRoll(
   const match = notation
     .trim()
     .toLowerCase()
-    .match(/^(\\d{1,3})d(\\d{1,4})$/);
+    .match(/^(\d{1,3})d(\d{1,4})$/);
 
   if (!match) {
     return "Формат: 2d6, 1d20 и т.п.";
