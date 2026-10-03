@@ -132,6 +132,7 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
     title: "Music / Lavalink",
     fields: [
       { key: "preferredTextChannelId", label: "Канал объявлений", type: "channel" },
+      { key: "requestChannelId", label: "Музыкальный канал (запросы + контроллер)", type: "channel", description: "Любой текст в этом канале от участника добавляется в очередь. Участник должен находиться в voice." },
       { key: "defaultVolume", label: "Громкость по умолчанию", type: "number", min: 0, max: 200 },
       { key: "announceTrackStart", label: "Объявлять начало трека", type: "boolean" },
       { key: "autoplay", label: "Autoplay", type: "boolean", description: "После окончания очереди искать следующий трек автоматически." },
@@ -244,6 +245,7 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
     table: "music_settings",
     columns: {
       preferredTextChannelId: "preferred_text_channel_id",
+      requestChannelId: "request_channel_id",
       defaultVolume: "default_volume",
       announceTrackStart: "announce_track_start",
       autoplay: "autoplay",
