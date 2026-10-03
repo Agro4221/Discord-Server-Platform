@@ -14,12 +14,14 @@ import { PermissionChecker } from "./permissions.js";
 import { TemporaryVoice } from "../modules/temporary-voice.js";
 import { Moderation } from "../modules/moderation.js";
 import { COMMAND_DEFINITIONS } from "../command-policy.js";
+import type { HelpPages } from "../help-pages.js";
 
 export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder | SlashCommandOptionsOnlyBuilder> {
   return [
     new SlashCommandBuilder()
       .setName("help")
-      .setDescription("Show available Vexa commands"),
+      .setDescription("Show available Vexa commands")
+      .addStringOption((o) => o.setName("page").setDescription("Optional custom help page slug").setMaxLength(40)),
 
     new SlashCommandBuilder()
       .setName("ping")
@@ -1015,9 +1017,24 @@ export async function handleCommand(
   interaction: ChatInputCommandInteraction,
   db: Database,
   temporaryVoice: TemporaryVoice,
-  moderation: Moderation
+  moderation: Moderation,
+  helpPages?: HelpPages
 ): Promise<void> {
   if (interaction.commandName === "help") {
+    const requestedPage = interaction.options.getString("page")?.trim();
+    if (requestedPage && helpPages) {
+      const page = await helpPages.get(interaction.guild!.id, requestedPage);
+      if (!page || !page.enabled) {
+        await interaction.reply({ content: "Страница помощи не найдена.", ephemeral: true });
+        return;
+      }
+      await interaction.reply({
+        content: "**" + page.title + "**\n" + page.content,
+        ephemeral: true
+      });
+      return;
+    }
+
     const rows = await db.query<{ command_name: string; enabled: boolean; slash_enabled: boolean; help_visible: boolean }>(
       "SELECT command_name,enabled,slash_enabled,help_visible FROM command_policies WHERE guild_id=$1",
       [interaction.guild!.id]
