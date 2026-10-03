@@ -16,6 +16,7 @@ import { EconomyShopPanel } from "./economy-shop-panel";
 import { ModerationPanel } from "./moderation-panel";
 import { MusicPanel } from "./music-panel";
 import { TicketsPanel } from "./tickets-panel";
+import { LevelingPanel } from "./leveling-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -434,7 +435,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets"]);
+const PANEL_KEYS = new Set(["moderation", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1470,6 +1471,18 @@ function ModulePage(props: {
         </section>
       )}
 
+      {props.module?.key === "leveling" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Leveling Center" eyebrow="OPERATIONS" />
+          <LevelingPanel
+            guildId={props.guildId}
+            roles={props.resources.roles}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
       {props.module?.key === "roles" && (
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Role Panels" eyebrow="OPERATIONS" />
@@ -1551,6 +1564,13 @@ function ModulePage(props: {
             channels={props.resources.channels.filter((item) => item.type === 2 || item.type === 13)}
             onChanged={props.onAudit}
           />
+        </section>
+      )}
+
+      {props.module?.key === "tickets" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Tickets Center" eyebrow="OPERATIONS" />
+          <TicketsPanel guildId={props.guildId} onChanged={props.onAudit} />
         </section>
       )}
 
