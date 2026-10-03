@@ -373,6 +373,10 @@ Never write credentials, tokens or private user data here.
 - No Discord mutation, webhook call or database write is performed by dry-run.
 
 
+## 2026-10-04 — Automation richer conditions/actions
+- Expanded Automation condition catalog with not-has-role, user-is-bot, channel-type-is and has-permission.
+- Expanded action catalog with set-nickname and react-message.
+- Kept dry-run, API validation, Dashboard builder and runtime execution on the same contract.
 ## 2026-10-04 — Automation workflow presets
 - Added migration 70 with durable per-guild workflow presets storing event, ALL/ANY conditions, actions and cooldown.
 - Added AutomationEngine preset CRUD with normalized names and the same validation contract as live rules.
