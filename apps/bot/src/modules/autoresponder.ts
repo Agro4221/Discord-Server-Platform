@@ -186,7 +186,9 @@ export class AutoResponder implements PlatformModule {
         user: message.author.username,
         mention: message.author.toString(),
         server: message.guild.name,
-        channel: message.channel.isTextBased() ? ("name" in message.channel ? message.channel.name : message.channelId) : message.channelId
+        channel: message.channel.isTextBased()
+          ? ("name" in message.channel && typeof message.channel.name === "string" ? message.channel.name : message.channelId)
+          : message.channelId
       });
       if (!content) return;
 
