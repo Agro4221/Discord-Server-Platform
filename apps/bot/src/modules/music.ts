@@ -576,6 +576,9 @@ export class Music implements PlatformModule {
       case "autoplay":
         await this.autoplay(interaction);
         break;
+      case "247":
+        await this.twentyFourSeven(interaction);
+        break;
       case "seek":
         await this.seek(interaction);
         break;
@@ -1190,6 +1193,22 @@ export class Music implements PlatformModule {
     await interaction.reply({ content: `🔁 Repeat: **${mode}**`, ephemeral: true });
   }
 
+  private async twentyFourSeven(interaction: ChatInputCommandInteraction): Promise<void> {
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "24/7 режим настраивается пользователями с DJ-ролью или Manage Server.", ephemeral: true });
+      return;
+    }
+    const enabled = interaction.options.getBoolean("enabled");
+    const settings = await this.musicSettings(interaction.guildId!);
+    if (enabled === null) {
+      await interaction.reply({ content: "24/7: **" + (settings.twentyFourSeven ? "включён" : "выключен") + "**", ephemeral: true });
+      return;
+    }
+    await this.setTwentyFourSeven(interaction.guildId!, enabled);
+    await interaction.reply({ content: "24/7 режим " + (enabled ? "включён" : "выключен") + ".", ephemeral: true });
+  }
+
   private async autoplay(interaction: ChatInputCommandInteraction): Promise<void> {
     const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
     if (!await this.canManageMusicMember(interaction.guildId!, member)) {
@@ -1775,9 +1794,9 @@ export class Music implements PlatformModule {
     return result.rows[0]?.autoplay ?? false;
   }
 
-  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number }> {
-    const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number }>(
-      "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds FROM music_settings WHERE guild_id=$1",
+  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number; twentyFourSeven: boolean }> {
+    const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number; twenty_four_seven: boolean }>(
+      "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds,twenty_four_seven FROM music_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -1786,7 +1805,8 @@ export class Music implements PlatformModule {
       requestChannelId: row?.request_channel_id ?? null,
       defaultVolume: Math.min(Math.max(Number(row?.default_volume ?? 100), 0), 200),
       announceTrackStart: row?.announce_track_start ?? true,
-      autoLeaveSeconds: Math.min(Math.max(Number(row?.auto_leave_seconds ?? 30), 0), 86400)
+      autoLeaveSeconds: Math.min(Math.max(Number(row?.auto_leave_seconds ?? 30), 0), 86400),
+      twentyFourSeven: row?.twenty_four_seven ?? false
     };
   }
 
@@ -1824,8 +1844,9 @@ export class Music implements PlatformModule {
 
   private async scheduleAutoLeave(player: Player): Promise<void> {
     this.cancelAutoLeave(player.guildId);
-    const seconds = (await this.musicSettings(player.guildId)).autoLeaveSeconds;
-    if (seconds <= 0 || !this.manager) return;
+    const settings = await this.musicSettings(player.guildId);
+    if (settings.twentyFourSeven || settings.autoLeaveSeconds <= 0 || !this.manager) return;
+    const seconds = settings.autoLeaveSeconds;
     const timer = setTimeout(() => {
       const current = this.manager?.players.get(player.guildId);
       if (!current || current.queue.current || current.queue.tracks.length > 0) return;
@@ -1835,6 +1856,13 @@ export class Music implements PlatformModule {
     }, seconds * 1000);
     timer.unref();
     this.autoLeaveTimers.set(player.guildId, timer);
+  }
+
+  private async setTwentyFourSeven(guildId: string, enabled: boolean): Promise<void> {
+    await this.db.query(
+      "INSERT INTO music_settings(guild_id,twenty_four_seven) VALUES($1,$2) ON CONFLICT(guild_id) DO UPDATE SET twenty_four_seven=EXCLUDED.twenty_four_seven,updated_at=now()",
+      [guildId, enabled]
+    );
   }
 
   private async setAutoplay(guildId: string, enabled: boolean): Promise<void> {
