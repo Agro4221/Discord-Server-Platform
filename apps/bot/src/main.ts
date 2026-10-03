@@ -275,6 +275,7 @@ async function main(): Promise<void> {
     },
     automation: {
       list: async (guildId) => automation.listRules(guildId),
+      diagnostics: async (guildId) => automation.diagnostics(guildId),
       dryRun: async (input) => automation.dryRun({
         guildId: input.guildId,
         event: input.event as import("@dsp/domain").AutomationEvent,
