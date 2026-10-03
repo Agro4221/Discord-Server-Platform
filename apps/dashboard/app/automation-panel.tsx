@@ -592,7 +592,7 @@ export function AutomationPanel({
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 8 }}>
             <Metric label="Rules" value={String(diagnostics.rules.enabled) + " / " + diagnostics.rules.total} />
             <Metric label="Templates" value={String(diagnostics.templates.total)} />
             <Metric label="Delayed pending" value={String(diagnostics.delayedJobs.pending)} />
