@@ -155,13 +155,28 @@ export class RolePanels implements PlatformModule {
     channelId: string,
     roles: PanelRole[],
     title: string,
-    selectionMode: RoleSelectionMode = "toggle",
-    maxSelections = 1,
+    selectionMode: RoleSelectionMode | (PanelMessageCallbacks & {
+      editMessage: (channelId: string, messageId: string, content: string, components: ActionRowBuilder<ButtonBuilder>[]) => Promise<void>;
+    }) = "toggle",
+    maxSelections: number | (PanelMessageCallbacks & {
+      editMessage: (channelId: string, messageId: string, content: string, components: ActionRowBuilder<ButtonBuilder>[]) => Promise<void>;
+    }) = 1,
     durationMinutes = 0,
-    callbacks: PanelMessageCallbacks & {
+    callbacks?: PanelMessageCallbacks & {
       editMessage: (channelId: string, messageId: string, content: string, components: ActionRowBuilder<ButtonBuilder>[]) => Promise<void>;
     }
   ): Promise<RolePanelRecord | null> {
+    if (typeof selectionMode !== "string") {
+      callbacks = selectionMode;
+      selectionMode = "toggle";
+      maxSelections = 1;
+      durationMinutes = 0;
+    } else if (typeof maxSelections !== "number") {
+      callbacks = maxSelections;
+      maxSelections = 1;
+      durationMinutes = 0;
+    }
+    if (!callbacks) throw new Error("role_panel_callbacks_required");
     if (!roles.length || roles.length > 5) throw new Error("panel_requires_1_to_5_roles");
     const cleaned = [...new Map(
       roles
