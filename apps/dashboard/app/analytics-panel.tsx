@@ -14,6 +14,11 @@ type AuditActivity = {
   created_at: string;
 };
 
+type AnalyticsSettings = {
+  retentionDays: number;
+  visibleCounters: Array<"message" | "member_join" | "member_leave" | "voice_join" | "voice_leave" | "voice_move">;
+};
+
 type AnalyticsReport = {
   hours: number;
   totals: Record<string, number>;
@@ -31,8 +36,13 @@ type AnalyticsReport = {
 export function AnalyticsPanel({ guildId }: { guildId: string }) {
   const [report, setReport] = useState<AnalyticsReport | null>(null);
   const [activity, setActivity] = useState<AuditActivity[]>([]);
+  const [settings, setSettings] = useState<AnalyticsSettings>({
+    retentionDays: 30,
+    visibleCounters: ["message","member_join","member_leave","voice_join","voice_leave","voice_move"]
+  });
   const [hours, setHours] = useState(24);
   const [loading, setLoading] = useState(false);
+  const [settingsBusy, setSettingsBusy] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -41,28 +51,61 @@ export function AnalyticsPanel({ guildId }: { guildId: string }) {
     setError("");
     Promise.all([
       fetch("/api/guilds/" + encodeURIComponent(guildId) + "/analytics?hours=" + hours, { cache: "no-store" }),
-      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/analytics/activity?limit=50", { cache: "no-store" })
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/analytics/activity?limit=50", { cache: "no-store" }),
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/analytics/settings", { cache: "no-store" })
     ])
-      .then(async ([reportResponse, activityResponse]) => {
+      .then(async ([reportResponse, activityResponse, settingsResponse]) => {
         const reportBody = await reportResponse.json().catch(() => ({}));
         const activityBody = await activityResponse.json().catch(() => ({}));
+        const settingsBody = await settingsResponse.json().catch(() => ({}));
         if (!reportResponse.ok) throw new Error(reportBody.error ?? "analytics_failed");
         if (!activityResponse.ok) throw new Error(activityBody.error ?? "analytics_activity_failed");
+        if (!settingsResponse.ok) throw new Error(settingsBody.error ?? "analytics_settings_failed");
         return {
           report: reportBody.report as AnalyticsReport,
-          activity: (activityBody.activity ?? []) as AuditActivity[]
+          activity: (activityBody.activity ?? []) as AuditActivity[],
+          settings: settingsBody.settings as AnalyticsSettings
         };
       })
       .then((next) => {
         if (!cancelled) {
           setReport(next.report);
           setActivity(next.activity);
+          setSettings(next.settings);
         }
       })
       .catch(() => { if (!cancelled) setError("Не удалось загрузить аналитику."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [guildId, hours]);
+
+  async function saveSettings() {
+    setSettingsBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/analytics/settings", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(settings)
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "analytics_settings_save_failed");
+      setSettings((body.settings ?? settings) as AnalyticsSettings);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось сохранить настройки Analytics.");
+    } finally {
+      setSettingsBusy(false);
+    }
+  }
+
+  function toggleCounter(counter: AnalyticsSettings["visibleCounters"][number]) {
+    setSettings((current) => ({
+      ...current,
+      visibleCounters: current.visibleCounters.includes(counter)
+        ? current.visibleCounters.filter((value) => value !== counter)
+        : [...current.visibleCounters, counter]
+    }));
+  }
 
   const events = useMemo(
     () => Object.entries(report?.totals ?? {}).sort((a, b) => b[1] - a[1]),
@@ -99,11 +142,31 @@ export function AnalyticsPanel({ guildId }: { guildId: string }) {
       {!loading && events.length === 0 && <div style={{ opacity: 0.42 }}>Данных пока нет или Analytics выключен.</div>}
 
       {!loading && report && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
+        <>
+          <section style={sectionStyle}>
+            <div style={{ fontWeight: 700, fontSize: 12 }}>History & counters</div>
+            <div style={{ color: "#697486", fontSize: 9 }}>
+              Retention удаляет только minute buckets из Analytics; persistent server counters не стираются.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "180px 1fr auto", gap: 8, alignItems: "end" }}>
+              <label style={label}><span>Retention, дней</span><input type="number" min={1} max={3650} value={settings.retentionDays} onChange={(e) => setSettings((current) => ({ ...current, retentionDays: Number(e.target.value) }))} style={input} /></label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {(["message","member_join","member_leave","voice_join","voice_leave","voice_move"] as const).map((counter) => (
+                  <button type="button" key={counter} onClick={() => toggleCounter(counter)} disabled={settingsBusy} style={{ ...secondary, opacity: settings.visibleCounters.includes(counter) ? 1 : 0.4 }}>
+                    {counter}
+                  </button>
+                ))}
+              </div>
+              <button type="button" disabled={settingsBusy} onClick={() => void saveSettings()} style={primary}>{settingsBusy ? "Сохранение…" : "Сохранить"}</button>
+            </div>
+          </section>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
           <Metric label="Сообщений всего" value={formatNumber(report.counters.messageCount)} />
           <Metric label="Входов / выходов" value={formatNumber(report.counters.memberJoins) + " / " + formatNumber(report.counters.memberLeaves)} />
           <Metric label="Voice событий" value={formatNumber(report.counters.voiceJoins + report.counters.voiceLeaves + report.counters.voiceMoves)} />
         </div>
+        </>
       )}
 
       {!loading && activity.length > 0 && (
@@ -157,6 +220,12 @@ function Metric({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+const sectionStyle = { display: "grid", gap: 8, padding: 11, borderRadius: 10, border: "1px solid #232a35", background: "#0e131a" } as const;
+const label = { display: "grid", gap: 4, color: "#7f8b9c", fontSize: 9 } as const;
+const input = { background: "#0f151d", color: "#f4f6fa", border: "1px solid #2d3643", borderRadius: 8, padding: "8px 9px" } as const;
+const primary = { border: "1px solid #3b8659", background: "#173522", color: "#c9f4d5", borderRadius: 8, padding: "7px 9px", cursor: "pointer" } as const;
+const secondary = { border: "1px solid #303846", background: "#171c24", color: "#d7dde6", borderRadius: 8, padding: "6px 8px", cursor: "pointer" } as const;
 
 function formatNumber(value: number): string {
   return Number.isFinite(value) ? value.toLocaleString("ru-RU") : "0";
