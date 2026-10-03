@@ -399,8 +399,9 @@ export class CustomCommandService implements PlatformModule {
       throw new Error("custom_command_alias_target_unknown");
     }
 
-    const builder = targetBuilder
-      ? { ...targetBuilder.toJSON(), name: command.name, description: command.description || targetBuilder.description }
+    const targetJson = targetBuilder?.toJSON();
+    const builder = targetJson
+      ? { ...targetJson, name: command.name, description: command.description || targetJson.description }
       : new SlashCommandBuilder()
           .setName(command.name)
           .setDescription(command.description || "Custom server command")
