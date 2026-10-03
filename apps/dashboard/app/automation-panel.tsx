@@ -19,7 +19,8 @@ type Action =
   | { type: "delete-message"; channelId: string; messageId: string }
   | { type: "log"; message: string }
   | { type: "delay"; seconds: number }
-  | { type: "webhook"; url: string; content: string };
+  | { type: "webhook"; url: string; content: string }
+  | { type: "branch"; condition: Condition; thenActions: Action[]; elseActions: Action[] };
 
 type Rule = {
   id: string;
@@ -192,6 +193,12 @@ export function AutomationPanel({
       type === "delete-message" ? { type, channelId: "@event", messageId: "@event" } :
       type === "delay" ? { type, seconds: 5 } :
       type === "webhook" ? { type, url: "", content: "" } :
+      type === "branch" ? {
+        type,
+        condition: { type: "contains", left: "content", right: "" } as Condition,
+        thenActions: [{ type: "send-message", channelId: "", content: "" }],
+        elseActions: []
+      } :
       { type: "log", message: "" };
     setActions((current) => current.map((item, i) => i === index ? next : item));
   }
@@ -372,6 +379,7 @@ export function AutomationPanel({
               <option value="log">log</option>
               <option value="delay">delay</option>
               <option value="webhook">webhook</option>
+              <option value="branch">branch</option>
             </select>
 
             {action.type === "send-message" && (
@@ -428,6 +436,30 @@ export function AutomationPanel({
               <div style={actionGrid}>
                 <input value={action.url} onChange={(e) => updateAction(index, { url: e.target.value })} placeholder="https://example.com/webhook" style={inputStyle} />
                 <input value={action.content} maxLength={2000} onChange={(e) => updateAction(index, { content: e.target.value })} placeholder="Webhook content · {user} {channel} {content}" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "branch" && (
+              <div style={{ display: "grid", gap: 8 }}>
+                <textarea
+                  value={JSON.stringify({ condition: action.condition, thenActions: action.thenActions, elseActions: action.elseActions }, null, 2)}
+                  onChange={(e) => {
+                    try {
+                      const parsed = JSON.parse(e.target.value) as { condition: Condition; thenActions: Action[]; elseActions?: Action[] };
+                      if (!parsed.condition || !Array.isArray(parsed.thenActions) || (parsed.elseActions !== undefined && !Array.isArray(parsed.elseActions))) return;
+                      updateAction(index, { condition: parsed.condition, thenActions: parsed.thenActions, elseActions: parsed.elseActions ?? [] });
+                    } catch {
+                      // Keep the last valid branch until JSON is complete.
+                    }
+                  }}
+                  rows={9}
+                  spellCheck={false}
+                  style={{ ...inputStyle, fontFamily: "monospace", resize: "vertical" }}
+                  aria-label="Conditional branch JSON"
+                />
+                <div style={{ fontSize: 11, opacity: 0.45 }}>
+                  Branch: JSON с полями condition, thenActions и необязательным elseActions. Вложенность до 2 уровней, максимум 10 действий на ветку.
+                </div>
               </div>
             )}
 
