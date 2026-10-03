@@ -657,6 +657,20 @@ const migrations = [
       "CREATE UNIQUE INDEX IF NOT EXISTS uq_stream_alert_guild_target ON stream_alerts(guild_id,platform,target,channel_id);",
       "CREATE INDEX IF NOT EXISTS idx_stream_alerts_due ON stream_alerts(enabled,last_checked_at,interval_seconds);"
     ])
+  },
+  {
+    version: 40,
+    name: "persistent_afk",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS afk_users (",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  reason text NOT NULL DEFAULT 'Отошёл',",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,user_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_afk_users_guild ON afk_users(guild_id);"
+    ])
   }
 ] as const;
 
