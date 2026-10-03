@@ -18,7 +18,8 @@ type Action =
   | { type: "timeout"; userId: string; durationSeconds: number; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
   | { type: "log"; message: string }
-  | { type: "delay"; seconds: number };
+  | { type: "delay"; seconds: number }
+  | { type: "webhook"; url: string; content: string };
 
 type Rule = {
   id: string;
@@ -190,6 +191,7 @@ export function AutomationPanel({
       type === "timeout" ? { type, userId: "@event", durationSeconds: 60, reason: "" } :
       type === "delete-message" ? { type, channelId: "@event", messageId: "@event" } :
       type === "delay" ? { type, seconds: 5 } :
+      type === "webhook" ? { type, url: "", content: "" } :
       { type: "log", message: "" };
     setActions((current) => current.map((item, i) => i === index ? next : item));
   }
@@ -369,6 +371,7 @@ export function AutomationPanel({
               <option value="delete-message">delete-message</option>
               <option value="log">log</option>
               <option value="delay">delay</option>
+              <option value="webhook">webhook</option>
             </select>
 
             {action.type === "send-message" && (
@@ -419,6 +422,13 @@ export function AutomationPanel({
 
             {action.type === "delay" && (
               <input type="number" min={1} max={3600} value={action.seconds} onChange={(e) => updateAction(index, { seconds: Number(e.target.value) })} placeholder="Seconds" style={inputStyle} />
+            )}
+
+            {action.type === "webhook" && (
+              <div style={actionGrid}>
+                <input value={action.url} onChange={(e) => updateAction(index, { url: e.target.value })} placeholder="https://example.com/webhook" style={inputStyle} />
+                <input value={action.content} maxLength={2000} onChange={(e) => updateAction(index, { content: e.target.value })} placeholder="Webhook content · {user} {channel} {content}" style={inputStyle} />
+              </div>
             )}
 
             <button type="button" disabled={saving || actions.length === 1} onClick={() => setActions((current) => current.filter((_, i) => i !== index))} style={buttonStyle("secondary")}>×</button>
