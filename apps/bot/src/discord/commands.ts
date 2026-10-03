@@ -1393,3 +1393,8 @@ function parseDurationMinutes(value: string): number | null {
   if (!match) return null;
   const amount = Number(match[1]);
   const unit = match[2];
+  if (!Number.isSafeInteger(amount) || amount <= 0) return null;
+  const multiplier = unit === "w" ? 7 * 24 * 60 : unit === "d" ? 24 * 60 : unit === "h" ? 60 : 1;
+  const minutes = amount * multiplier;
+  return Number.isSafeInteger(minutes) && minutes <= 40320 ? minutes : null;
+}
