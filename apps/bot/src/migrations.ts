@@ -682,6 +682,8 @@ const migrations = [
       "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS max_open_per_user integer NOT NULL DEFAULT 1 CHECK(max_open_per_user BETWEEN 1 AND 10);",
       "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS auto_close_minutes integer NOT NULL DEFAULT 0 CHECK(auto_close_minutes BETWEEN 0 AND 43200);",
       "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS last_activity_at timestamptz NOT NULL DEFAULT now();",
+      "DROP INDEX IF EXISTS uq_open_ticket_per_creator;",
+      "CREATE INDEX IF NOT EXISTS idx_tickets_open_creator ON tickets(guild_id,creator_id,status);",
       "CREATE INDEX IF NOT EXISTS idx_tickets_auto_close ON tickets(status,last_activity_at);"
     ])
   },
