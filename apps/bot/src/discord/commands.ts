@@ -723,9 +723,10 @@ export async function handleCommand(
   interaction: ChatInputCommandInteraction,
   db: Database,
   temporaryVoice: TemporaryVoice,
-  moderation: Moderation
+  moderation: Moderation,
+  commandName = commandName
 ): Promise<void> {
-  if (interaction.commandName === "help") {
+  if (commandName === "help") {
     const rows = await db.query<{ command_name: string; help_visible: boolean }>(
       "SELECT command_name,help_visible FROM command_policies WHERE guild_id=$1 AND enabled=true AND slash_enabled=true AND help_visible=true ORDER BY command_name",
       [interaction.guild!.id]
@@ -744,7 +745,7 @@ export async function handleCommand(
     return;
   }
 
-  if (interaction.commandName === "ping") {
+  if (commandName === "ping") {
     const start = performance.now();
     let database = "ok";
     try {
@@ -761,33 +762,33 @@ export async function handleCommand(
 
   if (!interaction.inGuild()) return;
 
-  if (interaction.commandName === "clear") {
+  if (commandName === "clear") {
     await moderation.purge(interaction, interaction.options.getInteger("amount", true));
     return;
   }
-  if (interaction.commandName === "slowmode") {
+  if (commandName === "slowmode") {
     await moderation.slowmode(interaction, interaction.options.getInteger("seconds", true));
     return;
   }
-  if (interaction.commandName === "lock") {
+  if (commandName === "lock") {
     await moderation.lockChannel(interaction);
     return;
   }
-  if (interaction.commandName === "unlock") {
+  if (commandName === "unlock") {
     await moderation.unlockChannel(interaction);
     return;
   }
 
-  if (["ban", "timeout", "kick", "warn", "unban"].includes(interaction.commandName)) {
+  if (["ban", "timeout", "kick", "warn", "unban"].includes(commandName)) {
     const target = interaction.options.getUser("user", true);
     const reason = interaction.options.getString("reason", true);
 
-    if (interaction.commandName === "warn") {
+    if (commandName === "warn") {
       await moderation.warn(interaction, target, reason);
       return;
     }
 
-    if (interaction.commandName === "unban") {
+    if (commandName === "unban") {
       await moderation.unban(interaction, target, reason);
       return;
     }
@@ -798,7 +799,7 @@ export async function handleCommand(
       return;
     }
 
-    if (interaction.commandName === "kick") {
+    if (commandName === "kick") {
       await moderation.kick(interaction, member, reason);
       return;
     }
@@ -810,7 +811,7 @@ export async function handleCommand(
       return;
     }
 
-    if (interaction.commandName === "timeout") {
+    if (commandName === "timeout") {
       await moderation.timeout(interaction, member, durationMinutes, reason);
     } else {
       await moderation.ban(interaction, member, reason, durationMinutes);
@@ -818,7 +819,7 @@ export async function handleCommand(
     return;
   }
 
-  if (interaction.commandName === "setup") {
+  if (commandName === "setup") {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
       await interaction.reply({ content: "Недостаточно прав: Manage Server.", ephemeral: true });
       return;
@@ -868,7 +869,7 @@ export async function handleCommand(
     return;
   }
 
-  if (interaction.commandName !== "moderate") return;
+  if (commandName !== "moderate") return;
 
   const subcommand = interaction.options.getSubcommand();
   const target = interaction.options.getUser("user", true);

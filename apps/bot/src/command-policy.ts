@@ -219,8 +219,15 @@ export class CommandPolicyService {
   }
 
   async checkInteraction(interaction: ChatInputCommandInteraction): Promise<boolean> {
+    return this.checkInteractionAs(interaction, commandKey(interaction));
+  }
+
+  async checkInteractionAs(
+    interaction: ChatInputCommandInteraction,
+    commandName: string
+  ): Promise<boolean> {
     if (!interaction.inGuild()) return true;
-    const key = commandKey(interaction);
+    const key = commandName;
     const policy = await this.get(interaction.guildId!, key);
     const definition = COMMAND_DEFINITIONS.find((item) => item.name === key) ?? COMMAND_DEFINITIONS.find((item) => item.name === interaction.commandName);
 

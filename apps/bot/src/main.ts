@@ -38,6 +38,7 @@ import { CommandPolicyService } from "./command-policy.js";
 import { Utility } from "./modules/utility.js";
 import { CommunityTools } from "./modules/community-tools.js";
 import { Logging } from "./modules/logging.js";
+import { CommandDispatcher } from "./command-dispatcher.js";
 
 let fatalCleanup: (() => Promise<void>) | undefined;
 
@@ -111,6 +112,33 @@ async function main(): Promise<void> {
   const music = new Music(database, config, identities);
   const customCommands = new CustomCommandService(database, config);
   const commandPolicy = new CommandPolicyService(database);
+
+  const dispatcher = new CommandDispatcher(
+    client,
+    database,
+    temporaryVoice,
+    moderation,
+    commandPolicy,
+    leveling,
+    economy,
+    reminders,
+    utility,
+    communityTools,
+    logging,
+    welcome,
+    verification,
+    security,
+    autoMod,
+    starboard,
+    notifications,
+    automation,
+    tickets,
+    rolePanels,
+    giveaways,
+    music,
+    analytics
+  );
+  customCommands.attachDispatcher(dispatcher);
 
   const setModuleHealth = (
     name: string,
