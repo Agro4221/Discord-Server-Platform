@@ -22,7 +22,7 @@ type Action =
   | { type: "webhook"; url: string; content: string }
   | { type: "branch"; condition: Condition; thenActions: Action[]; elseActions: Action[] };
 
-type Rule = {
+type Template = { name: string; content: string };\n\ntype Rule = {
   id: string;
   name: string;
   enabled: boolean;
@@ -55,6 +55,9 @@ export function AutomationPanel({
   onChanged?: () => void | Promise<void>;
 }) {
   const [rules, setRules] = useState<Rule[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templateName, setTemplateName] = useState("");
+  const [templateContent, setTemplateContent] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("Новое правило");
   const [event, setEvent] = useState<string>("message.create");
@@ -67,10 +70,16 @@ export function AutomationPanel({
   const [error, setError] = useState("");
 
   async function load() {
-    const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation", { cache: "no-store" });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body.error ?? "automation_failed");
-    setRules(body.rules ?? []);
+    const [rulesResponse, templatesResponse] = await Promise.all([
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation", { cache: "no-store" }),
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation/templates", { cache: "no-store" })
+    ]);
+    const rulesBody = await rulesResponse.json().catch(() => ({}));
+    const templatesBody = await templatesResponse.json().catch(() => ({}));
+    if (!rulesResponse.ok) throw new Error(rulesBody.error ?? "automation_failed");
+    if (!templatesResponse.ok) throw new Error(templatesBody.error ?? "templates_failed");
+    setRules(rulesBody.rules ?? []);
+    setTemplates(templatesBody.templates ?? []);
   }
 
   useEffect(() => {
@@ -213,6 +222,35 @@ export function AutomationPanel({
       </div>
 
       {error && <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d" }}>{error}</div>}
+
+      <section style={sectionStyle}>
+        <div style={sectionTitle}>Reusable templates</div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(130px,.4fr) minmax(0,1fr) auto", gap: 8 }}>
+          <input value={templateName} maxLength={40} onChange={(e) => setTemplateName(e.target.value)} placeholder="welcome" style={inputStyle} />
+          <input value={templateContent} maxLength={2000} onChange={(e) => setTemplateContent(e.target.value)} placeholder="Привет, {user}! Канал: {channel}" style={inputStyle} />
+          <button type="button" disabled={saving || !templateName.trim() || !templateContent.trim()} onClick={() => void (async () => {
+            const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation/templates", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: templateName, content: templateContent }) });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) { setError(body.error ?? "template_save_failed"); return; }
+            setTemplateName(""); setTemplateContent(""); await load(); await onChanged?.();
+          })()} style={buttonStyle("secondary")}>Сохранить</button>
+        </div>
+        {templates.length ? templates.map((template) => (
+          <div key={template.name} style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", padding: "8px 9px", borderRadius: 9, background: "#0c1118", border: "1px solid #1d2430" }}>
+            <div style={{ minWidth: 0 }}><strong style={{ fontSize: 10 }}>{template.name}</strong><div style={{ marginTop: 2, color: "#697486", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{template.content}</div></div>
+            <div style={{ display: "flex", gap: 5 }}>
+              <button type="button" disabled={saving} onClick={() => { setTemplateName(template.name); setTemplateContent(template.content); }} style={buttonStyle("secondary")}>Править</button>
+              <button type="button" disabled={saving} onClick={() => void (async () => {
+                if (!window.confirm("Удалить шаблон " + template.name + "?")) return;
+                const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation/templates/" + encodeURIComponent(template.name), { method: "DELETE" });
+                if (!response.ok) { setError("Не удалось удалить шаблон."); return; }
+                await load(); await onChanged?.();
+              })()} style={buttonStyle("secondary")}>Удалить</button>
+            </div>
+          </div>
+        )) : <div style={{ opacity: 0.4, fontSize: 11 }}>Шаблонов пока нет.</div>}
+        <div style={{ opacity: 0.4, fontSize: 10 }}>В действиях используй <code>{"{template:name}"}</code> и переменные события: <code>{"{user}"}</code>, <code>{"{channel}"}</code>, <code>{"{content}"}</code>, <code>{"{event}"}</code>.</div>
+      </section>
 
       <input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder="Название правила" style={inputStyle} />
 
