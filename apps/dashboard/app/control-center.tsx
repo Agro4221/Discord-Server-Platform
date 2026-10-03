@@ -24,6 +24,7 @@ import { DiscordDiagnosticsPanel } from "./discord-diagnostics-panel";
 import { CommunityToolsPanel } from "./community-tools-panel";
 import { VerificationPanel } from "./verification-panel";
 import { SecurityPanel } from "./security-panel";
+import { WelcomePanel } from "./welcome-panel";
 import { TemporaryVoicePanel } from "./temporary-voice-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
@@ -180,12 +181,13 @@ const MODULE_META: Record<string, ModuleMeta> = {
     summary: "Приветствия, goodbye и отправка сообщений.",
     category: "server",
     commands: ["/welcome setup"],
+
     functions: [
       { title: "Welcome message", description: "Сообщение при входе нового участника." },
       { title: "DM", description: "Опциональная копия приветствия в личные сообщения." },
       { title: "Embeds", description: "Переключение embed-оформления сообщения." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   verification: {
     icon: "✓",
@@ -443,7 +445,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "security", "temporary-voice", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "starboard", "community-tools", "verification"]);
+const PANEL_KEYS = new Set(["moderation", "security", "temporary-voice", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "starboard", "community-tools", "verification", "welcome"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1513,6 +1515,17 @@ function ModulePage(props: {
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Temporary Voice Center" eyebrow="OPERATIONS" />
           <TemporaryVoicePanel guildId={props.guildId} onChanged={props.onAudit} />
+        </section>
+      )}
+
+      {props.module?.key === "welcome" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Welcome Center" eyebrow="OPERATIONS" />
+          <WelcomePanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0 || item.type === 5)}
+            values={props.values}
+          />
         </section>
       )}
 

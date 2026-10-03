@@ -19,6 +19,7 @@ import type { Tickets } from "./modules/tickets.js";
 import type { Starboard } from "./modules/starboard.js";
 import type { CommunityTools } from "./modules/community-tools.js";
 import type { Verification } from "./modules/verification.js";
+import type { Welcome } from "./modules/welcome.js";
 import type { Security } from "./modules/security.js";
 import type { TemporaryVoice } from "./modules/temporary-voice.js";
 import { CommandPolicyService, COMMAND_DEFINITIONS } from "./command-policy.js";
@@ -110,6 +111,7 @@ type ApiOptions = {
   starboard?: Starboard;
   communityTools?: CommunityTools;
   verification?: Verification;
+  welcome?: Welcome;
   security?: Security;
   temporaryVoice?: TemporaryVoice;
   commandPolicy?: CommandPolicyService;
