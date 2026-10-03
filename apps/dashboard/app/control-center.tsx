@@ -328,6 +328,8 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Playback", description: "Play, pause, resume, skip, stop и seek." },
       { title: "Queue", description: "Очередь, shuffle и повтор трека/очереди." },
       { title: "Autoplay", description: "Автоматическое продолжение после окончания очереди." },
+      { title: "Request channel", description: "Можно писать песню, исполнителя, URL или плейлист прямо в выделенный текстовый канал." },
+      { title: "Controller", description: "Постоянный panel с pause, skip, shuffle, repeat, stop, volume и queue." },
       { title: "Voice access", description: "Управление привязано к voice-каналу или Manage Server." },
       { title: "Lavalink health", description: "Статус модуля зависит от доступности узлов." },
       { title: "Multi-bot routing", description: "Отдельные bot identities могут обслуживать разные voice-каналы." }
