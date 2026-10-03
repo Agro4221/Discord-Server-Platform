@@ -2269,7 +2269,7 @@ export function canControlMusic(
 }
 
 
-function formatTrackProgress(player: Player, track: Track | null): string {
+export function formatTrackProgress(player: Player, track: Track | null): string {
   if (!track) return "—";
   const durationMs = Math.max(0, Number(track.info.duration ?? 0));
   const basePosition = Math.max(0, Number(player.lastPosition ?? 0));
