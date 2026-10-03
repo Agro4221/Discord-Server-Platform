@@ -62,6 +62,7 @@ Premium parity = **совокупность сильных функций раз
 
 ### AutoMod / Security
 - blocked words;
+- Dashboard AutoMod rule editor with per-detector actions, thresholds, scopes, exemptions and response templates;
 - links/invites;
 - spam/repeated messages;
 - mention/caps/emoji limits;
