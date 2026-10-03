@@ -16,7 +16,8 @@ export type ModuleKey =
   | "stream-alerts"
   | "automation"
   | "music"
-  | "analytics";
+  | "analytics"
+  | "polls";
 
 export const MODULE_CATALOG: readonly {
   key: ModuleKey;
@@ -41,5 +42,6 @@ export const MODULE_CATALOG: readonly {
   { key: "stream-alerts", title: "Stream Alerts", description: "Twitch, YouTube and VK Video Live start notifications", defaultEnabled: false },
   { key: "automation", title: "Automation", description: "Event / condition / action workflows", defaultEnabled: false },
   { key: "music", title: "Music", description: "Lavalink music platform", defaultEnabled: false },
-  { key: "analytics", title: "Analytics", description: "Server and module analytics", defaultEnabled: false }
+  { key: "analytics", title: "Analytics", description: "Server and module analytics", defaultEnabled: false },
+  { key: "polls", title: "Polls", description: "Interactive community polls", defaultEnabled: false }
 ];
