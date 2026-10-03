@@ -103,7 +103,7 @@ async function main(): Promise<void> {
   const automation = new AutomationEngine(database);
   const security = new Security(database);
   const notifications = new Notifications(database);
-  const streamAlerts = new StreamAlerts(database, config.streamAlerts);
+  const streamAlerts = new StreamAlerts(database, config.streamAlerts, auditLog);
   const verification = new Verification(database);
   const analytics = new Analytics(database);
   const music = new Music(database, config, identities);
