@@ -1003,6 +1003,21 @@ const migrations = [
       "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS destructive_role_removal boolean NOT NULL DEFAULT true;",
       "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS destructive_quarantine_enabled boolean NOT NULL DEFAULT true;"
     ])
+  },
+  {
+    version: 64,
+    name: "afk_users",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS afk_users (",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  reason text NOT NULL,",
+      "  since_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,user_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_afk_users_guild ON afk_users(guild_id);"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
