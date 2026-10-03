@@ -1249,6 +1249,7 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_music_history_guild_recent ON music_history(guild_id,bot_identity_id,played_at DESC,id DESC);"
     ])
+  },
   {
     version: 80,
     name: "welcome_embed_images",
