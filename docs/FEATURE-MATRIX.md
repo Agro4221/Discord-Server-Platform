@@ -177,7 +177,7 @@ LavaSrc уже подключён. Следующий этап — включа�
 | Favorites | 🟡 |
 | Per-user queue permissions | 🟡 |
 | DJ role policy | ✅ |
-| Lyrics | 🟡 |
+| Lyrics | 🟡 | Provider/node lyrics support remains to be wired into UX
 | Filters / equalizer / 8D / nightcore / bassboost | 🟡 |
 | 24/7 mode | 🟡 |
 | Multi-node failover validation | 🟡 |
