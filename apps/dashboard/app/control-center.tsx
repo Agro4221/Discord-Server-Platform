@@ -1491,6 +1491,7 @@ function ModulePage(props: {
           <SectionHeader title="Moderation Center" eyebrow="OPERATIONS" />
           <ModerationPanel
             guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0 || item.type === 5)}
             onChanged={props.onAudit}
           />
         </section>

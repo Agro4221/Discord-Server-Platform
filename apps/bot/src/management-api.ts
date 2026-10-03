@@ -1317,6 +1317,39 @@ export class ManagementApiServer {
             return;
           }
 
+          const moderationChannelMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/channel$/);
+
+          if (method === "POST" && moderationChannelMatch) {
+            if (!this.options.moderation) {
+              this.json(res, 500, { error: "moderation_unavailable" });
+              return;
+            }
+            const guildId = moderationChannelMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const action = body.action;
+            if (!["clear","slowmode","lock","unlock"].includes(action)) {
+              throw new RequestInputError("invalid_channel_action", 400);
+            }
+            const channelId = typeof body.channelId === "string" ? body.channelId : "";
+            if (!/^\d{15,25}$/.test(channelId)) throw new RequestInputError("invalid_channel", 400);
+            const value = body.value === undefined ? undefined : Number(body.value);
+            const result = await this.options.moderation!.dashboardChannelAction(guildId, channelId, action, value);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "moderation.channel." + action,
+              targetType: "channel",
+              targetId: channelId,
+              metadata: result
+            });
+            this.json(res, 200, { ok: true, result });
+            return;
+          }
+
           const moderationCaseMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/cases\/(\\d+)$/);
           if (method === "PATCH" && moderationCaseMatch) {
             if (!this.options.moderation) {

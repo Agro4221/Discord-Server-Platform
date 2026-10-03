@@ -51,6 +51,9 @@ export function ModerationPanel({
   const [historyAction, setHistoryAction] = useState<"all" | Action>("all");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [channelId, setChannelId] = useState("");
+  const [channelAction, setChannelAction] = useState<"clear" | "slowmode" | "lock" | "unlock">("clear");
+  const [channelValue, setChannelValue] = useState("10");
 
   const selectedMember = useMemo(
     () => members.find((member) => member.id === targetUserId) ?? null,
@@ -153,6 +156,36 @@ export function ModerationPanel({
       await onChanged?.();
     } catch (caught) {
       setError(formatModerationError(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function channelExecute() {
+    if (!channelId) {
+      setError("Выбери текстовый канал.");
+      return;
+    }
+    const value = channelAction === "clear" || channelAction === "slowmode" ? Number(channelValue) : undefined;
+    if (value !== undefined && !Number.isInteger(value)) {
+      setError("Укажи целое числовое значение.");
+      return;
+    }
+    if ((channelAction === "clear" || channelAction === "lock") && !window.confirm("Выполнить " + channelAction + " для выбранного канала?")) return;
+
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/channel", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: channelAction, channelId, ...(value === undefined ? {} : { value }) })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(String(body.error ?? "moderation_channel_failed"));
+      await onChanged?.();
+    } catch (reason) {
+      setError(formatModerationError(reason));
     } finally {
       setBusy(false);
     }
@@ -313,13 +346,14 @@ function formatModerationError(error: unknown): string {
   return messages[code] ?? code;
 }
 
-const panel = {
+const channelStyle = {
   padding: 15,
   border: "1px solid #222a35",
   borderRadius: 14,
   background: "#0d1219"
 } as const;
 
+const panel = { padding: 15, border: "1px solid #222a35", borderRadius: 14, background: "#0d1219" } as const;
 const inputStyle = {
   width: "100%",
   boxSizing: "border-box" as const,
