@@ -336,6 +336,21 @@ const MODULE_META: Record<string, ModuleMeta> = {
     ],
     kind: "settings"
   },
+  polls: {
+    icon: "◉",
+    accent: "#79c7dd",
+    title: "Опросы",
+    summary: "Интерактивные голосования прямо в Discord.",
+    category: "community",
+    commands: ["/poll create", "/poll close"],
+    functions: [
+      { title: "Live voting", description: "Голоса пересчитываются прямо на опубликованном сообщении." },
+      { title: "Multiple choice", description: "Один вариант или несколько вариантов на участника." },
+      { title: "Auto-close", description: "Опрос закрывается автоматически по заданному дедлайну." },
+      { title: "Persistent state", description: "Вопросы и голоса сохраняются в PostgreSQL." }
+    ],
+    kind: "discord"
+  },
   analytics: {
     icon: "▥",
     accent: "#7cc9b8",
