@@ -415,25 +415,27 @@ export class Giveaways implements PlatformModule {
     }
 
     const requirements = normalizeRequirements(activeGiveaway.requirements);
-    const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-    if (!member) {
-      await interaction.reply({ content: "Не удалось проверить требования giveaway.", ephemeral: true });
-      return;
-    }
-    const missingRole = requirements.requiredRoleIds.find((roleId) => !member.roles.cache.has(roleId));
-    if (missingRole) {
-      await interaction.reply({ content: "Для участия нужна роль <@&" + missingRole + ">.", ephemeral: true });
-      return;
-    }
-    if (requirements.minLevel > 0) {
-      const level = await this.db.query<{ level: number }>(
-        "SELECT level FROM leveling_users WHERE guild_id=$1 AND user_id=$2",
-        [interaction.guild.id, interaction.user.id]
-      );
-      const currentLevel = level.rows[0]?.level ?? 0;
-      if (currentLevel < requirements.minLevel) {
-        await interaction.reply({ content: "Для участия нужен уровень " + requirements.minLevel + ". Твой уровень: " + currentLevel + ".", ephemeral: true });
+    if (requirements.requiredRoleIds.length > 0 || requirements.minLevel > 0) {
+      const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+      if (!member) {
+        await interaction.reply({ content: "Не удалось проверить требования giveaway.", ephemeral: true });
         return;
+      }
+      const missingRole = requirements.requiredRoleIds.find((roleId) => !member.roles.cache.has(roleId));
+      if (missingRole) {
+        await interaction.reply({ content: "Для участия нужна роль <@&" + missingRole + ">.", ephemeral: true });
+        return;
+      }
+      if (requirements.minLevel > 0) {
+        const level = await this.db.query<{ level: number }>(
+          "SELECT level FROM leveling_users WHERE guild_id=$1 AND user_id=$2",
+          [interaction.guild.id, interaction.user.id]
+        );
+        const currentLevel = level.rows[0]?.level ?? 0;
+        if (currentLevel < requirements.minLevel) {
+          await interaction.reply({ content: "Для участия нужен уровень " + requirements.minLevel + ". Твой уровень: " + currentLevel + ".", ephemeral: true });
+          return;
+        }
       }
     }
 
