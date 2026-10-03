@@ -50,7 +50,7 @@
 | Anti-nuke / destructive burst | ✅ |
 | Quarantine / lockdown workflow | ✅ |
 | Scam / phishing heuristics | ✅ |
-| Security incident dashboard | 🟡 |
+| Security incident dashboard | 🟡 | `/security status` is live; Dashboard drilldown remains
 | Honeypot / advanced detectors | 🟡 |
 
 ## Community
@@ -63,21 +63,21 @@
 | Restore roles on return | ✅ |
 | Reaction roles | ✅ |
 | Button / select-menu role panels | ✅ |
-| Timed / exclusive / max-selection role modes | 🟡 | Exclusive/max implemented; timed roles remain
+| Timed / exclusive / max-selection role modes | ✅ | Toggle/exclusive/max + timed assignments
 | Leveling / XP | ✅ |
 | Text + voice XP | ✅ |
 | XP exclusions / anti-abuse | ✅ |
 | Rank / leaderboard | ✅ |
-| Rank cards | 🟡 |
+| Rank cards | ✅ |
 | Giveaways | ✅ |
 | Giveaway requirements / templates | 🟡 |
 | Starboard | ✅ |
 | Economy / shop / ledger | ✅ |
 | Reputation / social profiles | ✅ |
 | Polls / suggestions | ✅ | Polls + Suggestions implemented
-| Birthdays / achievements | 🟡 |
-| Invite tracking | 🟡 |
-| Server statistics / counters | 🟡 |
+| Birthdays / achievements | ✅ |
+| Invite tracking | ✅ |
+| Server statistics / counters | 🟡 | Live `/stats`; persistent counters remain
 | Embed builder | 🟡 |
 | Sticky messages / scheduled messages | 🟡 |
 
@@ -102,7 +102,7 @@
 | Cooldowns | ✅ |
 | Message / role / moderation actions | ✅ |
 | Schedule trigger | ✅ |
-| DM / webhook actions | 🟡 | DM implemented; webhook remains
+| DM / webhook actions | ✅ | DM + hardened webhook action
 | Conditional branches | 🟡 |
 | Delay / queue semantics | 🟡 | Delay implemented; durable queue semantics remain
 | Template variables / reusable snippets | 🟡 |
@@ -116,7 +116,7 @@
 | Twitch start alerts | ✅ |
 | YouTube start alerts | ✅ |
 | VK Video Live alerts | ✅ |
-| Stream alert templates | 🟡 |
+| Stream alert templates | ✅ |
 | Multiple provider credentials per guild | 🟡 |
 | Reddit / TikTok / Kick adapters | 🟡 |
 | GitHub notifications | 🟡 |
@@ -172,14 +172,14 @@ LavaSrc уже подключён. Следующий этап — включа�
 | Buttons: volume / queue | ✅, Music v2 |
 | Queue pagination | ✅ |
 | Previous track | ✅ |
-| Interactive seek | 🟡 |
-| Saved playlists | 🟡 |
-| Favorites | 🟡 |
-| Per-user queue permissions | 🟡 |
+| Interactive seek | ✅ |
+| Saved playlists | ✅ |
+| Favorites | ✅ |
+| Per-user queue permissions | 🟡 | Being added below
 | DJ role policy | ✅ |
 | Lyrics | ✅ | LavaLyrics plugin + current-track lookup
-| Filters / equalizer / 8D / nightcore / bassboost | 🟡 |
-| 24/7 mode | 🟡 |
+| Filters / equalizer / 8D / nightcore / bassboost | ✅ |
+| 24/7 mode | ✅ |
 | Multi-node failover validation | 🟡 |
 
 ## Dashboard
