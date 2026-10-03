@@ -175,7 +175,7 @@ LavaSrc уже подключён. Следующий этап — включа�
 | Interactive seek | ✅ |
 | Saved playlists | ✅ |
 | Favorites | ✅ |
-| Per-user queue permissions | 🟡 | Being added below
+| Per-user queue permissions | ✅ | `everyone` / `dj` policy enforced for queue requests
 | DJ role policy | ✅ |
 | Lyrics | ✅ | LavaLyrics plugin + current-track lookup
 | Filters / equalizer / 8D / nightcore / bassboost | ✅ |
