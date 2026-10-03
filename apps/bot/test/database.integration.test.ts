@@ -22,7 +22,7 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1)",
       [[
         "guild_modules","automod_settings","verification_settings","automation_rules",
-        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets"
+        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules"
       ]]
     );
     assert.equal(tables.rows.length, 15);
@@ -31,8 +31,8 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='automation_delayed_jobs' AND column_name='dead_lettered_at'"
     );
     assert.equal(retryColumn.rows.length, 1);
-    assert.equal(Number(version), 70);
-    assert.equal(Number(first.rows[0]?.count), 70);
+    assert.equal(Number(version), 71);
+    assert.equal(Number(first.rows[0]?.count), 71);
   } finally {
     await db.close();
   }
@@ -420,6 +420,36 @@ test("background jobs are isolated by guild bot assignment", { skip: !enabled },
     await db.query("DELETE FROM giveaways WHERE guild_id IN ($1,$2)", [primaryGuild, secondaryGuild]).catch(() => undefined);
     await db.query("DELETE FROM guild_bot_assignments WHERE guild_id IN ($1,$2)", [primaryGuild, secondaryGuild]).catch(() => undefined);
     await db.query("DELETE FROM bot_identities WHERE id IN ('worker-primary-test','worker-secondary-test')").catch(() => undefined);
+    await db.close();
+  }
+});
+
+test("moderation scheduled cleanup persists and enforces the expected bounds", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345749";
+  try {
+    await migrate(db);
+    await db.query("INSERT INTO guild_modules(guild_id,module_key,enabled) VALUES($1,'moderation',true) ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()", [guildId]);
+    await db.query("INSERT INTO moderation_cleanup_rules(guild_id,channel_id,interval_seconds,max_messages) VALUES($1,$2,3600,100)", [guildId,"123456789012345748"]);
+    const rows = await db.query<{ channel_id: string; interval_seconds: number; max_messages: number; enabled: boolean }>(
+      "SELECT channel_id,interval_seconds,max_messages,enabled FROM moderation_cleanup_rules WHERE guild_id=$1",
+      [guildId]
+    );
+    assert.deepEqual(rows.rows, [{
+      channel_id: "123456789012345748",
+      interval_seconds: 3600,
+      max_messages: 100,
+      enabled: true
+    }]);
+    await assert.rejects(
+      db.query(
+        "INSERT INTO moderation_cleanup_rules(guild_id,channel_id,interval_seconds,max_messages) VALUES($1,$2,59,100)",
+        [guildId,"123456789012345747"]
+      )
+    );
+  } finally {
+    await db.query("DELETE FROM moderation_cleanup_rules WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.query("DELETE FROM guild_modules WHERE guild_id=$1 AND module_key='moderation'", [guildId]).catch(() => undefined);
     await db.close();
   }
 });
