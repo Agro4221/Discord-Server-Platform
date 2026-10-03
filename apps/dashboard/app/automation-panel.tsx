@@ -26,6 +26,16 @@ type Action =
 
 type Template = { name: string; content: string };
 
+type Preset = {
+  name: string;
+  event: string;
+  conditions: Condition[];
+  anyConditions: Condition[];
+  actions: Action[];
+  cooldownSeconds: number;
+  updatedAt: string;
+};
+
 type Diagnostics = {
   rules: { total: number; enabled: number; byEvent: Record<string, number> };
   templates: { total: number };
@@ -93,6 +103,8 @@ export function AutomationPanel({
 }) {
   const [rules, setRules] = useState<Rule[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [presetName, setPresetName] = useState("");
   const [templateName, setTemplateName] = useState("");
   const [templateContent, setTemplateContent] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -115,19 +127,23 @@ export function AutomationPanel({
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
 
   async function load() {
-    const [rulesResponse, templatesResponse, diagnosticsResponse] = await Promise.all([
+    const [rulesResponse, templatesResponse, presetsResponse, diagnosticsResponse] = await Promise.all([
       fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation", { cache: "no-store" }),
       fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation/templates", { cache: "no-store" }),
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation/presets", { cache: "no-store" }),
       fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation/diagnostics", { cache: "no-store" })
     ]);
     const rulesBody = await rulesResponse.json().catch(() => ({}));
     const templatesBody = await templatesResponse.json().catch(() => ({}));
+    const presetsBody = await presetsResponse.json().catch(() => ({}));
     const diagnosticsBody = await diagnosticsResponse.json().catch(() => ({}));
     if (!rulesResponse.ok) throw new Error(rulesBody.error ?? "automation_failed");
     if (!templatesResponse.ok) throw new Error(templatesBody.error ?? "templates_failed");
+    if (!presetsResponse.ok) throw new Error(presetsBody.error ?? "presets_failed");
     if (!diagnosticsResponse.ok) throw new Error(diagnosticsBody.error ?? "automation_diagnostics_failed");
     setRules(rulesBody.rules ?? []);
     setTemplates(templatesBody.templates ?? []);
+    setPresets(presetsBody.presets ?? []);
     setDiagnostics(diagnosticsBody.diagnostics ?? null);
   }
 
@@ -204,6 +220,71 @@ export function AutomationPanel({
     }
   }
 
+  async function savePreset() {
+    const normalized = presetName.trim();
+    if (!normalized) {
+      setError("Укажи имя workflow preset.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/automation/presets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: normalized,
+          event,
+          cooldownSeconds,
+          conditions,
+          anyConditions,
+          actions
+        })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "automation_preset_save_failed");
+      setPresetName("");
+      await load();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось сохранить workflow preset.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function loadPreset(preset: Preset) {
+    setEditingId(null);
+    setName("Новое правило");
+    setEvent(preset.event);
+    setCooldownSeconds(preset.cooldownSeconds);
+    setEnabled(true);
+    setConditions(Array.isArray(preset.conditions) ? structuredClone(preset.conditions) : []);
+    setAnyConditions(Array.isArray(preset.anyConditions) ? structuredClone(preset.anyConditions) : []);
+    setActions(Array.isArray(preset.actions) ? structuredClone(preset.actions) : []);
+    setError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function removePreset(presetNameToDelete: string) {
+    if (!window.confirm("Удалить этот workflow preset?")) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(
+        "/api/guilds/" + encodeURIComponent(guildId) + "/automation/presets/" + encodeURIComponent(presetNameToDelete),
+        { method: "DELETE" }
+      );
+      if (!response.ok) throw new Error("automation_preset_delete_failed");
+      await load();
+      await onChanged?.();
+    } catch {
+      setError("Не удалось удалить workflow preset.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function remove(ruleId: string) {
     if (!window.confirm("Удалить это automation rule?")) return;
     setSaving(true);
@@ -273,6 +354,44 @@ export function AutomationPanel({
       </div>
 
       {error && <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d" }}>{error}</div>}
+
+      <section style={sectionStyle}>
+        <div style={sectionTitle}>Workflow presets · reusable automation</div>
+        <div style={{ fontSize: 11, opacity: 0.5 }}>
+          Сохраняет текущие event + conditions + actions + cooldown. Пресет можно загрузить в редактор и затем изменить перед публикацией.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 8 }}>
+          <input
+            value={presetName}
+            maxLength={40}
+            onChange={(e) => setPresetName(e.target.value)}
+            placeholder="welcome_message"
+            style={inputStyle}
+          />
+          <button type="button" disabled={saving} onClick={() => void savePreset()} style={buttonStyle("secondary")}>
+            Сохранить текущий workflow
+          </button>
+        </div>
+
+        {presets.length > 0 && (
+          <div style={{ display: "grid", gap: 6 }}>
+            {presets.map((preset) => (
+              <div key={preset.name} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center", padding: "8px 0", borderBottom: "1px solid #1d212b" }}>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{preset.name}</div>
+                  <div style={{ marginTop: 3, fontSize: 10, opacity: 0.45 }}>
+                    {preset.event} · {preset.conditions.length} ALL + {preset.anyConditions.length} ANY · {preset.actions.length} actions
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button type="button" disabled={saving} onClick={() => loadPreset(preset)} style={buttonStyle("secondary")}>Загрузить</button>
+                  <button type="button" disabled={saving} onClick={() => void removePreset(preset.name)} style={buttonStyle("danger")}>Удалить</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section style={sectionStyle}>
         <div style={sectionTitle}>Reusable templates</div>
