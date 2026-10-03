@@ -115,3 +115,15 @@ test("community tool slash commands preserve required-before-optional ordering",
     ["set", "clear"]
   );
 });
+
+
+test("automation slash command exposes server and security events", () => {
+  const command = buildCommands().find((item) => item.name === "automation");
+  assert.ok(command);
+  const json = command.toJSON();
+  const eventOption = json.options?.[0]?.options?.find((option) => option.name === "event");
+  const values = eventOption?.choices?.map((choice) => String(choice.value)) ?? [];
+  for (const value of ["channel.create", "channel.delete", "role.create", "role.delete", "member.ban", "member.unban"]) {
+    assert.ok(values.includes(value), value);
+  }
+});

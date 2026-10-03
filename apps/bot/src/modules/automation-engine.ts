@@ -29,7 +29,9 @@ const SUPPORTED_EVENTS: AutomationEvent[] = [
   "member.join","member.leave","member.role.add","member.role.remove",
   "message.create","message.delete","message.edit","reaction.add",
   "voice.join","voice.leave","voice.move","moderation.case",
-  "ticket.create","ticket.close","giveaway.end","schedule"
+  "ticket.create","ticket.close","giveaway.end","schedule",
+  "channel.create","channel.delete","role.create","role.delete",
+  "member.ban","member.unban","security.incident"
 ];
 
 export type AutomationRuleRecord = AutomationRule & {
@@ -95,7 +97,9 @@ export class AutomationEngine implements PlatformModule {
         if (!reaction.message.guildId) return;
         return this.execute({
           type: "reaction.add", guildId: reaction.message.guildId, userId: user.id,
-          channelId: reaction.message.channelId, messageId: reaction.message.id
+          channelId: reaction.message.channelId, messageId: reaction.message.id,
+          content: reaction.emoji.name ?? reaction.emoji.identifier,
+          numeric: { reactionCount: reaction.count ?? 0 }
         });
       }),
       context.events.on("voice.state", ({ oldState, newState }) => this.executeFromVoice(oldState, newState)),
@@ -508,7 +512,6 @@ export class AutomationEngine implements PlatformModule {
 
   private async execute(event: RuntimeEvent): Promise<void> {
     if (!await moduleEnabled(this.db, event.guildId, "automation", false)) return;
-    if (!this.allowExecution(event.guildId)) return;
 
     const rules = this.rules.get(event.guildId) ?? [];
 
@@ -518,6 +521,7 @@ export class AutomationEngine implements PlatformModule {
       if (rule.any.length > 0 && !await this.conditionsAnyMatch(rule.any, event)) continue;
 
       const cooldownSeconds = rule.cooldownSeconds;
+      if (!this.allowExecution(event.guildId)) continue;
       this.executionCounter += 1;
       if (this.executionCounter % 100 === 0) this.pruneCooldowns(Date.now());
       const cooldownKey = `${event.guildId}:${rule.id}:${event.userId ?? "global"}`;
@@ -653,7 +657,8 @@ export class AutomationEngine implements PlatformModule {
         }
 
         if (action.type === "send-message") {
-          const channel = client?.channels.cache.get(action.channelId);
+          const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
+          const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
           if (channel?.isTextBased() && "send" in channel) {
             await channel.send(renderTemplate(action.content, event));
           }

@@ -373,6 +373,7 @@ export function AutomationPanel({
               <div style={actionGrid}>
                 <select value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} style={inputStyle}>
                   <option value="">Канал</option>
+                  <option value="@event">Канал события</option>
                   {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
                 </select>
                 <input value={action.content} maxLength={2000} onChange={(e) => updateAction(index, { content: e.target.value })} placeholder="Текст · {user} {channel} {content}" style={inputStyle} />
