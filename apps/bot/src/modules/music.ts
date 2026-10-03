@@ -1094,14 +1094,8 @@ export class Music implements PlatformModule {
       await this.persistPlayer(player);
       await message.reply("🔀 Очередь перемешана.");
     } else if (action === "queue") {
-      const tracks = player.queue.tracks.slice(0, 15);
-      const lines = tracks.map((track, index) => (index + 1) + ". **" + track.info.title + "** — " + track.info.author);
-      const embed = new EmbedBuilder()
-        .setTitle("🎶 Playlist / Queue")
-        .setDescription(lines.length ? lines.join("\n") : "Очередь пуста.")
-        .setFooter({ text: message.guild.name })
-        .setTimestamp();
-      await message.reply({ embeds: [embed] });
+      const page = this.buildQueuePage(player, 0);
+      await message.reply({ content: page.content, components: page.components });
     } else if (action === "nowplaying") {
       const track = player.queue.current;
       if (!track) {
