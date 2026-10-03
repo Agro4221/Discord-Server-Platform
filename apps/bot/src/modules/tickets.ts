@@ -132,6 +132,67 @@ export class Tickets implements PlatformModule {
     );
   }
 
+  async listTickets(guildId: string, status?: "open" | "closed" | "closing"): Promise<Array<{
+    id: number;
+    channelId: string;
+    creatorId: string;
+    claimedBy: string | null;
+    status: "open" | "closed" | "closing";
+    priority: "low" | "normal" | "high" | "urgent";
+    tags: string[];
+    createdAt: string;
+    closedAt: string | null;
+    lastActivityAt: string | null;
+  }>> {
+    const result = await this.db.query<{
+      id: string;
+      channel_id: string;
+      creator_id: string;
+      claimed_by: string | null;
+      status: "open" | "closed" | "closing";
+      priority: "low" | "normal" | "high" | "urgent";
+      tags: string[];
+      created_at: string;
+      closed_at: string | null;
+      last_activity_at: string | null;
+    }>(
+      "SELECT id,channel_id,creator_id,claimed_by,status,priority,tags,created_at,closed_at,last_activity_at FROM tickets WHERE guild_id=$1" +
+      (status ? " AND status=$2" : "") +
+      " ORDER BY CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,created_at DESC LIMIT 200",
+      status ? [guildId,status] : [guildId]
+    );
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      channelId: row.channel_id,
+      creatorId: row.creator_id,
+      claimedBy: row.claimed_by,
+      status: row.status,
+      priority: row.priority,
+      tags: Array.isArray(row.tags) ? row.tags : [],
+      createdAt: row.created_at,
+      closedAt: row.closed_at,
+      lastActivityAt: row.last_activity_at
+    }));
+  }
+
+  async updateTicketMetadata(
+    guildId: string,
+    ticketId: number,
+    input: { priority?: "low" | "normal" | "high" | "urgent"; tags?: string[] }
+  ): Promise<boolean> {
+    if (!Number.isSafeInteger(ticketId) || ticketId < 1) throw new Error("invalid_ticket_id");
+    if (input.priority !== undefined && !["low","normal","high","urgent"].includes(input.priority)) throw new Error("invalid_ticket_priority");
+    if (input.tags !== undefined) {
+      if (!Array.isArray(input.tags) || input.tags.length > 10) throw new Error("invalid_ticket_tags");
+      if (input.tags.some((tag) => typeof tag !== "string" || !tag.trim() || tag.length > 40)) throw new Error("invalid_ticket_tags");
+    }
+    const result = await this.db.query(
+      "UPDATE tickets SET priority=$1,tags=$2,updated_at=now() WHERE id=$3 AND guild_id=$4",
+      [input.priority ?? "normal", input.tags ?? [], ticketId, guildId]
+    );
+    return result.rowCount === 1;
+  }
+
   async closeByAutomation(guildId: string, ticketId: number, actorUserId: string): Promise<boolean> {
     if (!await moduleEnabled(this.db, guildId, "tickets", false)) throw new Error("tickets_disabled");
     if (!Number.isSafeInteger(ticketId) || ticketId < 1) throw new Error("invalid_ticket_id");
