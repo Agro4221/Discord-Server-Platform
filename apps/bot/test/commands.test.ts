@@ -52,6 +52,13 @@ test("all Discord application command option lists keep required options before 
     ]
   );
 
+  const afk = commands.find((command) => command.name === "afk");
+  assert.equal(afk?.description, "Set or clear AFK status");
+  assert.deepEqual(
+    afk?.options?.map((option) => ({ name: option.name, required: option.required })),
+    [{ name: "reason", required: false }]
+  );
+
   const streamAlertCreate = commands.find((command) => command.name === "streamalert")?.options?.find((option) => option.name === "create");
   assert.deepEqual(
     streamAlertCreate?.options?.map((option) => ({ name: option.name, required: option.required })),
