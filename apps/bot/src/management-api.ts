@@ -572,7 +572,7 @@ export class ManagementApiServer {
               return;
             }
 
-            const input: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean } = {};
+            const input: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean; messageTemplate?: string } = {};
             if (typeof body.channelId === "string") input.channelId = body.channelId;
             if (typeof body.url === "string") input.url = body.url;
             if (typeof body.intervalSeconds === "number") input.intervalSeconds = body.intervalSeconds;
