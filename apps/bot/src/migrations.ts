@@ -1060,6 +1060,17 @@ const migrations = [
     ])
   },
   {
+    version: 68,
+    name: "ticket_customization",
+    sql: q([
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS panel_title text NOT NULL DEFAULT '🎫 Поддержка';",
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS panel_description text NOT NULL DEFAULT 'Нажми кнопку ниже — Vexa откроет форму тикета.';",
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS create_button_label text NOT NULL DEFAULT 'Создать тикет';",
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS claim_button_label text NOT NULL DEFAULT 'Забрать';",
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS close_button_label text NOT NULL DEFAULT 'Закрыть';"
+    ])
+  },
+  {
     version: 69,
     name: "automation_delayed_retry_dead_letter",
     sql: q([
@@ -1068,12 +1079,22 @@ const migrations = [
     ])
   },
   {
-    version: 72,
-    name: "notification_feed_filters_and_templates",
+    version: 70,
+    name: "automation_workflow_presets",
     sql: q([
-      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS message_template text NOT NULL DEFAULT '📡 **Новая запись из feed**\\n**{title}**\\n{url}';",
-      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS include_keywords text[] NOT NULL DEFAULT '{}';",
-      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS exclude_keywords text[] NOT NULL DEFAULT '{}';"
+      "CREATE TABLE IF NOT EXISTS automation_workflow_presets (",
+      "  guild_id text NOT NULL,",
+      "  name text NOT NULL,",
+      "  event text NOT NULL,",
+      "  conditions jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  any_conditions jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  actions jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  cooldown_seconds integer NOT NULL DEFAULT 0 CHECK(cooldown_seconds BETWEEN 0 AND 86400),",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,name)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_automation_workflow_presets_guild_updated ON automation_workflow_presets(guild_id,updated_at DESC);"
     ])
   },
   {
@@ -1097,35 +1118,14 @@ const migrations = [
     ])
   },
   {
-    version: 70,
-    name: "automation_workflow_presets",
+    version: 72,
+    name: "notification_feed_filters_and_templates",
     sql: q([
-      "CREATE TABLE IF NOT EXISTS automation_workflow_presets (",
-      "  guild_id text NOT NULL,",
-      "  name text NOT NULL,",
-      "  event text NOT NULL,",
-      "  conditions jsonb NOT NULL DEFAULT '[]'::jsonb,",
-      "  any_conditions jsonb NOT NULL DEFAULT '[]'::jsonb,",
-      "  actions jsonb NOT NULL DEFAULT '[]'::jsonb,",
-      "  cooldown_seconds integer NOT NULL DEFAULT 0 CHECK(cooldown_seconds BETWEEN 0 AND 86400),",
-      "  created_at timestamptz NOT NULL DEFAULT now(),",
-      "  updated_at timestamptz NOT NULL DEFAULT now(),",
-      "  PRIMARY KEY(guild_id,name)",
-      ");",
-      "CREATE INDEX IF NOT EXISTS idx_automation_workflow_presets_guild_updated ON automation_workflow_presets(guild_id,updated_at DESC);"
+      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS message_template text NOT NULL DEFAULT '📡 **Новая запись из feed**\\n**{title}**\\n{url}';",
+      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS include_keywords text[] NOT NULL DEFAULT '{}';",
+      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS exclude_keywords text[] NOT NULL DEFAULT '{}';"
     ])
-  },
-  {
-    version: 68,
-    name: "ticket_customization",
-    sql: q([
-      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS panel_title text NOT NULL DEFAULT '🎫 Поддержка';",
-      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS panel_description text NOT NULL DEFAULT 'Нажми кнопку ниже — Vexa откроет форму тикета.';",
-      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS create_button_label text NOT NULL DEFAULT 'Создать тикет';",
-      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS claim_button_label text NOT NULL DEFAULT 'Забрать';",
-      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS close_button_label text NOT NULL DEFAULT 'Закрыть';"
-    ])
-  } ] as const;
+  }
 
 export async function migrate(db: Database): Promise<void> {
   await db.query(q([
