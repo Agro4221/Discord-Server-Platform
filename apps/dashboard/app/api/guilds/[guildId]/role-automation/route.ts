@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { currentSession } from "../../../../../lib/auth";
+import { assertSameOrigin, currentSession } from "../../../../../lib/auth";
 
 function upstream(path: string): string {
   return new URL(path, process.env.MANAGEMENT_API_URL ?? "http://127.0.0.1:3002").toString();
