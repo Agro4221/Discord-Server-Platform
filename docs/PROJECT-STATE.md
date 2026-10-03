@@ -258,6 +258,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Delayed execution propagates action errors instead of swallowing them, while non-delayed event execution retains its existing per-action best-effort behavior.
 - Rule IDs are preserved on delayed jobs and diagnostics distinguish pending, processing, completed and dead-lettered jobs.
 
+## 2026-10-04 — Automation workflow presets
+- Automation now supports reusable per-guild workflow presets alongside text templates.
+- Presets persist full workflow definitions and can be saved, loaded into the Dashboard Builder, deleted and transferred through Config Export/Import.
+- Preset persistence reuses the existing Automation validation and audit contracts; no second workflow engine was introduced.
+
 ## 2026-10-04 — Automation diagnostics
 - Automation now has an operational diagnostics surface backed by the existing delayed-job queue and rule/template state.
 - Management API: GET /api/guilds/:guildId/automation/diagnostics.
