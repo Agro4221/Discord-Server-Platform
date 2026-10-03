@@ -354,6 +354,15 @@ export function ModerationPanel({ guildId, channels, onChanged }: { guildId: str
   );
 }
 
+const sectionStyle = {
+  display: "grid",
+  gap: 10,
+  padding: 12,
+  border: "1px solid #202632",
+  borderRadius: 12,
+  background: "#0b0f15"
+} as const;
+
 const inputStyle = {
   width: "100%",
   boxSizing: "border-box" as const,
