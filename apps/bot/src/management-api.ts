@@ -1330,10 +1330,11 @@ export class ManagementApiServer {
               return;
             }
             const body = await readJson(req);
-            const action = body.action;
-            if (!["clear","slowmode","lock","unlock"].includes(action)) {
+            const rawAction = body.action;
+            if (!["clear","slowmode","lock","unlock"].includes(rawAction)) {
               throw new RequestInputError("invalid_channel_action", 400);
             }
+            const action = rawAction as "clear" | "slowmode" | "lock" | "unlock";
             const channelId = typeof body.channelId === "string" ? body.channelId : "";
             if (!/^\d{15,25}$/.test(channelId)) throw new RequestInputError("invalid_channel", 400);
             const value = body.value === undefined ? undefined : Number(body.value);
