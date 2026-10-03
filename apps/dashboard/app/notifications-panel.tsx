@@ -31,6 +31,10 @@ export function NotificationsPanel({
   const [messageTemplate, setMessageTemplate] = useState("📡 **Новая запись из feed**\\n**{title}**\\n{url}");
   const [includeKeywords, setIncludeKeywords] = useState("");
   const [excludeKeywords, setExcludeKeywords] = useState("");
+  const [editingFeedId, setEditingFeedId] = useState<number | null>(null);
+  const [editingTemplate, setEditingTemplate] = useState("");
+  const [editingInclude, setEditingInclude] = useState("");
+  const [editingExclude, setEditingExclude] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -73,6 +77,31 @@ export function NotificationsPanel({
       await onChanged?.();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Не удалось создать feed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveFeedSettings(feed: Feed) {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/feeds/" + feed.id, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          messageTemplate: editingTemplate,
+          includeKeywords: editingInclude.split(",").map((value) => value.trim()).filter(Boolean),
+          excludeKeywords: editingExclude.split(",").map((value) => value.trim()).filter(Boolean)
+        })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "feed_settings_update_failed");
+      setEditingFeedId(null);
+      await load();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось сохранить настройки feed.");
     } finally {
       setBusy(false);
     }
@@ -143,7 +172,7 @@ export function NotificationsPanel({
       {feeds.length === 0 ? (
         <div style={{ opacity: 0.42, padding: "8px 0" }}>Feed'ов пока нет.</div>
       ) : feeds.map((feed) => (
-        <div key={feed.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: "10px 0", borderBottom: "1px solid #1d212b" }}>
+        <div key={feed.id} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, alignItems: "center", padding: "10px 0", borderBottom: "1px solid #1d212b" }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{feed.url}</div>
             <div style={{ marginTop: 4, fontSize: 11, opacity: 0.42 }}>
@@ -151,9 +180,32 @@ export function NotificationsPanel({
             </div>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setEditingFeedId(editingFeedId === feed.id ? null : feed.id);
+                setEditingTemplate(feed.messageTemplate);
+                setEditingInclude(feed.includeKeywords.join(", "));
+                setEditingExclude(feed.excludeKeywords.join(", "));
+              }}
+              style={buttonStyle("secondary")}
+            >
+              {editingFeedId === feed.id ? "Закрыть" : "Настроить"}
+            </button>
             <button type="button" disabled={busy} onClick={() => void patch(feed, !feed.enabled)} style={buttonStyle("secondary")}>{feed.enabled ? "ON" : "OFF"}</button>
             <button type="button" disabled={busy} onClick={() => void remove(feed)} style={buttonStyle("danger")}>Удалить</button>
           </div>
+          {editingFeedId === feed.id && (
+            <div style={{ gridColumn: "1 / -1", display: "grid", gap: 7, marginTop: 6 }}>
+              <input value={editingTemplate} maxLength={1800} onChange={(e) => setEditingTemplate(e.target.value)} placeholder="Template: {title} {url} {timestamp}" style={inputStyle} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+                <input value={editingInclude} onChange={(e) => setEditingInclude(e.target.value)} placeholder="Include keywords" style={inputStyle} />
+                <input value={editingExclude} onChange={(e) => setEditingExclude(e.target.value)} placeholder="Exclude keywords" style={inputStyle} />
+              </div>
+              <button type="button" disabled={busy} onClick={() => void saveFeedSettings(feed)} style={buttonStyle("primary")}>Сохранить настройки</button>
+            </div>
+          )}
         </div>
       ))}
     </div>
