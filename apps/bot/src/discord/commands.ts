@@ -509,6 +509,26 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       ),
 
     new SlashCommandBuilder()
+      .setName("birthday")
+      .setDescription("Manage birthdays")
+      .addSubcommand((sub) =>
+        sub
+          .setName("set")
+          .setDescription("Save your birthday")
+          .addIntegerOption((o) => o.setName("month").setDescription("Month 1-12").setMinValue(1).setMaxValue(12).setRequired(true))
+          .addIntegerOption((o) => o.setName("day").setDescription("Day 1-31").setMinValue(1).setMaxValue(31).setRequired(true))
+      )
+      .addSubcommand((sub) => sub.setName("remove").setDescription("Remove your birthday"))
+      .addSubcommand((sub) => sub.setName("list").setDescription("List birthdays"))
+      .addSubcommand((sub) =>
+        sub
+          .setName("setup")
+          .setDescription("Configure birthday announcement channel")
+          .addChannelOption((o) => o.setName("channel").setDescription("Announcement channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
+          .addStringOption((o) => o.setName("template").setDescription("Template: {user} {server}").setMaxLength(500))
+      ),
+
+    new SlashCommandBuilder()
       .setName("rep")
       .setDescription("Community reputation")
       .addSubcommand((sub) =>
