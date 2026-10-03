@@ -1135,6 +1135,40 @@ const migrations = [
       "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();",
       "CREATE INDEX IF NOT EXISTS idx_tickets_guild_priority ON tickets(guild_id,status,priority,created_at DESC);"
     ])
+  },
+  {
+    version: 74,
+    name: "role_automation_rules_and_jobs",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS role_automation_rules (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  trigger text NOT NULL CHECK(trigger IN ('member.join','voice.join','voice.leave')),",
+      "  channel_id text NOT NULL DEFAULT '',",
+      "  role_id text NOT NULL,",
+      "  delay_seconds integer NOT NULL DEFAULT 0 CHECK(delay_seconds BETWEEN 0 AND 604800),",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  UNIQUE(guild_id,trigger,channel_id,role_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_role_automation_rules_guild ON role_automation_rules(guild_id,enabled,trigger,channel_id);",
+      "CREATE TABLE IF NOT EXISTS role_automation_jobs (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  role_id text NOT NULL,",
+      "  add_role boolean NOT NULL DEFAULT true,",
+      "  available_at timestamptz NOT NULL,",
+      "  processing_until timestamptz,",
+      "  attempts integer NOT NULL DEFAULT 0,",
+      "  last_error text,",
+      "  completed_at timestamptz,",
+      "  dead_lettered_at timestamptz,",
+      "  created_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_role_automation_jobs_due ON role_automation_jobs(guild_id,completed_at,dead_lettered_at,available_at);"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
