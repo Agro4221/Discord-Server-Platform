@@ -267,6 +267,33 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addUserOption((option) => option.setName("user").setDescription("User").setRequired(true))
           .addStringOption((option) => option.setName("text").setDescription("Note text").setMaxLength(1000))
       ),
+      .addSubcommand((sub) =>
+        sub
+          .setName("escalation")
+          .setDescription("Configure automatic escalation by warning count")
+          .addStringOption((option) =>
+            option.setName("action").setDescription("Action").addChoices(
+              { name: "Set", value: "set" },
+              { name: "List", value: "list" },
+              { name: "Remove", value: "remove" }
+            ).setRequired(true)
+          )
+          .addIntegerOption((option) =>
+            option.setName("warn-count").setDescription("Warning threshold").setMinValue(1).setMaxValue(100)
+          )
+          .addStringOption((option) =>
+            option.setName("punishment").setDescription("timeout or ban").addChoices(
+              { name: "Timeout", value: "timeout" },
+              { name: "Ban", value: "ban" }
+            )
+          )
+          .addIntegerOption((option) =>
+            option.setName("minutes").setDescription("Duration; 0 = permanent ban").setMinValue(0).setMaxValue(40320)
+          )
+          .addStringOption((option) =>
+            option.setName("reason").setDescription("Reason").setMaxLength(500)
+          )
+      ),
 
     new SlashCommandBuilder()
       .setName("ticket")
@@ -1102,6 +1129,43 @@ export async function handleCommand(
 
   const subcommand = interaction.options.getSubcommand();
   const target = interaction.options.getUser("user", true);
+
+  if (subcommand === "escalation") {
+    const action = interaction.options.getString("action", true);
+    if (action === "list") {
+      const rules = await moderation.listEscalations(interaction.guild!.id);
+      const content = rules.length
+        ? "⚖️ **Escalation rules**\n" + rules.map((rule) =>
+            `${rule.warnCount} warn → ${rule.action === "timeout" ? "timeout " + rule.durationMinutes + "m" : "ban" + (rule.durationMinutes > 0 ? " " + rule.durationMinutes + "m" : " permanent")} · ${rule.reason}`
+          ).join("\n").slice(0,3900)
+        : "Правил эскалации нет.";
+      await interaction.reply({ content, ephemeral: true });
+      return;
+    }
+
+    const warnCount = interaction.options.getInteger("warn-count", true);
+    if (action === "remove") {
+      const removed = await moderation.removeEscalation(interaction.guild!.id, warnCount);
+      await interaction.reply({
+        content: removed ? "Правило эскалации для " + warnCount + " warn удалено." : "Такого правила нет.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    const punishment = interaction.options.getString("punishment", true) as "timeout" | "ban";
+    const minutes = interaction.options.getInteger("minutes") ?? 0;
+    const reason = interaction.options.getString("reason")?.trim() || "Automatic moderation escalation";
+    await moderation.setEscalation(interaction.guild!.id, warnCount, punishment, minutes, reason);
+    await moderation.audit("moderation.escalation.configured", interaction.guild!.id, interaction.user.id, String(warnCount), {
+      warnCount, punishment, minutes, reason
+    });
+    await interaction.reply({
+      content: "✅ Эскалация настроена: " + warnCount + " warn → " + punishment + (punishment === "timeout" ? " на " + minutes + " мин." : (minutes > 0 ? " на " + minutes + " мин." : "")),
+      ephemeral: true
+    });
+    return;
+  }
 
   if (subcommand === "history" || subcommand === "note") {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ModerateMembers) &&
