@@ -214,3 +214,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Expanded the existing Command Policy Dashboard editor to expose the full persisted policy scope: enable/Prefix/Slash, cooldown, allowed/denied roles, allowed/denied channels and help visibility.
 - Reused the existing command_policies API and policy guard; no new permission model or migration was introduced.
 - Browser editing and live Discord authorization remain release-gate validation; CI validates TypeScript/build contracts.
+
+
+## 2026-10-04 — AutoMod ban action
+- Added `ban` as a rule action for the existing AutoMod rule builder.
+- AutoMod bans are routed through Moderation so the action receives the common Discord role-hierarchy check, audit event and moderation case persistence.
+- Migration 67 widens the persistent AutoMod action constraint to include `ban`.
+- Dashboard exposes the ban action; unit coverage verifies rule persistence. Live Discord hierarchy/ban behavior remains release-gate validation.

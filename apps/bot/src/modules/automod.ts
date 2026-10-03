@@ -97,7 +97,7 @@ export class AutoMod implements PlatformModule {
     enabled: boolean;
     threshold: number | null;
     windowSeconds: number | null;
-    action: "delete" | "timeout" | "warn" | "log";
+    action: "delete" | "timeout" | "warn" | "ban" | "log";
     timeoutMinutes: number;
     affectedRoleIds: string[];
     ignoredRoleIds: string[];
@@ -112,7 +112,7 @@ export class AutoMod implements PlatformModule {
       enabled: boolean;
       threshold: string | number | null;
       window_seconds: number | null;
-      action: "delete" | "timeout" | "warn" | "log";
+      action: "delete" | "timeout" | "warn" | "ban" | "log";
       timeout_minutes: number;
       affected_role_ids: string[];
       ignored_role_ids: string[];
@@ -149,7 +149,7 @@ export class AutoMod implements PlatformModule {
       enabled?: boolean;
       threshold?: number | null;
       windowSeconds?: number | null;
-      action?: "delete" | "timeout" | "warn" | "log";
+      action?: "delete" | "timeout" | "warn" | "ban" | "log";
       timeoutMinutes?: number;
       affectedRoleIds?: string[];
       ignoredRoleIds?: string[];
@@ -167,7 +167,7 @@ export class AutoMod implements PlatformModule {
     if (!supported.has(detector)) throw new Error("unsupported_automod_detector");
 
     const action = input.action ?? "delete";
-    if (!["delete","timeout","warn","log"].includes(action)) throw new Error("invalid_automod_rule_action");
+    if (!["delete","timeout","warn","ban","log"].includes(action)) throw new Error("invalid_automod_rule_action");
 
     const threshold =
       input.threshold === undefined || input.threshold === null
@@ -340,7 +340,7 @@ export class AutoMod implements PlatformModule {
       enabled: boolean;
       threshold: number | null;
       window_seconds: number | null;
-      action: "delete" | "timeout" | "warn" | "log";
+      action: "delete" | "timeout" | "warn" | "ban" | "log";
       timeout_minutes: number;
       affected_role_ids: string[];
       ignored_role_ids: string[];
@@ -509,13 +509,13 @@ export class AutoMod implements PlatformModule {
     message: Message,
     rule: {
       detector: string;
-      action: "delete" | "timeout" | "warn" | "log";
+      action: "delete" | "timeout" | "warn" | "ban" | "log";
       timeoutMinutes: number;
       messageTemplate: string;
     }
   ): Promise<boolean> {
     let deleted = false;
-    if (rule.action === "delete" || rule.action === "timeout" || rule.action === "warn") {
+    if (rule.action === "delete" || rule.action === "timeout" || rule.action === "warn" || rule.action === "ban") {
       try {
         await message.delete();
         deleted = true;
@@ -528,6 +528,23 @@ export class AutoMod implements PlatformModule {
           error: String(error)
         });
       }
+    }
+
+    if (rule.action === "ban" && this.moderation) {
+      const banned = await this.moderation.applyAutomodBan(
+        message.guild!.id,
+        message.author.id,
+        "AutoMod: " + rule.detector
+      ).catch((error) => {
+        logger.warn("AutoMod ban action failed", {
+          guildId: message.guild!.id,
+          userId: message.author.id,
+          detector: rule.detector,
+          error: String(error)
+        });
+        return false;
+      });
+      if (!banned) return false;
     }
 
     let warned = false;

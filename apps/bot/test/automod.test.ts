@@ -198,3 +198,24 @@ test("AutoMod exemption parser accepts whitespace- and comma-separated IDs", () 
     ["channel-1", "channel-2", "channel-3", "channel-4"]
   );
 });
+
+
+test("AutoMod rule builder accepts the ban action", async () => {
+  const queries: Array<{ text: string; values: readonly unknown[] }> = [];
+  const db = {
+    async query<T>(text: string, values: readonly unknown[] = []) {
+      queries.push({ text, values });
+      return { rows: [] as T[], rowCount: 1 };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const automod = new AutoMod(db);
+  await automod.upsertRule("guild-1", {
+    detector: "scam",
+    action: "ban"
+  });
+
+  const insert = queries.find((entry) => entry.text.startsWith("INSERT INTO automod_rules"));
+  assert.ok(insert);
+  assert.equal(insert.values[5], "ban");
+});

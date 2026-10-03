@@ -438,3 +438,9 @@ Live validation, требующая пользовательского окру�
 - Function-level permission editing is now represented as implemented: the Dashboard exposes enabled state, Prefix/Slash mode, cooldown, allowed/denied roles, allowed/denied channels and help visibility for every registered command.
 - The implementation reuses the existing command_policies persistence/API and shared runtime enforcement; no second permissions model was introduced.
 - Live browser CRUD and Discord authorization/resource-scope behavior remain release-gate validation items.
+
+
+### 2026-10-04 — AutoMod ban action
+- AutoMod rule actions now include `ban` in addition to delete/timeout/warn/log.
+- The implementation reuses the existing Moderation service for role-hierarchy validation, audit and case persistence.
+- Migration 67 updates the persistent action constraint; live Discord ban execution remains a release-gate check.

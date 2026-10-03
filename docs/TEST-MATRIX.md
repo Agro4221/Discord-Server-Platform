@@ -140,3 +140,9 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Dashboard now exposes all persisted command-policy scope fields: allowed/denied roles and channels, cooldown, Prefix/Slash, enabled and help visibility.
 - Backend already persists and enforces these fields through the shared command-policy guard and Management API.
 - CI remains the static/build gate; live browser edits plus real Discord permission/scope behavior remain release-gate validation.
+
+
+### 2026-10-04 — AutoMod ban action
+- Added deterministic unit coverage that the rule builder persists `ban` as a valid action.
+- Migration 67 updates the database check constraint for persisted AutoMod actions.
+- Live ban execution, role hierarchy and notification/resource behavior remain release-gate validation.

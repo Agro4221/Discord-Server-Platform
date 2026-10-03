@@ -633,6 +633,21 @@ export class Moderation implements PlatformModule {
     await message.reply(`✅ Пользователь <@${userId}> разблокирован.`);
   }
 
+  async applyAutomodBan(guildId: string, targetUserId: string, reason: string): Promise<boolean> {
+    const guild = this.client?.guilds.cache.get(guildId);
+    if (!guild) return false;
+    const member = await guild.members.fetch(targetUserId).catch(() => null);
+    if (!member?.bannable) return false;
+
+    await member.ban({ reason });
+    await this.audit("moderation.ban.applied", guildId, "automod", targetUserId, {
+      reason,
+      source: "automod"
+    });
+    await this.recordBestEffort(guildId, targetUserId, "automod", "ban", reason);
+    return true;
+  }
+
   async applyAutomodWarn(guildId: string, target: User, reason: string): Promise<void> {
     await this.applyWarn(guildId, "automod", target, reason);
   }

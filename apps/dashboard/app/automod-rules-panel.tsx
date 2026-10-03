@@ -9,7 +9,7 @@ type Rule = {
   enabled: boolean;
   threshold: number | null;
   windowSeconds: number | null;
-  action: "delete" | "timeout" | "warn" | "log";
+  action: "delete" | "timeout" | "warn" | "ban" | "log";
   timeoutMinutes: number;
   affectedRoleIds: string[];
   ignoredRoleIds: string[];
@@ -37,6 +37,7 @@ const DETECTORS = [
 
 const ACTIONS = [
   ["delete", "Удалить сообщение"],
+  ["ban", "Удалить + заблокировать"],
   ["timeout", "Удалить + timeout"],
   ["warn", "Удалить + warn"],
   ["log", "Только лог"]

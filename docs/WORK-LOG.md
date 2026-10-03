@@ -334,3 +334,10 @@ Never write credentials, tokens or private user data here.
 - Added allowed-role, denied-role, allowed-channel and denied-channel editors plus help visibility; retained Prefix/Slash, enabled and cooldown controls.
 - Kept the existing command_policies backend and shared guard; no duplicate permission architecture or migration added.
 - Updated Feature Matrix / Project State / Test Matrix / Handoff for cross-chat continuity.
+
+
+## 2026-10-04 — AutoMod ban action
+- Extended the existing AutoMod rule builder with a first-class `ban` action.
+- Routed AutoMod bans through `Moderation.applyAutomodBan()` for shared hierarchy validation, `moderation.ban.applied` audit and moderation-case persistence.
+- Added migration 67 for the `automod_rules.action` constraint and Dashboard action selection.
+- Added deterministic unit coverage and updated the canonical project logs.

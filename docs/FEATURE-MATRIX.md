@@ -351,7 +351,7 @@ Music должен стремиться к функциональности си
 | Attachments / URL / invite / mention / emoji / caps / spam controls | ✅ / расширять |
 | Anti-raid / anti-nuke / quarantine | ✅ / расширять |
 | Scam / phishing / honeypot detectors | ✅ / расширять |
-| Autoban rules | 🟡 |
+| Autoban rules | ✅ | AutoMod rules can directly apply a ban through the existing Moderation case/audit pipeline |
 | Auto-purge / scheduled cleanup | 🟡 |
 | Lockdown presets / incident response playbooks | 🟡 |
 | Moderation presets/templates | 🟡 |

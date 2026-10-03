@@ -1050,6 +1050,14 @@ const migrations = [
       "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS form_fields jsonb NOT NULL DEFAULT '[]'::jsonb;",
       "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS form_data jsonb NOT NULL DEFAULT '{}'::jsonb;"
     ])
+  },
+  {
+    version: 67,
+    name: "automod_ban_action",
+    sql: q([
+      "ALTER TABLE automod_rules DROP CONSTRAINT IF EXISTS automod_rules_action_check;",
+      "ALTER TABLE automod_rules ADD CONSTRAINT automod_rules_action_check CHECK(action IN ('delete','timeout','warn','ban','log'));"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
