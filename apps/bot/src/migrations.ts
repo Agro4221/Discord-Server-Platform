@@ -746,6 +746,32 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_suggestions_guild_status ON suggestions(guild_id,status);"
     ])
+  } ,
+  {
+    version: 46,
+    name: "music_saved_state",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS music_favorites (",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  identifier text NOT NULL,",
+      "  track jsonb NOT NULL,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,user_id,identifier)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_music_favorites_user ON music_favorites(guild_id,user_id,created_at DESC);",
+      "CREATE TABLE IF NOT EXISTS music_playlists (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  name text NOT NULL,",
+      "  tracks jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  UNIQUE(guild_id,user_id,name)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_music_playlists_user ON music_playlists(guild_id,user_id,updated_at DESC);"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
