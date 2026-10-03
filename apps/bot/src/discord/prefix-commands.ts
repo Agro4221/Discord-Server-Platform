@@ -10,6 +10,7 @@ import type { Reminders } from "../modules/reminders.js";
 import type { Tickets } from "../modules/tickets.js";
 import type { RolePanels } from "../modules/role-panels.js";
 import type { Giveaways } from "../modules/giveaways.js";
+import type { Utility } from "../modules/utility.js";
 
 const BUILTIN_PREFIX_COMMANDS = new Set([
   "help",
@@ -17,7 +18,8 @@ const BUILTIN_PREFIX_COMMANDS = new Set([
   "ban", "unban", "kick", "timeout", "warn", "history", "clear", "slowmode", "lock", "unlock",
   "play", "pause", "resume", "skip", "stop", "shuffle",
   "playlist", "queue", "nowplaying", "repeat", "seek", "volume", "autoplay",
-  "balance", "daily", "leaderboard", "pay", "shop", "buy", "remind", "ticket", "roles", "giveaway"
+  "balance", "daily", "leaderboard", "pay", "shop", "buy", "remind", "ticket", "roles", "giveaway",
+  "serverinfo", "userinfo", "avatar", "membercount", "roleinfo", "channelinfo", "afk"
 ]);
 
 export class PrefixCommandRouter {
@@ -32,6 +34,7 @@ export class PrefixCommandRouter {
     private readonly commandPolicy: CommandPolicyService,
     private readonly economy: Economy,
     private readonly reminders: Reminders,
+    private readonly utility: Utility,
     private readonly tickets: Tickets,
     private readonly rolePanels: RolePanels,
     private readonly giveaways: Giveaways
@@ -83,6 +86,7 @@ export class PrefixCommandRouter {
         if (await this.music.handlePrefixCommand(message, commandName, args)) return;
         if (await this.economy.handlePrefixCommand(message, commandName, args)) return;
         if (await this.reminders.handlePrefixCommand(message, commandName, args)) return;
+        if (await this.utility.handlePrefixCommand(message, commandName, args)) return;
         if (await this.tickets.handlePrefixCommand(message, commandName)) return;
         if (await this.rolePanels.handlePrefixCommand(message, commandName, args)) return;
         if (await this.giveaways.handlePrefixCommand(message, commandName, args)) return;
