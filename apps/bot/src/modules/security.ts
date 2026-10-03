@@ -253,10 +253,7 @@ export class Security implements PlatformModule {
 
   private async resolveIncident(incidentId: number, guildId: string): Promise<void> {
     const guild = this.client?.guilds.cache.get(guildId);
-    if (!guild) {
-      logger.debug?.("Security incident resolution deferred until guild is available", { guildId, incidentId });
-      return;
-    }
+    if (!guild) return;
 
     const assignments = await this.db.query<{
       user_id: string;
