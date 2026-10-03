@@ -1492,7 +1492,15 @@ export class Music implements PlatformModule {
   private async syncController(player: Player): Promise<void> {
     if (!this.client || !player.textChannelId) return;
 
-    const channel = this.client.channels.cache.get(player.textChannelId);
+    const preferredChannelId = await this.preferredTextChannelId(player.guildId, player.textChannelId);
+    if (preferredChannelId && preferredChannelId !== player.textChannelId) {
+      player.textChannelId = preferredChannelId;
+      await this.persistPlayer(player);
+    }
+
+    const channelId = player.textChannelId;
+    if (!channelId) return;
+    const channel = this.client.channels.cache.get(channelId);
     if (!channel?.isTextBased() || !("send" in channel)) return;
 
     const stored = await this.db.query<{ controller_message_id: string | null }>(
@@ -1500,11 +1508,6 @@ export class Music implements PlatformModule {
       [player.guildId,this.config.botIdentityId]
     );
     const storedId = stored.rows[0]?.controller_message_id ?? null;
-    const preferredChannelId = await this.preferredTextChannelId(player.guildId, player.textChannelId);
-    if (preferredChannelId && preferredChannelId !== player.textChannelId) {
-      player.textChannelId = preferredChannelId;
-      await this.persistPlayer(player);
-    }
     const current = player.queue.current;
     const queueLines = player.queue.tracks.slice(0,10).map((track,index) =>
       `${index + 1}. ${track.info.title} — ${track.info.author ?? "Unknown artist"}`
