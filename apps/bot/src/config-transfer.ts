@@ -40,6 +40,7 @@ const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
   { table: "automation_workflow_presets", fields: ["name","event","conditions","any_conditions","actions","cooldown_seconds"] },
   { table: "role_panels", fields: ["channel_id","message_id","title","roles","selection_mode","max_selections","duration_minutes"] },
   { table: "stream_alerts", fields: ["platform","target","channel_id","mention_role_id","enabled","interval_seconds","message_template"] },
+  { table: "tickets", fields: ["channel_id","creator_id","claimed_by","status","priority","tags","created_at","closed_at","last_activity_at"] },
   { table: "notification_feeds", fields: ["channel_id","url","enabled","interval_seconds","last_item_key","last_polled_at","message_template","include_keywords","exclude_keywords"] }
 ];
 
@@ -94,6 +95,7 @@ export class ConfigTransferService {
         table.table === "automation_rules" || table.table === "automation_workflow_presets" ? "automation" :
         table.table === "role_panels" ? "roles" :
         table.table === "notification_feeds" ? "notifications" :
+        table.table === "tickets" ? "tickets" :
         "stream-alerts";
       const target = modules.find((module) => module.key === moduleKey);
       if (target) {
@@ -183,6 +185,33 @@ export class ConfigTransferService {
               JSON.stringify(rule.anyConditions),
               JSON.stringify(rule.actions),
               rule.cooldownSeconds
+            ]
+          );
+        }
+      }
+
+      const ticketsModule = data.modules.find((module) => module.key === "tickets");
+      const exportedTickets = ticketsModule?.settings.tickets;
+      if (exportedTickets !== undefined && !Array.isArray(exportedTickets)) {
+        throw new Error("invalid_tickets");
+      }
+      if (Array.isArray(exportedTickets)) {
+        const normalizedTickets = exportedTickets.map((ticket) => normalizeImportedTicket(ticket));
+        await client.query("DELETE FROM tickets WHERE guild_id=$1", [targetGuildId]);
+        for (const ticket of normalizedTickets) {
+          await client.query(
+            "INSERT INTO tickets(guild_id,channel_id,creator_id,claimed_by,status,priority,tags,created_at,closed_at,last_activity_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+            [
+              targetGuildId,
+              ticket.channelId,
+              ticket.creatorId,
+              ticket.claimedBy,
+              ticket.status,
+              ticket.priority,
+              ticket.tags,
+              ticket.createdAt,
+              ticket.closedAt,
+              ticket.lastActivityAt
             ]
           );
         }
@@ -669,6 +698,52 @@ type NormalizedNotificationFeed = {
   includeKeywords: string[];
   excludeKeywords: string[];
 };
+
+type NormalizedTicket = {
+  channelId: string;
+  creatorId: string;
+  claimedBy: string | null;
+  status: "open" | "closed" | "closing";
+  priority: "low" | "normal" | "high" | "urgent";
+  tags: string[];
+  createdAt: string;
+  closedAt: string | null;
+  lastActivityAt: string | null;
+};
+
+function normalizeImportedTicket(value: unknown): NormalizedTicket {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_ticket");
+  const object = value as Record<string, unknown>;
+  if (
+    typeof object.channel_id !== "string" || !/^\d{17,20}$/.test(object.channel_id) ||
+    typeof object.creator_id !== "string" || !/^\d{17,20}$/.test(object.creator_id) ||
+    (object.claimed_by !== null && object.claimed_by !== undefined && (typeof object.claimed_by !== "string" || !/^\d{17,20}$/.test(object.claimed_by))) ||
+    typeof object.status !== "string" || !["open","closed","closing"].includes(object.status) ||
+    typeof object.priority !== "string" || !["low","normal","high","urgent"].includes(object.priority) ||
+    !Array.isArray(object.tags) ||
+    typeof object.created_at !== "string"
+  ) throw new Error("invalid_ticket");
+
+  const tags = [...new Set(
+    object.tags.filter((tag): tag is string => typeof tag === "string")
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+      .slice(0,10)
+      .map((tag) => tag.slice(0,40))
+  )];
+
+  return {
+    channelId: object.channel_id,
+    creatorId: object.creator_id,
+    claimedBy: object.claimed_by === null || object.claimed_by === undefined ? null : object.claimed_by,
+    status: object.status as NormalizedTicket["status"],
+    priority: object.priority as NormalizedTicket["priority"],
+    tags,
+    createdAt: object.created_at,
+    closedAt: typeof object.closed_at === "string" ? object.closed_at : null,
+    lastActivityAt: typeof object.last_activity_at === "string" ? object.last_activity_at : null
+  };
+}
 
 function normalizeImportedNotificationFeed(value: unknown): NormalizedNotificationFeed {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_notification_feed");
