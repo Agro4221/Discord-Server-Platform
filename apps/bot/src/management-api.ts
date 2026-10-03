@@ -72,6 +72,7 @@ type ApiOptions = {
   };
   automation?: {
     list: (guildId: string) => Promise<unknown[]>;
+    diagnostics: (guildId: string) => Promise<unknown>;
     dryRun: (input: {
       guildId: string;
       event: string;
@@ -82,6 +83,7 @@ type ApiOptions = {
       userId?: string;
       channelId?: string;
       roleIds?: string[];
+      numeric?: Record<string, number>;
     }) => Promise<unknown>;
     create: (guildId: string, input: {
       name: string;
@@ -754,10 +756,24 @@ export class ManagementApiServer {
 
           const automationMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation$/);
           const automationDryRunMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/dry-run$/);
+          const automationDiagnosticsMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/diagnostics$/);
           const automationItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/([^/]+)$/);
 
-          if ((automationMatch || automationDryRunMatch || automationItemMatch) && !this.options.automation) {
+          if ((automationMatch || automationDryRunMatch || automationDiagnosticsMatch || automationItemMatch) && !this.options.automation) {
             this.json(res, 500, { error: "automation_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && automationDiagnosticsMatch) {
+            const guildId = automationDiagnosticsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, {
+              guildId,
+              diagnostics: await this.options.automation!.diagnostics(guildId)
+            });
             return;
           }
 
