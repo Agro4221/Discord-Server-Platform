@@ -41,6 +41,14 @@ type Customization = {
   closeButtonLabel: string;
 };
 
+type SlaConfig = {
+  enabled: boolean;
+  firstResponseMinutes: number;
+  reminderMinutes: number;
+  escalationMinutes: number;
+  escalationRoleId: string | null;
+};
+
 const DEFAULT_CUSTOMIZATION: Customization = {
   panelTitle: "🎫 Поддержка",
   panelDescription: "Нажми кнопку ниже — Vexa откроет форму тикета.",
@@ -52,6 +60,13 @@ const DEFAULT_CUSTOMIZATION: Customization = {
 export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onChanged?: () => void | Promise<void> }) {
   const [fields, setFields] = useState<Field[]>([]);
   const [customization, setCustomization] = useState<Customization>(DEFAULT_CUSTOMIZATION);
+  const [sla, setSla] = useState<SlaConfig>({
+    enabled: false,
+    firstResponseMinutes: 30,
+    reminderMinutes: 120,
+    escalationMinutes: 240,
+    escalationRoleId: null
+  });
   const [status, setStatus] = useState("");
   const [tickets, setTickets] = useState<TicketSummary[]>([]);
   const [ticketFilter, setTicketFilter] = useState<"open" | "closed" | "closing" | "all">("open");
@@ -60,19 +75,23 @@ export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onCha
 
   async function load() {
     const ticketQuery = ticketFilter === "all" ? "" : "?status=" + ticketFilter;
-    const [formResponse, customizationResponse, ticketsResponse] = await Promise.all([
+    const [formResponse, customizationResponse, slaResponse, ticketsResponse] = await Promise.all([
       fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/form", { cache: "no-store" }),
       fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/customization", { cache: "no-store" }),
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/sla", { cache: "no-store" }),
       fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets" + ticketQuery, { cache: "no-store" })
     ]);
     const formBody = await formResponse.json().catch(() => ({}));
     const customizationBody = await customizationResponse.json().catch(() => ({}));
+    const slaBody = await slaResponse.json().catch(() => ({}));
     const ticketsBody = await ticketsResponse.json().catch(() => ({}));
     if (!formResponse.ok) throw new Error(formBody.error ?? "ticket_form_failed");
     if (!customizationResponse.ok) throw new Error(customizationBody.error ?? "ticket_customization_failed");
+    if (!slaResponse.ok) throw new Error(slaBody.error ?? "ticket_sla_failed");
     if (!ticketsResponse.ok) throw new Error(ticketsBody.error ?? "tickets_failed");
     setFields((formBody.fields ?? []) as Field[]);
     setCustomization((customizationBody.customization ?? DEFAULT_CUSTOMIZATION) as Customization);
+    setSla((slaBody.sla ?? sla) as SlaConfig);
     const nextTickets = (ticketsBody.tickets ?? []) as TicketSummary[];
     setTickets(nextTickets);
     setTicketEdits(Object.fromEntries(nextTickets.map((ticket) => [
@@ -130,6 +149,31 @@ export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onCha
       await onChanged?.();
     } catch (caught) {
       setStatus(caught instanceof Error ? caught.message : "Не удалось обновить ticket.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function patchSla(patch: Partial<SlaConfig>) {
+    setSla((current) => ({ ...current, ...patch }));
+  }
+
+  async function saveSla() {
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/sla", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(sla)
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "ticket_sla_save_failed");
+      setSla((body.sla ?? sla) as SlaConfig);
+      setStatus("SLA тикетов сохранён.");
+      await onChanged?.();
+    } catch (caught) {
+      setStatus(caught instanceof Error ? caught.message : "Не удалось сохранить SLA.");
     } finally {
       setBusy(false);
     }
@@ -231,6 +275,29 @@ export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onCha
             </div>
           );
         })}
+      </section>
+
+      <section style={sectionStyle}>
+        <div style={sectionTitle}>Staff SLA · напоминания и эскалация</div>
+        <label style={check}>
+          <input type="checkbox" checked={sla.enabled} onChange={(e) => patchSla({ enabled: e.target.checked })} />
+          Включить SLA worker
+        </label>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
+          <label style={label}><span>Первый ответ, минут</span><input type="number" min={1} max={10080} value={sla.firstResponseMinutes} onChange={(e) => patchSla({ firstResponseMinutes: Number(e.target.value) })} style={input} /></label>
+          <label style={label}><span>Напоминание, минут</span><input type="number" min={1} max={10080} value={sla.reminderMinutes} onChange={(e) => patchSla({ reminderMinutes: Number(e.target.value) })} style={input} /></label>
+          <label style={label}><span>Эскалация, минут</span><input type="number" min={1} max={20160} value={sla.escalationMinutes} onChange={(e) => patchSla({ escalationMinutes: Number(e.target.value) })} style={input} /></label>
+        </div>
+        <label style={label}>
+          <span>Role ID для эскалации (необязательно)</span>
+          <input value={sla.escalationRoleId ?? ""} maxLength={20} onChange={(e) => patchSla({ escalationRoleId: e.target.value.trim() || null })} placeholder="123456789012345678" style={input} />
+        </label>
+        <div style={{ color: "#697486", fontSize: 9 }}>
+          Напоминание отправляется один раз: непринятым тикетам — после таймера первого ответа, принятым — после бездействия. Эскалация также одноразовая.
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button type="button" onClick={() => void saveSla()} disabled={busy} style={secondary}>{busy ? "Сохранение…" : "Сохранить SLA"}</button>
+        </div>
       </section>
 
       <section style={sectionStyle}>
