@@ -36,8 +36,13 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       [["message_template","include_keywords","exclude_keywords"]]
     );
     assert.equal(feedColumns.rows.length, 3);
-    assert.equal(Number(version), 72);
-    assert.equal(Number(first.rows[0]?.count), 72);
+    const ticketColumns = await db.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='tickets' AND column_name = ANY($1)",
+      [["priority","tags","updated_at"]]
+    );
+    assert.equal(ticketColumns.rows.length, 3);
+    assert.equal(Number(version), 73);
+    assert.equal(Number(first.rows[0]?.count), 73);
   } finally {
     await db.close();
   }
@@ -499,6 +504,33 @@ test("notification feed filters and templates persist with bounded arrays", { sk
     }]);
   } finally {
     await db.query("DELETE FROM notification_feeds WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.close();
+  }
+});
+
+test("ticket priority and tags persist with expected bounds", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345739";
+  try {
+    await migrate(db);
+    await db.query("DELETE FROM tickets WHERE guild_id=$1", [guildId]);
+    await db.query(
+      "INSERT INTO tickets(guild_id,channel_id,creator_id,status,priority,tags) VALUES($1,$2,$3,'open','urgent',$4)",
+      [guildId,"123456789012345738","123456789012345737",["billing","vip"]]
+    );
+    const result = await db.query<{ priority: string; tags: string[] }>(
+      "SELECT priority,tags FROM tickets WHERE guild_id=$1",
+      [guildId]
+    );
+    assert.deepEqual(result.rows, [{ priority: "urgent", tags: ["billing","vip"] }]);
+    await assert.rejects(
+      db.query(
+        "UPDATE tickets SET priority='invalid' WHERE guild_id=$1",
+        [guildId]
+      )
+    );
+  } finally {
+    await db.query("DELETE FROM tickets WHERE guild_id=$1", [guildId]).catch(() => undefined);
     await db.close();
   }
 });
