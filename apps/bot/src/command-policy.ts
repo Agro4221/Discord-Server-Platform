@@ -71,6 +71,7 @@ export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
   { name: "starboard", label: "Starboard", module: "starboard", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true },
   { name: "analytics", label: "Analytics", module: "analytics", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: false, slash: true },
   { name: "feed", label: "Notifications", module: "notifications", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true },
+  { name: "streamalert", label: "Stream alerts", module: "notifications", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: false, slash: true },
   { name: "music", label: "Music group", module: "music", prefix: true, slash: true },
   { name: "play", label: "Play", module: "music", prefix: true, slash: true },
   { name: "pause", label: "Pause", module: "music", prefix: true, slash: true },
