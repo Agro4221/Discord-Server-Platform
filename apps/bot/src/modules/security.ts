@@ -107,8 +107,19 @@ export class Security implements PlatformModule {
   }
 
   private async config(guildId: string): Promise<SecurityConfig> {
-    const result = await this.db.query<{ enabled: boolean; max_joins: number; window_seconds: number; max_destructive_actions: number; destructive_window_seconds: number; quarantine_role_id: string | null; log_channel_id: string | null }>(
-      "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id FROM security_settings WHERE guild_id=$1",
+    const result = await this.db.query<{
+      enabled: boolean;
+      max_joins: number;
+      window_seconds: number;
+      max_destructive_actions: number;
+      destructive_window_seconds: number;
+      quarantine_role_id: string | null;
+      log_channel_id: string | null;
+      incident_duration_seconds: number;
+      auto_quarantine: boolean;
+      remove_executor_roles: boolean;
+    }>(
+      "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id,incident_duration_seconds,auto_quarantine,remove_executor_roles FROM security_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -130,24 +141,42 @@ export class Security implements PlatformModule {
     const current = await this.config(guildId);
     const next = { ...current, ...patch };
     await this.db.query(
-      `INSERT INTO security_settings(guild_id,enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id,incident_duration_seconds,auto_quarantine,remove_executor_roles)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-       ON CONFLICT(guild_id) DO UPDATE SET
-       enabled=EXCLUDED.enabled,max_joins=EXCLUDED.max_joins,window_seconds=EXCLUDED.window_seconds,
-       max_destructive_actions=EXCLUDED.max_destructive_actions,destructive_window_seconds=EXCLUDED.destructive_window_seconds,
-       quarantine_role_id=EXCLUDED.quarantine_role_id,log_channel_id=EXCLUDED.log_channel_id,updated_at=now()`,
-      [guildId,next.enabled,Math.min(Math.max(next.maxJoins,2),200),Math.min(Math.max(next.windowSeconds,5),300),
-       Math.min(Math.max(next.maxDestructiveActions,2),100),Math.min(Math.max(next.destructiveWindowSeconds,5),300),
-       next.quarantineRoleId,next.logChannelId,
-      Math.min(Math.max(next.incidentDurationSeconds, 60), 3600),
-      next.autoQuarantine,
-      next.removeExecutorRoles
+      `INSERT INTO security_settings(
+        guild_id,enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,
+        quarantine_role_id,log_channel_id,incident_duration_seconds,auto_quarantine,remove_executor_roles
+      )
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      ON CONFLICT(guild_id) DO UPDATE SET
+        enabled=EXCLUDED.enabled,
+        max_joins=EXCLUDED.max_joins,
+        window_seconds=EXCLUDED.window_seconds,
+        max_destructive_actions=EXCLUDED.max_destructive_actions,
+        destructive_window_seconds=EXCLUDED.destructive_window_seconds,
+        quarantine_role_id=EXCLUDED.quarantine_role_id,
+        log_channel_id=EXCLUDED.log_channel_id,
+        incident_duration_seconds=EXCLUDED.incident_duration_seconds,
+        auto_quarantine=EXCLUDED.auto_quarantine,
+        remove_executor_roles=EXCLUDED.remove_executor_roles,
+        updated_at=now()`,
+      [
+        guildId,
+        next.enabled,
+        Math.min(Math.max(next.maxJoins, 2), 200),
+        Math.min(Math.max(next.windowSeconds, 5), 300),
+        Math.min(Math.max(next.maxDestructiveActions, 2), 100),
+        Math.min(Math.max(next.destructiveWindowSeconds, 5), 300),
+        next.quarantineRoleId,
+        next.logChannelId,
+        clampSecurityIncidentDuration(next.incidentDurationSeconds),
+        next.autoQuarantine,
+        next.removeExecutorRoles
+      ]
     );
     await this.db.query(
       `INSERT INTO guild_modules(guild_id,module_key,enabled)
        VALUES($1,'security',$2)
        ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=now()`,
-      [guildId,next.enabled]
+      [guildId, next.enabled]
     );
   }
 
@@ -232,10 +261,18 @@ export class Security implements PlatformModule {
     for (const assignment of assignments.rows) {
       const member = guild ? await guild.members.fetch(assignment.user_id).catch(() => null) : null;
       const role = guild?.roles.cache.get(assignment.role_id);
-      if (member && role && member.roles.cache.has(role.id)) {
+      const otherAssignments = await this.db.query<{ incident_id: string }>(
+        "SELECT incident_id FROM security_quarantine_assignments WHERE guild_id=$1 AND user_id=$2 AND role_id=$3 AND incident_id<>$4 AND restored_at IS NULL LIMIT 1",
+        [guildId, assignment.user_id, assignment.role_id, incidentId]
+      );
+      if (!otherAssignments.rows.length && member && role && member.roles.cache.has(role.id)) {
         await member.roles.remove(role, "Security incident ended").catch((error) => {
           logger.warn("Security quarantine role removal failed", {
-            guildId, incidentId, userId: assignment.user_id, roleId: role.id, error: String(error)
+            guildId,
+            incidentId,
+            userId: assignment.user_id,
+            roleId: assignment.role_id,
+            error: String(error)
           });
         });
       }
@@ -250,10 +287,8 @@ export class Security implements PlatformModule {
       [incidentId, guildId]
     );
 
-    const currentRaid = this.raidIncidents.get(guildId);
-    if (currentRaid?.id === incidentId) this.raidIncidents.delete(guildId);
-    const currentDestructive = this.destructiveIncidents.get(guildId);
-    if (currentDestructive?.id === incidentId) this.destructiveIncidents.delete(guildId);
+    if (this.raidIncidents.get(guildId)?.id === incidentId) this.raidIncidents.delete(guildId);
+    if (this.destructiveIncidents.get(guildId)?.id === incidentId) this.destructiveIncidents.delete(guildId);
 
     await this.audit(guildId, "security.incident-resolved", { incidentId });
   }
@@ -292,14 +327,33 @@ export class Security implements PlatformModule {
     const botMember = member.guild.members.me;
     const role = member.guild.roles.cache.get(config.quarantineRoleId);
     if (!botMember || !role || role.managed || role.position >= botMember.roles.highest.position) return;
-    if (member.roles.cache.has(role.id)) return;
 
-    await member.roles.add(role, "Security quarantine").catch((error) => {
+    const existingSecurityAssignment = await this.db.query<{ incident_id: string }>(
+      "SELECT incident_id FROM security_quarantine_assignments WHERE guild_id=$1 AND user_id=$2 AND role_id=$3 AND restored_at IS NULL LIMIT 1",
+      [member.guild.id, member.id, role.id]
+    );
+
+    if (member.roles.cache.has(role.id)) {
+      if (existingSecurityAssignment.rows.length) {
+        await this.db.query(
+          "INSERT INTO security_quarantine_assignments(incident_id,guild_id,user_id,role_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING",
+          [incidentId, member.guild.id, member.id, role.id]
+        );
+      }
+      return;
+    }
+
+    try {
+      await member.roles.add(role, "Security quarantine");
+    } catch (error) {
       logger.warn("Security quarantine role assignment failed", {
-        guildId: member.guild.id, userId: member.id, roleId: role.id, error: String(error)
+        guildId: member.guild.id,
+        userId: member.id,
+        roleId: role.id,
+        error: String(error)
       });
       return;
-    });
+    }
 
     await this.db.query(
       "INSERT INTO security_quarantine_assignments(incident_id,guild_id,user_id,role_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING",
@@ -313,13 +367,25 @@ export class Security implements PlatformModule {
       await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
       return;
     }
-    if (interaction.options.getSubcommand() !== "setup") return;
+
+    const sub = interaction.options.getSubcommand();
+    if (sub === "clear") {
+      const cleared = await this.clearIncidents(interaction.guild!.id);
+      await interaction.reply({
+        content: cleared ? `Закрыто инцидентов: ${cleared}.` : "Активных Security-инцидентов нет.",
+        ephemeral: true
+      });
+      return;
+    }
+    if (sub !== "setup") return;
+
     const logChannelOption = interaction.options.getChannel("log-channel");
     const logChannel = logChannelOption ? interaction.guild!.channels.cache.get(logChannelOption.id) : null;
     if (logChannelOption && (!logChannel || logChannel.type !== 0)) {
       await interaction.reply({ content: "Security log channel должен быть текстовым.", ephemeral: true });
       return;
     }
+
     await this.configure(interaction.guild!.id, {
       enabled: true,
       maxJoins: interaction.options.getInteger("max-joins", true),
