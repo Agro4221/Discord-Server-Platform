@@ -100,3 +100,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Added deterministic coverage for AFK reason normalization, clear keywords and Discord relative-time notice formatting.
 - AFK persistence, mention notifications and automatic return clearing are wired through the Reminders module.
 - Live Discord behavior (message-volume interaction, permission/resource edge cases and restart persistence against a live PostgreSQL instance) remains part of the release-gate suite.
+### 2026-10-03 — AutoMod rule editor snapshot
+- Dashboard CRUD now exposes the existing persistent AutoMod detector-rule contract with resource pickers for roles/channels.
+- Rule actions support delete, timeout, warn and log; warn is routed through the existing Moderation case/escalation path.
+- Backend validation rejects unsupported actions and non-finite/out-of-range per-rule numeric values.
+- Live Discord behavior, role hierarchy and provider/resource failure paths remain release-gate validation.
