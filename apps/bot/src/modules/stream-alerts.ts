@@ -7,7 +7,7 @@ import { logger } from "../logger.js";
 export type StreamAlertPlatform = "twitch" | "youtube" | "vk";
 export type StreamAlertRecord = {
   id:number; guildId:string; platform:StreamAlertPlatform; target:string; targetId:string|null;
-  channelId:string; mentionRoleId:string|null; enabled:boolean; intervalSeconds:number;
+  channelId:string; mentionRoleId:string|null; enabled:boolean; intervalSeconds:number; messageTemplate:string;
   lastStreamKey:string|null; lastOnline:boolean; lastCheckedAt:string|null; lastError:string|null;
 };
 type LiveInfo={key:string;title:string;url:string;author:string;thumbnail?:string};
@@ -43,23 +43,23 @@ export class StreamAlerts implements PlatformModule {
   async list(guildId:string):Promise<StreamAlertRecord[]>{
     const r=await this.db.query<{
       id:string;guild_id:string;platform:StreamAlertPlatform;target:string;target_id:string|null;
-      channel_id:string;mention_role_id:string|null;enabled:boolean;interval_seconds:number;
+      channel_id:string;mention_role_id:string|null;enabled:boolean;interval_seconds:number;message_template:string;
       last_stream_key:string|null;last_online:boolean;last_checked_at:string|null;last_error:string|null;
     }>(
-      "SELECT id,guild_id,platform,target,target_id,channel_id,mention_role_id,enabled,interval_seconds,last_stream_key,last_online,last_checked_at,last_error FROM stream_alerts WHERE guild_id=$1 ORDER BY id DESC",[guildId]
+      "SELECT id,guild_id,platform,target,target_id,channel_id,mention_role_id,enabled,interval_seconds,message_template,last_stream_key,last_online,last_checked_at,last_error FROM stream_alerts WHERE guild_id=$1 ORDER BY id DESC",[guildId]
     );
     return r.rows.map(row=>({
       id:Number(row.id),guildId:row.guild_id,platform:row.platform,target:row.target,targetId:row.target_id,
-      channelId:row.channel_id,mentionRoleId:row.mention_role_id,enabled:row.enabled,intervalSeconds:row.interval_seconds,
+      channelId:row.channel_id,mentionRoleId:row.mention_role_id,enabled:row.enabled,intervalSeconds:row.interval_seconds,messageTemplate:row.message_template,
       lastStreamKey:row.last_stream_key,lastOnline:row.last_online,lastCheckedAt:row.last_checked_at,lastError:row.last_error
     }));
   }
 
-  async create(guildId:string,input:{platform:StreamAlertPlatform;target:string;channelId:string;mentionRoleId?:string|null;intervalSeconds:number;enabled?:boolean}):Promise<StreamAlertRecord>{
+  async create(guildId:string,input:{platform:StreamAlertPlatform;target:string;channelId:string;mentionRoleId?:string|null;intervalSeconds:number;enabled?:boolean;messageTemplate?:string}):Promise<StreamAlertRecord>{
     const target=normalizeTarget(input.platform,input.target);
     const r=await this.db.query<{id:string}>(
-      "INSERT INTO stream_alerts(guild_id,platform,target,channel_id,mention_role_id,interval_seconds,enabled) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id",
-      [guildId,input.platform,target,input.channelId,input.mentionRoleId??null,clampInterval(input.intervalSeconds),input.enabled!==false]
+      "INSERT INTO stream_alerts(guild_id,platform,target,channel_id,mention_role_id,interval_seconds,enabled,message_template) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id",
+      [guildId,input.platform,target,input.channelId,input.mentionRoleId??null,clampInterval(input.intervalSeconds),input.enabled!==false,normalizeTemplate(input.messageTemplate)]
     );
     const id=r.rows[0]?.id;
     if(!id)throw new Error("stream_alert_create_failed");
@@ -72,13 +72,13 @@ export class StreamAlerts implements PlatformModule {
     return created;
   }
 
-  async update(guildId:string,id:number,patch:{target?:string;channelId?:string;mentionRoleId?:string|null;intervalSeconds?:number;enabled?:boolean}):Promise<boolean>{
+  async update(guildId:string,id:number,patch:{target?:string;channelId?:string;mentionRoleId?:string|null;intervalSeconds?:number;enabled?:boolean;messageTemplate?:string}):Promise<boolean>{
     const current=(await this.list(guildId)).find(item=>item.id===id);
     if(!current)return false;
     const target=patch.target===undefined?current.target:normalizeTarget(current.platform,patch.target);
     await this.db.query(
-      "UPDATE stream_alerts SET target=$1,channel_id=$2,mention_role_id=$3,interval_seconds=$4,enabled=$5,last_error=NULL,updated_at=now() WHERE id=$6 AND guild_id=$7",
-      [target,patch.channelId??current.channelId,patch.mentionRoleId===undefined?current.mentionRoleId:patch.mentionRoleId,clampInterval(patch.intervalSeconds??current.intervalSeconds),patch.enabled??current.enabled,id,guildId]
+      "UPDATE stream_alerts SET target=$1,channel_id=$2,mention_role_id=$3,interval_seconds=$4,enabled=$5,message_template=$6,last_error=NULL,updated_at=now() WHERE id=$7 AND guild_id=$8",
+      [target,patch.channelId??current.channelId,patch.mentionRoleId===undefined?current.mentionRoleId:patch.mentionRoleId,clampInterval(patch.intervalSeconds??current.intervalSeconds),patch.enabled??current.enabled,patch.messageTemplate===undefined?current.messageTemplate:normalizeTemplate(patch.messageTemplate),id,guildId]
     );
     return true;
   }
@@ -94,9 +94,9 @@ export class StreamAlerts implements PlatformModule {
     try{
       const r=await this.db.query<{
         id:string;guild_id:string;platform:StreamAlertPlatform;target:string;target_id:string|null;channel_id:string;
-        mention_role_id:string|null;last_stream_key:string|null;last_online:boolean;
+        mention_role_id:string|null;message_template:string;last_stream_key:string|null;last_online:boolean;
       }>(
-        "SELECT sa.id,sa.guild_id,sa.platform,sa.target,sa.target_id,sa.channel_id,sa.mention_role_id,sa.last_stream_key,sa.last_online "+
+        "SELECT sa.id,sa.guild_id,sa.platform,sa.target,sa.target_id,sa.channel_id,sa.mention_role_id,sa.message_template,sa.last_stream_key,sa.last_online "+
         "FROM stream_alerts sa INNER JOIN guild_bot_assignments ga ON ga.guild_id=sa.guild_id "+
         "WHERE sa.enabled=true AND (ga.bot_identity_id=$1 OR ($1='primary' AND ga.bot_identity_id<>'primary' AND NOT EXISTS ("+
         "SELECT 1 FROM bot_heartbeats bh WHERE bh.bot_identity_id=ga.bot_identity_id AND bh.last_seen_at>=now()-interval '90 seconds'))) "+
@@ -120,7 +120,7 @@ export class StreamAlerts implements PlatformModule {
     try{
       const live=await this.fetchLive(alert.platform,alert.target,alert.target_id);
       if(live&&(!alert.last_online||live.key!==alert.last_stream_key)){
-        await this.sendAlert(alert.guild_id,alert.channel_id,alert.mention_role_id,alert.platform,live);
+        await this.sendAlert(alert.guild_id,alert.channel_id,alert.mention_role_id,alert.platform,live,alert.message_template);
       }
       const targetId=alert.platform==="twitch"
         ? await this.resolveTwitchUserId(alert.target)
@@ -209,14 +209,21 @@ export class StreamAlerts implements PlatformModule {
     return body.access_token;
   }
 
-  private async sendAlert(guildId:string,channelId:string,mentionRoleId:string|null,platform:StreamAlertPlatform,live:LiveInfo):Promise<void>{
+  private async sendAlert(guildId:string,channelId:string,mentionRoleId:string|null,platform:StreamAlertPlatform,live:LiveInfo,messageTemplate:string):Promise<void>{
     const channel=this.client?.guilds.cache.get(guildId)?.channels.cache.get(channelId);
     if(!channel?.isTextBased()||!("send" in channel))throw new Error("stream_alert_channel_unavailable");
     const names:Record<StreamAlertPlatform,string>={twitch:"Twitch",youtube:"YouTube",vk:"VK Видео Live"};
     const embed=new EmbedBuilder().setTitle("🔴 "+names[platform]+" — эфир начался").setDescription("**"+live.title+"**").setURL(live.url).addFields({name:"Канал",value:live.author,inline:true}).setTimestamp();
     if(live.thumbnail)embed.setThumbnail(live.thumbnail);
+    const content=renderTemplate(messageTemplate,{
+      mention:mentionRoleId?"<@&"+mentionRoleId+">":"",
+      platform:names[platform],
+      title:live.title,
+      author:live.author,
+      url:live.url
+    });
     await channel.send({
-      content:mentionRoleId?"<@&"+mentionRoleId+">":undefined,
+      content:content || undefined,
       embeds:[embed],
       allowedMentions:mentionRoleId?{roles:[mentionRoleId]}:{parse:[]}
     });
@@ -238,4 +245,15 @@ function normalizeTarget(platform:StreamAlertPlatform,raw:string):string{
 function clampInterval(value:number):number{
   if(!Number.isFinite(value))throw new Error("invalid_stream_alert_interval");
   return Math.min(Math.max(Math.trunc(value),15),3600);
+}
+
+
+function normalizeTemplate(value:string|undefined):string {
+  const fallback="{mention} 🔴 {platform}: **{title}** — {author} {url}";
+  const template=(value??fallback).trim().slice(0,1000);
+  return template || fallback;
+}
+
+function renderTemplate(template:string,vars:Record<string,string>):string {
+  return normalizeTemplate(template).replace(/\{(mention|platform|title|author|url)\}/g,(_,key:string)=>vars[key]??"");
 }
