@@ -994,6 +994,15 @@ const migrations = [
       "ALTER TABLE stream_alerts DROP CONSTRAINT IF EXISTS stream_alerts_platform_check;",
       "ALTER TABLE stream_alerts ADD CONSTRAINT stream_alerts_platform_check CHECK(platform IN ('twitch','youtube','vk','kick')); "
     ])
+  },
+  {
+    version: 63,
+    name: "security_response_policies",
+    sql: q([
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS raid_quarantine_enabled boolean NOT NULL DEFAULT true;",
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS destructive_role_removal boolean NOT NULL DEFAULT true;",
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS destructive_quarantine_enabled boolean NOT NULL DEFAULT true;"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
