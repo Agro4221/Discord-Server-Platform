@@ -633,6 +633,10 @@ export class Moderation implements PlatformModule {
     await message.reply(`✅ Пользователь <@${userId}> разблокирован.`);
   }
 
+  async applyAutomodWarn(guildId: string, target: User, reason: string): Promise<void> {
+    await this.applyWarn(guildId, "automod", target, reason);
+  }
+
   private async applyWarn(guildId: string, moderatorUserId: string, target: User, reason: string): Promise<void> {
     await this.audit("moderation.warn.attempted", guildId, moderatorUserId, target.id, { reason });
     const caseId = await this.recordBestEffort(guildId, target.id, moderatorUserId, "warn", reason);
