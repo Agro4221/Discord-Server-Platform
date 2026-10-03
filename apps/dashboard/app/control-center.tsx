@@ -336,6 +336,20 @@ const MODULE_META: Record<string, ModuleMeta> = {
     ],
     kind: "settings"
   },
+  reputation: {
+    icon: "★",
+    accent: "#d7ba73",
+    title: "Репутация",
+    summary: "Rep и социальные профили участников.",
+    category: "community",
+    commands: ["/rep give", "/rep check", "/rep leaderboard", "/profile"],
+    functions: [
+      { title: "Rep", description: "Участники выдают друг другу +1 rep с защитой от повторной выдачи в течение дня." },
+      { title: "Leaderboard", description: "Топ участников по репутации сервера." },
+      { title: "Profiles", description: "Публичное био и текущая репутация участника." }
+    ],
+    kind: "discord"
+  },
   polls: {
     icon: "◉",
     accent: "#79c7dd",
