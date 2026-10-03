@@ -1069,7 +1069,7 @@ const migrations = [
       "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS claim_button_label text NOT NULL DEFAULT 'Забрать';",
       "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS close_button_label text NOT NULL DEFAULT 'Закрыть';"
     ])
-  },
+  }
   {
     version: 69,
     name: "automation_delayed_retry_dead_letter",
@@ -1077,25 +1077,7 @@ const migrations = [
       "ALTER TABLE automation_delayed_jobs ADD COLUMN IF NOT EXISTS dead_lettered_at timestamptz;",
       "CREATE INDEX IF NOT EXISTS idx_automation_delayed_retry_state ON automation_delayed_jobs(guild_id,completed_at,dead_lettered_at,available_at);"
     ])
-  },
-  {
-    version: 71,
-    name: "ticket_sla",
-    sql: q([
-      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS sla_reminded_at timestamptz;",
-      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS sla_escalated_at timestamptz;",
-      "CREATE TABLE IF NOT EXISTS ticket_sla_settings (",
-      "  guild_id text PRIMARY KEY,",
-      "  enabled boolean NOT NULL DEFAULT false,",
-      "  first_response_minutes integer NOT NULL DEFAULT 30 CHECK(first_response_minutes BETWEEN 1 AND 10080),",
-      "  reminder_minutes integer NOT NULL DEFAULT 120 CHECK(reminder_minutes BETWEEN 1 AND 10080),",
-      "  escalation_minutes integer NOT NULL DEFAULT 240 CHECK(escalation_minutes BETWEEN 1 AND 20160),",
-      "  escalation_role_id text,",
-      "  updated_at timestamptz NOT NULL DEFAULT now()",
-      ");",
-      "CREATE INDEX IF NOT EXISTS idx_ticket_sla_open_activity ON tickets(guild_id,status,last_activity_at,created_at) WHERE status='open';"
-    ])
-  },
+  }
   {
     version: 70,
     name: "automation_workflow_presets",
@@ -1114,7 +1096,7 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_automation_workflow_presets_guild_updated ON automation_workflow_presets(guild_id,updated_at DESC);"
     ])
-  },
+  }
   {
     version: 71,
     name: "moderation_scheduled_cleanup",
@@ -1134,7 +1116,7 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_moderation_cleanup_due ON moderation_cleanup_rules(guild_id,enabled,last_run_at,processing_until);"
     ])
-  },
+  }
   {
     version: 72,
     name: "notification_feed_filters_and_templates",
@@ -1143,7 +1125,7 @@ const migrations = [
       "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS include_keywords text[] NOT NULL DEFAULT '{}';",
       "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS exclude_keywords text[] NOT NULL DEFAULT '{}';"
     ])
-  },
+  }
   {
     version: 73,
     name: "ticket_priority_and_tags",
@@ -1153,22 +1135,7 @@ const migrations = [
       "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();",
       "CREATE INDEX IF NOT EXISTS idx_tickets_guild_priority ON tickets(guild_id,status,priority,created_at DESC);"
     ])
-  },
-  {
-    version: 75,
-    name: "moderation_presets",
-    sql: q([
-      "CREATE TABLE IF NOT EXISTS moderation_presets (",
-      "  guild_id text NOT NULL,",
-      "  name text NOT NULL,",
-      "  payload jsonb NOT NULL,",
-      "  created_at timestamptz NOT NULL DEFAULT now(),",
-      "  updated_at timestamptz NOT NULL DEFAULT now(),",
-      "  PRIMARY KEY(guild_id,name)",
-      ");",
-      "CREATE INDEX IF NOT EXISTS idx_moderation_presets_guild_updated ON moderation_presets(guild_id,updated_at DESC);"
-    ])
-  },
+  }
   {
     version: 74,
     name: "role_automation_rules_and_jobs",
@@ -1202,6 +1169,40 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_role_automation_jobs_due ON role_automation_jobs(guild_id,completed_at,dead_lettered_at,available_at);"
     ])
+  }
+  {
+    version: 75,
+    name: "moderation_presets",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS moderation_presets (",
+      "  guild_id text NOT NULL,",
+      "  name text NOT NULL,",
+      "  payload jsonb NOT NULL,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,name)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_moderation_presets_guild_updated ON moderation_presets(guild_id,updated_at DESC);"
+    ])
+  }
+  {
+    version: 76,
+    name: "ticket_sla",
+    sql: q([
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS sla_reminded_at timestamptz;",
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS sla_escalated_at timestamptz;",
+      "CREATE TABLE IF NOT EXISTS ticket_sla_settings (",
+      "  guild_id text PRIMARY KEY,",
+      "  enabled boolean NOT NULL DEFAULT false,",
+      "  first_response_minutes integer NOT NULL DEFAULT 30 CHECK(first_response_minutes BETWEEN 1 AND 10080),",
+      "  reminder_minutes integer NOT NULL DEFAULT 120 CHECK(reminder_minutes BETWEEN 1 AND 10080),",
+      "  escalation_minutes integer NOT NULL DEFAULT 240 CHECK(escalation_minutes BETWEEN 1 AND 20160),",
+      "  escalation_role_id text,",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_ticket_sla_open_activity ON tickets(guild_id,status,last_activity_at,created_at) WHERE status='open';"
+    ])
+  }
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
