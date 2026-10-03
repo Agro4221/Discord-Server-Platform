@@ -59,7 +59,7 @@
 |---|---|
 | Welcome / goodbye | ✅ |
 | Verification | ✅ |
-| Autoroles / starter roles | 🟡 |
+| Autoroles / starter roles | ✅ |
 | Restore roles on return | ✅ |
 | Reaction roles | ✅ |
 | Button / select-menu role panels | ✅ |
@@ -74,7 +74,7 @@
 | Starboard | ✅ |
 | Economy / shop / ledger | ✅ |
 | Reputation / social profiles | 🟡 |
-| Polls / suggestions | 🟡 |
+| Polls / suggestions | ✅ | Polls implemented; suggestions remain
 | Birthdays / achievements | 🟡 |
 | Invite tracking | 🟡 |
 | Server statistics / counters | 🟡 |
