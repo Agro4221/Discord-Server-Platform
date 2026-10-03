@@ -95,7 +95,7 @@ async function main(): Promise<void> {
   const temporaryVoice = new TemporaryVoice(database, () => client.guilds.cache.values());
   const moderation = new Moderation(database);
   const autoMod = new AutoMod(database, moderation);
-  const welcome = new Welcome(database);
+  const welcome = new Welcome(database, (guildId) => client.guilds.cache.get(guildId));
   const leveling = new Leveling(database);
   const tickets = new Tickets(database);
   const rolePanels = new RolePanels(database);
@@ -371,6 +371,7 @@ async function main(): Promise<void> {
     },
     actions: {
       "temporary-voice.reconcile": async (guildId) => { await temporaryVoice.reconcileGuild(guildId); return { guildId, ok: true }; },
+      "welcome.preview": async (guildId) => { if (!welcome) throw new Error("welcome_unavailable"); return welcome.sendPreview(guildId); },
       "automation.reload": async (guildId) => { await automation.reload(); return { guildId, ok: true }; },
       "security.check-hierarchy": async (guildId) => security.checkHierarchy(guildId)
     }
