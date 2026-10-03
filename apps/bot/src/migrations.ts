@@ -1169,7 +1169,7 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_role_automation_jobs_due ON role_automation_jobs(guild_id,completed_at,dead_lettered_at,available_at);"
     ])
-  }
+  },
   {
     version: 75,
     name: "moderation_presets",
@@ -1184,7 +1184,7 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_moderation_presets_guild_updated ON moderation_presets(guild_id,updated_at DESC);"
     ])
-  }
+  },
   {
     version: 76,
     name: "ticket_sla",
