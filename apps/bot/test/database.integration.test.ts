@@ -130,6 +130,47 @@ test("config import rejects malformed automation rules", { skip: !enabled }, asy
   }
 });
 
+test("config transfer preserves automation workflow presets", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345750";
+  try {
+    await migrate(db);
+    await db.query("DELETE FROM automation_workflow_presets WHERE guild_id=$1", [guildId]);
+    await db.query(
+      "INSERT INTO automation_workflow_presets(guild_id,name,event,conditions,any_conditions,actions,cooldown_seconds) VALUES($1,'welcome_flow','member.join',$2::jsonb,$3::jsonb,$4::jsonb,30)",
+      [
+        guildId,
+        JSON.stringify([{ type: "equals", left: "guildId", right: guildId }]),
+        JSON.stringify([]),
+        JSON.stringify([{ type: "log", message: "welcome {userId}" }])
+      ]
+    );
+
+    const transfer = new ConfigTransferService(db);
+    const exported = await transfer.exportGuild(guildId);
+    const automation = exported.modules.find((module) => module.key === "automation");
+    const presets = automation?.settings.automation_workflow_presets as Array<Record<string, unknown>> | undefined;
+    assert.equal(presets?.length, 1);
+    assert.equal(presets?.[0]?.name, "welcome_flow");
+
+    await db.query("DELETE FROM automation_workflow_presets WHERE guild_id=$1", [guildId]);
+    await transfer.importGuild(guildId, exported);
+
+    const restored = await db.query<{ name: string; event: string; cooldown_seconds: number }>(
+      "SELECT name,event,cooldown_seconds FROM automation_workflow_presets WHERE guild_id=$1",
+      [guildId]
+    );
+    assert.deepEqual(restored.rows, [{
+      name: "welcome_flow",
+      event: "member.join",
+      cooldown_seconds: 30
+    }]);
+  } finally {
+    await db.query("DELETE FROM automation_workflow_presets WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.close();
+  }
+});
+
 test("config transfer and local backup round-trip preserve guild configuration", { skip: !enabled }, async () => {
   const db = new Database(process.env.DATABASE_URL!);
   const directory = await mkdtemp(join(tmpdir(), "dsp-backup-"));
