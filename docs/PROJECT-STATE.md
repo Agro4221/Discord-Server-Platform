@@ -184,3 +184,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Music advanced work remains on the roadmap, including emoji controller controls, dedicated Loop One, queue/DJ/fairness features and broad provider support, but Music work must not displace unfinished high-value Discord platform capabilities.
 - Updated release order in docs/FEATURE-MATRIX.md to enforce platform-wide parity before the final advanced Music passes and whole-platform release validation.
 - Recent scope-correction commits: b2770f1c, d2ff12a7, cf2877e0.
+
+## 2026-10-03 — Benchmark methodology broadened
+- Premium parity is benchmarked against a **set of mature Discord bots**, not Carl-bot alone: MEE6, JuniperBot, ProBot, Dyno, Jockie Music and relevant specialized bots.
+- Functional coverage is evaluated across administration, moderation/AutoMod/security, logging, custom commands and templates, roles/onboarding, tickets/forms, automation, community/engagement, notifications/integrations, analytics and Music.
+- The benchmark also considers feature depth, configurable limits, permissions, UX, persistence, integrations and cross-module automation hooks rather than a simple checkbox list.
+- Official/current references used for this benchmark include MEE6 Support, JuniperBot Documentation, ProBot Premium, Dyno Documentation/Premium and Jockie Music FAQ/site. This is an external product benchmark; no proprietary implementation or closed code is being copied.
