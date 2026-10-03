@@ -966,6 +966,26 @@ const migrations = [
       "  PRIMARY KEY(guild_id,name)",
       ");"
     ])
+  },
+  {
+    version: 61,
+    name: "automation_delayed_jobs",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS automation_delayed_jobs (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  rule_id text,",
+      "  event jsonb NOT NULL,",
+      "  actions jsonb NOT NULL,",
+      "  available_at timestamptz NOT NULL,",
+      "  processing_until timestamptz,",
+      "  attempts integer NOT NULL DEFAULT 0 CHECK(attempts >= 0),",
+      "  last_error text,",
+      "  completed_at timestamptz,",
+      "  created_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_automation_delayed_available ON automation_delayed_jobs(completed_at,available_at);"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
