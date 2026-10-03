@@ -467,7 +467,7 @@ Music должен стремиться к функциональности си
 | Moderation/security incident drilldown | ✅ |
 | Per-module health | ✅ |
 | Music/Lavalink health | ✅ |
-| Audit/activity timeline | 🟡 |
+| Audit/activity timeline | ✅ | Dashboard exposes recent audit activity with timestamps/source and scoped targets |
 | Configurable metrics/counters | 🟡 |
 | Exportable analytics | 🟡 |
 | Retention/history settings | 🟡 |
