@@ -876,7 +876,23 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .setDescription("Seek within the current track")
           .addIntegerOption((o) => o.setName("seconds").setDescription("Position in seconds").setMinValue(0).setMaxValue(86400).setRequired(true))
       )
-      .addSubcommand((sub) => sub.setName("queue").setDescription("Show queue"))
+      .addSubcommand((sub) =>
+        sub
+          .setName("queue")
+          .setDescription("Show or edit the queue")
+          .addStringOption((o) => o.setName("action").setDescription("Queue operation").addChoices(
+            { name: "View", value: "view" },
+            { name: "Remove track", value: "remove" },
+            { name: "Remove range", value: "remove-range" },
+            { name: "Move track", value: "move" },
+            { name: "Move to front", value: "front" },
+            { name: "Clear queue", value: "clear" }
+          ))
+          .addIntegerOption((o) => o.setName("position").setDescription("Track position in queue").setMinValue(1).setMaxValue(500))
+          .addIntegerOption((o) => o.setName("to").setDescription("Destination position for move").setMinValue(1).setMaxValue(500))
+          .addIntegerOption((o) => o.setName("from").setDescription("Start position for range remove").setMinValue(1).setMaxValue(500))
+          .addIntegerOption((o) => o.setName("end").setDescription("End position for range remove").setMinValue(1).setMaxValue(500))
+      )
       .addSubcommand((sub) => sub.setName("nowplaying").setDescription("Show current track"))
       .addSubcommand((sub) => sub.setName("previous").setDescription("Play previous track"))
       .addSubcommand((sub) => sub.setName("lyrics").setDescription("Show lyrics for the current track"))
