@@ -348,7 +348,7 @@ export class CustomCommandService implements PlatformModule {
     const result = await this.db.query<Record<string, unknown>>(
       `SELECT id,guild_id,name,aliases,description,enabled,prefix_enabled,slash_enabled,
               action_type,response,alias_target,allowed_role_ids,allowed_channel_ids,
-              cooldown_seconds,discord_command_id,created_at,updated_at
+              cooldown_seconds,role_id,discord_command_id,created_at,updated_at
        FROM custom_commands
        WHERE guild_id=$1 AND name=$2 AND enabled=true AND slash_enabled=true
        LIMIT 1`,
@@ -360,6 +360,9 @@ export class CustomCommandService implements PlatformModule {
   private async assertNameFree(guildId: string, name: string): Promise<void> {
     const builtIn = new Set(buildCommands().map((command) => command.name));
     if (builtIn.has(name)) throw new Error("custom_command_name_conflicts_with_builtin");
+    if ((input.aliases ?? []).some((alias) => builtIn.has(normalizeName(alias)))) {
+      throw new Error("custom_command_alias_conflicts_with_builtin");
+    }
     const result = await this.db.query<{ id: string }>(
       "SELECT id FROM custom_commands WHERE guild_id=$1 AND (name=$2 OR $2=ANY(aliases)) LIMIT 1",
       [guildId, name]
