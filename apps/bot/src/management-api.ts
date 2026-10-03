@@ -144,6 +144,8 @@ type ApiOptions = {
       ticketId: number,
       input: { priority?: "low" | "normal" | "high" | "urgent"; tags?: string[] }
     ) => Promise<boolean>;
+    getSlaConfig: (guildId: string) => Promise<unknown>;
+    setSlaConfig: (guildId: string, input: Record<string, unknown>) => Promise<unknown>;
   };
   moderationPresets?: {
     list: (guildId: string) => Promise<unknown[]>;
@@ -1999,6 +2001,53 @@ export class ManagementApiServer {
             return;
           }
 
+          const ticketSlaMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/sla$/);
+
+          if (ticketSlaMatch && !this.options.tickets) {
+            this.json(res, 500, { error: "tickets_unavailable" });
+            return;
+          }
+
+          if (ticketSlaMatch) {
+            const guildId = ticketSlaMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+
+            if (method === "GET") {
+              this.json(res, 200, { guildId, sla: await this.options.tickets!.getSlaConfig(guildId) });
+              return;
+            }
+
+            if (method === "PUT") {
+              const body = await readJson(req);
+              const allowed = new Set(["enabled","firstResponseMinutes","reminderMinutes","escalationMinutes","escalationRoleId"]);
+              const input: Record<string, unknown> = {};
+              for (const [key,value] of Object.entries(body)) {
+                if (allowed.has(key)) input[key] = value;
+              }
+              if (
+                input.enabled !== undefined && typeof input.enabled !== "boolean" ||
+                input.firstResponseMinutes !== undefined && (typeof input.firstResponseMinutes !== "number" || !Number.isFinite(input.firstResponseMinutes)) ||
+                input.reminderMinutes !== undefined && (typeof input.reminderMinutes !== "number" || !Number.isFinite(input.reminderMinutes)) ||
+                input.escalationMinutes !== undefined && (typeof input.escalationMinutes !== "number" || !Number.isFinite(input.escalationMinutes)) ||
+                input.escalationRoleId !== undefined && input.escalationRoleId !== null && (typeof input.escalationRoleId !== "string" || !/^\d{17,20}$/.test(input.escalationRoleId))
+              ) {
+                throw new RequestInputError("invalid_ticket_sla", 400);
+              }
+              const sla = await this.options.tickets!.setSlaConfig(guildId, input);
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "tickets.sla.updated",
+                targetType: "ticket-sla",
+                targetId: guildId
+              });
+              this.json(res, 200, { guildId, sla });
+              return;
+            }
+          }
           const ticketCustomizationMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/customization$/);
           if (ticketCustomizationMatch && !this.options.tickets) {
             this.json(res, 500, { error: "tickets_unavailable" });
