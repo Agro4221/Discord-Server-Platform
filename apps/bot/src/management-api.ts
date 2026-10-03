@@ -38,6 +38,13 @@ type ApiOptions = {
   actions: Record<string, (guildId: string) => Promise<unknown>>;
   giveaways?: {
     list: (guildId: string) => Promise<unknown[]>;
+    create: (guildId: string, input: {
+      channelId: string;
+      hostUserId: string;
+      prize: string;
+      winners: number;
+      minutes: number;
+    }) => Promise<unknown>;
     end: (guildId: string, giveawayId: number) => Promise<unknown>;
     reroll: (guildId: string, giveawayId: number) => Promise<unknown>;
   };
