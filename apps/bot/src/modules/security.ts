@@ -10,7 +10,7 @@ import type { ModuleContext, PlatformModule } from "../module.js";
 import { logger } from "../logger.js";
 import { moduleEnabled } from "../module-utils.js";
 
-type SecurityConfig = {
+export type SecurityConfig = {
   enabled: boolean;
   maxJoins: number;
   windowSeconds: number;
@@ -60,7 +60,7 @@ export class Security implements PlatformModule {
     this.client = undefined;
   }
 
-  private async config(guildId: string): Promise<SecurityConfig> {
+  async getConfig(guildId: string): Promise<SecurityConfig> {
     const result = await this.db.query<{ enabled: boolean; max_joins: number; window_seconds: number; max_destructive_actions: number; destructive_window_seconds: number; quarantine_role_id: string | null; log_channel_id: string | null; raid_quarantine_enabled: boolean; destructive_role_removal: boolean; destructive_quarantine_enabled: boolean }>(
       "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id,raid_quarantine_enabled,destructive_role_removal,destructive_quarantine_enabled FROM security_settings WHERE guild_id=$1",
       [guildId]
@@ -228,7 +228,7 @@ export class Security implements PlatformModule {
 
   private async onDestructive(guildId: string | null, type: string, targetUserId?: string): Promise<void> {
     if (!guildId || !await moduleEnabled(this.db, guildId, "security", false)) return;
-    const config = await this.config(guildId);
+    const config = await this.getConfig(guildId);
     if (!config.enabled) return;
     const now = Date.now();
     const cutoff = now - config.destructiveWindowSeconds * 1000;
