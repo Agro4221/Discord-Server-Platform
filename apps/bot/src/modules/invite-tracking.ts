@@ -15,7 +15,8 @@ export class InviteTracking implements PlatformModule {
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
     const memberAdd = context.events.on("member.add", (member) => this.onMemberAdd(member));
-    this.unsubscribe = () => memberAdd();
+    const command = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    this.unsubscribe = () => { memberAdd(); command(); };
     for (const guild of context.client.guilds.cache.values()) await this.refreshGuild(guild.id);
   }
 
