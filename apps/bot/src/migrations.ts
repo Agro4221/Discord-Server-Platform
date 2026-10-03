@@ -831,6 +831,13 @@ const migrations = [
     sql: q([
       "ALTER TABLE role_panels ADD COLUMN IF NOT EXISTS duration_minutes integer NOT NULL DEFAULT 0 CHECK(duration_minutes BETWEEN 0 AND 43200);"
     ])
+  } ,
+  {
+    version: 51,
+    name: "stream_alert_templates",
+    sql: q([
+      "ALTER TABLE stream_alerts ADD COLUMN IF NOT EXISTS message_template text NOT NULL DEFAULT '{mention} 🔴 {platform}: **{title}** — {author} {url}';"
+    ])
   } ] as const;
 
 export async function migrate(db: Database): Promise<void> {
