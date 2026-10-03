@@ -91,7 +91,7 @@ async function main(): Promise<void> {
   const events = new PlatformEventBus((guildId) => identities.ownsGuild(guildId));
   const temporaryVoice = new TemporaryVoice(database, () => client.guilds.cache.values());
   const moderation = new Moderation(database);
-  const autoMod = new AutoMod(database);
+  const autoMod = new AutoMod(database, moderation);
   const welcome = new Welcome(database);
   const leveling = new Leveling(database);
   const tickets = new Tickets(database);
