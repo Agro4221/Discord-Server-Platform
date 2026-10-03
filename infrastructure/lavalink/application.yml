@@ -2,21 +2,9 @@ server:
   port: ${SERVER_PORT:2333}
   address: 0.0.0.0
 
-lavalink:
-  server:
-    password: "${LAVALINK_SERVER_PASSWORD:change-me-local}"
-    resumingEnabled: true
-    resumeTimeout: 300
-
-plugins:
-  - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.2"
-    snapshot: false
-  - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.8.3"
-    snapshot: false
-
-# LavaSrc providers are opt-in so a fresh installation stays compatible with
-# the existing YouTube-only setup. Enable a source only after configuring the
-# credentials it requires in .env.
+# Plugin-owned configuration.
+# Sources stay disabled by default; enable them in .env only after credentials
+# for that provider are configured.
 plugins:
   lavasrc:
     providers:
@@ -33,25 +21,43 @@ plugins:
       ytdlp: ${LAVASRC_YTDLP_ENABLED:false}
       jiosaavn: ${LAVASRC_JIOSAAVN_ENABLED:false}
     spotify:
-      clientId: ${SPOTIFY_CLIENT_ID:}
-      clientSecret: ${SPOTIFY_CLIENT_SECRET:}
+      clientId: "${SPOTIFY_CLIENT_ID:}"
+      clientSecret: "${SPOTIFY_CLIENT_SECRET:}"
       countryCode: ${LAVASRC_COUNTRY_CODE:DE}
+      playlistLoadLimit: 6
+      albumLoadLimit: 6
     applemusic:
-      mediaAPIToken: ${APPLE_MUSIC_API_TOKEN:}
+      mediaAPIToken: "${APPLE_MUSIC_API_TOKEN:}"
       countryCode: ${LAVASRC_COUNTRY_CODE:DE}
+      playlistLoadLimit: 6
+      albumLoadLimit: 6
     deezer:
-      masterDecryptionKey: ${DEEZER_MASTER_DECRYPTION_KEY:}
-      arl: ${DEEZER_ARL:}
+      masterDecryptionKey: "${DEEZER_MASTER_DECRYPTION_KEY:}"
+      arl: "${DEEZER_ARL:}"
     yandexmusic:
-      accessToken: ${YANDEX_MUSIC_ACCESS_TOKEN:}
+      accessToken: "${YANDEX_MUSIC_ACCESS_TOKEN:}"
     vkmusic:
-      userToken: ${VK_MUSIC_USER_TOKEN:}
+      userToken: "${VK_MUSIC_USER_TOKEN:}"
     tidal:
-      token: ${TIDAL_TOKEN:}
+      token: "${TIDAL_TOKEN:}"
     qobuz:
-      userOauthToken: ${QOBUZ_USER_OAUTH_TOKEN:}
+      userOauthToken: "${QOBUZ_USER_OAUTH_TOKEN:}"
     ytdlp:
-      path: ${YTDLP_PATH:yt-dlp}
+      path: "${YTDLP_PATH:yt-dlp}"
+    jiosaavn:
+      decryption:
+        secretKey: "${JIOSAAVN_SECRET_KEY:}"
+
+lavalink:
+  server:
+    password: "${LAVALINK_SERVER_PASSWORD:change-me-local}"
+    resumingEnabled: true
+    resumeTimeout: 300
+  plugins:
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.2"
+      snapshot: false
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.8.3"
+      snapshot: false
 
 logging:
   level:
