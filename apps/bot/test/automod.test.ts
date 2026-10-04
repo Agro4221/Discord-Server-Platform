@@ -420,6 +420,23 @@ test("AutoMod rule upsert rejects unsupported detectors before database writes",
 });
 
 
+test("AutoMod log rules require a configured log channel", async () => {
+  let writes = 0;
+  const db = {
+    async query<T>(text: string, _values: readonly unknown[] = []) {
+      if (/INSERT INTO|UPDATE|DELETE/i.test(text)) writes += 1;
+      return { rows: [], rowCount: 0 } as { rows: T[]; rowCount: number };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const automod = new AutoMod(db);
+  await assert.rejects(
+    () => automod.upsertRule("guild-1", { detector: "honeypot", action: "log", logChannelId: null }),
+    /automod_log_channel_required/
+  );
+  assert.equal(writes, 0);
+});
+
 test("AutoMod log rule can deliver a template to its configured log channel", async () => {
   const sent: unknown[] = [];
   const auditEvents: unknown[] = [];
