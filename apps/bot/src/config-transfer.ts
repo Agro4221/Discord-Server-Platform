@@ -45,7 +45,8 @@ const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
   { table: "stream_alerts", fields: ["platform","target","channel_id","mention_role_id","enabled","interval_seconds","message_template"] },
   { table: "tickets", fields: ["channel_id","creator_id","claimed_by","status","priority","tags","created_at","closed_at","last_activity_at"] },
   { table: "notification_feeds", fields: ["channel_id","url","enabled","interval_seconds","last_item_key","last_polled_at","message_template","include_keywords","exclude_keywords"] },
-  { table: "role_automation_rules", fields: ["trigger","channel_id","role_id","delay_seconds","enabled"] }
+  { table: "role_automation_rules", fields: ["trigger","channel_id","role_id","delay_seconds","enabled"] },
+  { table: "custom_forms", fields: ["name","title","description","panel_channel_id","response_channel_id","button_label","enabled","fields"] }
 ];
 
 export class ConfigTransferService {
@@ -99,6 +100,7 @@ export class ConfigTransferService {
         table.table === "automation_rules" || table.table === "automation_workflow_presets" ? "automation" :
         table.table === "role_panels" || table.table === "role_automation_rules" ? "roles" :
         table.table === "notification_feeds" ? "notifications" :
+        table.table === "custom_forms" ? "forms" :
         table.table === "tickets" ? "tickets" :
         table.table === "help_pages" ? "automation" :
         "stream-alerts";
@@ -301,6 +303,38 @@ export class ConfigTransferService {
               alert.enabled,
               alert.intervalSeconds,
               alert.messageTemplate
+            ]
+          );
+        }
+      }
+
+      const formsModule = data.modules.find((module) => module.key === "forms");
+      const customForms = formsModule?.settings.custom_forms;
+      if (customForms !== undefined && !Array.isArray(customForms)) {
+        throw new Error("invalid_custom_forms");
+      }
+      if (Array.isArray(customForms)) {
+        await client.query("DELETE FROM custom_forms WHERE guild_id=$1", [targetGuildId]);
+        for (const form of customForms) {
+          if (!form || typeof form !== "object" || Array.isArray(form)) throw new Error("invalid_custom_form");
+          const value = form as Record<string, unknown>;
+          if (
+            typeof value.name !== "string" || !/^[a-z0-9_-]{1,40}$/i.test(value.name) ||
+            typeof value.title !== "string" || typeof value.description !== "string" ||
+            typeof value.button_label !== "string" || !Array.isArray(value.fields)
+          ) throw new Error("invalid_custom_form");
+          await client.query(
+            "INSERT INTO custom_forms(guild_id,name,title,description,panel_channel_id,response_channel_id,button_label,enabled,fields) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)",
+            [
+              targetGuildId,
+              value.name.toLowerCase(),
+              value.title.slice(0,256),
+              value.description.slice(0,4096),
+              typeof value.panel_channel_id === "string" ? value.panel_channel_id : null,
+              typeof value.response_channel_id === "string" ? value.response_channel_id : null,
+              value.button_label.slice(0,80),
+              value.enabled !== false,
+              JSON.stringify(value.fields)
             ]
           );
         }
