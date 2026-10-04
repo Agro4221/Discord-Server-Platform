@@ -38,6 +38,17 @@ export type TicketSlaConfig = {
   escalationRoleId: string | null;
 };
 
+export type TicketPanel = {
+  id: number;
+  guildId: string;
+  channelId: string;
+  messageId: string | null;
+  title: string;
+  description: string;
+  buttonLabel: string;
+  enabled: boolean;
+};
+
 export type TicketConfig = {
   enabled: boolean;
   categoryId: string | null;
@@ -89,6 +100,179 @@ export class Tickets implements PlatformModule {
     this.recoveryTimer = undefined;
     this.events = undefined;
     this.client = undefined;
+  }
+
+  async listPanels(guildId: string): Promise<TicketPanel[]> {
+    const result = await this.db.query<{
+      id: string;
+      guild_id: string;
+      channel_id: string;
+      message_id: string | null;
+      title: string;
+      description: string;
+      button_label: string;
+      enabled: boolean;
+    }>(
+      "SELECT id,guild_id,channel_id,message_id,title,description,button_label,enabled FROM ticket_panels WHERE guild_id=$1 ORDER BY id DESC",
+      [guildId]
+    );
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      guildId: row.guild_id,
+      channelId: row.channel_id,
+      messageId: row.message_id,
+      title: row.title,
+      description: row.description,
+      buttonLabel: row.button_label,
+      enabled: row.enabled
+    }));
+  }
+
+  async createPanel(guildId: string, input: {
+    channelId: string;
+    title: string;
+    description: string;
+    buttonLabel: string;
+    enabled?: boolean;
+  }): Promise<TicketPanel> {
+    const normalized = normalizeTicketPanelInput(input);
+    const guild = this.client?.guilds.cache.get(guildId);
+    const channel = guild?.channels.cache.get(normalized.channelId);
+    const bot = guild?.members.me;
+    if (!guild || !channel || channel.type !== ChannelType.GuildText) throw new Error("text_channel_required");
+    if (!bot?.permissionsIn(channel).has(PermissionFlagsBits.SendMessages) ||
+        !bot.permissionsIn(channel).has(PermissionFlagsBits.EmbedLinks)) {
+      throw new Error("bot_missing_panel_permissions");
+    }
+
+    const inserted = await this.db.query<{ id: string }>(
+      "INSERT INTO ticket_panels(guild_id,channel_id,title,description,button_label,enabled) VALUES($1,$2,$3,$4,$5,$6) RETURNING id",
+      [guildId, normalized.channelId, normalized.title, normalized.description, normalized.buttonLabel, normalized.enabled]
+    );
+    const id = Number(inserted.rows[0]?.id);
+    if (!Number.isSafeInteger(id) || id < 1) throw new Error("ticket_panel_id_missing");
+
+    try {
+      const message = await channel.send(this.panelMessage(id, normalized));
+      await this.db.query(
+        "UPDATE ticket_panels SET message_id=$1,updated_at=now() WHERE id=$2 AND guild_id=$3",
+        [message.id, id, guildId]
+      );
+      return { id, guildId, messageId: message.id, ...normalized };
+    } catch (error) {
+      await this.db.query("DELETE FROM ticket_panels WHERE id=$1 AND guild_id=$2", [id, guildId]).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async updatePanel(guildId: string, panelId: number, input: Partial<{
+    channelId: string;
+    title: string;
+    description: string;
+    buttonLabel: string;
+    enabled: boolean;
+  }>): Promise<TicketPanel | null> {
+    if (!Number.isSafeInteger(panelId) || panelId < 1) throw new Error("invalid_ticket_panel_id");
+
+    const current = await this.db.query<{
+      id: string;
+      channel_id: string;
+      message_id: string | null;
+      title: string;
+      description: string;
+      button_label: string;
+      enabled: boolean;
+    }>(
+      "SELECT id,channel_id,message_id,title,description,button_label,enabled FROM ticket_panels WHERE id=$1 AND guild_id=$2",
+      [panelId, guildId]
+    );
+    const row = current.rows[0];
+    if (!row) return null;
+
+    const normalized = normalizeTicketPanelInput({
+      channelId: input.channelId ?? row.channel_id,
+      title: input.title ?? row.title,
+      description: input.description ?? row.description,
+      buttonLabel: input.buttonLabel ?? row.button_label,
+      enabled: input.enabled ?? row.enabled
+    });
+
+    const guild = this.client?.guilds.cache.get(guildId);
+    const channel = guild?.channels.cache.get(normalized.channelId);
+    const bot = guild?.members.me;
+    if (!guild || !channel || channel.type !== ChannelType.GuildText) throw new Error("text_channel_required");
+    if (!bot?.permissionsIn(channel).has(PermissionFlagsBits.SendMessages) ||
+        !bot.permissionsIn(channel).has(PermissionFlagsBits.EmbedLinks)) {
+      throw new Error("bot_missing_panel_permissions");
+    }
+
+    let messageId = row.message_id;
+    if (messageId && normalized.channelId === row.channel_id) {
+      const message = await channel.messages.fetch(messageId);
+      await message.edit(this.panelMessage(panelId, normalized));
+    } else {
+      if (messageId) {
+        const oldChannel = guild.channels.cache.get(row.channel_id);
+        if (oldChannel?.isTextBased() && "messages" in oldChannel) {
+          await oldChannel.messages.delete(messageId).catch(() => undefined);
+        }
+      }
+      const message = await channel.send(this.panelMessage(panelId, normalized));
+      messageId = message.id;
+    }
+
+    await this.db.query(
+      "UPDATE ticket_panels SET channel_id=$1,message_id=$2,title=$3,description=$4,button_label=$5,enabled=$6,updated_at=now() WHERE id=$7 AND guild_id=$8",
+      [normalized.channelId, messageId, normalized.title, normalized.description, normalized.buttonLabel, normalized.enabled, panelId, guildId]
+    );
+
+    return { id: panelId, guildId, messageId, ...normalized };
+  }
+
+  async deletePanel(guildId: string, panelId: number): Promise<boolean> {
+    if (!Number.isSafeInteger(panelId) || panelId < 1) throw new Error("invalid_ticket_panel_id");
+    const result = await this.db.query<{ channel_id: string; message_id: string | null }>(
+      "SELECT channel_id,message_id FROM ticket_panels WHERE id=$1 AND guild_id=$2",
+      [panelId, guildId]
+    );
+    const row = result.rows[0];
+    if (!row) return false;
+
+    const guild = this.client?.guilds.cache.get(guildId);
+    if (row.message_id) {
+      const channel = guild?.channels.cache.get(row.channel_id);
+      if (channel?.isTextBased() && "messages" in channel) {
+        await channel.messages.delete(row.message_id).catch((error) => {
+          logger.warn("Ticket panel message delete failed", { guildId, panelId, error: String(error) });
+        });
+      }
+    }
+
+    const deleted = await this.db.query(
+      "DELETE FROM ticket_panels WHERE id=$1 AND guild_id=$2",
+      [panelId, guildId]
+    );
+    return deleted.rowCount === 1;
+  }
+
+  private panelMessage(panelId: number, input: {
+    title: string;
+    description: string;
+    buttonLabel: string;
+    enabled: boolean;
+  }) {
+    return {
+      embeds: [new EmbedBuilder().setTitle(input.title).setDescription(input.description)],
+      components: [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId("dsp:ticket:panel:" + panelId)
+            .setLabel(input.buttonLabel)
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(!input.enabled)
+        )
+      ]
+    };
   }
 
   private async config(guildId: string): Promise<TicketConfig> {
@@ -554,9 +738,21 @@ export class Tickets implements PlatformModule {
     return normalized;
   }
 
-  private async showCreateModal(interaction: ChatInputCommandInteraction | ButtonInteraction): Promise<void> {
+  private async showCreateModal(interaction: ChatInputCommandInteraction | ButtonInteraction, panelId?: number): Promise<void> {
+    if (panelId !== undefined) {
+      const result = await this.db.query<{ enabled: boolean }>(
+        "SELECT enabled FROM ticket_panels WHERE id=$1 AND guild_id=$2",
+        [panelId, interaction.guild!.id]
+      );
+      if (!result.rows[0]?.enabled) {
+        await interaction.reply({ content: "Эта Ticket Panel сейчас отключена.", ephemeral: true });
+        return;
+      }
+    }
     const fields = (await this.config(interaction.guild!.id)).formFields;
-    const modal = new ModalBuilder().setCustomId("dsp:ticket:create").setTitle("Создать тикет");
+    const modal = new ModalBuilder()
+      .setCustomId(panelId === undefined ? "dsp:ticket:create" : "dsp:ticket:create:" + panelId)
+      .setTitle("Создать тикет");
     for (const field of fields) {
       const input = new TextInputBuilder()
         .setCustomId("ticket:" + field.id)
@@ -572,6 +768,19 @@ export class Tickets implements PlatformModule {
   }
 
   private async createTicket(interaction: ModalSubmitInteraction): Promise<void> {
+    const rawPanelId = interaction.customId.split(":")[3];
+    const panelId = rawPanelId ? Number(rawPanelId) : null;
+    if (panelId !== null) {
+      const panel = await this.db.query<{ enabled: boolean }>(
+        "SELECT enabled FROM ticket_panels WHERE id=$1 AND guild_id=$2",
+        [panelId, interaction.guild!.id]
+      );
+      if (!panel.rows[0]?.enabled) {
+        await interaction.reply({ content: "Эта Ticket Panel сейчас отключена.", ephemeral: true });
+        return;
+      }
+    }
+
     const config = await this.config(interaction.guild!.id);
     const me = interaction.guild!.members.me;
     if (!me?.permissions.has(PermissionFlagsBits.ManageChannels)) {
@@ -608,8 +817,8 @@ export class Tickets implements PlatformModule {
     let ticketId: string | undefined;
     try {
       const inserted = await this.db.query<{ id: string }>(
-        `INSERT INTO tickets(guild_id,channel_id,creator_id,status,form_data)
-         VALUES($1,$2,$3,'open',$4) RETURNING id`,
+        `INSERT INTO tickets(guild_id,channel_id,creator_id,status,form_data,panel_id)
+         VALUES($1,$2,$3,'open',$4,$5) RETURNING id`,
         [interaction.guild!.id,channel.id,interaction.user.id,JSON.stringify(formData)]
       );
       ticketId = inserted.rows[0]?.id;
@@ -684,7 +893,7 @@ export class Tickets implements PlatformModule {
   }
 
   private async onInteraction(interaction: import("discord.js").Interaction): Promise<void> {
-    if (interaction.isModalSubmit() && interaction.customId === "dsp:ticket:create" && interaction.guild) {
+    if (interaction.isModalSubmit() && /^dsp:ticket:create(?::\d+)?$/.test(interaction.customId) && interaction.guild) {
       if (!await moduleEnabled(this.db, interaction.guild!.id, "tickets", false)) {
         await interaction.reply({ content: "Tickets выключены.", ephemeral: true });
         return;
@@ -699,6 +908,20 @@ export class Tickets implements PlatformModule {
         return;
       }
       await this.showCreateModal(interaction);
+      return;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith("dsp:ticket:panel:") && interaction.guild) {
+      if (!await moduleEnabled(this.db, interaction.guild.id, "tickets", false)) {
+        await interaction.reply({ content: "Tickets выключены.", ephemeral: true });
+        return;
+      }
+      const panelId = Number(interaction.customId.split(":")[3]);
+      if (!Number.isSafeInteger(panelId) || panelId < 1) {
+        await interaction.reply({ content: "Некорректная Ticket Panel.", ephemeral: true });
+        return;
+      }
+      await this.showCreateModal(interaction, panelId);
       return;
     }
 
@@ -1029,6 +1252,30 @@ export function isOpenTicketConflict(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const value = error as { code?: unknown; constraint?: unknown };
   return value.code === "23505" && value.constraint === "uq_open_ticket_per_creator";
+}
+
+function normalizeTicketPanelInput(input: {
+  channelId: string;
+  title: string;
+  description: string;
+  buttonLabel: string;
+  enabled?: boolean;
+}): Omit<TicketPanel, "id" | "guildId" | "messageId"> {
+  if (
+    !/^\d{17,20}$/.test(input.channelId) ||
+    typeof input.title !== "string" || !input.title.trim() || input.title.length > 256 ||
+    typeof input.description !== "string" || !input.description.trim() || input.description.length > 4096 ||
+    typeof input.buttonLabel !== "string" || !input.buttonLabel.trim() || input.buttonLabel.length > 80
+  ) {
+    throw new Error("invalid_ticket_panel");
+  }
+  return {
+    channelId: input.channelId,
+    title: input.title.trim(),
+    description: input.description.trim(),
+    buttonLabel: input.buttonLabel.trim(),
+    enabled: input.enabled !== false
+  };
 }
 
 function normalizeFormFields(value: unknown): TicketFormField[] {
