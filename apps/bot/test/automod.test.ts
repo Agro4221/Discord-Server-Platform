@@ -260,6 +260,7 @@ test("AutoMod timeout rule creates a moderation case only after Discord timeout 
     author: { id: "456789012345678901", username: "tester", bot: false },
     member: {
       moderatable: true,
+      roles: { cache: new Map() },
       timeout: async (duration: number) => { timeoutMs = duration; }
     },
     content: "trap message",
