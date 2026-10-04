@@ -831,6 +831,24 @@ const migrations = [
     sql: q([
       "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS executor_ban_enabled boolean NOT NULL DEFAULT false;"
     ])
+  },
+  {
+    version: 51,
+    name: "security_incident_lockdown",
+    sql: q([
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS auto_lockdown boolean NOT NULL DEFAULT false;",
+      "CREATE TABLE IF NOT EXISTS security_channel_locks (",
+      "  incident_id bigint NOT NULL REFERENCES security_incidents(id) ON DELETE CASCADE,",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  previous_send_messages boolean,",
+      "  owned boolean NOT NULL DEFAULT true,",
+      "  locked_at timestamptz NOT NULL DEFAULT now(),",
+      "  restored_at timestamptz,",
+      "  PRIMARY KEY(incident_id,channel_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_security_channel_locks_cleanup ON security_channel_locks(guild_id,channel_id,restored_at);"
+    ])
   }] as const;
 
 export async function migrate(db: Database): Promise<void> {
