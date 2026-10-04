@@ -233,3 +233,10 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Security partial incident cleanup is regression-tested; only the successfully resolved incident is counted.
 - ⚠ Latest development HEAD `83755f29b9ac747b278bce919d97397441a96d00` currently has no attached CI status, so full pipeline verification is pending.
 - ☐ Next: AutoMod log-action contract/warn semantics, Security executor-role lifecycle, then broader Music/Fleet failure and live release-gate validation.
+
+## 2026-10-04 — AutoMod/Security response contract verification
+- ✅ Repeated-text per-rule window regression coverage.
+- ✅ Log-action missing-channel rejection regression coverage.
+- ✅ Security partial incident-resolution count regression coverage.
+- ⚠ Latest development HEAD `7121d7557063772d712c47006bdbb9845c99d1b9` has no attached CI status yet.
+- ☐ Remaining: AutoMod warn semantics/response edge cases; Security executor-role lifecycle/restart semantics; Music/Fleet failure-path coverage; live Discord/Lavalink/Windows/VPS release gates.
