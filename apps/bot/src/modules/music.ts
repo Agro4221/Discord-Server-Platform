@@ -1402,6 +1402,31 @@ export class Music implements PlatformModule {
 }
 
 
+export function normalizeMusicSearchProvider(value: string): MusicSearchProvider | null {
+  const normalized = value.trim().toLowerCase();
+  return normalized === "auto" || normalized === "youtube" || normalized === "youtube_music" || normalized === "soundcloud"
+    ? normalized
+    : null;
+}
+
+export function buildMusicSearch(
+  provider: MusicSearchProvider,
+  rawQuery: string
+): { query: string; source?: string } | null {
+  const query = rawQuery.trim();
+  if (!query) return null;
+  if (/^https?:\/\//i.test(query)) return { query };
+
+  if (provider === "auto") {
+    if (/^(ytsearch|ytmsearch|scsearch):/i.test(query)) return { query };
+    return { query, source: "ytsearch" };
+  }
+
+  const normalizedQuery = query.replace(/^(ytsearch|ytmsearch|scsearch):\s*/i, "");
+  if (!normalizedQuery) return null;
+  return { query: normalizedQuery, source: MUSIC_PROVIDER_SOURCES[provider] };
+}
+
 export function canControlMusic(
   memberVoiceChannelId: string | null,
   playerVoiceChannelId: string | null,
