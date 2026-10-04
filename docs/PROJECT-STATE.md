@@ -348,3 +348,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - The response template field is rendered as an actual editable control instead of a stale placeholder.
 - CI #1657 is green for the complete automated pipeline.
 - Latest verified development commit: `4c2ba68c0c45700a7f1f13f48942c9452de2c7dc`.
+
+## 2026-10-04 — Security response accounting checkpoint
+- Executor role-removal reporting is now based on successful Discord operations rather than attempted removals.
+- Removed role IDs are persisted in security response event/audit metadata.
+- CI #1663 is green for the full automated pipeline.
+- Latest verified development code: `b62d5f9f811429dd25ec247623a761ba0985da6b`.
