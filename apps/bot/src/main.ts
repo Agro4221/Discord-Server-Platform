@@ -364,7 +364,23 @@ async function main(): Promise<void> {
     void (async () => {
       const connectedGuildIds = [...client.guilds.cache.keys()];
 
-      if (config.botIdentityId !== "primary") {
+      if (config.botIdentityId === "primary") {
+        try {
+          const claimed = await identities.claimStaleGuildsAsPrimary(connectedGuildIds, 100);
+          if (claimed.length) {
+            logger.warn("Primary fleet failover claimed stale guilds", {
+              identityId: config.botIdentityId,
+              guildIds: claimed,
+              count: claimed.length
+            });
+          }
+        } catch (error) {
+          logger.warn("Primary fleet failover check failed", {
+            identityId: config.botIdentityId,
+            error: String(error)
+          });
+        }
+      } else {
         try {
           const claimed = await identities.claimStaleGuilds(connectedGuildIds, 20);
           if (claimed.length) {
