@@ -24,6 +24,7 @@ import { CommandPolicyService, COMMAND_DEFINITIONS } from "./command-policy.js";
 import type { StreamAlertPlatform } from "./modules/stream-alerts.js";
 import { BotIdentityRepository } from "./bot-identity.js";
 import type { ServerConfigPresetService } from "./config-presets.js";
+import type { IntegrationCredentialProvider, IntegrationCredentialRepository } from "./integration-credentials.js";
 
 type ApiOptions = {
   host: string;
@@ -35,6 +36,7 @@ type ApiOptions = {
   settings: DashboardSettingsService;
   transfer: ConfigTransferService;
   presets?: ServerConfigPresetService;
+  integrationCredentials?: IntegrationCredentialRepository;
   backups: BackupService;
   identities?: BotIdentityRepository;
   botSetup?: {
@@ -87,7 +89,7 @@ type ApiOptions = {
   };
   streamAlerts?: {
     list: (guildId: string) => Promise<unknown[]>;
-    providers: () => unknown;
+    providers: (guildId?: string) => Promise<unknown>;
     create: (guildId: string, input: {
       platform: StreamAlertPlatform;
       target: string;
@@ -920,6 +922,67 @@ export class ManagementApiServer {
             return;
           }
 
+          const integrationCredentialsMatch = path.match(/^\/api\/guilds\/([^/]+)\/integration-credentials$/);
+          const integrationCredentialItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/integration-credentials\/(\\d+)$/);
+          if ((integrationCredentialsMatch || integrationCredentialItemMatch) && !this.options.integrationCredentials) {
+            this.json(res, 500, { error: "integration_credentials_unavailable" });
+            return;
+          }
+          if (method === "GET" && integrationCredentialsMatch) {
+            const guildId = integrationCredentialsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, credentials: await this.options.integrationCredentials!.list(guildId) });
+            return;
+          }
+          if (method === "POST" && integrationCredentialsMatch) {
+            const guildId = integrationCredentialsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const provider = body.provider;
+            if (!["twitch","youtube","kick"].includes(provider) || typeof body.label !== "string") {
+              throw new RequestInputError("invalid_integration_credential", 400);
+            }
+            const credential = await this.options.integrationCredentials!.save(guildId, {
+              provider: provider as IntegrationCredentialProvider,
+              label: body.label,
+              clientId: typeof body.clientId === "string" ? body.clientId : undefined,
+              clientSecret: typeof body.clientSecret === "string" ? body.clientSecret : undefined,
+              apiKey: typeof body.apiKey === "string" ? body.apiKey : undefined
+            });
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "integration.credential.saved",
+              targetType: "integration-credential", targetId: String(credential.id),
+              metadata: { provider: credential.provider, label: credential.label }
+            });
+            this.json(res, 200, { ok: true, guildId, credential });
+            return;
+          }
+          if (method === "DELETE" && integrationCredentialItemMatch) {
+            const guildId = integrationCredentialItemMatch[1] ?? "";
+            const credentialId = Number(integrationCredentialItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(credentialId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_credential_not_found" });
+              return;
+            }
+            const deleted = await this.options.integrationCredentials!.delete(guildId, credentialId);
+            if (!deleted) {
+              this.json(res, 404, { error: "integration_credential_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "integration.credential.deleted",
+              targetType: "integration-credential", targetId: String(credentialId)
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
           const streamAlertsMatch = path.match(/^\/api\/guilds\/([^/]+)\/stream-alerts$/);
           const streamAlertItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/stream-alerts\/(\\d+)$/);
 
@@ -934,7 +997,7 @@ export class ManagementApiServer {
               this.json(res, 404, { error: "guild_not_found" });
               return;
             }
-            this.json(res, 200, { guildId, providers: this.options.streamAlerts!.providers(), alerts: await this.options.streamAlerts!.list(guildId) });
+            this.json(res, 200, { guildId, providers: this.options.streamAlerts!.providers(guildId), alerts: await this.options.streamAlerts!.list(guildId) });
             return;
           }
 
@@ -951,7 +1014,7 @@ export class ManagementApiServer {
             const mentionRoleId = body.mentionRoleId == null ? null : typeof body.mentionRoleId === "string" ? body.mentionRoleId : "";
             const messageTemplate = typeof body.messageTemplate === "string" ? body.messageTemplate.slice(0, 1000) : undefined;
             const intervalSeconds = Number(body.intervalSeconds);
-            if (!["twitch","youtube","vk","kick"].includes(platform) || !target || target.length > 200 || !/^\d{17,20}$/.test(channelId) || (mentionRoleId && !/^\d{17,20}$/.test(mentionRoleId)) || !Number.isFinite(intervalSeconds)) {
+            if (!["twitch","youtube","vk","kick"].includes(platform) || !target || target.length > 200 || !/^\d{17,20}$/.test(channelId) || (mentionRoleId && !/^\d{17,20}$/.test(mentionRoleId)) || !Number.isFinite(intervalSeconds) || (credentialId !== null && (!Number.isSafeInteger(credentialId) || credentialId < 1))) {
               throw new RequestInputError("invalid_stream_alert", 400);
             }
             const guild = this.options.client.guilds.cache.get(guildId);
@@ -960,7 +1023,7 @@ export class ManagementApiServer {
             if (mentionRoleId && !guild?.roles.cache.has(mentionRoleId)) throw new RequestInputError("role_not_found", 400);
             const created = await this.options.streamAlerts!.create(guildId, {
               platform: platform as StreamAlertPlatform, target, channelId, mentionRoleId,
-              intervalSeconds: Math.trunc(intervalSeconds), enabled: body.enabled !== false, messageTemplate
+              intervalSeconds: Math.trunc(intervalSeconds), enabled: body.enabled !== false, messageTemplate, credentialId
             });
             await this.options.auditLog.record({ guildId, source: "dashboard", action: "stream-alert.created", targetType: "stream-alert", targetId: String((created as { id?: number }).id ?? "unknown") });
             this.json(res, 200, { ok: true, alert: created });
@@ -975,12 +1038,14 @@ export class ManagementApiServer {
               return;
             }
             const body = await readJson(req);
-            const input: { target?: string; channelId?: string; mentionRoleId?: string | null; intervalSeconds?: number; enabled?: boolean; messageTemplate?: string } = {};
+            const input: { target?: string; channelId?: string; mentionRoleId?: string | null; credentialId?: number | null; intervalSeconds?: number; enabled?: boolean; messageTemplate?: string } = {};
             if (typeof body.target === "string") input.target = body.target.trim();
             if (typeof body.channelId === "string") input.channelId = body.channelId;
             if (body.mentionRoleId === null) input.mentionRoleId = null;
             else if (typeof body.mentionRoleId === "string") input.mentionRoleId = body.mentionRoleId;
             if (typeof body.intervalSeconds === "number") input.intervalSeconds = Math.trunc(body.intervalSeconds);
+            if (body.credentialId === null) input.credentialId = null;
+            else if (typeof body.credentialId === "number" && Number.isSafeInteger(body.credentialId) && body.credentialId > 0) input.credentialId = body.credentialId;
             if (typeof body.enabled === "boolean") input.enabled = body.enabled;
             const guild = this.options.client.guilds.cache.get(guildId);
             if (input.channelId) {
