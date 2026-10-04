@@ -229,8 +229,8 @@ function Ensure-Secret([string]$Name, [int]$Length) {
 try {
   if ($Down) {
     Stop-NativeProcess "dashboard"
-    Stop-NativeProcess "bot"
     Stop-NativeProcess "fleet"
+    Stop-NativeProcess "bot"
     Stop-NativeProcess "lavalink2"
     Stop-NativeProcess "lavalink"
     & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ".\scripts\reconcile-fleet-native.ps1" -Down
@@ -381,10 +381,13 @@ try {
   Write-Host "Bot health: $healthUrl"
   Write-Host "Logs: $logRoot"
 
-  & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ".\scripts\reconcile-fleet-native.ps1" -Loop
-  if ($LASTEXITCODE -ne 0) {
-    throw "Native Bot Fleet supervisor could not be started."
-  }
+  Start-NativeProcess "fleet" "powershell.exe" @(
+    "-NoLogo",
+    "-NoProfile",
+    "-ExecutionPolicy", "Bypass",
+    "-File", (Join-Path (Get-Location) "scripts\reconcile-fleet-native.ps1"),
+    "-Loop"
+  ) (Get-Location).Path "fleet"
 
   if ($Dashboard) {
     Write-Host "Control Center: $dashboardUrl"
