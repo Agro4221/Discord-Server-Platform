@@ -11,6 +11,7 @@ import { ConfigTransferService } from "./config-transfer.js";
 import { BackupService } from "./backup.js";
 import type { CustomCommandService } from "./custom-commands.js";
 import type { AutoResponder, AutoResponderInput } from "./modules/autoresponder.js";
+import type { Forms, CustomForm } from "./modules/forms.js";
 import type { TicketCustomization, TicketFormField } from "./modules/tickets.js";
 import type { HelpPage } from "./help-pages.js";
 import type { Moderation } from "./modules/moderation.js";
@@ -141,6 +142,7 @@ type ApiOptions = {
   };
   customCommands?: CustomCommandService;
   autoResponder?: AutoResponder;
+  forms?: Forms;
   tickets?: {
     getFormFields: (guildId: string) => Promise<TicketFormField[]>;
     setFormFields: (guildId: string, fields: TicketFormField[]) => Promise<TicketFormField[]>;
@@ -2066,6 +2068,90 @@ export class ManagementApiServer {
             });
             this.json(res,200,{ok:true});
             return;
+          }
+
+          const formsMatch = path.match(/^\/api\/guilds\/([^/]+)\/forms$/);
+          const formItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/forms\/([^/]+)$/);
+          const formPublishMatch = path.match(/^\/api\/guilds\/([^/]+)\/forms\/([^/]+)\/publish$/);
+
+          if ((formsMatch || formItemMatch || formPublishMatch) && !this.options.forms) {
+            this.json(res, 500, { error: "forms_unavailable" });
+            return;
+          }
+          if (formsMatch || formItemMatch || formPublishMatch) {
+            const guildId = formsMatch?.[1] ?? formItemMatch?.[1] ?? formPublishMatch?.[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+
+            if (method === "GET" && formsMatch) {
+              this.json(res, 200, { guildId, forms: await this.options.forms!.list(guildId) });
+              return;
+            }
+
+            if (method === "PUT" && formItemMatch) {
+              const name = decodeURIComponent(formItemMatch[2] ?? "");
+              const body = await readJson(req);
+              const form = await this.options.forms!.save(guildId, {
+                name,
+                title: body.title,
+                description: body.description,
+                panelChannelId: body.panelChannelId,
+                responseChannelId: body.responseChannelId,
+                buttonLabel: body.buttonLabel,
+                enabled: body.enabled,
+                fields: body.fields
+              } satisfies Partial<CustomForm> & { name: string });
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "forms.updated",
+                targetType: "form",
+                targetId: form.name,
+                metadata: { fieldCount: form.fields.length }
+              });
+              this.json(res, 200, { ok: true, guildId, form });
+              return;
+            }
+
+            if (method === "DELETE" && formItemMatch) {
+              const name = decodeURIComponent(formItemMatch[2] ?? "");
+              const deleted = await this.options.forms!.delete(guildId, name);
+              if (!deleted) {
+                this.json(res, 404, { error: "form_not_found" });
+                return;
+              }
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "forms.deleted",
+                targetType: "form",
+                targetId: name.toLowerCase()
+              });
+              this.json(res, 200, { ok: true });
+              return;
+            }
+
+            if (method === "POST" && formPublishMatch) {
+              const name = decodeURIComponent(formPublishMatch[2] ?? "");
+              const body = await readJson(req).catch(() => ({}));
+              const result = await this.options.forms!.publish(
+                guildId,
+                name,
+                typeof body.channelId === "string" ? body.channelId : undefined
+              );
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "forms.published",
+                targetType: "form",
+                targetId: name.toLowerCase(),
+                metadata: result
+              });
+              this.json(res, 200, { ok: true, guildId, ...result });
+              return;
+            }
           }
 
           const ticketFormMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/form$/);
