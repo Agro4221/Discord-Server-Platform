@@ -26,7 +26,11 @@ export type ProviderCredentialSecret = {
 export class IntegrationCredentialRepository {
   private readonly key: Buffer;
 
-  constructor(private readonly db: Database, secret: string) {
+  constructor(
+    private readonly db: Database,
+    secret: string,
+    private readonly fetcher: typeof fetch = fetch
+  ) {
     this.key = createHash("sha256").update(secret, "utf8").digest();
   }
 
@@ -76,6 +80,55 @@ export class IntegrationCredentialRepository {
     const secret = this.decrypt(value);
     normalizeSecret(provider, secret);
     return secret;
+  }
+
+  async test(guildId: string, id: number): Promise<{ provider: IntegrationCredentialProvider; latencyMs: number }> {
+    const result = await this.db.query<{
+      provider: IntegrationCredentialProvider;
+      secret_ciphertext: string;
+    }>(
+      "SELECT provider,secret_ciphertext FROM integration_credentials WHERE id=$1 AND guild_id=$2",
+      [id, guildId]
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error("integration_credential_not_found");
+
+    const secret = this.decrypt(row.secret_ciphertext);
+    normalizeSecret(row.provider, secret);
+    const startedAt = Date.now();
+
+    if (row.provider === "twitch" || row.provider === "kick") {
+      const clientId = secret.clientId!;
+      const clientSecret = secret.clientSecret!;
+      const url = row.provider === "twitch"
+        ? "https://id.twitch.tv/oauth2/token"
+        : "https://id.kick.com/oauth/token";
+      const body = row.provider === "twitch"
+        ? new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: "client_credentials" })
+        : new URLSearchParams({ grant_type: "client_credentials", client_id: clientId, client_secret: clientSecret });
+      const response = await this.fetcher(url, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+        signal: AbortSignal.timeout(10000)
+      });
+      if (!response.ok) throw new Error("integration_credential_test_http_" + response.status);
+      const payload = await response.json() as { access_token?: string };
+      if (!payload.access_token) throw new Error("integration_credential_test_token_missing");
+    } else {
+      const params = new URLSearchParams({
+        part: "id",
+        chart: "mostPopular",
+        maxResults: "1",
+        key: secret.apiKey!
+      });
+      const response = await this.fetcher("https://www.googleapis.com/youtube/v3/videos?" + params.toString(), {
+        signal: AbortSignal.timeout(10000)
+      });
+      if (!response.ok) throw new Error("integration_credential_test_http_" + response.status);
+    }
+
+    return { provider: row.provider, latencyMs: Math.max(0, Date.now() - startedAt) };
   }
 
   async delete(guildId: string, id: number): Promise<boolean> {
