@@ -354,3 +354,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Removed role IDs are persisted in security response event/audit metadata.
 - CI #1663 is green for the full automated pipeline.
 - Latest verified development code: `b62d5f9f811429dd25ec247623a761ba0985da6b`.
+
+## 2026-10-04 — Security restart-resilience checkpoint
+- Active Security incidents are regression-tested across process restart state restoration.
+- CI #1667 is green for the complete automated pipeline.
+- Latest verified development code: `87e893c2d7e3454b97a5cda3caf0d7109ef3f401`.
