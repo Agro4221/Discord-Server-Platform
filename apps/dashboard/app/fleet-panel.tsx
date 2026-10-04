@@ -24,6 +24,18 @@ export function FleetPanel({
   onChanged?: () => void | Promise<void>;
 }) {
   const [items, setItems] = useState<FleetIdentity[]>([]);
+  const [botSettings, setBotSettings] = useState<{
+    id: string;
+    clientId: string;
+    enabled: boolean;
+    presenceName: string | null;
+    tokenConfigured: boolean;
+  } | null>(null);
+  const [botClientId, setBotClientId] = useState("");
+  const [botToken, setBotToken] = useState("");
+  const [botPresence, setBotPresence] = useState("");
+  const [botEnabled, setBotEnabled] = useState(true);
+  const [botBusy, setBotBusy] = useState(false);
   const [selected, setSelected] = useState("");
   const [voiceChannelId, setVoiceChannelId] = useState("");
   const [musicAssignments, setMusicAssignments] = useState<MusicAssignment[]>([]);
@@ -43,6 +55,17 @@ export function FleetPanel({
       body.identities?.[0]?.id ||
       ""
     );
+  }
+
+  async function loadBotSettings() {
+    const response = await fetch("/api/bot", { cache: "no-store" });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error ?? "bot_settings_failed");
+    const bot = body.bot;
+    setBotSettings(bot ?? null);
+    setBotClientId(bot?.clientId ?? "");
+    setBotPresence(bot?.presenceName ?? "");
+    setBotEnabled(bot?.enabled !== false);
   }
 
   async function loadMusicAssignments() {
@@ -66,11 +89,11 @@ export function FleetPanel({
     if (!guildId) return;
     setError("");
 
-    void Promise.all([loadFleet(), loadMusicAssignments()])
+    void Promise.all([loadFleet(), loadBotSettings(), loadMusicAssignments()])
       .catch(() => setError("Не удалось загрузить состояние bot fleet."));
 
     const timer = window.setInterval(() => {
-      void Promise.all([loadFleet(), loadMusicAssignments()]).catch(() => undefined);
+      void Promise.all([loadFleet(), loadBotSettings(), loadMusicAssignments()]).catch(() => undefined);
     }, 15000);
 
     return () => window.clearInterval(timer);
@@ -80,6 +103,38 @@ export function FleetPanel({
     () => voiceChannels.filter((channel) => !musicAssignments.some((item) => item.voiceChannelId === channel.id)),
     [musicAssignments, voiceChannels]
   );
+
+  async function saveBotSettings() {
+    if (!botClientId.trim()) {
+      setError("Укажи Application / Client ID Discord-бота.");
+      return;
+    }
+    setBotBusy(true);
+    setError("");
+    try {
+      const payload: Record<string, unknown> = {
+        clientId: botClientId.trim(),
+        enabled: botEnabled,
+        presenceName: botPresence.trim() || null
+      };
+      if (botToken.trim()) payload.token = botToken.trim();
+      const response = await fetch("/api/bot", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "bot_registration_failed");
+      setBotToken("");
+      setBotSettings(body.bot ?? null);
+      await loadFleet();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось зарегистрировать Discord-бота.");
+    } finally {
+      setBotBusy(false);
+    }
+  }
 
   async function assignGuild() {
     if (!guildId || !selected) return;
@@ -164,6 +219,25 @@ export function FleetPanel({
       </div>
 
       <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #202530" }}>
+        <div style={{ fontSize: 12, fontWeight: 700 }}>Регистрация Discord-бота</div>
+        <div style={{ marginTop: 4, fontSize: 11, opacity: 0.45 }}>
+          Локальная Control Center хранит токен зашифрованным. При сохранении бот подключается заново; токен обратно не показывается.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 8, marginTop: 10 }}>
+          <input value={botClientId} onChange={(e) => setBotClientId(e.target.value)} placeholder="Application / Client ID" style={fieldStyle} inputMode="numeric" />
+          <input value={botToken} onChange={(e) => setBotToken(e.target.value)} placeholder={botSettings?.tokenConfigured ? "Новый токен (оставь пустым, чтобы сохранить текущий)" : "Bot Token"} type="password" autoComplete="new-password" style={fieldStyle} />
+          <input value={botPresence} onChange={(e) => setBotPresence(e.target.value)} placeholder="Статус / activity, например: !help" maxLength={128} style={fieldStyle} />
+        </div>
+        <div style={{ display: "flex", gap: 9, alignItems: "center", marginTop: 9, flexWrap: "wrap" }}>
+          <label style={{ display: "flex", gap: 7, alignItems: "center", fontSize: 11, opacity: 0.75 }}>
+            <input type="checkbox" checked={botEnabled} onChange={(e) => setBotEnabled(e.target.checked)} />
+            Бот включён
+          </label>
+          <button type="button" disabled={botBusy || !botClientId.trim() || (!botSettings?.tokenConfigured && !botToken.trim())} onClick={() => void saveBotSettings()} style={buttonStyle}>
+            {botBusy ? "Подключение..." : botSettings?.tokenConfigured ? "Сохранить и переподключить" : "Зарегистрировать и подключить"}
+          </button>
+        </div>
+      </div>
         <div style={{ fontSize: 12, fontWeight: 700 }}>Music voice assignments</div>
         <div style={{ marginTop: 4, fontSize: 11, opacity: 0.45 }}>
           Primary обслуживает незакреплённые voice-каналы. Закреплённый channel обслуживается выбранной identity.
@@ -229,6 +303,14 @@ export function FleetPanel({
     </section>
   );
 }
+
+const fieldStyle = {
+  background: "#0d1016",
+  color: "#f4f5f7",
+  border: "1px solid #303643",
+  borderRadius: 9,
+  padding: "9px 10px"
+} as const;
 
 const inputStyle = {
   background: "#0d1016",
