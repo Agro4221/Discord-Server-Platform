@@ -6,7 +6,7 @@ import type { AuditLog } from "../audit.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 
-type AutoModConfig = {
+type RecentMessage = { content: string; timestamp: number };\n\ntype AutoModConfig = {
   enabled: boolean;
   blockedWords: string[];
   maxMentions: number;
