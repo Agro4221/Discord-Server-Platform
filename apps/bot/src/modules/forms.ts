@@ -47,11 +47,13 @@ export class Forms implements PlatformModule {
   readonly name = "forms";
   private unsubscribe?: () => void;
   private client?: ModuleContext["client"];
+  private auditLog?: ModuleContext["auditLog"];
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+    this.auditLog = context.auditLog;
     const a = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const b = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
     this.unsubscribe = () => { a(); b(); };
@@ -61,6 +63,7 @@ export class Forms implements PlatformModule {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.client = undefined;
+    this.auditLog = undefined;
   }
 
   async list(guildId: string): Promise<Array<CustomForm & { fieldCount: number }>> {
@@ -88,6 +91,8 @@ export class Forms implements PlatformModule {
     const name = normalizeFormName(input.name);
     if (!name) throw new Error("invalid_form_name");
     const existing = await this.get(guildId, name);
+    if (input.enabled !== undefined && typeof input.enabled !== "boolean") throw new Error("invalid_form_enabled");
+    if (input.fields !== undefined && !Array.isArray(input.fields)) throw new Error("invalid_form_fields");
     const form: CustomForm = {
       name,
       title: normalizeText(input.title ?? existing?.title, "Форма", 256),
