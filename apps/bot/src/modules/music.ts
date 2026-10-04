@@ -1264,7 +1264,6 @@ export class Music implements PlatformModule {
       } finally {
         this.recoveryGate.leave(row.guild_id);
       }
-      }
     }
   }
 
@@ -1397,7 +1396,6 @@ export class Music implements PlatformModule {
         });
       } finally {
         this.recoveryGate.leave(guildId);
-      }
       }
     }
   }
