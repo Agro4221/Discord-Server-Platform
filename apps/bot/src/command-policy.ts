@@ -65,6 +65,7 @@ export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
   { name: "security", label: "Security", module: "security", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true },
   { name: "verify", label: "Verification", module: "verification", prefix: true, slash: true },
   { name: "ticket", label: "Tickets", module: "tickets", prefix: true, slash: true },
+  { name: "form", label: "Reusable forms", module: "forms", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: false, slash: true },
   { name: "roles", label: "Role panels", module: "roles", requiredPermission: PermissionFlagsBits.ManageRoles, prefix: true, slash: true },
   { name: "giveaway", label: "Giveaways", module: "giveaways", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true },
   { name: "economy", label: "Economy", module: "economy", prefix: true, slash: true },
