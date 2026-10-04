@@ -103,7 +103,10 @@ test("claimStaleGuilds atomically returns guilds claimed by an enabled failover 
       transactionCalls += 1;
       const client = {
         query: async () => ({
-          rows: [{ guild_id: "111111111111111111" }, { guild_id: "222222222222222222" }]
+          rows: [
+            { guild_id: "111111111111111111", previous_identity_id: "primary-old" },
+            { guild_id: "222222222222222222", previous_identity_id: "primary-old" }
+          ]
         })
       };
       return fn(client as never);
@@ -270,7 +273,7 @@ test("primary takeover durably reassigns stale guilds", async () => {
       const client = {
         query: async (sql: string) => {
           queries.push(sql);
-          return { rows: [{ guild_id: "111111111111111111" }] };
+          return { rows: [{ guild_id: "111111111111111111", previous_identity_id: "secondary" }] };
         }
       };
       return fn(client as never);
@@ -301,7 +304,7 @@ test("primary failover claims stale Music voice assignments without duplicating 
       const client = {
         query: async (sql: string) => {
           queries.push(sql);
-          return { rows: [{ guild_id: "222222222222222222" }] };
+          return { rows: [{ guild_id: "222222222222222222", voice_channel_id: "333333333333333333", previous_identity_id: "secondary" }] };
         }
       };
       return fn(client as never);
@@ -311,7 +314,7 @@ test("primary failover claims stale Music voice assignments without duplicating 
   const primary = new BotIdentityRepository(db, "primary");
   assert.deepEqual(
     await primary.claimStaleMusicAssignments(["222222222222222222"], 10),
-    ["222222222222222222"]
+    [{ guildId: "222222222222222222", voiceChannelId: "333333333333333333", previousIdentityId: "secondary" }]
   );
   assert.equal(transactionCalls, 1);
   assert.match(queries[0] ?? "", /UPDATE guild_music_bot_assignments/);
