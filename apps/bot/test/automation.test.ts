@@ -98,3 +98,47 @@ test("Automation set-cooldown action validates duration bounds", () => {
     { type: "set-cooldown", key: "welcome", durationSeconds: 86401 }
   ]), /invalid_set_cooldown_action/);
 });
+
+
+test("Automation cooldown actions set and clear rendered keyed cooldowns", async () => {
+  const db = {
+    async query<T>() {
+      return { rows: [] } as { rows: T[] };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const engine = new (await import("../src/modules/automation-engine.js")).AutomationEngine(db);
+  const state = engine as unknown as {
+    keyedCooldowns: Map<string, number>;
+    perform: (actions: unknown[], event: {
+      type: "message.create";
+      guildId: string;
+      userId: string;
+    }) => Promise<void>;
+  };
+
+  const before = Date.now();
+  await state.perform([
+    { type: "set-cooldown", key: "welcome-{userId}", durationSeconds: 60 }
+  ], {
+    type: "message.create",
+    guildId: "guild-1",
+    userId: "user-1"
+  });
+
+  const key = "guild-1:welcome-user-1";
+  const expiresAt = state.keyedCooldowns.get(key);
+  assert.ok(expiresAt);
+  assert.ok(expiresAt >= before + 59_000);
+  assert.ok(expiresAt <= before + 61_500);
+
+  await state.perform([
+    { type: "clear-cooldown", key: "welcome-{userId}" }
+  ], {
+    type: "message.create",
+    guildId: "guild-1",
+    userId: "user-1"
+  });
+
+  assert.equal(state.keyedCooldowns.has(key), false);
+});
