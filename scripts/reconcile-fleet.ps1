@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
+$reconcileFailed = $false
 
 $DataDirectory = Join-Path (Get-Location) "data"
 $LogDirectory = Join-Path $DataDirectory "logs"
@@ -42,20 +43,25 @@ function Get-FleetContainers {
 
 function Remove-FleetContainer([string]$Name) {
   $status = Get-ContainerStatus $Name
-  if ($null -ne $status) {
-    Write-FleetLog "remove container=$Name status=$status"
-    & docker rm -f $Name *> $null
-    if ($LASTEXITCODE -ne 0) {
-      Write-FleetLog "ERROR remove failed container=$Name exit=$LASTEXITCODE"
-    }
+  if ($null -eq $status) { return $true }
+
+  Write-FleetLog "remove container=$Name status=$status"
+  & docker rm -f $Name *> $null
+  if ($LASTEXITCODE -ne 0) {
+    Write-FleetLog "ERROR remove failed container=$Name exit=$LASTEXITCODE"
+    return $false
   }
+  return $true
 }
 
 if ($Down) {
   foreach ($container in Get-FleetContainers) {
-    Remove-FleetContainer $container
+    if (-not (Remove-FleetContainer $container)) {
+      $reconcileFailed = $true
+    }
   }
-  Write-FleetLog "down complete"
+  Write-FleetLog "down complete failed=$reconcileFailed"
+  if ($reconcileFailed) { exit 1 }
   exit 0
 }
 
@@ -92,7 +98,9 @@ foreach ($identity in @($fleet.identities)) {
 
 foreach ($container in Get-FleetContainers) {
   if (-not ($desired.Values -contains $container)) {
-    Remove-FleetContainer $container
+    if (-not (Remove-FleetContainer $container)) {
+      $reconcileFailed = $true
+    }
   }
 }
 
@@ -110,16 +118,22 @@ foreach ($entry in $desired.GetEnumerator()) {
 
   if ($null -ne $status) {
     Write-FleetLog "restart container=$containerName identity=$identityId containerStatus=$status fleetStatus=$fleetStatus"
-    Remove-FleetContainer $containerName
+    if (-not (Remove-FleetContainer $containerName)) {
+      $reconcileFailed = $true
+      continue
+    }
   }
 
   Write-FleetLog "start identity=$identityId container=$containerName"
   & docker compose run -d --no-deps --name $containerName -e "BOT_IDENTITY_ID=$identityId" bot *> $null
   if ($LASTEXITCODE -ne 0) {
     Write-FleetLog "ERROR start failed identity=$identityId container=$containerName exit=$LASTEXITCODE"
+    $reconcileFailed = $true
     continue
   }
   Write-FleetLog "started identity=$identityId container=$containerName"
 }
 
-Write-FleetLog "reconcile complete desired=$($desired.Count)"
+Write-FleetLog "reconcile complete desired=$($desired.Count) failed=$reconcileFailed"
+if ($reconcileFailed) { exit 1 }
+exit 0
