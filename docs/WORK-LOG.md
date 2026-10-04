@@ -314,3 +314,8 @@ Never write credentials, tokens or private user data here.
 - CI run **#1272** (`37153758025`) passed on development head `e709c239a4bc3a852e7f55f719f47ba43e9cc54e`.
 - Routing audit caught a concrete Temporary Voice gap: `/voice` was implemented but not subscribed to the `interaction.command` event. The module now registers and removes that listener with its lifecycle.
 - Notification feed channel preflight and Role Panel channel permission preflight are also part of the hardened Core path.
+
+## 2026-10-04 — Local Dashboard authentication removal
+- Local Control Center no longer has an end-user login/logout flow or dashboard admin password/session secret.
+- Dashboard access remains local-first/loopback by default; server-side requests to the Management API remain protected by the internal bearer key.
+- Legacy login routes and page were removed.

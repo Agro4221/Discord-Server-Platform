@@ -1,5 +1,5 @@
-import { DiscordAdmin } from "./discord-admin";
+import { ControlCenter } from "./control-center";
 
 export default function Home() {
-  return <DiscordAdmin />;
+  return <ControlCenter />;
 }

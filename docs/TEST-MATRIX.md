@@ -160,3 +160,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-04 — Command routing verification
 - CI run **#1272** passed the full automated matrix after the Temporary Voice slash-command listener wiring fix.
 - Existing command registration tests plus full build/typecheck validate the routing contract; live Discord interaction acceptance remains environment-dependent.
+
+## 2026-10-04 — Local Dashboard authentication removal
+- Local Control Center no longer has an end-user login/logout flow or dashboard admin password/session secret.
+- Dashboard access remains local-first/loopback by default; server-side requests to the Management API remain protected by the internal bearer key.
+- Legacy login routes and page were removed.

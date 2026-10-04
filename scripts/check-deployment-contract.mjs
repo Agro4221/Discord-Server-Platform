@@ -13,8 +13,7 @@ const envExample = await readFile(".env.example", "utf8");
 const requiredEnv = [
   "MANAGEMENT_API_KEY",
   "DATABASE_URL",
-  "LAVALINK_PASSWORD",
-  "MANAGEMENT_API_KEY"
+  "LAVALINK_PASSWORD"
 ];
 
 for (const name of requiredEnv) {

@@ -253,3 +253,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-04 — Command routing checkpoint
 - Development head `e709c239a4bc3a852e7f55f719f47ba43e9cc54e` passed CI run **#1272**.
 - Temporary Voice slash routing is now connected through the same event-bus lifecycle used by other command-driven modules.
+
+## 2026-10-04 — Local Dashboard authentication removal
+- Local Control Center no longer has an end-user login/logout flow or dashboard admin password/session secret.
+- Dashboard access remains local-first/loopback by default; server-side requests to the Management API remain protected by the internal bearer key.
+- Legacy login routes and page were removed.
