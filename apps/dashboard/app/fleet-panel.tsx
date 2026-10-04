@@ -29,11 +29,17 @@ export function FleetPanel({
     clientId: string;
     enabled: boolean;
     presenceName: string | null;
+    username: string | null;
+    avatarUrl: string | null;
+    bannerUrl: string | null;
     tokenConfigured: boolean;
   } | null>(null);
   const [botClientId, setBotClientId] = useState("");
   const [botToken, setBotToken] = useState("");
   const [botPresence, setBotPresence] = useState("");
+  const [botUsername, setBotUsername] = useState("");
+  const [botAvatarData, setBotAvatarData] = useState<string | null>(null);
+  const [botBannerData, setBotBannerData] = useState<string | null>(null);
   const [botEnabled, setBotEnabled] = useState(true);
   const [botBusy, setBotBusy] = useState(false);
   const [selected, setSelected] = useState("");
@@ -65,6 +71,9 @@ export function FleetPanel({
     setBotSettings(bot ?? null);
     setBotClientId(bot?.clientId ?? "");
     setBotPresence(bot?.presenceName ?? "");
+    setBotUsername(bot?.username ?? "");
+    setBotAvatarData(null);
+    setBotBannerData(null);
     setBotEnabled(bot?.enabled !== false);
   }
 
@@ -104,9 +113,31 @@ export function FleetPanel({
     [musicAssignments, voiceChannels]
   );
 
+  async function readImage(file: File): Promise<string> {
+    if (!["image/png", "image/jpeg", "image/gif"].includes(file.type)) {
+      throw new Error("Поддерживаются PNG, JPEG и GIF.");
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      throw new Error("Размер изображения не должен превышать 2 MiB.");
+    }
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") resolve(reader.result);
+        else reject(new Error("Не удалось прочитать изображение."));
+      };
+      reader.onerror = () => reject(new Error("Не удалось прочитать изображение."));
+      reader.readAsDataURL(file);
+    });
+  }
+
   async function saveBotSettings() {
     if (!botClientId.trim()) {
       setError("Укажи Application / Client ID Discord-бота.");
+      return;
+    }
+    if (botUsername.trim().length < 2 || botUsername.trim().length > 32) {
+      setError("Username бота должен содержать от 2 до 32 символов.");
       return;
     }
     setBotBusy(true);
@@ -115,9 +146,12 @@ export function FleetPanel({
       const payload: Record<string, unknown> = {
         clientId: botClientId.trim(),
         enabled: botEnabled,
-        presenceName: botPresence.trim() || null
+        presenceName: botPresence.trim() || null,
+        username: botUsername.trim()
       };
       if (botToken.trim()) payload.token = botToken.trim();
+      if (botAvatarData !== null) payload.avatarData = botAvatarData;
+      if (botBannerData !== null) payload.bannerData = botBannerData;
       const response = await fetch("/api/bot", {
         method: "PUT",
         headers: { "content-type": "application/json" },
@@ -226,7 +260,27 @@ export function FleetPanel({
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 8, marginTop: 10 }}>
           <input value={botClientId} onChange={(e) => setBotClientId(e.target.value)} placeholder="Application / Client ID" style={fieldStyle} inputMode="numeric" />
           <input value={botToken} onChange={(e) => setBotToken(e.target.value)} placeholder={botSettings?.tokenConfigured ? "Новый токен (оставь пустым, чтобы сохранить текущий)" : "Bot Token"} type="password" autoComplete="new-password" style={fieldStyle} />
+          <input value={botUsername} onChange={(e) => setBotUsername(e.target.value)} placeholder="Username бота" maxLength={32} style={fieldStyle} />
           <input value={botPresence} onChange={(e) => setBotPresence(e.target.value)} placeholder="Статус / activity, например: !help" maxLength={128} style={fieldStyle} />
+          <label style={fileLabel}>
+            Avatar · PNG/JPEG/GIF · до 2 MiB
+            <input type="file" accept="image/png,image/jpeg,image/gif" disabled={botBusy} onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void readImage(file).then(setBotAvatarData).catch((caught) => setError(caught instanceof Error ? caught.message : "Не удалось прочитать avatar."));
+              e.currentTarget.value = "";
+            }} />
+          </label>
+          <label style={fileLabel}>
+            Banner · PNG/JPEG/GIF · до 2 MiB
+            <input type="file" accept="image/png,image/jpeg,image/gif" disabled={botBusy} onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void readImage(file).then(setBotBannerData).catch((caught) => setError(caught instanceof Error ? caught.message : "Не удалось прочитать banner."));
+              e.currentTarget.value = "";
+            }} />
+          </label>
+        </div>
+        <div style={{ marginTop: 8, fontSize: 9, opacity: 0.42 }}>
+          Discord жёстко ограничивает частоту смены username; меняй его только при необходимости. Avatar/banner отправляются только при выборе нового файла.
         </div>
         <div style={{ display: "flex", gap: 9, alignItems: "center", marginTop: 9, flexWrap: "wrap" }}>
           <label style={{ display: "flex", gap: 7, alignItems: "center", fontSize: 11, opacity: 0.75 }}>
@@ -292,6 +346,7 @@ export function FleetPanel({
         )}
       </div>
 
+      {botSettings?.avatarUrl && <img src={botSettings.avatarUrl} alt="" style={{ width: 56, height: 56, borderRadius: 14, objectFit: "cover", marginTop: 9 }} />}
       {error && <div style={{ marginTop: 9, fontSize: 12, color: "#ffb3b3" }}>{error}</div>}
       {items.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
@@ -305,6 +360,18 @@ export function FleetPanel({
     </section>
   );
 }
+
+const fileLabel = {
+  display: "grid",
+  gap: 5,
+  alignItems: "center",
+  border: "1px solid #2d3643",
+  borderRadius: 9,
+  padding: "8px 9px",
+  color: "#8993a2",
+  fontSize: 9,
+  background: "#0f151d"
+} as const;
 
 const fieldStyle = {
   background: "#0d1016",
