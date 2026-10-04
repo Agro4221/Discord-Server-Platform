@@ -92,6 +92,7 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "incidentDurationSeconds", label: "Длительность инцидента, сек.", type: "number", min: 60, max: 3600 },
       { key: "autoQuarantine", label: "Автоматический quarantine", type: "boolean" },
       { key: "removeExecutorRoles", label: "Снимать роли исполнителя при Anti-Nuke", type: "boolean" },
+      { key: "executorTimeoutMinutes", label: "Timeout исполнителя, минут", type: "number", min: 0, max: 40320 },
       { key: "quarantineRoleId", label: "Quarantine role", type: "role" },
       { key: "logChannelId", label: "Security log channel", type: "channel" }
     ],
@@ -232,6 +233,7 @@ export const DASHBOARD_SETTINGS_STORAGE: Partial<Record<ModuleKey, StorageSpec>>
       incidentDurationSeconds: "incident_duration_seconds",
       autoQuarantine: "auto_quarantine",
       removeExecutorRoles: "remove_executor_roles",
+      executorTimeoutMinutes: "executor_timeout_minutes",
       quarantineRoleId: "quarantine_role_id",
       logChannelId: "log_channel_id"
     }
