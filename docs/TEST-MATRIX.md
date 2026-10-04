@@ -516,3 +516,8 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ Existing requestRestart persistence is now reachable from Dashboard via Management API.
 - ✅ restart_required state remains durable until the next process heartbeat explicitly clears it.
 - ⚠ Actual process restart is deployment/supervisor dependent and is not falsely simulated by the Dashboard.
+
+## 2026-10-04 — Automation event/action breadth verification
+- ✅ reaction.remove, channel.update and role.update are routed into Automation.
+- ✅ set-slowmode and set-channel-topic are validated and exposed in the Dashboard/API catalog.
+- ⚠ Real Discord permission/hierarchy behavior remains part of live acceptance.

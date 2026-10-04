@@ -736,3 +736,9 @@ Never write credentials, tokens or private user data here.
 - Exposed the existing durable fleet restart request through Management API PATCH /api/fleet/:id.
 - Dashboard now lets an administrator request a restart for a secondary identity.
 - The operation only sets restart_required; an external/supervisor process remains responsible for performing the actual process restart.
+
+## 2026-10-04 — Automation event/action breadth checkpoint
+- Added Automation handling for reaction.remove, channel.update and role.update events already emitted by Discord Core.
+- Added channel actions set-slowmode and set-channel-topic with event-relative or explicit channel targets.
+- Extended Dashboard and Management API validation to keep the catalog aligned.
+- Added validator regression coverage for the new channel actions.
