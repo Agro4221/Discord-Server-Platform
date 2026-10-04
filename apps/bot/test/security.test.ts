@@ -95,7 +95,8 @@ test("Security clear reports only incidents that were actually resolved", async 
   assert.equal(await security.clearIncidents("guild-1"), 1);
   assert.equal(queries.filter((query) => query.startsWith("UPDATE security_incidents SET resolved_at")).length, 1);
 });
-\ntest("Security anti-nuke tracks channel/role create and delete audit actions", () => {
+
+test("Security anti-nuke tracks channel/role create and delete audit actions", () => {
   assert.equal(securityAuditLogEventType("channel.create"), AuditLogEvent.ChannelCreate);
   assert.equal(securityAuditLogEventType("channel.delete"), AuditLogEvent.ChannelDelete);
   assert.equal(securityAuditLogEventType("role.create"), AuditLogEvent.RoleCreate);
