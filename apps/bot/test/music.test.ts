@@ -89,3 +89,13 @@ test("Music skip-to keeps the selected queued track at the front", () => {
   assert.equal(trimMusicQueueToPosition(queue, 0), null);
   assert.deepEqual(queue, ["two", "three"]);
 });
+
+
+test("music search selection accepts only existing result indexes", async () => {
+  const { isValidMusicSearchSelection } = await import("../src/modules/music.js");
+  assert.equal(isValidMusicSearchSelection(0, 5), true);
+  assert.equal(isValidMusicSearchSelection(4, 5), true);
+  assert.equal(isValidMusicSearchSelection(-1, 5), false);
+  assert.equal(isValidMusicSearchSelection(5, 5), false);
+  assert.equal(isValidMusicSearchSelection(1.5, 5), false);
+});
