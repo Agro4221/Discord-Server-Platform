@@ -851,3 +851,10 @@ Never write credentials, tokens or private user data here.
 - Fleet failover detail/audit and AutoMod rule-level ban remain verified by earlier green runs.
 ### Next concrete work
 - Continue functional breadth with remaining moderation/community actions, then return to Music/Fleet/VPS production depth and final live acceptance.
+
+
+## 2026-10-05 — Automation kick verified
+- CI #1845 passed completely: dependency/audit, source/deployment contracts, bot typecheck, tests and all builds.
+- Automation now has `kick` alongside `timeout`, `ban`, role management, nickname, message, reaction, channel, cooldown and logging actions.
+- Kick supports `@event` or explicit user IDs, rendered reasons up to 500 characters, and Discord `kickable` hierarchy protection.
+- Current development HEAD: `8e909adab460ae498c3258ec6cc59b2d55b7c820`.

@@ -587,3 +587,9 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ CI #1839 full pipeline.
 - ✅ Automation `set-nickname`: validation + runtime + nickname clear.
 - ✅ Automation `ban`: validation + runtime, rendered reason and bannable guard.
+
+
+## 2026-10-05 — Automation kick verification
+- ✅ `kick` validation contract.
+- ✅ `kick` runtime with rendered reason and `kickable` guard.
+- ✅ CI #1845 full pipeline.

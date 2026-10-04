@@ -7,7 +7,7 @@
 
 Репозиторий: `Agro4221/Discord-Server-Platform`
 Ветка: `development`
-Последний известный HEAD на момент обновления этого файла: `d1e0b2114f67ebdf188bc11b6600e1ee6a93440b`
+Последний известный HEAD на момент обновления этого файла: `8e909adab460ae498c3258ec6cc59b2d55b7c820`
 Тип: self-hosted Discord Server Platform / единый Discord-бот.
 Основной локальный runtime: Native Windows.
 Docker: дополнительный путь для локального/VPS-развёртывания.
@@ -264,3 +264,9 @@ Audit-log ingestion расширен для:
 - CI #1839: success on Automation moderation breadth.
 - Added and verified Automation `set-nickname` and `ban` actions.
 - Next implementation target remains functional breadth; documentation-only milestones do not replace feature work.
+
+
+### 2026-10-05 — Latest verified checkpoint
+- CI #1845: success.
+- Automation `kick` verified end-to-end.
+- Next target: continue functional breadth; avoid documentation-only checkpoints.

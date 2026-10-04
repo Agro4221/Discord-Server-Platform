@@ -590,3 +590,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Automation: `set-nickname` and `ban` are green under CI #1839.
 - Security, AutoMod and Fleet breadth previously verified remains active.
 - Current code tree has no known typecheck/test/build failures; live Discord hierarchy and multi-process failover remain environment-gate items.
+
+
+## 2026-10-05 — Latest verified Automation state
+- Automation moderation actions now include verified `timeout`, `ban` and `kick`.
+- `set-nickname`, named cooldown controls and the recent Fleet failover work remain green on the current tree.
+- CI #1845 is green.
