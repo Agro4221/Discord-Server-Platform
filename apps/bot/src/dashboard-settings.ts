@@ -93,6 +93,7 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "autoQuarantine", label: "Автоматический quarantine", type: "boolean" },
       { key: "removeExecutorRoles", label: "Снимать роли исполнителя при Anti-Nuke", type: "boolean" },
       { key: "executorTimeoutMinutes", label: "Timeout исполнителя, минут", type: "number", min: 0, max: 40320 },
+      { key: "executorBanEnabled", label: "Ban исполнителя при Anti-Nuke", type: "boolean" },
       { key: "quarantineRoleId", label: "Quarantine role", type: "role" },
       { key: "logChannelId", label: "Security log channel", type: "channel" }
     ],
