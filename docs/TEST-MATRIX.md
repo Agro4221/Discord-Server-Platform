@@ -559,3 +559,11 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ Successful ban suppresses timeout fallback.
 - ✅ Ban failure remains fail-soft; timeout can still be used when configured.
 - ⚠ Live Discord hierarchy/ban permission behavior remains environment-dependent and belongs to the live release gate.
+
+
+## 2026-10-04 — Security lockdown / Automation Dashboard verification
+- ✅ Security incident lockdown persists previous channel SendMessages state and applies only to manageable channels.
+- ✅ Security incident resolution has durable per-incident/channel ownership to avoid overlapping-incident premature unlocks.
+- ✅ Migration 51 adds the Security lockdown setting and durable channel-lock assignments.
+- ✅ Automation Dashboard builder restored to full pre-regression size and strict numeric operators compile successfully.
+- ✅ CI #1811 passed full typecheck, 137 tests and all builds.

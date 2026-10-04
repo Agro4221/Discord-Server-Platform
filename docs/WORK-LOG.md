@@ -807,3 +807,18 @@ Never write credentials, tokens or private user data here.
 
 ### Next concrete work
 - Re-check CI #1795 after completion, then continue the remaining Security/AutoMod policy depth and broader Automation actions/fields.
+
+
+## 2026-10-04 — Security lockdown + Automation Dashboard repair checkpoint
+- Added optional Security `autoLockdown` response for active raid/destructive-burst incidents.
+- When enabled, Security records the prior `@everyone` SendMessages state and locks manageable text channels for the incident.
+- Lock ownership is durable per incident/channel and supports overlapping Security incidents without premature restoration.
+- Incident cleanup restores only channel locks owned by the resolving incident; failures keep the incident unresolved for retry/recovery.
+- Added migration 51 and Control Center/config-transfer persistence for `autoLockdown`.
+- Corrected migration ordering so versions 47–50 are monotonic.
+- Fixed the Automation Dashboard numeric-condition implementation after CI exposed a truncated `automation-panel.tsx`; the full 29KB builder was restored from the exact pre-regression commit and `number-eq/gt/lt` support was reapplied with the required TypeScript union/constructor coverage.
+- CI #1811 passed completely: dependency/audit checks, source/deployment contracts, bot typecheck, all 137 bot tests, domain build, bot build and Dashboard build.
+- Current development HEAD before this documentation commit: `ed4b68e96dc35e5c7f1379b6974e9521e8d4d949`.
+
+### Next concrete work
+- Continue Automation action breadth with named cooldown controls, then return to remaining Music/Fleet/VPS depth and final live/E2E validation.

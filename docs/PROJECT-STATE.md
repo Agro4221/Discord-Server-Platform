@@ -562,3 +562,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Successful ban and timeout actions create durable moderation cases only after Discord enforcement succeeds.
 - Latest development HEAD before documentation update: `afeb5c184cbb1d19b1033c9600593f0274326453`.
 - CI #1795 is the active verification gate.
+
+
+## 2026-10-04 — Security lockdown + Automation Dashboard repair
+- Security now has optional incident lockdown of manageable text channels, persisted by incident/channel ownership and reversible during incident resolution.
+- Security response depth now includes role stripping, optional ban, timeout fallback and optional server lockdown.
+- Automation Dashboard now has a fully restored builder with strict numeric conditions `number-eq`, `number-gt`, and `number-lt` rendered in ALL and ANY builders.
+- CI #1811 is green on the feature tree.
+- Current documented HEAD: `ed4b68e96dc35e5c7f1379b6974e9521e8d4d949`.

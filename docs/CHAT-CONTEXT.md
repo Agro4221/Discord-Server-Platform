@@ -7,7 +7,7 @@
 
 Репозиторий: `Agro4221/Discord-Server-Platform`
 Ветка: `development`
-Последний известный HEAD на момент обновления этого файла: `afeb5c184cbb1d19b1033c9600593f0274326453`
+Последний известный HEAD на момент обновления этого файла: `ed4b68e96dc35e5c7f1379b6974e9521e8d4d949`
 Тип: self-hosted Discord Server Platform / единый Discord-бот.
 Основной локальный runtime: Native Windows.
 Docker: дополнительный путь для локального/VPS-развёртывания.
@@ -238,3 +238,11 @@ Audit-log ingestion расширен для:
 ## 11. ПОСЛЕДНИЙ NEXT STEP
 
 Перепроверить CI #1764, затем продолжить с конкретной Security/AutoMod response-policy задачей и последовательно закрывать оставшиеся функциональные breadth gaps.
+
+
+### 2026-10-04 — Latest development checkpoint
+- Security: optional `autoLockdown` for raid/destructive-burst incidents; durable channel ownership and restoration.
+- Security settings also include `executorTimeoutMinutes` and `executorBanEnabled`.
+- Automation: `number-eq`, `number-gt`, `number-lt`; Dashboard builder restored to full implementation after a truncated-file regression was corrected.
+- CI #1811: **success** on full pipeline.
+- Next concrete implementation target: Automation named cooldown action/control, followed by remaining Music/Fleet/VPS breadth.
