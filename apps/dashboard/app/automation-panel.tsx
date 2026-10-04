@@ -22,6 +22,7 @@ type Action =
   | { type: "set-slowmode"; channelId: string; seconds: number }
   | { type: "set-channel-topic"; channelId: string; topic: string }
   | { type: "set-channel-name"; channelId: string; name: string }
+  | { type: "clear-cooldown"; key: string }
   | { type: "log"; message: string };
 
 type Rule = {
@@ -200,6 +201,7 @@ export function AutomationPanel({
       type === "set-slowmode" ? { type, channelId: "@event", seconds: 0 } :
       type === "set-channel-topic" ? { type, channelId: "@event", topic: "" } :
       type === "set-channel-name" ? { type, channelId: "@event", name: "" } :
+      type === "clear-cooldown" ? { type, key: "" } :
       { type: "log", message: "" };
     setActions((current) => current.map((item, i) => i === index ? next : item));
   }
@@ -396,6 +398,7 @@ export function AutomationPanel({
               <option value="set-slowmode">set-slowmode</option>
               <option value="set-channel-topic">set-channel-topic</option>
               <option value="set-channel-name">set-channel-name</option>
+              <option value="clear-cooldown">clear-cooldown</option>
               <option value="log">log</option>
             </select>
 
@@ -491,6 +494,10 @@ export function AutomationPanel({
                 </select>
                 <input value={action.name} maxLength={100} onChange={(e) => updateAction(index, { name: e.target.value })} placeholder="Новое имя · ticket-{userId}" style={inputStyle} />
               </div>
+            )}
+
+            {action.type === "clear-cooldown" && (
+              <input value={action.key} maxLength={100} onChange={(e) => updateAction(index, { key: e.target.value })} placeholder="Cooldown key · {userId}" style={inputStyle} />
             )}
 
             {action.type === "log" && (
