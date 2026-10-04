@@ -780,3 +780,17 @@ Never write credentials, tokens or private user data here.
 
 ### Next concrete work
 - Continue Security/AutoMod response-policy depth after CI verification, then broaden Automation conditions/actions and Music/Fleet failover breadth.
+
+## 2026-10-04 — Security executor timeout + Automation numeric breadth checkpoint
+- Security gained configurable `executorTimeoutMinutes` for confirmed destructive executors after the existing response threshold.
+- Successful Security timeout creates a durable moderation timeout case and emits the standard `moderation.case` event; Discord timeout failure does not create a false case.
+- Control Center Security schema/storage, migration 49 and config transfer were extended for the new policy.
+- Fixed an existing Automation Dashboard parity gap: `number-eq` now renders its numeric operands in both ALL and ANY condition builders.
+- Added strict Automation numeric conditions `number-gt` and `number-lt` across domain types, Core evaluation/validation, Management API and Dashboard.
+- Regression coverage covers strict numeric validation and the Security timeout policy/runtime.
+- During the numeric Automation API update, a partial-file overwrite was detected immediately and corrected by restoring the complete `management-api.ts` from the exact pre-change commit before reapplying the intended validator change.
+- Current development HEAD: `4c69d5644b5e35fd5497619c008642c74ece02dd`.
+- Fresh CI run #1783 is pending on this current tree; do not call it green until completion.
+
+### Next concrete work
+- After the current CI gate, continue Security/AutoMod response-policy depth, then broader Automation actions/fields and remaining Music/Fleet/VPS breadth.
