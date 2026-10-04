@@ -13,6 +13,7 @@ import {
   LavalinkManager,
   type Player,
   type Track,
+  type UnresolvedTrack,
   type QueueStoreManager,
   type StoredQueue
 } from "lavalink-client";
@@ -493,10 +494,13 @@ export class Music implements PlatformModule {
     } else if (action === "move") {
       const move = normalizeMusicQueueMove(Number(input.from), Number(input.to), player.queue.tracks.length);
       if (!move) throw new Error("invalid_queue_move");
-      await Promise.resolve(player.queue.move(move.from, move.to));
+      const movingTrack = player.queue.tracks[move.from];
+      if (!movingTrack) throw new Error("invalid_queue_move");
+      await Promise.resolve(player.queue.remove(move.from));
+      await Promise.resolve(player.queue.splice(move.to, 0, movingTrack));
     } else if (action === "clear") {
       if (player.queue.tracks.length === 0) throw new Error("music_queue_empty");
-      await Promise.resolve(player.queue.clear());
+      await Promise.resolve(player.queue.splice(0, player.queue.tracks.length));
     } else if (action === "pause") {
       await player.pause();
     } else if (action === "resume") {
@@ -882,7 +886,13 @@ export class Music implements PlatformModule {
       await interaction.reply({ content: "Некорректные позиции очереди.", ephemeral: true });
       return;
     }
-    await Promise.resolve(player.queue.move(move.from, move.to));
+    const movingTrack = player.queue.tracks[move.from];
+    if (!movingTrack) {
+      await interaction.reply({ content: "Некорректные позиции очереди.", ephemeral: true });
+      return;
+    }
+    await Promise.resolve(player.queue.remove(move.from));
+    await Promise.resolve(player.queue.splice(move.to, 0, movingTrack));
     await this.persistPlayer(player);
     await interaction.reply({
       content: `↕️ Трек перемещён: **#${move.from + 1} → #${move.to + 1}**`,
@@ -902,7 +912,7 @@ export class Music implements PlatformModule {
       await interaction.reply({ content: "Очередь уже пуста.", ephemeral: true });
       return;
     }
-    await Promise.resolve(player.queue.clear());
+    await Promise.resolve(player.queue.splice(0, player.queue.tracks.length));
     await this.persistPlayer(player);
     await interaction.reply({
       content: `🧹 Очередь очищена. Удалено треков: **${count}**.`,
@@ -1862,10 +1872,10 @@ export function buildMusicSearchCandidates(
   ];
 }
 
-export function selectMusicEnqueueTracks<T>(
-  tracks: readonly T[],
+export function selectMusicEnqueueTracks(
+  tracks: readonly (Track | UnresolvedTrack)[],
   limit = MAX_MUSIC_ENQUEUE_TRACKS
-): T[] {
+): Array<Track | UnresolvedTrack> {
   const safeLimit = Number.isInteger(limit)
     ? Math.min(Math.max(limit, 1), MAX_MUSIC_ENQUEUE_TRACKS)
     : MAX_MUSIC_ENQUEUE_TRACKS;
