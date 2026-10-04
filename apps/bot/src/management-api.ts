@@ -308,13 +308,22 @@ export class ManagementApiServer {
               return;
             }
 
-            const body = await readJson(req);
+            const body = await readJson(req, 8 * 1024 * 1024);
+            const validProfileData = (value: unknown): value is string | null =>
+              value === null ||
+              (typeof value === "string" &&
+                value.length <= 3 * 1024 * 1024 &&
+                /^data:image\/(png|jpeg|gif);base64,[A-Za-z0-9+/=_-]+$/i.test(value));
+
             if (
               typeof body.clientId !== "string" ||
               !/^\d{17,20}$/.test(body.clientId) ||
               (body.token !== undefined && (typeof body.token !== "string" || body.token.length < 1 || body.token.length > 512)) ||
               (body.enabled !== undefined && typeof body.enabled !== "boolean") ||
-              (body.presenceName !== undefined && body.presenceName !== null && (typeof body.presenceName !== "string" || body.presenceName.length > 128))
+              (body.presenceName !== undefined && body.presenceName !== null && (typeof body.presenceName !== "string" || body.presenceName.length > 128)) ||
+              (body.username !== undefined && (typeof body.username !== "string" || body.username.trim().length < 2 || body.username.trim().length > 32)) ||
+              (body.avatarData !== undefined && !validProfileData(body.avatarData)) ||
+              (body.bannerData !== undefined && !validProfileData(body.bannerData))
             ) {
               throw new RequestInputError("invalid_bot_registration", 400);
             }
@@ -323,7 +332,10 @@ export class ManagementApiServer {
               clientId: body.clientId,
               ...(body.token !== undefined ? { token: body.token } : {}),
               ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
-              ...(body.presenceName !== undefined ? { presenceName: body.presenceName === null ? null : body.presenceName.trim() } : {})
+              ...(body.presenceName !== undefined ? { presenceName: body.presenceName === null ? null : body.presenceName.trim() } : {}),
+              ...(body.username !== undefined ? { username: body.username.trim() } : {}),
+              ...(body.avatarData !== undefined ? { avatarData: body.avatarData } : {}),
+              ...(body.bannerData !== undefined ? { bannerData: body.bannerData } : {})
             });
             await this.options.auditLog.record({
               source: "dashboard",
@@ -334,7 +346,10 @@ export class ManagementApiServer {
                 clientId: body.clientId,
                 tokenChanged: body.token !== undefined,
                 enabled: body.enabled,
-                presenceNameChanged: body.presenceName !== undefined
+                presenceNameChanged: body.presenceName !== undefined,
+                usernameChanged: body.username !== undefined,
+                avatarChanged: body.avatarData !== undefined,
+                bannerChanged: body.bannerData !== undefined
               }
             });
             this.json(res, 200, { ok: true, bot: result });
