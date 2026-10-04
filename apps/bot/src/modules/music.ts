@@ -1877,7 +1877,7 @@ async function searchMusicWithFallback(
   provider: MusicSearchProvider,
   rawQuery: string,
   requester: Parameters<Player["search"]>[1]
-): Promise<{ tracks: Track[] } | null> {
+): Promise<Awaited<ReturnType<Player["search"]>> | null> {
   let lastError: unknown = null;
   for (const search of buildMusicSearchCandidates(provider, rawQuery)) {
     try {
