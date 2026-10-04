@@ -736,7 +736,7 @@ export class RolePanels implements PlatformModule {
 
     const panelRoles = (row.roles ?? [])
       .map((entry) => interaction.guild!.roles.cache.get(entry.roleId))
-      .filter((role): role is import("discord.js").Role => Boolean(role) && !role.managed && role.position < bot.roles.highest.position);
+      .filter((role): role is import("discord.js").Role => role !== undefined && !role.managed && role.position < bot.roles.highest.position);
 
     let changed = 0;
     for (const role of panelRoles) {
