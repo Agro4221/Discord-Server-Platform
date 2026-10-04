@@ -99,3 +99,49 @@ test("music search selection accepts only existing result indexes", async () => 
   assert.equal(isValidMusicSearchSelection(5, 5), false);
   assert.equal(isValidMusicSearchSelection(1.5, 5), false);
 });
+
+
+test("music queue export contains safe track metadata", async () => {
+  const { buildMusicQueueExport, buildMusicQueueShare } = await import("../src/modules/music.js");
+  const tracks = [
+    {
+      info: {
+        identifier: "abc",
+        title: "Song",
+        author: "Artist",
+        duration: 123000,
+        uri: "https://youtube.com/watch?v=abc"
+      },
+      requester: { id: "123456789012345678" }
+    }
+  ] as never;
+
+  const payload = JSON.parse(buildMusicQueueExport(tracks)) as {
+    schemaVersion: number;
+    tracks: Array<Record<string, unknown>>;
+  };
+  assert.equal(payload.schemaVersion, 1);
+  assert.equal(payload.tracks[0]?.title, "Song");
+  assert.equal(payload.tracks[0]?.requesterId, "123456789012345678");
+  assert.equal(payload.tracks[0]?.secret, undefined);
+
+  const shared = buildMusicQueueShare(tracks);
+  assert.match(shared, /Song/);
+  assert.match(shared, /Artist/);
+  assert.match(shared, /youtube\.com/);
+});
+
+test("music queue share truncates safely for long queues", async () => {
+  const { buildMusicQueueShare } = await import("../src/modules/music.js");
+  const tracks = Array.from({ length: 100 }, (_, index) => ({
+    info: {
+      identifier: "id-" + index,
+      title: "Very long track title " + index + " ".repeat(15),
+      author: "Artist"
+    }
+  })) as never;
+
+  const shared = buildMusicQueueShare(tracks);
+  assert.equal(shared.length <= 1900, true);
+  assert.match(shared, /используй|export/i);
+});
