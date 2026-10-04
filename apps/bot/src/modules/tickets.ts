@@ -1060,7 +1060,8 @@ export function validateTicketFormSubmission(
   values: Record<string, string>
 ): string | null {
   for (const field of fields) {
-    const value = typeof values[field.id] === "string" ? values[field.id].trim() : "";
+    const rawValue = values[field.id];
+    const value = typeof rawValue === "string" ? rawValue.trim() : "";
     if (field.required && !value) return "Заполни обязательное поле: " + field.label + ".";
     if (value.length < field.minLength) return "Поле «" + field.label + "» слишком короткое: минимум " + field.minLength + " символа.";
     if (value.length > field.maxLength) return "Поле «" + field.label + "» слишком длинное: максимум " + field.maxLength + " символов.";
