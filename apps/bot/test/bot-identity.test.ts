@@ -116,7 +116,10 @@ test("claimStaleGuilds atomically returns guilds claimed by an enabled failover 
       ["111111111111111111", "222222222222222222"],
       20
     ),
-    ["111111111111111111", "222222222222222222"]
+    [
+      { guildId: "111111111111111111", previousIdentityId: "primary-old" },
+      { guildId: "222222222222222222", previousIdentityId: "primary-old" }
+    ]
   );
   assert.equal(transactionCalls, 1);
 });
@@ -275,7 +278,9 @@ test("primary takeover durably reassigns stale guilds", async () => {
   } as never;
 
   const primary = new BotIdentityRepository(db, "primary");
-  assert.deepEqual(await primary.claimStaleGuildsAsPrimary(["111111111111111111"], 10), ["111111111111111111"]);
+  assert.deepEqual(await primary.claimStaleGuildsAsPrimary(["111111111111111111"], 10), [
+    { guildId: "111111111111111111", previousIdentityId: "secondary" }
+  ]);
   assert.equal(transactionCalls, 1);
   assert.match(queries[0] ?? "", /SET bot_identity_id='primary'/);
 });
@@ -329,4 +334,30 @@ test("secondary Music failover requires failover_enabled", async () => {
     []
   );
   assert.equal(transactionCalls, 0);
+});
+
+
+test("Fleet failover result preserves previous Music identity for audit", async () => {
+  const db = {
+    query: async () => ({ rows: [{ failover_enabled: true, enabled: true }] }),
+    transaction: async (fn: (client: never) => Promise<unknown>) => fn({
+      query: async () => ({
+        rows: [{
+          guild_id: "111111111111111111",
+          voice_channel_id: "333333333333333333",
+          previous_identity_id: "secondary"
+        }]
+      })
+    } as never)
+  } as never;
+
+  const primary = new BotIdentityRepository(db, "primary");
+  assert.deepEqual(
+    await primary.claimStaleMusicAssignments(["111111111111111111"], 10),
+    [{
+      guildId: "111111111111111111",
+      voiceChannelId: "333333333333333333",
+      previousIdentityId: "secondary"
+    }]
+  );
 });
