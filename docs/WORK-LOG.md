@@ -364,3 +364,16 @@ Never write credentials, tokens or private user data here.
 
 ### Next concrete work
 - Music — multi-node failover hardening: verify and strengthen automatic player migration/recovery when an active Lavalink node disconnects, including persistent player state and regression coverage.
+
+
+## 2026-10-04 — Music multi-node failover hardening checkpoint verified
+- Development HEAD: `7d62d0421d31ab3deebbca29d3c9412908b41543`.
+- CI run **#1608** passed the full automated pipeline.
+- Music failover now logs the relevant player node-change success/failure events from `lavalink-client`.
+- Active players are persisted when a Lavalink node disconnects, with explicit success/failure logging for the persistence attempt.
+- Control Center now exposes the player's active Lavalink node alongside total connected nodes.
+- Automatic player migration remains delegated to `lavalink-client`'s built-in node-migration mechanism; the platform layer adds state durability and observability around it.
+- Live node-loss/migration, queue continuity and audio continuity remain environment-dependent release-gate tests.
+### Next concrete work
+- Release-gate validation of Music multi-node failover: live node loss/recovery with queue, current track position and player state continuity.
+- Then continue the remaining broader fleet/release-gate validation without reopening already verified Music slices.

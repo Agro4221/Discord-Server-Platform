@@ -293,3 +293,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Security anti-nuke expansion is CI-verified by run #1596.
 - Music provider-aware search routing is CI-verified by run #1603 on `035e23cc163871172cba9e0298d824876a74387c`.
 - Current next bounded development task: Music multi-node failover hardening and regression coverage.
+
+
+## 2026-10-04 — Music failover checkpoint
+- Provider-aware Music search routing and multi-node failover hardening are CI-verified.
+- Failover observability, disconnect-time player persistence and active-node visibility are implemented.
+- Current remaining Music limitation is live Lavalink node-loss/recovery acceptance with real Discord audio playback.
+- Next bounded scope: release-gate/live validation of failover continuity, followed by broader fleet/release-gate coverage.

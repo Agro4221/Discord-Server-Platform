@@ -201,3 +201,12 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ CI run #1603 verifies Music provider-aware search routing, provider command registration and Control Center provider selection.
 - ⚠ Live Security audit-log correlation, real Lavalink provider availability and real multi-node failover remain environment-dependent acceptance tests.
 - ☐ Next: Music multi-node failover hardening with deterministic node-loss/recovery regression coverage.
+
+
+## 2026-10-04 — Music multi-node failover snapshot
+- ✅ CI run #1605 verifies failover event instrumentation and debug-event filtering.
+- ✅ CI run #1606 verifies disconnect-time player persistence wiring.
+- ✅ CI run #1607 verifies accurate persistence failure reporting.
+- ✅ CI run #1608 verifies active-node visibility in the Control Center plus the complete automated matrix.
+- ⚠ Live Lavalink node-loss/recovery, player migration, queue continuity and audio continuity remain environment-dependent release-gate tests.
+- ☐ Next: live Music failover acceptance, then broader fleet/release-gate validation.
