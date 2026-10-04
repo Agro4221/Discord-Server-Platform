@@ -7,6 +7,7 @@ export type ModuleKey =
   | "temporary-voice"
   | "welcome"
   | "verification"
+  | "onboarding"
   | "roles"
   | "leveling"
   | "tickets"
@@ -39,6 +40,7 @@ export const MODULE_CATALOG: readonly {
   { key: "temporary-voice", title: "Temporary Voice", description: "Temporary voice rooms", defaultEnabled: false },
   { key: "welcome", title: "Welcome", description: "Welcome and goodbye messages", defaultEnabled: false },
   { key: "verification", title: "Verification", description: "Member verification and verified role", defaultEnabled: false },
+  { key: "onboarding", title: "Onboarding", description: "Configurable post-join and post-verification member flow", defaultEnabled: false },
   { key: "roles", title: "Roles", description: "Role panels and self-assignment", defaultEnabled: false },
   { key: "leveling", title: "Leveling", description: "XP, ranks and leaderboards", defaultEnabled: false },
   { key: "tickets", title: "Tickets", description: "Support tickets and transcripts", defaultEnabled: false },

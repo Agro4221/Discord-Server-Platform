@@ -21,6 +21,7 @@ import { Security } from "./modules/security.js";
 import { Notifications } from "./modules/notifications.js";
 import { StreamAlerts } from "./modules/stream-alerts.js";
 import { Verification } from "./modules/verification.js";
+import { Onboarding } from "./modules/onboarding.js";
 import { Analytics } from "./modules/analytics.js";
 import { Music } from "./modules/music.js";
 import { createDiscordClient, registerCommands, routeCommand, wireDiscordEvents } from "./discord/bot.js";
@@ -129,6 +130,7 @@ async function main(): Promise<void> {
   const notifications = new Notifications(database);
   const streamAlerts = new StreamAlerts(database, config.streamAlerts, auditLog);
   const verification = new Verification(database, (guildId) => client.guilds.cache.get(guildId));
+  const onboarding = new Onboarding(database);
   const analytics = new Analytics(database);
   const music = new Music(database, runtimeConfig, identities);
   const moderationPresets = new ModerationPresets(database, autoMod, security, moderation);
@@ -213,6 +215,7 @@ async function main(): Promise<void> {
   modules.register(notifications);
   modules.register(streamAlerts);
   modules.register(verification);
+  modules.register(onboarding);
   modules.register(analytics);
   modules.register(music);
   modules.register(customCommands);
@@ -363,6 +366,10 @@ async function main(): Promise<void> {
     customCommands,
     autoResponder,
     forms,
+    onboarding: {
+      get: async (guildId) => onboarding.get(guildId),
+      set: async (guildId, input) => onboarding.configure(guildId, input)
+    },
     helpPages: {
       list: async (guildId) => helpPages.list(guildId),
       save: async (guildId, slug, title, content, enabled) => helpPages.save(guildId, slug, title, content, enabled),

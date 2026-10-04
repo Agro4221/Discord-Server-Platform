@@ -1316,6 +1316,21 @@ const migrations = [
       "ALTER TABLE bot_identities ADD COLUMN IF NOT EXISTS token_ciphertext text;"
     ])
   },
+  {
+    version: 85,
+    name: "onboarding_flows",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS onboarding_flows (",
+      "  guild_id text PRIMARY KEY,",
+      "  enabled boolean NOT NULL DEFAULT false,",
+      "  trigger text NOT NULL DEFAULT 'member.join' CHECK(trigger IN ('member.join','verification.passed')),"
+      "  steps jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_onboarding_flows_updated ON onboarding_flows(updated_at DESC);"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {

@@ -22,10 +22,10 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1)",
       [[
         "guild_modules","automod_settings","verification_settings","automation_rules",
-        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs","moderation_presets","ticket_sla_settings","help_pages","analytics_settings","music_history","custom_forms","custom_form_submissions"
+        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs","moderation_presets","ticket_sla_settings","help_pages","analytics_settings","music_history","custom_forms","custom_form_submissions","onboarding_flows"
       ]]
     );
-    assert.equal(tables.rows.length, 25);
+    assert.equal(tables.rows.length, 26);
     const version = (await db.query("SELECT max(version) AS version FROM schema_migrations")).rows[0]?.version;
     const retryColumn = await db.query(
       "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='automation_delayed_jobs' AND column_name='dead_lettered_at'"
@@ -81,6 +81,41 @@ test("analytics settings persist and normalize safely", { skip: !enabled }, asyn
     assert.deepEqual(restored, saved);
   } finally {
     await db.query("DELETE FROM analytics_settings WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.close();
+  }
+});
+
+test("onboarding flow settings persist with normalized steps", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345741";
+  const onboarding = new (await import("../src/modules/onboarding.js")).Onboarding(db);
+  try {
+    await migrate(db);
+    await db.query("DELETE FROM guild_modules WHERE guild_id=$1 AND module_key='onboarding'", [guildId]);
+    await db.query("DELETE FROM onboarding_flows WHERE guild_id=$1", [guildId]);
+    const saved = await onboarding.configure(guildId, {
+      enabled: true,
+      trigger: "verification.passed",
+      steps: [
+        { type: "role", roleId: "123456789012345678" },
+        { type: "channel-message", channelId: "123456789012345679", content: " Hello {mention}! " },
+        { type: "dm", content: "Welcome to {server}" }
+      ]
+    });
+    assert.deepEqual(saved, {
+      guildId,
+      enabled: true,
+      trigger: "verification.passed",
+      steps: [
+        { type: "role", roleId: "123456789012345678" },
+        { type: "channel-message", channelId: "123456789012345679", content: "Hello {mention}!" },
+        { type: "dm", content: "Welcome to {server}" }
+      ]
+    });
+    assert.deepEqual(await onboarding.get(guildId), saved);
+  } finally {
+    await db.query("DELETE FROM guild_modules WHERE guild_id=$1 AND module_key='onboarding'", [guildId]).catch(() => undefined);
+    await db.query("DELETE FROM onboarding_flows WHERE guild_id=$1", [guildId]).catch(() => undefined);
     await db.close();
   }
 });
