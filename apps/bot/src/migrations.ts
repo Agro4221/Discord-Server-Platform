@@ -1323,7 +1323,7 @@ const migrations = [
       "CREATE TABLE IF NOT EXISTS onboarding_flows (",
       "  guild_id text PRIMARY KEY,",
       "  enabled boolean NOT NULL DEFAULT false,",
-      "  trigger text NOT NULL DEFAULT 'member.join' CHECK(trigger IN ('member.join','verification.passed'))",
+      "  trigger text NOT NULL DEFAULT 'member.join' CHECK(trigger IN ('member.join','verification.passed')),",
       "  steps jsonb NOT NULL DEFAULT '[]'::jsonb,",
       "  created_at timestamptz NOT NULL DEFAULT now(),",
       "  updated_at timestamptz NOT NULL DEFAULT now()",
