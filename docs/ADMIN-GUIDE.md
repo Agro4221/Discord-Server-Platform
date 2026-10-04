@@ -8,13 +8,7 @@
 
     powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1
 
-На первом запуске launcher создаёт .env и попросит только:
-
-- Discord Bot Token
-- Discord Client ID
-- Dashboard admin password
-
-Остальные локальные секреты генерируются автоматически.
+На первом запуске launcher создаёт .env и попросит Discord Bot Token и Discord Client ID. Остальные локальные секреты генерируются автоматически.
 
 После запуска автоматически открывается:
 
@@ -22,11 +16,11 @@
 
 При успешном запуске `start-local.bat` закрывает окно launcher после открытия Control Center. При ошибке окно остаётся открытым, чтобы сообщение можно было прочитать.
 
-По умолчанию Dashboard и Management API доступны только с локального компьютера.
+Пользовательского входа в локальный Control Center нет: Dashboard доступен только с локального компьютера, а серверная часть использует внутренний bearer-ключ Management API.
 
 ## 2. Control Center
 
-После входа выбери сервер слева.
+После открытия Control Center выбери сервер слева.
 
 Control Center разделён на функциональные области, а не только на список модулей:
 

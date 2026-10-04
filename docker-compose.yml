@@ -90,8 +90,6 @@ services:
       BOT_HEALTH_URL: http://bot:3001/health
       MANAGEMENT_API_URL: http://bot:3002
       MANAGEMENT_API_KEY: ${MANAGEMENT_API_KEY}
-      DASHBOARD_ADMIN_PASSWORD: ${DASHBOARD_ADMIN_PASSWORD:-}
-      DASHBOARD_AUTH_REQUIRED: ${DASHBOARD_AUTH_REQUIRED:-false}
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/"]
       interval: 10s

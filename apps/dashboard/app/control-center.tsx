@@ -774,11 +774,6 @@ export function ControlCenter() {
     }
   }
 
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
-  }
-
   const activeCategory = CATEGORIES.find((item) => item.key === category) ?? CATEGORIES[0];
   const changed = JSON.stringify(values) !== JSON.stringify(originalValues);
 
@@ -834,7 +829,6 @@ export function ControlCenter() {
               }}
             />
           </label>
-          <button type="button" onClick={() => void logout()} style={buttonStyle("secondary")}>Выйти</button>
         </header>
 
         {(notice || error) && (
