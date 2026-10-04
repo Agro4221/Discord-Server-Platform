@@ -383,6 +383,7 @@ export class Music implements PlatformModule {
     current: { title: string; author: string; durationMs: number; positionMs: number } | null;
     queue: Array<{ title: string; author: string; durationMs: number }>;
     nodeCount: number;
+    nodeId: string | null;
   }> {
     const enabled = await moduleEnabled(this.db, guildId, "music", false);
     const player = this.manager?.players.get(guildId);
@@ -411,7 +412,8 @@ export class Music implements PlatformModule {
         author: track.info.author ?? "Unknown artist",
         durationMs: Number(track.info.duration ?? 0)
       })),
-      nodeCount: this.connectedNodes.size
+      nodeCount: this.connectedNodes.size,
+      nodeId: player ? musicPlayerNodeId(player) : null
     };
   }
 

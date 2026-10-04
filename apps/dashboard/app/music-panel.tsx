@@ -17,6 +17,7 @@ type MusicState = {
   current: Track & { positionMs: number } | null;
   queue: Track[];
   nodeCount: number;
+  nodeId: string | null;
 };
 
 const EMPTY: MusicState = {
@@ -30,7 +31,8 @@ const EMPTY: MusicState = {
   autoplay: false,
   current: null,
   queue: [],
-  nodeCount: 0
+  nodeCount: 0,
+  nodeId: null
 };
 
 export function MusicPanel({
@@ -150,6 +152,7 @@ export function MusicPanel({
 
           <div style={{ color: "#7f8b9e", fontSize: 10, textAlign: "right" }}>
             <div>{state.nodeCount} Lavalink node{state.nodeCount === 1 ? "" : "s"}</div>
+            <div>Active node: {state.nodeId ?? "не определён"}</div>
             <div>{state.voiceChannelId ? "Voice: " + state.voiceChannelId : "Voice не подключён"}</div>
           </div>
         </div>
