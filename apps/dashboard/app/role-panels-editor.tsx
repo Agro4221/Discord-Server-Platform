@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 type Resource = { id: string; name: string; type?: number; manageable?: boolean };
 type PanelRole = { roleId: string; label: string };
-type RolePanel = { id: number; guildId: string; channelId: string; messageId: string | null; title: string; roles: PanelRole[]; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number };
+type RolePanel = { id: number; guildId: string; channelId: string; messageId: string | null; title: string; roles: PanelRole[]; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number; componentType?: "buttons" | "select" };
 type RoleAutomationRule = {
   id: number;
   trigger: "member.join" | "voice.join" | "voice.leave";
@@ -38,6 +38,7 @@ export function RolePanelsEditor({
   const [selectionMode, setSelectionMode] = useState<"toggle" | "exclusive" | "max">("toggle");
   const [maxSelections, setMaxSelections] = useState(1);
   const [durationMinutes, setDurationMinutes] = useState(0);
+  const [componentType, setComponentType] = useState<"buttons" | "select">("buttons");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -129,6 +130,7 @@ export function RolePanelsEditor({
     setSelectionMode("toggle");
     setMaxSelections(1);
     setDurationMinutes(0);
+    setComponentType("buttons");
     setError("");
   }
 
@@ -140,6 +142,7 @@ export function RolePanelsEditor({
     setSelectionMode(panel.selectionMode ?? "toggle");
     setMaxSelections(panel.maxSelections ?? 1);
     setDurationMinutes(panel.durationMinutes ?? 0);
+    setComponentType(panel.componentType ?? "buttons");
     setError("");
   }
 
@@ -157,7 +160,7 @@ export function RolePanelsEditor({
         {
           method: editingId === null ? "POST" : "PUT",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ channelId, title, roles: cleanRoles, selectionMode, maxSelections, durationMinutes })
+          body: JSON.stringify({ channelId, title, roles: cleanRoles, selectionMode, maxSelections, durationMinutes, componentType })
         }
       );
       const body = await response.json().catch(() => ({}));
@@ -206,6 +209,10 @@ export function RolePanelsEditor({
           <option value="toggle">Режим: Toggle</option>
           <option value="exclusive">Режим: Exclusive — только одна роль</option>
           <option value="max">Режим: Max selections</option>
+        </select>
+        <select value={componentType} onChange={(event) => setComponentType(event.target.value as "buttons" | "select")} style={inputStyle}>
+          <option value="buttons">Компонент: кнопки</option>
+          <option value="select">Компонент: select menu</option>
         </select>
         <input
           type="number"
@@ -289,7 +296,7 @@ export function RolePanelsEditor({
           <div key={panel.id} style={{ padding: "11px 0", borderBottom: "1px solid #1d212b", display: "flex", justifyContent: "space-between", gap: 12 }}>
             <div>
               <div>{panel.title}</div>
-              <div style={{ opacity: 0.42, fontSize: 11 }}>{panel.roles.length} ролей · канал {panel.channelId}</div>
+              <div style={{ opacity: 0.42, fontSize: 11 }}>{panel.roles.length} ролей · {panel.componentType === "select" ? "select menu" : "кнопки"} · канал {panel.channelId}</div>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               <button type="button" disabled={saving} onClick={() => edit(panel)} style={buttonStyle("secondary")}>Изменить</button>
