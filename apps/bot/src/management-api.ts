@@ -2963,9 +2963,42 @@ export class ManagementApiServer {
               return;
             }
 
+            const source = url.searchParams.get("source") || undefined;
+            if (source && !["discord", "dashboard", "system"].includes(source)) {
+              this.json(res, 400, { error: "invalid_source" });
+              return;
+            }
+
+            const action = url.searchParams.get("action")?.trim() || undefined;
+            if (action && action.length > 120) {
+              this.json(res, 400, { error: "invalid_action_filter" });
+              return;
+            }
+
+            const actorUserId = url.searchParams.get("actorUserId")?.trim() || undefined;
+            if (actorUserId && !/^\\d{17,20}$/.test(actorUserId)) {
+              this.json(res, 400, { error: "invalid_actor_user_id" });
+              return;
+            }
+
+            const before = url.searchParams.get("before") || undefined;
+            if (before && Number.isNaN(new Date(before).getTime())) {
+              this.json(res, 400, { error: "invalid_before" });
+              return;
+            }
+
+            const events = await this.options.auditLog.query(guildId, {
+              limit,
+              source: source as import("./audit.js").AuditEvent["source"] | undefined,
+              action,
+              actorUserId,
+              before
+            });
+
             this.json(res, 200, {
               guildId,
-              events: await this.options.auditLog.recent(guildId, limit)
+              events,
+              nextBefore: events.length === limit ? String((events[events.length - 1] as { created_at?: string })?.created_at ?? "") : null
             });
             return;
           }
