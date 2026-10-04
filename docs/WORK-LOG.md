@@ -766,3 +766,17 @@ Never write credentials, tokens or private user data here.
 ### Next concrete work
 - Re-check CI #1764 after the continuity-doc commit.
 - Continue feature completion with a concrete Security/AutoMod response-policy slice, then Automation breadth, Music failover/provider depth, Fleet hardening, VPS production tooling and final live acceptance.
+
+
+## 2026-10-04 — Security executor timeout response checkpoint
+- Added configurable executorTimeoutMinutes to the Security response policy, with a safe 0–40320 minute bound (0 disables the response).
+- When a destructive-burst executor reaches the existing response threshold and is Discord-moderatable, Security can now apply the configured timeout.
+- A successful Security timeout creates a durable moderation_cases timeout entry with expiration and emits the standard moderation.case event.
+- Timeout failure is fail-soft: the incident response continues without creating a false moderation case; response metadata records whether timeout actually succeeded.
+- Control Center schema/storage and config export/import now expose the new setting.
+- Migration 49 adds security_settings.executor_timeout_minutes.
+- Regression coverage was added for validation, configuration persistence and successful/failed executor timeout behavior.
+- Verification status: feature implementation is complete; fresh CI for the resulting development tree is required before marking the checkpoint green.
+
+### Next concrete work
+- Continue Security/AutoMod response-policy depth after CI verification, then broaden Automation conditions/actions and Music/Fleet failover breadth.
