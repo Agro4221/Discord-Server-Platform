@@ -1,6 +1,7 @@
 import type { Database } from "./database.js";
 import { MODULE_CATALOG } from "./modules/catalog.js";
 import { validateAutomationRule } from "./modules/automation-engine.js";
+import { normalizeFormFields } from "./modules/forms.js";
 import type { AutomationAction, AutomationCondition, AutomationEvent } from "@dsp/domain";
 import type { ServerConfigExport, ServerModuleConfig } from "@dsp/domain";
 
