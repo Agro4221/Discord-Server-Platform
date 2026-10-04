@@ -316,3 +316,14 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ CI #1687 passed typecheck, bot tests, dependency/source/deployment/observability checks, and all domain/bot/Dashboard builds.
 - ⚠ Real Lavalink session expiry, simultaneous node loss, Windows/Docker multi-bot restart and Discord permission behavior remain live release-gate cases.
 - ☐ Next: Fleet failure injection and Music multi-session/node-loss reconciliation.
+
+
+## 2026-10-04 — Fleet credential-rotation verification
+- ✅ Secondary credential rotation sets a durable restart request.
+- ✅ Existing heartbeat updates cannot accidentally clear the restart request.
+- ✅ New process startup explicitly clears the restart request.
+- ✅ Fleet status becomes `degraded` while restart is pending, driving local reconciler restart.
+- ✅ Dashboard exposes the pending restart state.
+- ✅ Migration 48 and regression coverage passed in CI #1689.
+- ⚠ Real Docker container restart and live Discord token rotation remain environment-dependent acceptance cases.
+- ☐ Next: Fleet restart/start failure injection and stale-heartbeat race coverage.

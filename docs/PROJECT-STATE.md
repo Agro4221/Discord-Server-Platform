@@ -389,3 +389,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - AutoMod `warn` is now distinct from destructive actions: no delete/timeout is performed, a moderation case is created, and warning-response delivery is tracked explicitly.
 - Fleet stale `starting`/ `ready` heartbeats are exposed as degraded and trigger local reconciler restart of running secondary containers.
 - CI #1687 passed the complete automated pipeline; latest verified code: `38f35992d2553b779d51dadb01882517933aa3f3`.
+
+
+## 2026-10-04 — Fleet credential-rotation lifecycle checkpoint
+- Secondary credential rotation now raises a durable restart request in `bot_heartbeats` instead of relying on a timing window.
+- Existing-process heartbeat updates preserve the request; a freshly started process clears it via the explicit startup heartbeat.
+- Management API/Dashboard expose the pending restart state; Fleet reconciler restarts the affected secondary container.
+- Migration 48 and regression tests are verified by CI #1689.
+- Latest verified code: `9e328270f378fb81a7de86b821745b82e9a9ef19`.

@@ -536,3 +536,16 @@ Never write credentials, tokens or private user data here.
 - Fleet: reconciliation failure injection and multi-bot process restart/credential-state edge cases.
 - Music: multi-session/node-loss de-duplication and position/queue continuity under simultaneous failures.
 - Final live release gate: real Discord permissions/hierarchy, Lavalink/providers, Windows/Docker multi-bot runtime, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Fleet credential-rotation lifecycle checkpoint
+- Added durable `bot_heartbeats.restart_required` state so a credential rotation can request controlled restart of an already running secondary Bot Identity.
+- Normal heartbeat updates preserve an outstanding restart request; only the new process startup heartbeat explicitly clears it.
+- Management API now requests restart for rotated secondary credentials and returns `restartRequired`; Dashboard displays the pending restart state.
+- Fleet status treats a pending restart as `degraded`, so the local reconciler removes/restarts the stale secondary container instead of accepting the old process as healthy.
+- Added migration 48 plus deterministic regression coverage for restart-request preservation and clearing semantics.
+- CI run #1689 passed the complete automated pipeline on commit `9e328270f378fb81a7de86b821745b82e9a9ef19`.
+### Next concrete work
+- Fleet: failure injection around restart/start failures and stale heartbeat races; harden recovery without masking an unavailable Docker/runtime.
+- Music: simultaneous node-loss/session-recovery de-duplication and cross-identity queue continuity.
+- Final live release gate: real Discord permissions/hierarchy, Lavalink/providers, Windows/Docker multi-bot runtime, soak/chaos/recovery and clean-host deployment.
