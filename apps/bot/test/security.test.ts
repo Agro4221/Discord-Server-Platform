@@ -36,7 +36,8 @@ test("Security executor audit lookback honors configured destructive window", ()
   assert.equal(securityAuditLookbackCutoff(100_000, 5), 95_000);
   assert.equal(securityAuditLookbackCutoff(100_000, 120), -20_000);
   assert.equal(securityAuditLookbackCutoff(100_000, 1), 95_000);
-  assert.equal(securityAuditLookbackCutoff(100_000, 999), -200_000);
+  assert.equal(securityAuditLookbackCutoff(100_000, 999), -899_000);
+  assert.equal(securityAuditLookbackCutoff(100_000, 3600), -3_500_000);
 });
 
 
