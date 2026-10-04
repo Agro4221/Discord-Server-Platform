@@ -9,6 +9,7 @@ import {
   type Message
 } from "discord.js";
 import {
+  DebugEvents,
   LavalinkManager,
   type Player,
   type Track,
@@ -160,6 +161,7 @@ export class Music implements PlatformModule {
           perTargetConcurrency: 2,
           backpressureDelayMs: 50
         },
+        enableDebugEvents: true,
         debugOptions: {
           noAudio: false,
           playerDestroy: {
@@ -304,6 +306,21 @@ export class Music implements PlatformModule {
       logger.warn("Lavalink node destroyed", {
         node: node.id
       });
+    });
+
+    this.manager.on("debug", (eventKey, eventData) => {
+      if (!isMusicFailoverDebugEvent(eventKey)) return;
+      const payload = eventData as { state?: unknown; message?: unknown; error?: unknown; functionLayer?: unknown };
+      const fields = {
+        identity: this.config.botIdentityId,
+        event: String(eventKey),
+        state: String(payload.state ?? "unknown"),
+        message: String(payload.message ?? ""),
+        functionLayer: String(payload.functionLayer ?? ""),
+        ...(payload.error ? { error: String(payload.error) } : {})
+      };
+      if (payload.state === "error") logger.error("Music player node failover event", fields);
+      else logger.info("Music player node failover event", fields);
     });
 
     this.manager.nodeManager.on("error", (node, error) => {
@@ -1402,6 +1419,13 @@ export class Music implements PlatformModule {
   }
 }
 
+
+export function isMusicFailoverDebugEvent(eventKey: DebugEvents): boolean {
+  return eventKey === DebugEvents.PlayerChangeNode ||
+    eventKey === DebugEvents.PlayerChangeNodeFail ||
+    eventKey === DebugEvents.PlayerChangeNodeFailNoEligibleNode ||
+    eventKey === DebugEvents.PlayerDestroyFail;
+}
 
 export function normalizeMusicSearchProvider(value: string): MusicSearchProvider | null {
   const normalized = value.trim().toLowerCase();

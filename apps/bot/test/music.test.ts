@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildMusicSearch,
   canControlMusic,
+  isMusicFailoverDebugEvent,
   musicNodeHealth,
   normalizeMusicRepeatMode,
   normalizeMusicSearchProvider,
@@ -26,6 +27,7 @@ test("Music repeat mode validator accepts only supported modes", () => {
   assert.equal(normalizeMusicRepeatMode(""), null);
 });
 
+import { DebugEvents } from "lavalink-client";
 import { shouldEmitSchedule } from "../src/modules/automation-engine.js";
 
 test("Automation schedule is emitted once per minute", () => {
@@ -68,4 +70,13 @@ test("Music search builder preserves URLs, explicit prefixes and provider select
   assert.deepEqual(buildMusicSearch("soundcloud", "Daft Punk"), { query: "Daft Punk", source: "scsearch" });
   assert.deepEqual(buildMusicSearch("soundcloud", "https://soundcloud.com/example/track"), { query: "https://soundcloud.com/example/track" });
   assert.equal(buildMusicSearch("auto", "   "), null);
+});
+
+
+test("Music failover debug filtering covers migration success and failure events", () => {
+  assert.equal(isMusicFailoverDebugEvent(DebugEvents.PlayerChangeNode), true);
+  assert.equal(isMusicFailoverDebugEvent(DebugEvents.PlayerChangeNodeFail), true);
+  assert.equal(isMusicFailoverDebugEvent(DebugEvents.PlayerChangeNodeFailNoEligibleNode), true);
+  assert.equal(isMusicFailoverDebugEvent(DebugEvents.PlayerDestroyFail), true);
+  assert.equal(isMusicFailoverDebugEvent(DebugEvents.QueueEnded), false);
 });
