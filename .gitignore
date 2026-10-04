@@ -13,3 +13,4 @@ coverage/
 .idea/
 
 .native-runtime/
+infrastructure/caddy/Caddyfile
