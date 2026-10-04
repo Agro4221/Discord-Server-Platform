@@ -227,3 +227,9 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Existing warn-case behavior remains covered and uses the same moderation event bus path.
 - ⚠ Real Discord moderation hierarchy, timeout permission and enforcement behavior remain live acceptance cases.
 - ☐ Next: continue richer AutoMod/Security response workflows, then broader Fleet/release-gate validation.
+
+## 2026-10-04 — AutoMod/Security consistency verification
+- ✅ Repeated-text rule window behavior is regression-tested for messages inside and outside the configured rule window.
+- ✅ Security partial incident cleanup is regression-tested; only the successfully resolved incident is counted.
+- ⚠ Latest development HEAD `83755f29b9ac747b278bce919d97397441a96d00` currently has no attached CI status, so full pipeline verification is pending.
+- ☐ Next: AutoMod log-action contract/warn semantics, Security executor-role lifecycle, then broader Music/Fleet failure and live release-gate validation.
