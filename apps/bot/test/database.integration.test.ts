@@ -459,7 +459,7 @@ test("config transfer preserves ticket panel links", { skip: !enabled }, async (
     const panels = ticketsModule?.settings.ticket_panels as Array<Record<string, unknown>> | undefined;
     const tickets = ticketsModule?.settings.tickets as Array<Record<string, unknown>> | undefined;
     assert.equal(panels?.[0]?.id, "9001");
-    assert.equal(tickets?.[0]?.panel_id, 9001);
+    assert.equal(tickets?.[0]?.panel_id, "9001");
 
     await db.query("DELETE FROM tickets WHERE guild_id=$1", [guildId]);
     await db.query("DELETE FROM ticket_panels WHERE guild_id=$1", [guildId]);
