@@ -1,6 +1,5 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import test from "node:test";
 import { Tickets, isOpenTicketConflict, validateTicketFormSubmission, type TicketFormField } from "../src/modules/tickets.js";
 import { PlatformEventBus } from "../src/events.js";
 
@@ -58,13 +57,21 @@ test("Tickets removes a persisted open row when Discord channel publication fail
       if (text.startsWith("SELECT enabled,first_response_minutes")) {
         return { rows: [] as T[], rowCount: 0 };
       }
-      if (text.startsWith("SELECT enabled,category_id")) {
+      if (text.startsWith("SELECT enabled,category_id,staff_role_id")) {
         return {
           rows: [{
             enabled: true,
             category_id: null,
             staff_role_id: null,
-            transcript_channel_id: null
+            transcript_channel_id: null,
+            max_open_per_user: 1,
+            auto_close_minutes: 0,
+            form_fields: [],
+            panel_title: null,
+            panel_description: null,
+            create_button_label: null,
+            claim_button_label: null,
+            close_button_label: null
           }] as T[],
           rowCount: 1
         };
