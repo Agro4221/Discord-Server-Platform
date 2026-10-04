@@ -7,6 +7,7 @@ import {
   securityResponseThreshold,
   clampSecurityIncidentDuration,
   clampSecurityWindowSeconds,
+  removeSecurityExecutorRoles,
   securityAuditLogEventType
 } from "../src/modules/security.js";
 import { AuditLogEvent } from "discord.js";
@@ -40,6 +41,16 @@ test("Security executor audit lookback honors configured destructive window", ()
   assert.equal(securityAuditLookbackCutoff(100_000, 3600), -3_500_000);
 });
 
+
+test("Security role-removal contract counts only successful removals", async () => {
+  const removed = await removeSecurityExecutorRoles(
+    [{ id: "role-a" }, { id: "role-b" }, { id: "role-c" }],
+    async (role) => {
+      if (role.id === "role-b") throw new Error("forbidden");
+    }
+  );
+  assert.deepEqual(removed, ["role-a", "role-c"]);
+});
 
 test("Security detection windows are bounded without truncating valid long windows", () => {
   assert.equal(clampSecurityWindowSeconds(1), 5);
