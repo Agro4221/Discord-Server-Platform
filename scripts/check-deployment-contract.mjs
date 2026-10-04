@@ -57,3 +57,18 @@ for (const contract of [
 if (!localLauncher.includes("reconcile-fleet.ps1")) {
   throw new Error("Local launcher must reconcile the registered Bot Fleet");
 }
+
+const releaseGate = await readFile("scripts/release-gate.ps1", "utf8");
+for (const contract of [
+  "Get-EnvValue",
+  "docker compose ps",
+  "/health",
+  "/api/fleet",
+  "restartRequired",
+  "credentialConfigured",
+  "RELEASE GATE PASSED"
+]) {
+  if (!releaseGate.includes(contract)) {
+    throw new Error("Local release-gate contract missing: " + contract);
+  }
+}
