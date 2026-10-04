@@ -768,7 +768,7 @@ export function clampSecurityWindowSeconds(value: number): number {
   return Math.min(Math.max(Math.trunc(value), 5), 3600);
 }
 
-function clampSecurityIncidentDuration(value: number): number {
+export function clampSecurityIncidentDuration(value: number): number {
   if (!Number.isFinite(value)) return 300;
   return Math.min(Math.max(Math.trunc(value), 60), 3600);
 }
