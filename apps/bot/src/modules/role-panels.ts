@@ -693,6 +693,8 @@ export class RolePanels implements PlatformModule {
       content: "Роль " + role.name + " выдана." + (durationMinutes > 0 ? " Время действия: " + durationMinutes + " мин." : ""),
       ephemeral: true
     });
+  }
+
   private async handleSelect(interaction: StringSelectMenuInteraction): Promise<void> {
     const panelId = Number(interaction.customId.slice("dsp:role-select:".length));
     if (!Number.isSafeInteger(panelId)) return;
