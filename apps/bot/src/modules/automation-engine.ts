@@ -930,6 +930,11 @@ export function validateAutomationRule(
       case "remove-role":
         if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !/^\d{17,20}$/.test(action.roleId)) throw new Error("invalid_role_action");
         break;
+      case "ban":
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !action.reason || action.reason.length > 500) {
+          throw new Error("invalid_ban_action");
+        }
+        break;
       case "timeout":
         if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !Number.isInteger(action.durationSeconds) || action.durationSeconds < 1 || action.durationSeconds > 2419200 || !action.reason || action.reason.length > 500) {
           throw new Error("invalid_timeout_action");
