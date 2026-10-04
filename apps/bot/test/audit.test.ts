@@ -68,7 +68,7 @@ test("audit module activity uses bounded action prefixes", async () => {
   assert.match(captured.text, /action ILIKE \$3 ESCAPE/);
   assert.match(captured.text, /action ILIKE \$4 ESCAPE/);
   assert.match(captured.text, /created_at < \$5/);
-  assert.match(captured.text, /LIMIT $6/);
+  assert.match(captured.text, /LIMIT \$6/);
   assert.deepEqual(captured.values, [
     "123456789012345678",
     "role-panel.%",
