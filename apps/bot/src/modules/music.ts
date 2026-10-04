@@ -403,6 +403,7 @@ export class Music implements PlatformModule {
     volume: number;
     repeatMode: MusicRepeatMode;
     autoplay: boolean;
+    filters: string[];
     current: { title: string; author: string; durationMs: number; positionMs: number } | null;
     queue: Array<{ title: string; author: string; durationMs: number }>;
     nodeCount: number;
@@ -1162,7 +1163,13 @@ export class Music implements PlatformModule {
         await message.reply("Использование: !music move <от> <куда>.");
         return true;
       }
-      await Promise.resolve(player.queue.move(move.from, move.to));
+      const movingTrack = player.queue.tracks[move.from];
+      if (!movingTrack) {
+        await message.reply("Некорректные позиции очереди.");
+        return true;
+      }
+      await Promise.resolve(player.queue.remove(move.from));
+      await Promise.resolve(player.queue.splice(move.to, 0, movingTrack));
       await this.persistPlayer(player);
       await message.reply("↕️ Трек перемещён: #" + (move.from + 1) + " → #" + (move.to + 1) + ".");
     } else if (action === "clear") {
@@ -1171,7 +1178,7 @@ export class Music implements PlatformModule {
         return true;
       }
       const count = player.queue.tracks.length;
-      await Promise.resolve(player.queue.clear());
+      await Promise.resolve(player.queue.splice(0, player.queue.tracks.length));
       await this.persistPlayer(player);
       await message.reply("🧹 Очередь очищена. Удалено треков: " + count + ".");
     } else if (action === "queue") {
