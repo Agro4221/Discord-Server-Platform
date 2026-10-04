@@ -44,8 +44,8 @@ const EVENTS = [
   "channel.create","channel.delete","role.create","role.delete","member.ban","member.unban","security.incident"
 ] as const;
 
-const TEXT_FIELDS = ["content","userId","channelId","messageId","guildId"] as const;
-const NUMBER_FIELDS = ["memberCount","messageLength","mentionCount","previousLength","giveawayId","winnerCount","rolePosition","incidentId","actionCount","joinCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"] as const;
+const TEXT_FIELDS = ["content","userId","channelId","previousChannelId","messageId","guildId"] as const;
+const NUMBER_FIELDS = ["memberCount","messageLength","mentionCount","previousLength","attachmentCount","embedCount","stickerCount","giveawayId","winnerCount","rolePosition","incidentId","actionCount","joinCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"] as const;
 
 export function AutomationPanel({
   guildId,
