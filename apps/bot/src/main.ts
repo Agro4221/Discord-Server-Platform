@@ -368,7 +368,8 @@ async function main(): Promise<void> {
     forms,
     onboarding: {
       get: async (guildId) => onboarding.get(guildId),
-      set: async (guildId, input) => onboarding.configure(guildId, input)
+      set: async (guildId, input) => onboarding.configure(guildId, input),
+      validate: async (guildId) => onboarding.validate(guildId)
     },
     helpPages: {
       list: async (guildId) => helpPages.list(guildId),
