@@ -1786,7 +1786,7 @@ export class ManagementApiServer {
             }
             const body = await readJson(req);
             const musicAction = body.action;
-            if (typeof musicAction !== "string" || !["play","pause","resume","skip","stop","shuffle","repeat","seek","volume","autoplay","remove","move","clear"].includes(musicAction)) {
+            if (typeof musicAction !== "string" || !["play","pause","resume","skip","stop","shuffle","repeat","seek","volume","autoplay","remove","move","clear","filter"].includes(musicAction)) {
               throw new RequestInputError("invalid_music_action", 400);
             }
             const action = musicAction as "play" | "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay";
@@ -1797,7 +1797,8 @@ export class ManagementApiServer {
               mode: typeof body.mode === "string" ? body.mode : undefined,
               enabled: typeof body.enabled === "boolean" ? body.enabled : undefined,
               from: body.from === undefined ? undefined : Number(body.from),
-              to: body.to === undefined ? undefined : Number(body.to)
+              to: body.to === undefined ? undefined : Number(body.to),
+              filter: typeof body.filter === "string" ? body.filter : undefined
             });
             await this.options.auditLog.record({
               guildId,

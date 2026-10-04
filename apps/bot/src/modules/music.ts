@@ -26,6 +26,7 @@ import { logger } from "../logger.js";
 
 type MusicRepeatMode = "off" | "track" | "queue";
 export type MusicSearchProvider = "auto" | "youtube" | "youtube_music" | "soundcloud";
+export type MusicFilterPreset = "off" | "nightcore" | "vaporwave" | "karaoke" | "rotation" | "tremolo" | "vibrato" | "lowpass";
 export const MAX_MUSIC_ENQUEUE_TRACKS = 100;
 type MusicSearchSource = "ytsearch" | "ytmsearch" | "scsearch";
 
@@ -423,6 +424,7 @@ export class Music implements PlatformModule {
       volume: player?.volume ?? 100,
       repeatMode: player?.repeatMode ?? "off",
       autoplay: await this.autoplayEnabled(guildId),
+      filters: getActiveMusicFilterPresets(player),
       current: current ? {
         title: current.info.title,
         author: current.info.author,
@@ -441,8 +443,8 @@ export class Music implements PlatformModule {
 
   async dashboardControl(
     guildId: string,
-    action: "play" | "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay" | "remove" | "move" | "clear",
-    input: { query?: string; voiceChannelId?: string; value?: number; mode?: string; enabled?: boolean; provider?: string; from?: number; to?: number }
+    action: "play" | "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay" | "remove" | "move" | "clear" | "filter",
+    input: { query?: string; voiceChannelId?: string; value?: number; mode?: string; enabled?: boolean; provider?: string; from?: number; to?: number; filter?: string }
   ): Promise<void> {
     if (!await moduleEnabled(this.db, guildId, "music", false)) throw new Error("music_disabled");
     if (!this.manager || !this.initialized) throw new Error("music_unavailable");
@@ -487,7 +489,11 @@ export class Music implements PlatformModule {
 
     if (!player) throw new Error("music_player_not_started");
 
-    if (action === "remove") {
+    if (action === "filter") {
+      const preset = normalizeMusicFilterPreset(String(input.filter ?? ""));
+      if (!preset) throw new Error("invalid_music_filter");
+      await applyMusicFilterPreset(player, preset);
+    } else if (action === "remove") {
       const position = normalizeMusicQueuePosition(Number(input.value), player.queue.tracks.length);
       if (position === null) throw new Error("invalid_queue_position");
       await Promise.resolve(player.queue.remove(position));
@@ -617,6 +623,9 @@ export class Music implements PlatformModule {
         break;
       case "clear":
         await this.clearQueue(interaction);
+        break;
+      case "filter":
+        await this.filter(interaction);
         break;
     }
   }
@@ -920,6 +929,23 @@ export class Music implements PlatformModule {
     });
   }
 
+  private async filter(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
+    const preset = normalizeMusicFilterPreset(interaction.options.getString("preset", true));
+    if (!preset) {
+      await interaction.reply({ content: "Неизвестный фильтр.", ephemeral: true });
+      return;
+    }
+    await applyMusicFilterPreset(player, preset);
+    await this.persistPlayer(player);
+    await interaction.reply({ content: "🎛️ Music filter: " + preset + ".", ephemeral: true });
+  }
+
   private async queue(interaction: ChatInputCommandInteraction): Promise<void> {
     const player = this.manager?.players.get(interaction.guildId!);
     if (!player) {
@@ -1007,7 +1033,7 @@ export class Music implements PlatformModule {
     const action = aliases[commandName] ?? commandName;
     const supported = new Set([
       "play", "pause", "resume", "skip", "stop", "shuffle",
-      "queue", "nowplaying", "repeat", "seek", "volume", "autoplay", "remove", "move", "clear"
+      "queue", "nowplaying", "repeat", "seek", "volume", "autoplay", "remove", "move", "clear", "filter"
     ]);
     if (!supported.has(action)) return false;
 
@@ -1111,6 +1137,15 @@ export class Music implements PlatformModule {
       await Promise.resolve(player.queue.shuffle());
       await this.persistPlayer(player);
       await message.reply("🔀 Очередь перемешана.");
+    } else if (action === "filter") {
+      const preset = normalizeMusicFilterPreset(args[0] ?? "");
+      if (!preset) {
+        await message.reply("Использование: !music filter <off|nightcore|vaporwave|karaoke|rotation|tremolo|vibrato|lowpass>.");
+        return true;
+      }
+      await applyMusicFilterPreset(player, preset);
+      await this.persistPlayer(player);
+      await message.reply("🎛️ Music filter: " + preset + ".");
     } else if (action === "remove") {
       const position = normalizeMusicQueuePosition(Number(args[0]), player.queue.tracks.length);
       if (position === null) {
@@ -1828,6 +1863,39 @@ export function isMusicFailoverDebugEvent(eventKey: DebugEvents): boolean {
     eventKey === DebugEvents.PlayerChangeNodeFail ||
     eventKey === DebugEvents.PlayerChangeNodeFailNoEligibleNode ||
     eventKey === DebugEvents.PlayerDestroyFail;
+}
+
+export function normalizeMusicFilterPreset(value: string): MusicFilterPreset | null {
+  const normalized = value.trim().toLowerCase();
+  return ["off","nightcore","vaporwave","karaoke","rotation","tremolo","vibrato","lowpass"].includes(normalized)
+    ? normalized as MusicFilterPreset
+    : null;
+}
+
+export function getActiveMusicFilterPresets(player: { filterManager?: { filters?: unknown } } | null | undefined): string[] {
+  const filters = player?.filterManager?.filters;
+  if (!filters || typeof filters !== "object") return [];
+  const source = filters as Record<string, unknown>;
+  const names = ["nightcore","vaporwave","karaoke","rotation","tremolo","vibrato","lowPass"];
+  return names.filter((name) => source[name] === true).map((name) => name === "lowPass" ? "lowpass" : name);
+}
+
+async function applyMusicFilterPreset(
+  player: Player,
+  preset: MusicFilterPreset
+): Promise<void> {
+  if (preset === "off") {
+    await player.filterManager.resetFilters();
+    return;
+  }
+  await player.filterManager.resetFilters();
+  if (preset === "nightcore") await player.filterManager.toggleNightcore();
+  else if (preset === "vaporwave") await player.filterManager.toggleVaporwave();
+  else if (preset === "karaoke") await player.filterManager.toggleKaraoke();
+  else if (preset === "rotation") await player.filterManager.toggleRotation();
+  else if (preset === "tremolo") await player.filterManager.toggleTremolo();
+  else if (preset === "vibrato") await player.filterManager.toggleVibrato();
+  else if (preset === "lowpass") await player.filterManager.toggleLowPass();
 }
 
 export function normalizeMusicSearchProvider(value: string): MusicSearchProvider | null {

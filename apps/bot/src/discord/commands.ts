@@ -712,6 +712,26 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
         .addIntegerOption((o) => o.setName("to").setDescription("New queue position").setMinValue(1).setMaxValue(100).setRequired(true))
       )
       .addSubcommand((sub) => sub.setName("clear").setDescription("Clear the upcoming queue"))
+      .addSubcommand((sub) =>
+        sub
+          .setName("filter")
+          .setDescription("Set an audio filter")
+          .addStringOption((o) => o
+            .setName("preset")
+            .setDescription("Audio filter")
+            .addChoices(
+              { name: "Off", value: "off" },
+              { name: "Nightcore", value: "nightcore" },
+              { name: "Vaporwave", value: "vaporwave" },
+              { name: "Karaoke", value: "karaoke" },
+              { name: "8D / Rotation", value: "rotation" },
+              { name: "Tremolo", value: "tremolo" },
+              { name: "Vibrato", value: "vibrato" },
+              { name: "Low Pass", value: "lowpass" }
+            )
+            .setRequired(true)
+          )
+      )
       .addSubcommand((sub) => sub.setName("nowplaying").setDescription("Show current track"))
       .addSubcommand((sub) =>
         sub
