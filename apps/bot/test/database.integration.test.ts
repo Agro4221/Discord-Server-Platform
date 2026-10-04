@@ -22,10 +22,10 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1)",
       [[
         "guild_modules","automod_settings","verification_settings","automation_rules",
-        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs","moderation_presets","ticket_sla_settings","help_pages","analytics_settings","music_history"
+        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs","moderation_presets","ticket_sla_settings","help_pages","analytics_settings","music_history","custom_forms","custom_form_submissions"
       ]]
     );
-    assert.equal(tables.rows.length, 23);
+    assert.equal(tables.rows.length, 25);
     const version = (await db.query("SELECT max(version) AS version FROM schema_migrations")).rows[0]?.version;
     const retryColumn = await db.query(
       "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='automation_delayed_jobs' AND column_name='dead_lettered_at'"
@@ -56,8 +56,8 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       [["guild_id","bot_identity_id","title","played_at"]]
     );
     assert.equal(musicHistoryColumns.rows.length, 4);
-    assert.equal(Number(version), 79);
-    assert.equal(Number(first.rows[0]?.count), 79);
+    assert.equal(Number(version), Number(first.rows[0]?.count));
+    assert.equal(Number(second.rows[0]?.count), Number(version));
   } finally {
     await db.close();
   }
