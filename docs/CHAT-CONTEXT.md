@@ -7,7 +7,7 @@
 
 Репозиторий: `Agro4221/Discord-Server-Platform`
 Ветка: `development`
-Последний известный HEAD на момент обновления этого файла: `79dfbb13e33fe9b63c26fbf7bc84b744e6867f2b`
+Последний известный HEAD на момент обновления этого файла: `0722ed241e3a677b27c73dac8bd41edc20e93c29`
 Тип: self-hosted Discord Server Platform / единый Discord-бот.
 Основной локальный runtime: Native Windows.
 Docker: дополнительный путь для локального/VPS-развёртывания.
@@ -107,6 +107,8 @@ Carl-bot, Juniper, MEE6, ProBot, Jockie Music и похожие боты.
 - добавлены validator/runtime regression tests.
 
 ### Security
+Добавлена опциональная реакция executorTimeoutMinutes для подтверждённого destructive executor; успешный timeout создаёт moderation case, неуспешный не создаёт ложную запись.
+
 Audit-log ingestion расширен для:
 - member kicks;
 - webhooks create/delete/update;
@@ -177,10 +179,8 @@ Audit-log ingestion расширен для:
 
 На момент создания контекста:
 - HEAD: `79dfbb13e33fe9b63c26fbf7bc84b744e6867f2b`
-- последний известный CI: **#1764**
-- run id: `37218825729`
-- на последнем наблюдении: **in_progress**
-- этот run нельзя называть green, пока он не завершён успешно.
+- CI #1764 для предыдущего HEAD завершён успешно.
+- Для текущего feature-коммита нужен новый CI run; его нельзя считать green до завершения.
 
 Последний предыдущий подтверждённо зелёный baseline: CI #1757.
 
@@ -199,6 +199,7 @@ Audit-log ingestion расширен для:
 - `incidentDurationSeconds`
 - `autoQuarantine`
 - `removeExecutorRoles`
+- `executorTimeoutMinutes`
 
 `respondToExecutor` сейчас:
 - загружает executor member;
