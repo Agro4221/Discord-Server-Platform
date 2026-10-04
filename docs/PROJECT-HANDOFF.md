@@ -509,3 +509,9 @@ Live validation, требующая пользовательского окру�
 - Completed and CI-verified the shared localization foundation and first core command migrations.
 - Source checkpoint: d871b56f36a91d15c07038ebf3122956d8d4e66a.
 - Next single backlog selection should come from the next unfinished feature, not from broad UI translation cleanup.
+
+
+### 2026-10-05 — Current development checkpoint
+- Per-guild integration credentials for Twitch/YouTube/Kick are implemented and selected per Stream Alert.
+- The next single backlog slice is **Integration test/diagnostics UI**.
+- Continue from branch `feature/music-v2`; do not reopen completed credentials work.

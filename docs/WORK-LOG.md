@@ -535,3 +535,13 @@ Never write credentials, tokens or private user data here.
 - Migrated core /help and /embed responses plus the Discord command error boundary to the configured guild locale.
 - Added deterministic localization tests covering RU/EN values and Russian fallback.
 - CI #1904 passed completely.
+
+
+## 2026-10-05 — Per-guild integration credentials
+- Completed the per-guild credentials slice for Stream Alerts.
+- Added encrypted PostgreSQL storage for Twitch, YouTube and Kick credentials with metadata-only GET responses.
+- Added Management API CRUD, credential selection on Stream Alerts and foreign-key cleanup when credentials are deleted.
+- Stream Alerts now resolves provider secrets per alert and caches Twitch/Kick OAuth tokens per credential instead of sharing one global token.
+- Added Dashboard credential management and per-alert credential selection.
+- CI #1917 passed the typecheck/build path before the final dashboard/UI completion; CI #1920 is the final complete gate for this slice.
+- Final code checkpoint before diagnostics work: `81dcc01269d34c90af9091d59d32c521d56dec98`.

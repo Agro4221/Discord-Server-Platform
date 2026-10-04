@@ -355,3 +355,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Source checkpoint: d871b56f36a91d15c07038ebf3122956d8d4e66a.
 - CI #1904 passed.
 - Localization foundation is complete; remaining work is incremental migration of module-specific Discord copy.
+
+
+## 2026-10-05 — Per-guild integration credentials verified
+- Final automated gate for the credential slice: CI #1917 / #1920 chain completed with typecheck, tests and builds green.
+- Multiple encrypted credentials per guild are now implemented; integration diagnostics remains the next unfinished item in Notifications / Integrations.
