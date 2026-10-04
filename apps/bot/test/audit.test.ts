@@ -63,7 +63,11 @@ test("audit module activity uses bounded action prefixes", async () => {
     "2026-10-05T00:00:00.000Z"
   );
 
-  assert.match(captured.text, /WHERE guild_id=$1 AND (action ILIKE $2 ESCAPE '\\' OR action ILIKE $3 ESCAPE '\\' OR action ILIKE $4 ESCAPE '\\') AND created_at < $5/);
+  assert.match(captured.text, /WHERE guild_id=\$1/);
+  assert.match(captured.text, /action ILIKE \$2 ESCAPE/);
+  assert.match(captured.text, /action ILIKE \$3 ESCAPE/);
+  assert.match(captured.text, /action ILIKE \$4 ESCAPE/);
+  assert.match(captured.text, /created_at < \$5/);
   assert.match(captured.text, /LIMIT $6/);
   assert.deepEqual(captured.values, [
     "123456789012345678",
