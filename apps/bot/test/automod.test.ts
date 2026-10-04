@@ -516,7 +516,7 @@ test("AutoMod warn does not delete or timeout and always attempts a warning resp
       message: unknown,
       rule: {
         detector: string;
-        action: "delete" | "timeout" | "warn" | "log";
+        action: "delete" | "timeout" | "warn" | "log" | "ban";
         timeoutMinutes: number;
         logChannelId: string | null;
         messageTemplate: string;
@@ -697,4 +697,81 @@ test("AutoMod log rule can deliver a template to its configured log channel", as
   assert.equal(sent.length, 1);
   assert.match(JSON.stringify(sent[0]), /нарушил правило/);
   assert.equal((auditEvents[0] as { metadata?: { logDelivered?: boolean } })?.metadata?.logDelivered, true);
+});
+
+
+test("AutoMod ban rule deletes the message and creates a case only after Discord ban succeeds", async () => {
+  const deletes: string[] = [];
+  const calls: Array<{ text: string; values: readonly unknown[] }> = [];
+  const auditEvents: unknown[] = [];
+  const moderationEvents: unknown[] = [];
+
+  const db = {
+    async query<T>(text: string, values: readonly unknown[] = []) {
+      calls.push({ text, values });
+      if (text.startsWith("INSERT INTO automod_events")) return { rows: [], rowCount: 1 } as { rows: T[] };
+      if (text.startsWith("INSERT INTO moderation_cases")) return { rows: [{ id: "99" }] } as { rows: T[] };
+      throw new Error("unexpected query: " + text);
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const events = new (await import("../src/events.js")).PlatformEventBus();
+  events.on("moderation.case", (event) => moderationEvents.push(event));
+
+  const automod = new AutoMod(db);
+  await automod.init({
+    client: {} as never,
+    db,
+    events,
+    auditLog: { record: async (event: unknown) => { auditEvents.push(event); } } as never,
+    identityId: "primary"
+  });
+
+  const message = {
+    id: "323456789012345678",
+    guild: { id: "234567890123456789" },
+    channelId: "345678901234567890",
+    channel: { isTextBased: () => true, send: async () => undefined },
+    author: { id: "456789012345678901", username: "tester", bot: false },
+    member: {
+      bannable: true,
+      moderatable: true,
+      ban: async () => undefined,
+      timeout: async () => { throw new Error("timeout should not run"); }
+    },
+    content: "banned content",
+    mentions: { users: { size: 0 }, roles: { size: 0 } },
+    delete: async () => { deletes.push("deleted"); }
+  };
+
+  await (automod as unknown as {
+    applyRule: (
+      message: unknown,
+      rule: {
+        detector: string;
+        action: "delete" | "timeout" | "warn" | "log" | "ban";
+        timeoutMinutes: number;
+        logChannelId: string | null;
+        messageTemplate: string;
+      }
+    ) => Promise<boolean>;
+  }).applyRule(message, {
+    detector: "scam",
+    action: "ban",
+    timeoutMinutes: 30,
+    logChannelId: null,
+    messageTemplate: ""
+  });
+
+  await automod.shutdown();
+
+  assert.deepEqual(deletes, ["deleted"]);
+  assert.equal(calls.filter((item) => item.text.startsWith("INSERT INTO moderation_cases")).length, 1);
+  assert.deepEqual(moderationEvents[0], {
+    guildId: "234567890123456789",
+    userId: "456789012345678901",
+    action: "ban",
+    caseId: 99
+  });
+  assert.equal((auditEvents[0] as { metadata?: { banned?: boolean } })?.metadata?.banned, true);
 });

@@ -849,7 +849,15 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_security_channel_locks_cleanup ON security_channel_locks(guild_id,channel_id,restored_at);"
     ])
-  }] as const;
+  }  {
+    version: 52,
+    name: "automod_ban_action",
+    sql: q([
+      "ALTER TABLE automod_rules DROP CONSTRAINT IF EXISTS automod_rules_action_check;",
+      "ALTER TABLE automod_rules ADD CONSTRAINT automod_rules_action_check CHECK(action IN ('delete','timeout','warn','log','ban'));"
+    ])
+  },
+] as const;
 
 export async function migrate(db: Database): Promise<void> {
   await db.query(q([

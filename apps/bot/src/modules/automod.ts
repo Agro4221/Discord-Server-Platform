@@ -140,7 +140,7 @@ export class AutoMod implements PlatformModule {
     enabled: boolean;
     threshold: number | null;
     windowSeconds: number | null;
-    action: "delete" | "timeout" | "warn" | "log";
+    action: "delete" | "timeout" | "warn" | "log" | "ban";
     timeoutMinutes: number;
     affectedRoleIds: string[];
     ignoredRoleIds: string[];
@@ -156,7 +156,7 @@ export class AutoMod implements PlatformModule {
       enabled: boolean;
       threshold: string | number | null;
       window_seconds: number | null;
-      action: "delete" | "timeout" | "warn" | "log";
+      action: "delete" | "timeout" | "warn" | "log" | "ban";
       timeout_minutes: number;
       affected_role_ids: string[];
       ignored_role_ids: string[];
@@ -397,7 +397,7 @@ export class AutoMod implements PlatformModule {
       detector: string;
       threshold: number | string | null;
       window_seconds: number | null;
-      action: "delete" | "timeout" | "warn" | "log";
+      action: "delete" | "timeout" | "warn" | "log" | "ban";
       timeout_minutes: number;
       affected_role_ids: string[];
       ignored_role_ids: string[];
@@ -581,7 +581,7 @@ export class AutoMod implements PlatformModule {
     message: Message,
     rule: {
       detector: string;
-      action: "delete" | "timeout" | "warn" | "log";
+      action: "delete" | "timeout" | "warn" | "log" | "ban";
       timeoutMinutes: number;
       logChannelId: string | null;
       messageTemplate: string;
@@ -604,6 +604,21 @@ export class AutoMod implements PlatformModule {
     }
 
     let timedOut = false;
+    let banned = false;
+    if (rule.action === "ban" && message.member?.bannable) {
+      await message.member
+        .ban({ reason: "AutoMod: " + rule.detector })
+        .then(() => { banned = true; })
+        .catch((error) =>
+          logger.warn("AutoMod rule ban failed", {
+            guildId: message.guild!.id,
+            userId: message.author.id,
+            detector: rule.detector,
+            error: String(error)
+          })
+        );
+    }
+
     if (rule.action === "timeout" && rule.timeoutMinutes > 0 && message.member?.moderatable) {
       await message.member
         .timeout(rule.timeoutMinutes * 60_000, "AutoMod: " + rule.detector)
@@ -623,8 +638,8 @@ export class AutoMod implements PlatformModule {
       [message.guild!.id,message.author.id,message.id,rule.detector]
     ).catch(() => undefined);
 
-    if (rule.action === "warn" || timedOut) {
-      const action = rule.action === "warn" ? "warn" : "timeout";
+    if (rule.action === "warn" || timedOut || banned) {
+      const action = banned ? "ban" : rule.action === "warn" ? "warn" : "timeout";
       const expiresAt = timedOut ? new Date(Date.now() + rule.timeoutMinutes * 60_000) : null;
       const caseResult = await this.db.query<{ id: string }>(
         "INSERT INTO moderation_cases(guild_id,target_user_id,moderator_user_id,action,reason,expires_at,created_at) VALUES($1,$2,'system',$3,$4,$5,now()) RETURNING id",
@@ -701,7 +716,7 @@ export class AutoMod implements PlatformModule {
       action: "automod.rule.triggered",
       targetType: "user",
       targetId: message.author.id,
-      metadata: { detector: rule.detector, action: rule.action, deleted, timedOut, responseDelivered, logDelivered }
+      metadata: { detector: rule.detector, action: rule.action, deleted, timedOut, banned, responseDelivered, logDelivered }
     }).catch(() => undefined);
 
     return true;

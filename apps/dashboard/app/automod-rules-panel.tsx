@@ -6,7 +6,7 @@ type Resource = { id: string; name: string; type?: number; manageable?: boolean 
 
 type Rule = {
   id: number; detector: string; enabled: boolean; threshold: number | null;
-  windowSeconds: number | null; action: "delete" | "timeout" | "warn" | "log";
+  windowSeconds: number | null; action: "delete" | "timeout" | "warn" | "log" | "ban";
   timeoutMinutes: number; affectedRoleIds: string[]; ignoredRoleIds: string[];
   affectedChannelIds: string[]; ignoredChannelIds: string[];
   ignoreModerators: boolean; logChannelId: string | null; messageTemplate: string;
@@ -21,7 +21,7 @@ const DETECTORS = [
 ];
 
 const ACTIONS: Array<[Rule["action"], string]> = [
-  ["delete", "Удалить"], ["timeout", "Удалить + timeout"], ["warn", "Warn"], ["log", "Только лог"]
+  ["delete", "Удалить"], ["timeout", "Удалить + timeout"], ["ban", "Удалить + ban"], ["warn", "Warn"], ["log", "Только лог"]
 ];
 
 export function AutoModRulesPanel(props: {

@@ -1327,7 +1327,7 @@ export class ManagementApiServer {
             const body = await readJson(req);
             const detector = typeof body.detector === "string" ? body.detector : "";
             const action = typeof body.action === "string" ? body.action : "delete";
-            if (!detector || !["delete","timeout","warn","log"].includes(action)) {
+            if (!detector || !["delete","timeout","warn","log","ban"].includes(action)) {
               throw new RequestInputError("invalid_automod_rule", 400);
             }
             const logChannelId =
@@ -1353,7 +1353,7 @@ export class ManagementApiServer {
               enabled: body.enabled !== false,
               threshold: body.threshold === null || body.threshold === undefined ? null : Number(body.threshold),
               windowSeconds: body.windowSeconds === null || body.windowSeconds === undefined ? null : Number(body.windowSeconds),
-              action: action as "delete" | "timeout" | "warn" | "log",
+              action: action as "delete" | "timeout" | "warn" | "log" | "ban",
               timeoutMinutes: body.timeoutMinutes === undefined ? 0 : Number(body.timeoutMinutes),
               affectedRoleIds: Array.isArray(body.affectedRoleIds) ? body.affectedRoleIds.filter((v: unknown): v is string => typeof v === "string") : [],
               ignoredRoleIds: Array.isArray(body.ignoredRoleIds) ? body.ignoredRoleIds.filter((v: unknown): v is string => typeof v === "string") : [],
