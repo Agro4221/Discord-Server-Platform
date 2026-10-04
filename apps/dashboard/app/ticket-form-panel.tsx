@@ -21,6 +21,7 @@ type Field = {
   type: "short" | "paragraph";
   required: boolean;
   placeholder: string;
+  minLength: number;
   maxLength: number;
 };
 
@@ -30,6 +31,7 @@ const EMPTY: Field = {
   type: "short",
   required: true,
   placeholder: "",
+  minLength: 0,
   maxLength: 100
 };
 
@@ -327,7 +329,8 @@ export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onCha
             <label style={label}><span>Название</span><input value={field.label} maxLength={45} onChange={(e) => patch(index, { label: e.target.value })} style={input} /></label>
             <label style={label}><span>Тип</span><select value={field.type} onChange={(e) => patch(index, { type: e.target.value as Field["type"], maxLength: e.target.value === "paragraph" ? 2000 : 100 })} style={input}><option value="short">Short</option><option value="paragraph">Paragraph</option></select></label>
             <label style={{ ...label, gridColumn: "1 / span 2" }}><span>Placeholder</span><input value={field.placeholder} maxLength={100} onChange={(e) => patch(index, { placeholder: e.target.value })} style={input} /></label>
-            <label style={label}><span>Макс. длина</span><input type="number" min={1} max={4000} value={field.maxLength} onChange={(e) => patch(index, { maxLength: Number(e.target.value) })} style={input} /></label>
+            <label style={label}><span>Макс. длина</span><input type="number" min={1} max={4000} value={field.maxLength} onChange={(e) => patch(index, { maxLength: Number(e.target.value) })} style={input} />
+            <label style={label}><span>Мин. длина</span><input type="number" min={0} max={field.maxLength} value={field.minLength} onChange={(e) => patch(index, { minLength: Number(e.target.value) })} style={input} /></label></label>
             <label style={check}><input type="checkbox" checked={field.required} onChange={(e) => patch(index, { required: e.target.checked })} /> Обязательно</label>
           </div>
           <button type="button" onClick={() => remove(index)} disabled={busy} style={danger}>Удалить поле</button>
