@@ -436,6 +436,48 @@ test("config transfer preserves automation workflow presets", { skip: !enabled }
   }
 });
 
+test("config transfer preserves ticket panel links", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345760";
+  try {
+    await migrate(db);
+    await db.query("DELETE FROM tickets WHERE guild_id=$1", [guildId]);
+    await db.query("DELETE FROM ticket_panels WHERE guild_id=$1", [guildId]);
+    await db.query("INSERT INTO guild_modules(guild_id,module_key,enabled) VALUES($1,'tickets',true) ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true", [guildId]);
+    await db.query(
+      "INSERT INTO ticket_panels(id,guild_id,channel_id,message_id,title,description,button_label,enabled) VALUES(9001,$1,'123456789012345761','123456789012345762','Support','Open support','Create',true)",
+      [guildId]
+    );
+    await db.query(
+      "INSERT INTO tickets(guild_id,channel_id,creator_id,status,priority,tags,form_data,panel_id) VALUES($1,'123456789012345763','123456789012345764','open','normal','{}','{}'::jsonb,9001)",
+      [guildId]
+    );
+
+    const transfer = new ConfigTransferService(db);
+    const exported = await transfer.exportGuild(guildId);
+    const ticketsModule = exported.modules.find((module) => module.key === "tickets");
+    const panels = ticketsModule?.settings.ticket_panels as Array<Record<string, unknown>> | undefined;
+    const tickets = ticketsModule?.settings.tickets as Array<Record<string, unknown>> | undefined;
+    assert.equal(panels?.[0]?.id, 9001);
+    assert.equal(tickets?.[0]?.panel_id, 9001);
+
+    await db.query("DELETE FROM tickets WHERE guild_id=$1", [guildId]);
+    await db.query("DELETE FROM ticket_panels WHERE guild_id=$1", [guildId]);
+    await transfer.importGuild(guildId, exported);
+
+    const restored = await db.query<{ panel_id: string | null; title: string }>(
+      "SELECT t.panel_id,p.title FROM tickets t LEFT JOIN ticket_panels p ON p.id=t.panel_id WHERE t.guild_id=$1",
+      [guildId]
+    );
+    assert.deepEqual(restored.rows, [{ panel_id: "9001", title: "Support" }]);
+  } finally {
+    await db.query("DELETE FROM tickets WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.query("DELETE FROM ticket_panels WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.query("DELETE FROM guild_modules WHERE guild_id=$1 AND module_key='tickets'", [guildId]).catch(() => undefined);
+    await db.close();
+  }
+});
+
 test("config transfer preserves analytics settings", { skip: !enabled }, async () => {
   const db = new Database(process.env.DATABASE_URL!);
   const guildId = "123456789012345759";
