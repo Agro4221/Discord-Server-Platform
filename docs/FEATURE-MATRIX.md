@@ -368,7 +368,7 @@ Music должен стремиться к функциональности си
 | Sticky messages | ✅ |
 | Reminders | ✅ |
 | Channel tools / lock / slowmode / cleanup | ✅ |
-| Forms | ✅ | Универсальный Forms-модуль: Dashboard builder, Discord Modal, persistent answers и staff response channel; generic select-menu toolkit remains a separate backlog item.
+| Forms | ✅ | Универсальный Forms-модуль: Dashboard builder, Discord Modal, persistent answers и staff response channel; cross-module component orchestration remains a separate backlog item.
 | Interactive buttons/selects/modals toolkit | ✅ | Buttons, select menus and Discord modals are implemented across reusable Forms and Role Panels; broader component orchestration remains backlog.
 | Custom help/menu pages | ✅ |
 | Server info / user info / role/channel utility suite | ✅ |
@@ -383,7 +383,7 @@ Music должен стремиться к функциональности си
 | Button/select role panels | ✅ |
 | Timed roles | ✅ |
 | Exclusive/max-selection role groups | ✅ |
-| Joinable ranks / self-service role menus | 🟡 |
+| Joinable ranks / self-service role menus | ✅ | Role Panels support persistent self-service role selection through buttons or select menus, with exclusive/max modes and timed assignments.
 | Voice-role links | ✅ |
 | Delayed autoroles | ✅ |
 | Onboarding / verification flow builder | 🟡 |
