@@ -831,6 +831,17 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
+        if (action.type === "set-nickname") {
+          const guild = client?.guilds.cache.get(event.guildId);
+          const userId = resolveUserReference(action.userId, event.userId);
+          const member = userId ? await guild?.members.fetch(userId).catch(() => null) : null;
+          if (member?.manageable) {
+            const nickname = renderTemplate(action.nickname, event).trim().slice(0, 32);
+            await member.setNickname(nickname || null, "Automation rule");
+          }
+          continue;
+        }
+
         if (action.type === "set-channel-name") {
           const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
           const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
@@ -936,6 +947,10 @@ export function validateAutomationRule(
       case "set-channel-topic":
         if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_topic_channel");
         if (action.topic.length > 1024) throw new Error("automation_topic_too_long");
+        break;
+      case "set-nickname":
+        if (action.userId !== "@event" && !/^\d{17,20}$/.test(action.userId)) throw new Error("invalid_nickname_user");
+        if (action.nickname.length > 32) throw new Error("invalid_nickname");
         break;
       case "set-channel-name":
         if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_channel_name_channel");

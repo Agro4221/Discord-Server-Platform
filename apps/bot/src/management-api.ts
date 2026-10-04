@@ -2533,6 +2533,12 @@ export function validateAutomationPayload(
           throw new RequestInputError("invalid_topic_action", 400);
         }
         break;
+      case "set-nickname":
+        if (typeof item.userId !== "string" || (item.userId !== "@event" && !/^\d{17,20}$/.test(item.userId)) ||
+            typeof item.nickname !== "string" || item.nickname.length > 32) {
+          throw new RequestInputError("invalid_set_nickname_action", 400);
+        }
+        break;
       case "set-channel-name":
         if (typeof item.channelId !== "string" || (item.channelId !== "@event" && !/^\d{17,20}$/.test(item.channelId)) ||
             typeof item.name !== "string" || !item.name.trim() || item.name.length > 100) {

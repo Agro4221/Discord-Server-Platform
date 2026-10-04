@@ -22,6 +22,7 @@ type Action =
   | { type: "set-slowmode"; channelId: string; seconds: number }
   | { type: "set-channel-topic"; channelId: string; topic: string }
   | { type: "set-channel-name"; channelId: string; name: string }
+  | { type: "set-nickname"; userId: string; nickname: string }
   | { type: "clear-cooldown"; key: string }
   | { type: "set-cooldown"; key: string; durationSeconds: number }
   | { type: "log"; message: string };
@@ -202,6 +203,7 @@ export function AutomationPanel({
       type === "set-slowmode" ? { type, channelId: "@event", seconds: 0 } :
       type === "set-channel-topic" ? { type, channelId: "@event", topic: "" } :
       type === "set-channel-name" ? { type, channelId: "@event", name: "" } :
+      type === "set-nickname" ? { type, userId: "@event", nickname: "" } :
       type === "clear-cooldown" ? { type, key: "" } :
       type === "set-cooldown" ? { type, key: "", durationSeconds: 60 } :
       { type: "log", message: "" };
@@ -400,6 +402,7 @@ export function AutomationPanel({
               <option value="set-slowmode">set-slowmode</option>
               <option value="set-channel-topic">set-channel-topic</option>
               <option value="set-channel-name">set-channel-name</option>
+              <option value="set-nickname">set-nickname</option>
               <option value="clear-cooldown">clear-cooldown</option>
               <option value="set-cooldown">set-cooldown</option>
               <option value="log">log</option>
@@ -496,6 +499,13 @@ export function AutomationPanel({
                   {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
                 </select>
                 <input value={action.name} maxLength={100} onChange={(e) => updateAction(index, { name: e.target.value })} placeholder="Новое имя · ticket-{userId}" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "set-nickname" && (
+              <div style={actionGrid}>
+                <input value={action.userId} maxLength={20} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event or User ID" style={inputStyle} />
+                <input value={action.nickname} maxLength={32} onChange={(e) => updateAction(index, { nickname: e.target.value })} placeholder="Nickname · {user}" style={inputStyle} />
               </div>
             )}
 

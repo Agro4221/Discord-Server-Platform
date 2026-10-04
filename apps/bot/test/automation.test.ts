@@ -44,6 +44,7 @@ test("Automation validation covers channel management actions", () => {
     { type: "set-slowmode", channelId: "@event", seconds: 30 },
     { type: "set-channel-topic", channelId: "@event", topic: "Topic {content}" },
     { type: "set-channel-name", channelId: "@event", name: "ticket-{userId}" },
+    { type: "set-nickname", userId: "@event", nickname: "{user}" },
     { type: "clear-cooldown", key: "welcome-{userId}" },
     { type: "set-cooldown", key: "welcome-{userId}", durationSeconds: 60 }
   ]));
@@ -141,4 +142,49 @@ test("Automation cooldown actions set and clear rendered keyed cooldowns", async
   });
 
   assert.equal(state.keyedCooldowns.has(key), false);
+});
+
+
+test("Automation set-nickname action validates target and nickname length", () => {
+  assert.doesNotThrow(() => validateAutomationRule("member.join", [], [
+    { type: "set-nickname", userId: "@event", nickname: "New name" }
+  ]));
+  assert.doesNotThrow(() => validateAutomationRule("member.join", [], [
+    { type: "set-nickname", userId: "123456789012345678", nickname: "" }
+  ]));
+  assert.throws(() => validateAutomationRule("member.join", [], [
+    { type: "set-nickname", userId: "bad", nickname: "New name" }
+  ]), /invalid_nickname_user/);
+  assert.throws(() => validateAutomationRule("member.join", [], [
+    { type: "set-nickname", userId: "@event", nickname: "x".repeat(33) }
+  ]), /invalid_nickname/);
+});
+
+test("Automation set-nickname updates a manageable member and supports clearing", async () => {
+  const calls: Array<{ nickname: string | null; reason: string }> = [];
+  const engine = new AutomationEngine({} as never);
+  const state = engine as unknown as {
+    perform: (actions: unknown[], event: { type: "member.join"; guildId: string; userId: string }) => Promise<void>;
+    client: { guilds: { cache: Map<string, { members: { fetch: (userId: string) => Promise<unknown> } } } };
+  };
+  state.client = {
+    guilds: {
+      cache: new Map([["guild-1", {
+        members: {
+          fetch: async () => ({
+            manageable: true,
+            setNickname: async (nickname: string | null, reason: string) => calls.push({ nickname, reason })
+          })
+        }
+      }]])
+    }
+  };
+  await state.perform([
+    { type: "set-nickname", userId: "@event", nickname: "Alice" },
+    { type: "set-nickname", userId: "@event", nickname: "" }
+  ], { type: "member.join", guildId: "guild-1", userId: "user-1" });
+  assert.deepEqual(calls, [
+    { nickname: "Alice", reason: "Automation rule" },
+    { nickname: null, reason: "Automation rule" }
+  ]);
 });
