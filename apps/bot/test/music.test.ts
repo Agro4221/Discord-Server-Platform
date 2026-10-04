@@ -11,6 +11,7 @@ import {
   shouldRetainMusicPlayerState,
   musicResumePosition,
   hasPersistedMusicPlayback,
+  createMusicRecoveryGate,
   normalizeMusicSearchProvider,
   shouldAutoplayAfterQueueEnd
 } from "../src/modules/music.js";
@@ -86,6 +87,17 @@ test("Music failover debug filtering covers migration success and failure events
   assert.equal(isMusicFailoverDebugEvent(DebugEvents.QueueEnded), false);
 });
 
+
+test("Music recovery gate suppresses duplicate per-guild recovery", () => {
+  const gate = createMusicRecoveryGate();
+  assert.equal(gate.enter("guild-1"), true);
+  assert.equal(gate.enter("guild-1"), false);
+  assert.equal(gate.enter("guild-2"), true);
+  gate.leave("guild-1");
+  assert.equal(gate.enter("guild-1"), true);
+  gate.leave("guild-1");
+  gate.leave("guild-2");
+});
 
 test("Music resume position advances only while playing and stays inside track duration", () => {
   assert.equal(musicResumePosition(30_000, 10_000, true, 120_000, 50_000), 30_000);

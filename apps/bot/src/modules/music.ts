@@ -97,6 +97,7 @@ export class Music implements PlatformModule {
   private readonly autoplayInFlight = new Set<string>();
   private readonly autoLeaveTimers = new Map<string, NodeJS.Timeout>();
   private restoreTimer?: NodeJS.Timeout;
+  private readonly recoveryGate = createMusicRecoveryGate();
 
   constructor(
     private readonly db: Database,
@@ -1178,7 +1179,9 @@ export class Music implements PlatformModule {
 
       const state = normalizePersistedMusicPlayerState(row.state);
       if (!hasPersistedMusicPlayback(state, row.queue_data)) continue;
+      if (!this.recoveryGate.enter(row.guild_id)) continue;
 
+      try {
       const player = this.manager.createPlayer({
         guildId: row.guild_id,
         voiceChannelId: row.voice_channel_id,
@@ -1258,6 +1261,9 @@ export class Music implements PlatformModule {
           node: connectedNodeId,
           error: String(error)
         });
+      } finally {
+        this.recoveryGate.leave(row.guild_id);
+      }
       }
     }
   }
@@ -1327,6 +1333,9 @@ export class Music implements PlatformModule {
         savedState = {};
       }
 
+      if (!this.recoveryGate.enter(guildId)) continue;
+
+      try {
       const existing = this.manager?.players.get(guildId);
       const player = existing ?? this.manager?.createPlayer({
         guildId,
@@ -1386,6 +1395,9 @@ export class Music implements PlatformModule {
           guildId,
           error: String(error)
         });
+      } finally {
+        this.recoveryGate.leave(guildId);
+      }
       }
     }
   }
@@ -1660,6 +1672,23 @@ export function hasPersistedMusicPlayback(state: Pick<PersistedMusicPlayerState,
   if (Array.isArray(source.tracks) && source.tracks.length > 0) return true;
   if (Array.isArray(source.queue) && source.queue.length > 0) return true;
   return false;
+}
+
+export function createMusicRecoveryGate(): {
+  enter: (guildId: string) => boolean;
+  leave: (guildId: string) => void;
+} {
+  const active = new Set<string>();
+  return {
+    enter(guildId) {
+      if (active.has(guildId)) return false;
+      active.add(guildId);
+      return true;
+    },
+    leave(guildId) {
+      active.delete(guildId);
+    }
+  };
 }
 
 export function shouldRetainMusicPlayerState(player: {
