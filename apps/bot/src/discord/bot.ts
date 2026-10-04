@@ -170,6 +170,10 @@ export function wireDiscordEvents(
       userId: ban.user.id
     });
   });
+
+  client.on("guildAuditLogEntryCreate", (entry, guild) => {
+    void events.emit("audit.entry", { entry, guild });
+  });
 }
 
 async function emitReaction(

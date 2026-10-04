@@ -5,7 +5,9 @@ import type {
   Message,
   MessageReaction,
   User,
-  VoiceState
+  VoiceState,
+  Guild,
+  GuildAuditLogsEntry
 } from "discord.js";
 import { logger } from "./logger.js";
 
@@ -44,6 +46,7 @@ export type PlatformEventMap = {
   "role.update": { oldRole: import("discord.js").Role; newRole: import("discord.js").Role };
   "member.ban": { guildId: string; userId: string };
   "member.unban": { guildId: string; userId: string };
+  "audit.entry": { guild: Guild; entry: GuildAuditLogsEntry };
   "security.incident": {
     guildId: string;
     incidentId: number;
@@ -169,6 +172,9 @@ function extractGuildId<K extends keyof PlatformEventMap>(
   }
   if (event === "member.ban" || event === "member.unban" || event === "security.incident") {
     return (payload as { guildId: string }).guildId;
+  }
+  if (event === "audit.entry") {
+    return (payload as { guild: Guild }).guild.id;
   }
   return null;
 }

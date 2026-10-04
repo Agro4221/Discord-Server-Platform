@@ -54,7 +54,12 @@ export class Security implements PlatformModule {
     const e = context.events.on("role.create", (role) => this.onDestructive(role.guild.id, "role.create"));
     const f = context.events.on("role.delete", (role) => this.onDestructive(role.guild.id, "role.delete"));
     const g = context.events.on("member.ban", ({ guildId, userId }) => this.onDestructive(guildId, "member.ban", userId));
-    this.unsubscribe = () => { a(); b(); c(); d(); e(); f(); g(); };
+    const h = context.events.on("audit.entry", ({ guild, entry }) => {
+      const mapped = securityAuditDestructiveType(entry.action);
+      if (!mapped) return;
+      void this.onDestructive(guild.id, mapped.type, mapped.targetUserId);
+    });
+    this.unsubscribe = () => { a(); b(); c(); d(); e(); f(); g(); h(); };
   }
 
   async shutdown(): Promise<void> {
@@ -838,6 +843,47 @@ export function securityResponseThreshold(maxDestructiveActions: number): number
   return Math.max(2, Math.ceil(maxDestructiveActions / 2));
 }
 
+export function securityAuditDestructiveType(action: AuditLogEvent): { type: string; targetUserId?: string } | null {
+  switch (action) {
+    case AuditLogEvent.MemberKick:
+      return { type: "member.kick" };
+    case AuditLogEvent.WebhookCreate:
+      return { type: "webhook.create" };
+    case AuditLogEvent.WebhookDelete:
+      return { type: "webhook.delete" };
+    case AuditLogEvent.WebhookUpdate:
+      return { type: "webhook.update" };
+    case AuditLogEvent.EmojiCreate:
+      return { type: "emoji.create" };
+    case AuditLogEvent.EmojiDelete:
+      return { type: "emoji.delete" };
+    case AuditLogEvent.EmojiUpdate:
+      return { type: "emoji.update" };
+    case AuditLogEvent.StickerCreate:
+      return { type: "sticker.create" };
+    case AuditLogEvent.StickerDelete:
+      return { type: "sticker.delete" };
+    case AuditLogEvent.StickerUpdate:
+      return { type: "sticker.update" };
+    case AuditLogEvent.ChannelOverwriteCreate:
+      return { type: "channel.overwrite.create" };
+    case AuditLogEvent.ChannelOverwriteUpdate:
+      return { type: "channel.overwrite.update" };
+    case AuditLogEvent.ChannelOverwriteDelete:
+      return { type: "channel.overwrite.delete" };
+    case AuditLogEvent.MemberPrune:
+      return { type: "member.prune" };
+    case AuditLogEvent.IntegrationCreate:
+      return { type: "integration.create" };
+    case AuditLogEvent.IntegrationDelete:
+      return { type: "integration.delete" };
+    case AuditLogEvent.IntegrationUpdate:
+      return { type: "integration.update" };
+    default:
+      return null;
+  }
+}
+
 export function securityAuditLogEventType(type: string): AuditLogEvent {
   switch (type) {
     case "channel.create": return AuditLogEvent.ChannelCreate;
@@ -845,6 +891,23 @@ export function securityAuditLogEventType(type: string): AuditLogEvent {
     case "role.create": return AuditLogEvent.RoleCreate;
     case "role.delete": return AuditLogEvent.RoleDelete;
     case "member.ban": return AuditLogEvent.MemberBanAdd;
+    case "member.kick": return AuditLogEvent.MemberKick;
+    case "webhook.create": return AuditLogEvent.WebhookCreate;
+    case "webhook.delete": return AuditLogEvent.WebhookDelete;
+    case "webhook.update": return AuditLogEvent.WebhookUpdate;
+    case "emoji.create": return AuditLogEvent.EmojiCreate;
+    case "emoji.delete": return AuditLogEvent.EmojiDelete;
+    case "emoji.update": return AuditLogEvent.EmojiUpdate;
+    case "sticker.create": return AuditLogEvent.StickerCreate;
+    case "sticker.delete": return AuditLogEvent.StickerDelete;
+    case "sticker.update": return AuditLogEvent.StickerUpdate;
+    case "channel.overwrite.create": return AuditLogEvent.ChannelOverwriteCreate;
+    case "channel.overwrite.update": return AuditLogEvent.ChannelOverwriteUpdate;
+    case "channel.overwrite.delete": return AuditLogEvent.ChannelOverwriteDelete;
+    case "member.prune": return AuditLogEvent.MemberPrune;
+    case "integration.create": return AuditLogEvent.IntegrationCreate;
+    case "integration.delete": return AuditLogEvent.IntegrationDelete;
+    case "integration.update": return AuditLogEvent.IntegrationUpdate;
     default: throw new Error("Unsupported security audit event type: " + type);
   }
 }
