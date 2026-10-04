@@ -754,3 +754,15 @@ Never write credentials, tokens or private user data here.
 - Added channel actions set-slowmode and set-channel-topic with event-relative or explicit channel targets.
 - Extended Dashboard and Management API validation to keep the catalog aligned.
 - Added validator regression coverage for the new channel actions.
+
+
+## 2026-10-04 — Cross-chat continuity context checkpoint
+- Added `docs/CHAT-CONTEXT.md` as the persistent transfer prompt for continuing the project in a new chat without re-explaining the architecture, product north star, verified feature breadth, remaining scope, workflow rules and current verification boundary.
+- The context explicitly preserves the core goal: one self-hosted bot/platform replacing the intended third-party bot stack (Carl-bot/Juniper/MEE6/ProBot/Jockie Music and similar) without artificial Premium walls.
+- It also records the modular work protocol: code the next concrete slice, regression-test it, log the result, and re-check CI before claiming verification.
+- Current continuity baseline is development HEAD `79dfbb13e33fe9b63c26fbf7bc84b744e6867f2b`; CI #1764 (run `37218825729`) was still in progress at the last observation and must be rechecked before being called green.
+- No credentials or private data were added to the context file.
+
+### Next concrete work
+- Re-check CI #1764 after the continuity-doc commit.
+- Continue feature completion with a concrete Security/AutoMod response-policy slice, then Automation breadth, Music failover/provider depth, Fleet hardening, VPS production tooling and final live acceptance.
