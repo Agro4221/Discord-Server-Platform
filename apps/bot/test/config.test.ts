@@ -79,3 +79,16 @@ test("invalid ports are rejected", () => {
     assert.throws(() => loadConfig(), /Invalid port environment variable/);
   });
 });
+
+
+test("first startup can load without Discord credentials for Control Center registration", () => {
+  withEnv({
+    ...baseEnv(),
+    DISCORD_TOKEN: undefined,
+    DISCORD_CLIENT_ID: undefined
+  }, () => {
+    const config = loadConfig();
+    assert.equal(config.discordToken, "");
+    assert.equal(config.discordClientId, "");
+  });
+});
