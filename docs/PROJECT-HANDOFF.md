@@ -473,3 +473,9 @@ Live validation, требующая пользовательского окру�
 - Do not reopen broad polish work before selecting the next single backlog module.
 - Source checkpoint: `f772b0503f3f5e5b9f9abb5f30625bacf5801068`.
 - CI #1854 is the automated verification gate; live Discord validation remains environment-dependent.
+
+    
+### 2026-10-05 — Onboarding slice closed
+- Completed and CI-verified: configurable onboarding triggers, ordered role/channel/DM steps, persistence, export/import, Management API and Control Center builder.
+- Final source HEAD: `de06195a8d70c18a01536231f3b587008f1309ba`; CI `#1857` passed.
+- Do not reopen broad polish work before selecting exactly one next backlog module.

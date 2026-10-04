@@ -207,3 +207,9 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Verification emits `verification.passed`; Onboarding consumes it through the shared Event Bus.
 - Management API exposes GET/PUT `/api/guilds/:guildId/onboarding`; Control Center exposes the Flow Builder.
 - Live release gate remains for Discord role hierarchy, channel permissions, DM failures, lifecycle ordering and restart behavior.
+
+    
+## 2026-10-05 — Onboarding automated gate passed
+- CI `#1857`: 123 bot tests passed; bot typecheck, domain build, bot build and Dashboard production build passed.
+- Migration 85 and onboarding persistence coverage are part of the passing suite.
+- Remaining unchecked items are intentionally live Discord validation: permissions/hierarchy, DM failure handling, lifecycle timing and restart behavior.

@@ -319,3 +319,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Control Center has the Flow Builder; Management API exposes GET/PUT.
 - Config export/import carries `onboarding_flows`.
 - Source checkpoint: `f772b0503f3f5e5b9f9abb5f30625bacf5801068`; live Discord behavior is still release-gate validation.
+
+    
+## 2026-10-05 — Onboarding Flow Builder verified
+- Final source HEAD: `de06195a8d70c18a01536231f3b587008f1309ba`.
+- CI `#1857` is green: 123/123 bot tests passed; typecheck, domain build, bot build and Dashboard production build passed.
+- Onboarding Flow Builder is complete for the automated gate; live Discord behavior remains an environment-dependent release-gate item.
