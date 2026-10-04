@@ -412,3 +412,17 @@ Never write credentials, tokens or private user data here.
 - AutoMod: tighten the `action=log` configuration contract and review `warn` action semantics.
 - Security: decide/pin the intended lifecycle for executor roles removed by anti-nuke response and add persistence/restoration if the intended behavior is reversible.
 - Then deepen Music/Fleet failure-path coverage and move through the live Discord/Windows/Lavalink release-gate matrix.
+
+## 2026-10-04 — AutoMod log-rule contract hardening
+- Development HEAD for this feature checkpoint: `7121d7557063772d712c47006bdbb9845c99d1b9`.
+- AutoMod `action=log` rules now require a configured log channel at the Core service boundary.
+- Management API rejects `action=log` without a log channel with a deterministic HTTP 400 error before persistence.
+- Added regression coverage proving an invalid log rule performs zero database writes.
+- Previous AutoMod repeated-text window and Security partial-resolution fixes remain part of the same consistency-hardening pass.
+- Verification state: the repository integration currently exposes no attached CI status for this direct `development` HEAD, so this checkpoint is not called CI-verified until Actions reports a run.
+### Remaining after this slice
+- AutoMod: review `warn` action semantics and complete response-workflow edge cases.
+- Security: finalize executor-role removal/restoration semantics and durable restart behavior for destructive-burst history.
+- Music: deeper failover/queue/current-position continuity and multi-session failure paths.
+- Fleet: failover/reconciliation edge cases and multi-bot Windows/Docker acceptance.
+- Final release gate: live Discord permissions/hierarchy, real Lavalink/provider behavior, soak/chaos/recovery, clean-host deployment.
