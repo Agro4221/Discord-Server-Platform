@@ -55,6 +55,7 @@ export type AutomationAction =
   | { type: "set-slowmode"; channelId: string; seconds: number }
   | { type: "set-channel-topic"; channelId: string; topic: string }
   | { type: "set-channel-name"; channelId: string; name: string }
+  | { type: "clear-cooldown"; key: string }
   | { type: "log"; message: string };
 
 export type AutomationRule = {
