@@ -40,3 +40,15 @@ test("forms validate required, minimum and maximum answer lengths", () => {
   assert.match(validateSubmission(fields, { message: "12345678901" }) ?? "", /слишком длинное/);
   assert.equal(validateSubmission(fields, { message: "hello" }), null);
 });
+
+test("forms reject more than five fields", () => {
+  const fields = Array.from({ length: 6 }, (_, index) => ({
+    id: "field_" + index,
+    label: "Поле " + index,
+    type: "short",
+    required: false,
+    placeholder: "",
+    maxLength: 20
+  }));
+  assert.throws(() => normalizeFormFields(fields), /invalid_form_fields/);
+});
