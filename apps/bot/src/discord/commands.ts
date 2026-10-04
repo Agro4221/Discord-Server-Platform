@@ -860,6 +860,12 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .setDescription("Play a song or search YouTube")
           .addStringOption((o) => o.setName("query").setDescription("Song, artist, URL or playlist").setMaxLength(2000).setRequired(true))
       )
+      .addSubcommand((sub) =>
+        sub
+          .setName("search")
+          .setDescription("Search tracks and choose a result")
+          .addStringOption((o) => o.setName("query").setDescription("Search query").setMaxLength(2000).setRequired(true))
+      )
       .addSubcommand((sub) => sub.setName("pause").setDescription("Pause playback"))
       .addSubcommand((sub) => sub.setName("resume").setDescription("Resume playback"))
       .addSubcommand((sub) => sub.setName("previous").setDescription("Play previous track"))
