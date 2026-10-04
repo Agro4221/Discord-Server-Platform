@@ -58,6 +58,9 @@ type ApiOptions = {
     end: (guildId: string, giveawayId: number) => Promise<unknown>;
     reroll: (guildId: string, giveawayId: number) => Promise<unknown>;
   };
+  community?: {
+    overview: (guildId: string) => Promise<unknown>;
+  };
   analytics?: {
     report: (guildId: string, hours?: number) => Promise<unknown>;
     getSettings: (guildId: string) => Promise<unknown>;
@@ -1116,6 +1119,24 @@ export class ManagementApiServer {
             }
             await this.options.auditLog.record({ guildId, source: "dashboard", action: "stream-alert.deleted", targetType: "stream-alert", targetId: String(alertId) });
             this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const communityMatch = path.match(/^\/api\/guilds\/([^/]+)\/community\/overview$/);
+          if (method === "GET" && communityMatch) {
+            const guildId = communityMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (!this.options.community) {
+              this.json(res, 500, { error: "community_unavailable" });
+              return;
+            }
+            this.json(res, 200, {
+              guildId,
+              overview: await this.options.community.overview(guildId)
+            });
             return;
           }
 
