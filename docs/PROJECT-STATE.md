@@ -522,3 +522,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 
 ## 2026-10-04 — Automation API parity
 - Management API validation is now aligned with the current Automation domain/runtime catalog, including the newer condition and message-action types.
+
+## 2026-10-04 — Fleet restart workflow
+- Fleet now exposes an operator-facing durable restart request for secondary identities.
+- Dashboard reflects the pending restart state already tracked by bot heartbeats.

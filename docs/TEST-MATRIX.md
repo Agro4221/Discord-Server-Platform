@@ -511,3 +511,8 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ Management API accepts the current Automation catalog.
 - ✅ Unsupported Automation condition/action types are rejected.
 - ✅ Dashboard/Core/API catalog alignment is now regression-tested at the API boundary.
+
+## 2026-10-04 — Fleet restart workflow verification
+- ✅ Existing requestRestart persistence is now reachable from Dashboard via Management API.
+- ✅ restart_required state remains durable until the next process heartbeat explicitly clears it.
+- ⚠ Actual process restart is deployment/supervisor dependent and is not falsely simulated by the Dashboard.

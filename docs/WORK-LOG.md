@@ -731,3 +731,8 @@ Never write credentials, tokens or private user data here.
 - Synchronized Management API Automation validation with the current Core/Dashboard catalog.
 - Added support for current Automation events, starts-with/ends-with/number-eq conditions, event-relative role/message targets and reaction/pin/unpin actions.
 - Added a dedicated management-api regression test covering accepted and rejected catalog entries.
+
+## 2026-10-04 — Fleet restart workflow checkpoint
+- Exposed the existing durable fleet restart request through Management API PATCH /api/fleet/:id.
+- Dashboard now lets an administrator request a restart for a secondary identity.
+- The operation only sets restart_required; an external/supervisor process remains responsible for performing the actual process restart.

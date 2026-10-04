@@ -296,19 +296,42 @@ export class ManagementApiServer {
             }
             const identityId = decodeURIComponent(fleetIdentityMatch[1] ?? "");
             const body = await readJson(req);
-            if (!identityId || typeof body.failoverEnabled !== "boolean") {
+            const hasFailoverChange = body.failoverEnabled !== undefined;
+            const requestRestart = body.requestRestart === true;
+            if (
+              !identityId ||
+              (!hasFailoverChange && !requestRestart) ||
+              (hasFailoverChange && typeof body.failoverEnabled !== "boolean") ||
+              (body.requestRestart !== undefined && typeof body.requestRestart !== "boolean")
+            ) {
               throw new RequestInputError("invalid_fleet_identity_update", 400);
             }
-            await this.options.identities.setFailover(identityId, body.failoverEnabled);
+
+            if (hasFailoverChange) {
+              await this.options.identities.setFailover(identityId, body.failoverEnabled as boolean);
+            }
+
+            const restartRequested = requestRestart
+              ? await this.options.identities.requestRestart(identityId)
+              : false;
+
             await this.options.auditLog.record({
               guildId: null,
               source: "dashboard",
-              action: "fleet.identity.failover.updated",
+              action: "fleet.identity.updated",
               targetType: "bot-identity",
               targetId: identityId,
-              metadata: { failoverEnabled: body.failoverEnabled }
+              metadata: {
+                failoverEnabled: hasFailoverChange ? body.failoverEnabled : undefined,
+                restartRequested
+              }
             });
-            this.json(res, 200, { ok: true, identityId, failoverEnabled: body.failoverEnabled });
+            this.json(res, 200, {
+              ok: true,
+              identityId,
+              ...(hasFailoverChange ? { failoverEnabled: body.failoverEnabled } : {}),
+              restartRequested
+            });
             return;
           }
 

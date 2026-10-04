@@ -138,6 +138,27 @@ export function FleetPanel({
     }
   }
 
+  async function requestRestart() {
+    if (!selected || selected === "primary") return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/fleet/" + encodeURIComponent(selected), {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ requestRestart: true })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "fleet_restart_request_failed");
+      await loadFleet();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось запросить перезапуск identity.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function toggleFailover(enabled: boolean) {
     if (!selected) return;
     setBusy(true);
@@ -217,6 +238,17 @@ export function FleetPanel({
             ))}
           </select>
           <button type="button" disabled={busy || !selected} onClick={() => void assignGuild()} style={buttonStyle}>Назначить guild</button>
+          {selected && selected !== "primary" && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void requestRestart()}
+              style={buttonStyle}
+            >
+              {items.find((item) => item.id === selected)?.restartRequired ? "Перезапуск запрошен" : "Запросить перезапуск"}
+            </button>
+          )}
+
           {selected && selected !== "primary" && (
             <button
               type="button"
