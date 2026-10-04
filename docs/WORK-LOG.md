@@ -448,3 +448,16 @@ Never write credentials, tokens or private user data here.
 - Music: deeper multi-node queue/current-position continuity and provider/runtime failure paths.
 - Fleet: reconciliation/failover failure paths and multi-bot Windows/Docker acceptance.
 - Release gate: live Discord permissions/hierarchy, Lavalink/provider behavior, soak/chaos/recovery and clean-host deployment.
+
+## 2026-10-04 — AutoMod Dashboard contract checkpoint
+- Dashboard AutoMod Rules form is now aligned with the Core/API `action=log` contract: selecting a log channel is mandatory for log rules.
+- Removed the stale `В текущий канал / только audit` option that contradicted the enforced persistence contract.
+- Restored the actual response-message template editor where a placeholder literal had been rendered in the UI.
+- Client-side validation now blocks saving a log rule without a log channel before making the request.
+- CI run #1657 passed the full pipeline on commit `4c2ba68c0c45700a7f1f13f48942c9452de2c7dc`.
+### Remaining after this checkpoint
+- Security: define and implement executor-role removal lifecycle, including whether it is reversible and how restart/reconciliation should behave.
+- AutoMod: richer response delivery/failure semantics and final warn behavior review.
+- Music: deeper failover/queue/current-position edge coverage.
+- Fleet: reconciliation/failover failure paths and multi-bot Windows/Docker acceptance.
+- Final live release gate: Discord permissions/hierarchy, Lavalink/provider behavior, soak/chaos/recovery and clean-host deployment.
