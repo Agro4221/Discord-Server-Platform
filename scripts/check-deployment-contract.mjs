@@ -86,8 +86,8 @@ for (const expected of [
   ".native-runtime",
   "Start-Process",
   "taskkill.exe",
-  "-Loop",
-  "-Down",
+  "[switch]$Loop",
+  "[switch]$Down",
   "ERROR management API unavailable"
 ]) {
   if (!nativeFleet.includes(expected)) {
