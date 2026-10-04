@@ -484,3 +484,17 @@ Never write credentials, tokens or private user data here.
 - Music: deeper failover/current-position/queue continuity and multi-session failure paths.
 - Fleet: reconciliation/failover failure paths and real multi-bot Windows/Docker acceptance.
 - Final live release gate: Discord permissions/hierarchy, real Lavalink/providers, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Security executor-role lifecycle + durable destructive history
+- Security now treats executor role stripping as a punitive, **non-reversible automatic action**: incident expiry/clear restores only temporary quarantine assignments.
+- Every successful executor-role removal now gets its own durable `security.executor-role-removed` event with incident, user, role and `reversible: false` metadata, while the aggregate `removedRoleIds` response record remains intact.
+- Every destructive action now gets a durable `destructive-action` event; startup reconstructs the in-memory anti-nuke history from the last supported one-hour window after process restart.
+- Destructive history reconstruction is capped at 50,000 rows and uses the existing durable `security_events` pipeline; no additional schema table was introduced.
+- Added deterministic regression coverage for destructive-history restart reconstruction and durable executor-role removal recording.
+- Verification state: this checkpoint awaits the fresh GitHub Actions result.
+### Next concrete work
+- AutoMod: richer response-delivery failure coverage and final warn semantics review.
+- Music: deeper failover/current-position/queue continuity and multi-session failure paths.
+- Fleet: reconciliation/failover failure paths and real multi-bot Windows/Docker acceptance.
+- Final live release gate: Discord permissions/hierarchy, real Lavalink/providers, soak/chaos/recovery and clean-host deployment.

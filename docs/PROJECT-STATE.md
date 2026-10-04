@@ -359,3 +359,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Active Security incidents are regression-tested across process restart state restoration.
 - CI #1667 is green for the complete automated pipeline.
 - Latest verified development code: `87e893c2d7e3454b97a5cda3caf0d7109ef3f401`.
+
+
+## 2026-10-04 — Security executor-role lifecycle checkpoint
+- Executor-role stripping is explicitly non-reversible by automatic incident cleanup; only the configured temporary quarantine role is restored during incident resolution.
+- Successful stripped roles are durably recorded as per-role `security.executor-role-removed` events, including incident/user/role identifiers and the pinned non-reversible policy.
+- Destructive Security events are durably appended to `security_events` and reconstructed into the one-hour in-memory detection window after restart.
+- Added regression coverage for restart reconstruction and durable role-removal recording.
+- Fresh CI verification is pending for this checkpoint.

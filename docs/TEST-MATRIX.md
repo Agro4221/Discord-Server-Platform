@@ -275,3 +275,13 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Latest active incident per type is selected deterministically after restart.
 - ✅ CI #1667 passed all automated checks and builds.
 - ☐ Next: Security executor-role lifecycle/restart policy; then Music/Fleet failure-path depth and live release gates.
+
+
+## 2026-10-04 — Security executor-role lifecycle / durable history verification
+- ✅ Executor role-removal policy is pinned as non-reversible automatic mitigation; incident clear/expiry continues to restore only quarantine assignments.
+- ✅ Each successful executor-role removal is durably recorded with incident/user/role metadata.
+- ✅ Destructive-action history is restored from durable `security_events` across process restart for the supported one-hour detection horizon.
+- ✅ Regression tests cover both restart reconstruction and durable executor-role removal recording.
+- ⚠ Real Discord role hierarchy, malicious-executor behavior and manual post-incident role reconciliation remain live acceptance cases.
+- ⚠ Fresh CI for this checkpoint is pending.
+- ☐ Next: AutoMod response-delivery edge cases, then Music/Fleet failure paths and live release-gate validation.

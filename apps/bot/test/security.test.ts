@@ -54,6 +54,56 @@ test("Security restores the latest active incident per type after restart", asyn
   assert.equal(state.destructiveIncidents.get("guild-1")?.id, 12);
 });
 
+test("Security restores destructive history after a process restart", async () => {
+  const now = Date.now();
+  const db = {
+    async query<T>(text: string) {
+      if (text.startsWith("SELECT guild_id,event_type,metadata,created_at FROM security_events")) {
+        return {
+          rows: [
+            { guild_id: "guild-1", event_type: "destructive-action", metadata: { type: "channel.create" }, created_at: new Date(now - 61 * 60_000).toISOString() },
+            { guild_id: "guild-1", event_type: "destructive-action", metadata: { type: "channel.create" }, created_at: new Date(now - 50_000).toISOString() },
+            { guild_id: "guild-1", event_type: "destructive-action", metadata: { type: "member.ban", targetUserId: "user-1" }, created_at: new Date(now - 10_000).toISOString() },
+            { guild_id: "guild-2", event_type: "security.executor-role-removed", metadata: { type: "role.delete" }, created_at: new Date(now - 5_000).toISOString() }
+          ]
+        } as { rows: T[] };
+      }
+      return { rows: [] } as { rows: T[] };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const security = new (await import("../src/modules/security.js")).Security(db);
+  await (security as unknown as { restoreDestructiveHistory: () => Promise<void> }).restoreDestructiveHistory();
+
+  const state = security as unknown as {
+    destructive: Map<string, { timestamp: number; type: string }[]>;
+  };
+  assert.deepEqual(state.destructive.get("guild-1")?.map((entry) => entry.type), ["channel.create", "member.ban"]);
+  assert.equal(state.destructive.has("guild-2"), false);
+});
+
+test("Security persists successful executor-role removals as durable non-reversible history", async () => {
+  const calls: Array<{ text: string; values: readonly unknown[] }> = [];
+  const db = {
+    async query<T>(text: string, values: readonly unknown[] = []) {
+      calls.push({ text, values });
+      return { rows: [] } as { rows: T[] };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const security = new (await import("../src/modules/security.js")).Security(db);
+  await (security as unknown as {
+    recordExecutorRoleRemoval: (guildId: string, incidentId: number, userId: string, roleId: string, roleName: string) => Promise<void>;
+  }).recordExecutorRoleRemoval("guild-1", 42, "user-1", "role-1", "Moderator");
+
+  const call = calls.find((entry) => entry.text.startsWith("INSERT INTO security_events(guild_id,event_type,metadata)"));
+  assert.ok(call);
+  assert.equal(call?.values[0], "guild-1");
+  assert.match(String(call?.values[1]), /security\.executor-role-removed/);
+  assert.match(String(call?.values[1]), /"reversible":false/);
+  assert.match(String(call?.values[1]), /"roleId":"role-1"/);
+});
+
 test("Security incident cooldown survives a process restart", () => {
   const createdAt = 1_000;
   assert.equal(securityIncidentCooldownUntil(createdAt, 20), 61_000);

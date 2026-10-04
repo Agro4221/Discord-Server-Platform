@@ -43,6 +43,7 @@ export class Security implements PlatformModule {
     this.auditLog = context.auditLog;
     this.events = context.events;
     await this.restoreActiveIncidents();
+    await this.restoreDestructiveHistory();
     await this.sweepIncidents();
     this.incidentTimer = setInterval(() => void this.sweepIncidents(), 15_000);
     this.incidentTimer.unref();
@@ -210,6 +211,30 @@ export class Security implements PlatformModule {
         if (!current || incident.expiresAt > current.expiresAt) this.destructiveIncidents.set(row.guild_id, incident);
       }
     }
+  }
+
+  private async restoreDestructiveHistory(): Promise<void> {
+    this.destructive.clear();
+
+    const result = await this.db.query<{
+      guild_id: string;
+      event_type: string;
+      metadata: Record<string, unknown>;
+      created_at: Date | string;
+    }>(
+      "SELECT guild_id,event_type,metadata,created_at FROM security_events WHERE event_type='destructive-action' AND created_at >= now()-interval '1 hour' ORDER BY created_at DESC LIMIT 50000"
+    );
+
+    const cutoff = Date.now() - 3_600_000;
+    const rows = [...result.rows].reverse();
+    for (const row of rows) {
+      const timestamp = new Date(row.created_at).getTime();
+      if (!Number.isFinite(timestamp) || timestamp < cutoff) continue;
+      const bucket = (this.destructive.get(row.guild_id) ?? []).filter((entry) => entry.timestamp >= cutoff);
+      bucket.push({ timestamp, type: row.metadata?.type ? String(row.metadata.type) : row.event_type });
+      this.destructive.set(row.guild_id, bucket);
+    }
+    this.pruneBuckets(Date.now());
   }
 
   private async sweepIncidents(): Promise<void> {
@@ -490,11 +515,46 @@ export class Security implements PlatformModule {
     await this.alert(member.guild.id, config, `Anti-Raid: ${bucket.length} входов за ${config.windowSeconds} сек.`);
   }
 
+  private async recordDestructiveAction(guildId: string, type: string, targetUserId?: string): Promise<void> {
+    try {
+      await this.db.query(
+        "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'destructive-action',$2::jsonb)",
+        [guildId, JSON.stringify({ type, targetUserId: targetUserId ?? null })]
+      );
+    } catch (error) {
+      logger.warn("Security destructive history write failed", { guildId, type, error: String(error) });
+    }
+  }
+
+  private async recordExecutorRoleRemoval(
+    guildId: string,
+    incidentId: number,
+    userId: string,
+    roleId: string,
+    roleName: string
+  ): Promise<void> {
+    try {
+      await this.db.query(
+        "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'security.executor-role-removed',$2::jsonb)",
+        [guildId, JSON.stringify({ incidentId, userId, roleId, roleName, reversible: false })]
+      );
+    } catch (error) {
+      logger.warn("Security executor-role history write failed", {
+        guildId,
+        incidentId,
+        userId,
+        roleId,
+        error: String(error)
+      });
+    }
+  }
+
   private async onDestructive(guildId: string | null, type: string, targetUserId?: string): Promise<void> {
     if (!guildId || !await moduleEnabled(this.db, guildId, "security", false)) return;
     const config = await this.config(guildId);
     if (!config.enabled) return;
     const now = Date.now();
+    await this.recordDestructiveAction(guildId, type, targetUserId);
     const cutoff = now - config.destructiveWindowSeconds * 1000;
     const bucket = (this.destructive.get(guildId) ?? []).filter((entry) => entry.timestamp >= cutoff);
     bucket.push({ timestamp: now, type });
@@ -712,6 +772,13 @@ export class Security implements PlatformModule {
         });
       }
     );
+
+    for (const roleId of removedRoleIds) {
+      const role = removable.get(roleId);
+      if (role) {
+        await this.recordExecutorRoleRemoval(guildId, incidentId, userId, role.id, role.name);
+      }
+    }
 
     await this.trackQuarantine(incidentId, member, config);
 
