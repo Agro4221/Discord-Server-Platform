@@ -180,6 +180,10 @@ type ApiOptions = {
     ) => Promise<boolean>;
     getSlaConfig: (guildId: string) => Promise<unknown>;
     setSlaConfig: (guildId: string, input: Record<string, unknown>) => Promise<unknown>;
+    listPanels: (guildId: string) => Promise<unknown[]>;
+    createPanel: (guildId: string, input: { channelId: string; title: string; description: string; buttonLabel: string; enabled?: boolean }) => Promise<unknown>;
+    updatePanel: (guildId: string, panelId: number, input: { channelId?: string; title?: string; description?: string; buttonLabel?: string; enabled?: boolean }) => Promise<unknown>;
+    deletePanel: (guildId: string, panelId: number) => Promise<boolean>;
   };
   moderationPresets?: {
     list: (guildId: string) => Promise<unknown[]>;
@@ -2472,6 +2476,92 @@ export class ManagementApiServer {
                 metadata: result
               });
               this.json(res, 200, { ok: true, guildId, ...result });
+              return;
+            }
+          }
+
+          const ticketPanelsMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/panels$/);
+          const ticketPanelItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/panels\/(\d+)$/);
+
+          if (ticketPanelsMatch || ticketPanelItemMatch) {
+            if (!this.options.tickets) {
+              this.json(res, 500, { error: "tickets_unavailable" });
+              return;
+            }
+            const guildId = ticketPanelsMatch?.[1] ?? ticketPanelItemMatch?.[1] ?? "";
+            const panelId = ticketPanelItemMatch ? Number(ticketPanelItemMatch[2]) : null;
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) ||
+                (panelId !== null && !Number.isSafeInteger(panelId))) {
+              this.json(res, 404, { error: "guild_or_ticket_panel_not_found" });
+              return;
+            }
+
+            if (method === "GET" && ticketPanelsMatch) {
+              this.json(res, 200, { guildId, panels: await this.options.tickets!.listPanels(guildId) });
+              return;
+            }
+
+            if (method === "POST" && ticketPanelsMatch) {
+              const body = await readJson(req);
+              const input = {
+                channelId: typeof body.channelId === "string" ? body.channelId : "",
+                title: typeof body.title === "string" ? body.title : "",
+                description: typeof body.description === "string" ? body.description : "",
+                buttonLabel: typeof body.buttonLabel === "string" ? body.buttonLabel : "",
+                enabled: body.enabled !== false
+              };
+              const panel = await this.options.tickets!.createPanel(guildId, input);
+              await this.options.auditLog.record({
+                guildId, source: "dashboard", action: "ticket.panel.created",
+                targetType: "ticket-panel", targetId: String((panel as { id: number }).id)
+              });
+              this.json(res, 200, { ok: true, guildId, panel });
+              return;
+            }
+
+            if (method === "PUT" && ticketPanelItemMatch) {
+              const body = await readJson(req);
+              const input: { channelId?: string; title?: string; description?: string; buttonLabel?: string; enabled?: boolean } = {};
+              if (body.channelId !== undefined) input.channelId = body.channelId;
+              if (body.title !== undefined) input.title = body.title;
+              if (body.description !== undefined) input.description = body.description;
+              if (body.buttonLabel !== undefined) input.buttonLabel = body.buttonLabel;
+              if (body.enabled !== undefined) input.enabled = body.enabled;
+
+              if (
+                input.channelId !== undefined && typeof input.channelId !== "string" ||
+                input.title !== undefined && typeof input.title !== "string" ||
+                input.description !== undefined && typeof input.description !== "string" ||
+                input.buttonLabel !== undefined && typeof input.buttonLabel !== "string" ||
+                input.enabled !== undefined && typeof input.enabled !== "boolean"
+              ) {
+                throw new RequestInputError("invalid_ticket_panel", 400);
+              }
+
+              const panel = await this.options.tickets!.updatePanel(guildId, panelId!, input);
+              if (!panel) {
+                this.json(res, 404, { error: "ticket_panel_not_found" });
+                return;
+              }
+              await this.options.auditLog.record({
+                guildId, source: "dashboard", action: "ticket.panel.updated",
+                targetType: "ticket-panel", targetId: String(panelId)
+              });
+              this.json(res, 200, { ok: true, guildId, panel });
+              return;
+            }
+
+            if (method === "DELETE" && ticketPanelItemMatch) {
+              const deleted = await this.options.tickets!.deletePanel(guildId, panelId!);
+              if (!deleted) {
+                this.json(res, 404, { error: "ticket_panel_not_found" });
+                return;
+              }
+              await this.options.auditLog.record({
+                guildId, source: "dashboard", action: "ticket.panel.deleted",
+                targetType: "ticket-panel", targetId: String(panelId)
+              });
+              this.json(res, 200, { ok: true });
               return;
             }
           }
