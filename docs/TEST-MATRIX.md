@@ -550,3 +550,12 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ Automation `number-gt` and `number-lt` validation coverage added.
 - ⚠ Live Discord timeout/hierarchy behavior and live Automation execution remain release-gate environment checks.
 - CI #1783 on the current tree is pending.
+
+
+## 2026-10-04 — Security response-depth verification
+- ✅ Optional executor ban policy persisted and exported/imported.
+- ✅ Ban requires the existing destructive response threshold and Discord bannable state.
+- ✅ Successful ban creates a standard moderation ban case/event.
+- ✅ Successful ban suppresses timeout fallback.
+- ✅ Ban failure remains fail-soft; timeout can still be used when configured.
+- ⚠ Live Discord hierarchy/ban permission behavior remains environment-dependent and belongs to the live release gate.
