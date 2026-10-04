@@ -42,6 +42,7 @@ import { Reputation } from "./modules/reputation.js";
 import { Birthdays } from "./modules/birthdays.js";
 import { InviteTracking } from "./modules/invite-tracking.js";
 import { HelpPages } from "./help-pages.js";
+import { Forms } from "./modules/forms.js";
 
 let fatalCleanup: (() => Promise<void>) | undefined;
 
@@ -123,6 +124,7 @@ async function main(): Promise<void> {
   const reputation = new Reputation(database);
   const birthdays = new Birthdays(database);
   const inviteTracking = new InviteTracking(database);
+  const forms = new Forms(database);
   const helpPages = new HelpPages(database);
 
   const setModuleHealth = (
@@ -196,6 +198,7 @@ async function main(): Promise<void> {
   modules.register(reputation);
   modules.register(birthdays);
   modules.register(inviteTracking);
+  modules.register(forms);
 
   for (const name of modules.list()) health.setModule(name, "starting");
 
@@ -250,6 +253,7 @@ async function main(): Promise<void> {
     backups,
     customCommands,
     autoResponder,
+    forms,
     helpPages: {
       list: async (guildId) => helpPages.list(guildId),
       save: async (guildId, slug, title, content, enabled) => helpPages.save(guildId, slug, title, content, enabled),
