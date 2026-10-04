@@ -582,10 +582,14 @@ export class AutoMod implements PlatformModule {
       }
     }
 
+    let timedOut = false;
     if ((rule.action === "timeout" || rule.action === "warn") && rule.timeoutMinutes > 0 && message.member?.moderatable) {
-      await message.member.timeout(rule.timeoutMinutes * 60_000, "AutoMod: " + rule.detector).catch((error) =>
-        logger.warn("AutoMod rule timeout failed", { guildId:message.guild!.id,userId:message.author.id,detector:rule.detector,error:String(error) })
-      );
+      await message.member
+        .timeout(rule.timeoutMinutes * 60_000, "AutoMod: " + rule.detector)
+        .then(() => { timedOut = true; })
+        .catch((error) =>
+          logger.warn("AutoMod rule timeout failed", { guildId:message.guild!.id,userId:message.author.id,detector:rule.detector,error:String(error) })
+        );
     }
 
     await this.db.query(
@@ -593,18 +597,20 @@ export class AutoMod implements PlatformModule {
       [message.guild!.id,message.author.id,message.id,rule.detector]
     ).catch(() => undefined);
 
-    if (rule.action === "warn") {
-      const warnResult = await this.db.query<{ id: string }>(
-        "INSERT INTO moderation_cases(guild_id,target_user_id,moderator_user_id,action,reason,created_at) VALUES($1,$2,'system','warn',$3,now()) RETURNING id",
-        [message.guild!.id, message.author.id, "AutoMod: " + rule.detector]
+    if (rule.action === "warn" || timedOut) {
+      const action = rule.action === "warn" ? "warn" : "timeout";
+      const expiresAt = timedOut ? new Date(Date.now() + rule.timeoutMinutes * 60_000) : null;
+      const caseResult = await this.db.query<{ id: string }>(
+        "INSERT INTO moderation_cases(guild_id,target_user_id,moderator_user_id,action,reason,expires_at,created_at) VALUES($1,$2,'system',$3,$4,$5,now()) RETURNING id",
+        [message.guild!.id, message.author.id, action, "AutoMod: " + rule.detector, expiresAt]
       ).catch(() => null);
 
-      const caseId = warnResult?.rows[0]?.id;
+      const caseId = caseResult?.rows[0]?.id;
       if (caseId) {
         await this.events?.emit("moderation.case", {
           guildId: message.guild!.id,
           userId: message.author.id,
-          action: "warn",
+          action,
           caseId: Number(caseId)
         }).catch(() => undefined);
       }
