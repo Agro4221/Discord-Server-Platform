@@ -81,7 +81,7 @@ try {
   $fleet = Invoke-RestMethod -Uri "http://127.0.0.1:$managementPort/api/fleet" -Headers $headers -Method Get -TimeoutSec 10
 } catch {
   Write-FleetLog "ERROR management API unavailable: $($_.Exception.Message)"
-  exit 0
+  exit 1
 }
 
 $desired = @{}

@@ -48,7 +48,9 @@ for (const contract of [
   "--no-deps",
   "BOT_IDENTITY_ID",
   "dsp-bot-fleet-",
-  "fleet-reconciler.log"
+  "fleet-reconciler.log",
+  "ERROR management API unavailable",
+  "exit 1"
 ]) {
   if (!fleetSupervisor.includes(contract)) {
     throw new Error("Local fleet reconciler contract missing: " + contract);

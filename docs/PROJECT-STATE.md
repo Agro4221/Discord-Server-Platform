@@ -426,3 +426,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Deployment contract now verifies the gate script is present and contains its core checks.
 - CI #1702 passed the complete automated pipeline; latest verified code: `ff052ebf277184e9164e77d7cfc3e2cc3a0d9c6f`.
 - Remaining release work is environment-dependent rather than an unverified code TODO.
+
+
+## 2026-10-04 — Fleet Management API failure propagation checkpoint
+- Local Fleet reconciliation now fails closed when the authenticated Management API cannot be reached, returning non-zero status instead of masking the outage.
+- Deployment contract coverage enforces the failure path.
+- Fresh CI verification is pending; current verified base remains `65739bc5c1f209c7dfe9de33a208533b71f718c5`.

@@ -599,3 +599,13 @@ Never write credentials, tokens or private user data here.
 - CI run #1702 passed the complete automated pipeline on commit `ff052ebf277184e9164e77d7cfc3e2cc3a0d9c6f`.
 ### Live release boundary
 - Automated code/deployment contracts are now green; remaining acceptance is genuinely environment-dependent: real Discord permissions/hierarchy, real Lavalink node loss/session expiry/audio continuity, Windows/Docker multi-bot runtime, chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Fleet Management API failure propagation checkpoint
+- Fleet reconciliation no longer reports success when the local Management API is unavailable: the reconciler logs the outage and returns exit code 1.
+- This prevents startup/maintenance automation from silently accepting an unreconciled secondary Bot Fleet.
+- Deployment contract now locks the failure-propagation behavior into CI.
+- Fresh CI verification is pending for this checkpoint.
+### Next concrete work
+- Complete static release-gate audit and operational acceptance boundaries.
+- Live acceptance on the user's Windows/Docker/Discord/Lavalink environment remains the only blocker to the final runtime gate.

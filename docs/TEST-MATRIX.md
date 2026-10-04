@@ -372,3 +372,10 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Deployment contract covers the gate script and CI #1702 passed all automated stages.
 - ⚠ Real Discord/Lavalink/Windows-Docker runtime behavior remains live acceptance.
 - ☐ Next: run the gate on the actual local host, then execute the live failure/soak matrix.
+
+
+## 2026-10-04 — Fleet Management API failure verification
+- ✅ Reconciler returns exit code 1 when the local Management API is unavailable.
+- ✅ Deployment contract explicitly checks the fail-closed API outage path.
+- ⚠ Real Management API outage injection on Windows/Docker remains a live acceptance case.
+- ☐ Fresh CI for this checkpoint is pending.
