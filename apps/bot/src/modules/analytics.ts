@@ -14,7 +14,7 @@ import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 
-function normalizeAnalyticsSettings(input: Partial<AnalyticsSettings>): AnalyticsSettings {
+export function normalizeAnalyticsSettings(input: Partial<AnalyticsSettings>): AnalyticsSettings {
   const allowed = new Set<AnalyticsSettings["visibleCounters"][number]>(["message","member_join","member_leave","voice_join","voice_leave","voice_move"]);
   const visibleCounters = Array.isArray(input.visibleCounters)
     ? [...new Set(input.visibleCounters.filter((value): value is AnalyticsSettings["visibleCounters"][number] => allowed.has(value)))]
@@ -239,6 +239,7 @@ export class Analytics implements PlatformModule {
       await interaction.reply({ content: "Модуль Analytics выключен.", ephemeral: true });
       return;
     }
+    const settings = await this.getSettings(interaction.guild!.id);
     const result = await this.db.query<{ event_type: string; total: string }>(
       `SELECT event_type,sum(count)::bigint AS total
        FROM analytics_events
@@ -246,7 +247,10 @@ export class Analytics implements PlatformModule {
        GROUP BY event_type ORDER BY total DESC`,
       [interaction.guild!.id]
     );
-    const lines = result.rows.map((row) => `• ${row.event_type}: ${row.total}`);
+    const visible = new Set(settings.visibleCounters);
+    const lines = result.rows
+      .filter((row) => visible.has(row.event_type as AnalyticsSettings["visibleCounters"][number]))
+      .map((row) => `• ${row.event_type}: ${row.total}`);
     await interaction.reply({
       content: lines.length ? `📊 **Последние 24 часа**\n${lines.join("\n")}` : "Нет аналитических данных.",
       ephemeral: true
