@@ -1,7 +1,7 @@
 # Project State
 
 ## Target
-Self-hosted Discord Server Platform: local-first, resilient, modular, no artificial premium wall, simple UX, optional VPS deployment, optional multi-bot scaling for multiple voice channels.
+Self-hosted Discord bot platform for Discord servers: local-first, resilient, modular, no artificial premium wall, simple UX, optional VPS deployment, optional multi-bot scaling for multiple voice channels.
 
 ## Current branch
 feature/music-v2
