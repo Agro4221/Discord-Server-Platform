@@ -812,6 +812,13 @@ const migrations = [
     ])
   },
   {
+    version: 50,
+    name: "security_executor_ban",
+    sql: q([
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS executor_ban_enabled boolean NOT NULL DEFAULT false;"
+    ])
+  },
+  {
     version: 49,
     name: "security_executor_timeout",
     sql: q([
