@@ -439,3 +439,15 @@ Never write credentials, tokens or private user data here.
 - Successful form submissions are audited without storing answer contents; processing and staff-channel delivery failures are logged and audited separately.
 - Failed panel publication rolls the Discord message back if persistence fails.
 - Corrected Discord snowflake validation and added regression coverage for form-field bounds, duplicate IDs, required/min/max validation and the five-field limit.
+
+
+## 2026-10-04 — Local Control Center / bot registration
+- Removed the local Dashboard user-login surface: login page and login/logout API routes are deleted, and the home page no longer redirects through a user session.
+- Kept same-origin validation for mutating Dashboard requests; the bot Management API remains loopback-oriented for local-first operation.
+- Added primary bot registration to Control Center/Fleet: Discord Application/Client ID, Bot Token, enabled state and presence text can be stored and updated from the local admin.
+- Bot tokens are encrypted at rest with AES-256-GCM and are never returned by the Dashboard GET endpoint or written to audit metadata.
+- Added reconnect-on-save and explicit audit logging for credential updates and connection failures.
+- Bootstrap can now start the local Control Center without Discord credentials; environment credentials remain supported as a migration/bootstrap path.
+- Added migration 84 for encrypted bot credentials and regression coverage for credential round-trip/encryption plus credential-less bootstrap.
+- Known validation status at the end of this increment: CI run for the latest test-fix commit is in progress; the preceding run passed Typecheck but failed three stale/regression tests, which were corrected in this increment.
+- Architecture decision: the first registered identity is the existing `primary` bot identity; secondary identities remain fleet infrastructure and are not exposed as a new registration flow in this increment.
