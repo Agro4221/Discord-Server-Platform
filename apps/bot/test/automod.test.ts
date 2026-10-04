@@ -215,7 +215,7 @@ test("AutoMod log rule can deliver a template to its configured log channel", as
     async query<T>(text: string) {
       if (text.startsWith("SELECT enabled FROM guild_modules")) return { rows: [{ enabled: true }] } as { rows: T[] };
       if (text.startsWith("SELECT enabled,blocked_words")) {
-        return { rows: [{ enabled: true, blocked_words: ["trigger"], max_mentions: 6, max_caps_ratio: 0.85, max_repeated_messages: 5, repeated_window_seconds: 10, block_links: false, block_invites: false, max_links: 3, max_emojis: 20, max_line_length: 1000, exempt_channel_ids: "", exempt_role_ids: "", delete_message: false, timeout_minutes: 0 }] } as { rows: T[] };
+        return { rows: [{ enabled: true, blocked_words: [], max_mentions: 6, max_caps_ratio: 0.85, max_repeated_messages: 5, repeated_window_seconds: 10, block_links: false, block_invites: false, max_links: 3, max_emojis: 20, max_line_length: 1000, exempt_channel_ids: "", exempt_role_ids: "", delete_message: false, timeout_minutes: 0 }] } as { rows: T[] };
       }
       if (text.includes("FROM automod_rules WHERE guild_id=")) {
         return { rows: [{ detector: "bad-words", threshold: null, window_seconds: null, action: "log", timeout_minutes: 0, affected_role_ids: [], ignored_role_ids: [], affected_channel_ids: [], ignored_channel_ids: [], ignore_moderators: true, log_channel_id: "999999999999999999", message_template: "{mention} нарушил правило в {channel}" }] } as { rows: T[] };

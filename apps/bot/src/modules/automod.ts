@@ -610,15 +610,6 @@ export class AutoMod implements PlatformModule {
       }
     }
 
-    await this.auditLog?.record({
-      guildId: message.guild!.id,
-      source: "system",
-      action: "automod.rule.triggered",
-      targetType: "user",
-      targetId: message.author.id,
-      metadata: { detector: rule.detector, action: rule.action, deleted }
-    }).catch(() => undefined);
-
     let logDelivered = false;
     if (rule.action === "log" && rule.logChannelId) {
       const logChannel = message.guild!.channels.cache.get(rule.logChannelId);
