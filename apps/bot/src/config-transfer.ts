@@ -93,7 +93,7 @@ export class ConfigTransferService {
 
     for (const table of JSON_TABLES) {
       const result = await this.db.query(
-        `SELECT ${table.fields.join(",")} FROM ${quoteIdentifier(table.table)} WHERE guild_id=$1 ORDER BY ${table.table === "automation_workflow_presets" ? "updated_at DESC,name" : table.table === "help_pages" ? "updated_at DESC,slug" : "id"}`,
+        `SELECT ${table.fields.join(",")} FROM ${quoteIdentifier(table.table)} WHERE guild_id=$1 ORDER BY ${table.table === "automation_workflow_presets" ? "updated_at DESC,name" : table.table === "help_pages" ? "updated_at DESC,slug" : table.table === "custom_forms" ? "name" : "id"}`,
         [guildId]
       );
       const moduleKey =
