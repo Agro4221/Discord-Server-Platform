@@ -149,3 +149,16 @@ for (const forbidden of [
     throw new Error("Local release-gate must remain non-destructive; found: " + forbidden);
   }
 }
+
+const nativeDiagnostics = await readFile("scripts/native-diagnostics.ps1", "utf8");
+for (const expected of [
+  "runtime = \"native-windows\"",
+  "managementUnauthenticated",
+  "Credentials are not printed",
+  "ConvertTo-Json",
+  "Get-PidSnapshot"
+]) {
+  if (!nativeDiagnostics.includes(expected)) {
+    throw new Error("Native diagnostics contract missing: " + expected);
+  }
+}

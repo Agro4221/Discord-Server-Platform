@@ -418,3 +418,12 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Local Setup no longer instructs for a Dashboard admin password and points to native release-gate preflight.
 - ☐ Real Windows process lifetime and live Discord/Lavalink acceptance remain environment-dependent.
 - ☐ Full CI verification for this checkpoint is pending.
+
+
+## 2026-10-04 — Native diagnostics verification
+- ✅ Diagnostic script is read-only and provides plain-text and JSON output modes.
+- ✅ Management API unauthenticated 401 state is included in the report.
+- ✅ Primary/Fleet/Lavalink/Dashboard PID state is visible.
+- ✅ Credential values are not printed by the report.
+- ☐ Real execution on the target Windows machine remains environment-dependent.
+- ☐ Full CI verification for this checkpoint is pending.

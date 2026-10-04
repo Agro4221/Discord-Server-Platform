@@ -78,3 +78,20 @@ Docker Compose remains supported for reproducible deployments and VPS use:
 
 The normal Docker launcher no longer rebuilds images on every start. Use -Rebuild when an image rebuild is actually needed.
 
+
+
+## Native diagnostics
+
+For a read-only snapshot of the native runtime:
+
+    powershell -ExecutionPolicy Bypass -File .\scripts\native-diagnostics.ps1
+
+Include Dashboard and the second Lavalink node when those are expected:
+
+    powershell -ExecutionPolicy Bypass -File .\scripts\native-diagnostics.ps1 -Dashboard -Lavalink2
+
+For machine-readable output:
+
+    powershell -ExecutionPolicy Bypass -File .\scripts\native-diagnostics.ps1 -Json
+
+The diagnostic report checks process/PID state, Bot health, Management API authentication, Fleet identity state, Dashboard reachability and Lavalink versions. Tokens/passwords are never printed.

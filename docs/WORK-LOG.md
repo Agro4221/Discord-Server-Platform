@@ -647,3 +647,9 @@ Never write credentials, tokens or private user data here.
 - Added deployment-contract regression coverage for the removed end-user auth UI and native supervisor health check.
 - Synchronized Local Setup documentation with the native-first runtime and read-only native release gate.
 - CI #1717 passed the preceding Discord bot registration rate-limit checkpoint; this cleanup is the current verification target.
+
+
+## 2026-10-04 — Native diagnostics checkpoint
+- Added `scripts/native-diagnostics.ps1` as a read-only operator diagnostic for the native Windows runtime.
+- Supports optional Dashboard/Lavalink2 checks and machine-readable JSON output.
+- It reports process/PID state, Bot health, Management API authentication, Fleet readiness and Lavalink versions without printing secrets.

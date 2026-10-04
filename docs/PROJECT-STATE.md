@@ -466,3 +466,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Deployment contract locks both checks against regression.
 - Local setup instructions now use native Windows as the normal local path and the native release gate as the operator preflight.
 - The preceding registration-rate-limit checkpoint was verified by CI #1717; this cleanup is the next verification target.
+
+
+## 2026-10-04 — Native diagnostics checkpoint
+- Added read-only `scripts/native-diagnostics.ps1` for native Windows runtime snapshots.
+- The report covers primary Bot/Fleet/Lavalink/Dashboard PID state, Bot health, Management API 401/authenticated access, Fleet identity readiness and Lavalink versions.
+- Plaintext and JSON modes both avoid printing credentials.
+- CI verification for this checkpoint is pending.
