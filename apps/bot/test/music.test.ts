@@ -7,6 +7,7 @@ import {
   musicPlayerNodeId,
   musicNodeHealth,
   normalizeMusicRepeatMode,
+  shouldRetainMusicPlayerState,
   normalizeMusicSearchProvider,
   shouldAutoplayAfterQueueEnd
 } from "../src/modules/music.js";
@@ -82,6 +83,21 @@ test("Music failover debug filtering covers migration success and failure events
   assert.equal(isMusicFailoverDebugEvent(DebugEvents.QueueEnded), false);
 });
 
+
+test("Music durable player state is retained when a destroyed player still has current or queued tracks", () => {
+  assert.equal(
+    shouldRetainMusicPlayerState({ queue: { current: { info: { title: "Current" } }, tracks: [] } }),
+    true
+  );
+  assert.equal(
+    shouldRetainMusicPlayerState({ queue: { current: null, tracks: [{ info: { title: "Queued" } }] } }),
+    true
+  );
+  assert.equal(
+    shouldRetainMusicPlayerState({ queue: { current: null, tracks: [] } }),
+    false
+  );
+});
 
 test("Music player node identity helper is safe for missing and invalid node metadata", () => {
   assert.equal(musicPlayerNodeId({ node: { id: "node-a" } }), "node-a");

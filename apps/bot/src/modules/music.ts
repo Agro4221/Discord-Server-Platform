@@ -250,6 +250,15 @@ export class Music implements PlatformModule {
       this.cancelAutoLeave(player.guildId);
       this.lastPlayedTracks.delete(player.guildId);
       this.autoplayInFlight.delete(player.guildId);
+      if (shouldRetainMusicPlayerState(player)) {
+        void this.persistPlayer(player);
+        logger.warn("Retaining durable Music player state after player destroy", {
+          guildId: player.guildId,
+          identity: this.config.botIdentityId,
+          node: musicPlayerNodeId(player)
+        });
+        return;
+      }
       void this.db.query(
         "DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
         [player.guildId, this.config.botIdentityId]
@@ -1455,6 +1464,15 @@ export class Music implements PlatformModule {
   }
 }
 
+
+export function shouldRetainMusicPlayerState(player: {
+  queue: {
+    current?: unknown | null;
+    tracks: readonly unknown[];
+  };
+}): boolean {
+  return Boolean(player.queue.current) || player.queue.tracks.length > 0;
+}
 
 export function musicPlayerNodeId(player: { node?: { id?: string } | null }): string | null {
   const id = player.node?.id;
