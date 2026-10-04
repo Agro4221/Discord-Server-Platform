@@ -461,3 +461,15 @@ Never write credentials, tokens or private user data here.
 - Music: deeper failover/queue/current-position edge coverage.
 - Fleet: reconciliation/failover failure paths and multi-bot Windows/Docker acceptance.
 - Final live release gate: Discord permissions/hierarchy, Lavalink/provider behavior, soak/chaos/recovery and clean-host deployment.
+
+## 2026-10-04 — Security response accounting checkpoint
+- Security anti-nuke executor role removal now records only roles whose Discord removal operation actually succeeded.
+- `security.response-applied` audit/event metadata now contains both the accurate `removedRoles` count and `removedRoleIds`.
+- Added a pure helper and regression coverage proving failed role-removal operations are excluded from the reported result.
+- CI run #1663 passed the complete automated pipeline on commit `b62d5f9f811429dd25ec247623a761ba0985da6b`.
+### Remaining after this checkpoint
+- Security: define durable lifecycle semantics for executor-role removal/restoration and restart/reconciliation handling of destructive history.
+- AutoMod: response delivery edge cases and final warn behavior review.
+- Music: deeper failover/current-position/queue continuity.
+- Fleet: reconciliation/failover failure paths and multi-bot Windows/Docker acceptance.
+- Final live release gate: real Discord permissions/hierarchy, Lavalink/provider behavior, soak/chaos/recovery and clean-host deployment.
