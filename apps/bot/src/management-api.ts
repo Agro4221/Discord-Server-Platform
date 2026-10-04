@@ -1306,6 +1306,9 @@ export class ManagementApiServer {
             if (body.logChannelId !== undefined && body.logChannelId !== null && logChannelId === null) {
               throw new RequestInputError("invalid_automod_log_channel", 400);
             }
+            if (action === "log" && !logChannelId) {
+              throw new RequestInputError("automod_log_channel_required", 400);
+            }
             if (logChannelId) {
               const logChannel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(logChannelId);
               if (!logChannel?.isTextBased() || !("send" in logChannel)) {
