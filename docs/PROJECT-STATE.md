@@ -295,3 +295,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Form definitions and submissions are durable in PostgreSQL; Dashboard and Discord share the same runtime contract.
 - Form panels use a Discord button to open a Modal; answers are validated server-side, persisted and optionally forwarded to a response channel.
 - The module is included in the catalog, shared config domain, command-policy definitions, Management API and Dashboard routes.
+
+
+### 2026-10-04 — Role Panels select-menu expansion
+- Self-service role panels now support Discord select menus in addition to the original buttons.
+- Component type, selection mode, max selections and timed assignments share the same durable role-panel model and Dashboard editor.
+- The feature remains backward-compatible: existing panels use buttons by default.
