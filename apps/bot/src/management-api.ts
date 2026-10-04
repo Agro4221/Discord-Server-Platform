@@ -183,23 +183,39 @@ type ApiOptions = {
       input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number; componentType?: "buttons" | "select" },
       callbacks: {
         deleteMessage: (channelId: string, messageId: string) => Promise<void>;
-        sendMessage: (channelId: string, content: string, components:
-          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[] | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]
-          | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => Promise<string>;
+        sendMessage: (
+          channelId: string,
+          content: string,
+          components: Array<
+            import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder> |
+            import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>
+          >
+        ) => Promise<string>;
       }
     ) => Promise<unknown>;
     update: (
       guildId: string,
       panelId: number,
-      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number },
+      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number; componentType?: "buttons" | "select" },
       callbacks: {
-        editMessage: (channelId: string, messageId: string, content: string, components:
-          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[] | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]
-          | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => Promise<void>;
+        editMessage: (
+          channelId: string,
+          messageId: string,
+          content: string,
+          components: Array<
+            import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder> |
+            import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>
+          >
+        ) => Promise<void>;
         deleteMessage: (channelId: string, messageId: string) => Promise<void>;
-        sendMessage: (channelId: string, content: string, components:
-          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[] | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]
-          | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => Promise<string>;
+        sendMessage: (
+          channelId: string,
+          content: string,
+          components: Array<
+            import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder> |
+            import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>
+          >
+        ) => Promise<string>;
       }
     ) => Promise<unknown>;
     delete: (guildId: string, panelId: number, deleteMessage: (channelId: string, messageId: string) => Promise<void>) => Promise<boolean>;
@@ -2101,13 +2117,13 @@ export class ManagementApiServer {
               if (typeof body.name !== "string") throw new RequestInputError("invalid_form_name", 400);
               const form = await this.options.forms!.save(guildId, {
                 name: body.name,
-                title: body.title,
-                description: body.description,
-                panelChannelId: body.panelChannelId,
-                responseChannelId: body.responseChannelId,
-                buttonLabel: body.buttonLabel,
-                enabled: body.enabled,
-                fields: body.fields
+                title: typeof body.title === "string" ? body.title : undefined,
+                description: typeof body.description === "string" ? body.description : undefined,
+                panelChannelId: typeof body.panelChannelId === "string" ? body.panelChannelId : body.panelChannelId === null ? null : undefined,
+                responseChannelId: typeof body.responseChannelId === "string" ? body.responseChannelId : body.responseChannelId === null ? null : undefined,
+                buttonLabel: typeof body.buttonLabel === "string" ? body.buttonLabel : undefined,
+                enabled: typeof body.enabled === "boolean" ? body.enabled : undefined,
+                fields: Array.isArray(body.fields) ? body.fields as CustomForm["fields"] : undefined
               } satisfies Partial<CustomForm> & { name: string });
               await this.options.auditLog.record({
                 guildId,
@@ -2126,13 +2142,13 @@ export class ManagementApiServer {
               const body = await readJson(req);
               const form = await this.options.forms!.save(guildId, {
                 name,
-                title: body.title,
-                description: body.description,
-                panelChannelId: body.panelChannelId,
-                responseChannelId: body.responseChannelId,
-                buttonLabel: body.buttonLabel,
-                enabled: body.enabled,
-                fields: body.fields
+                title: typeof body.title === "string" ? body.title : undefined,
+                description: typeof body.description === "string" ? body.description : undefined,
+                panelChannelId: typeof body.panelChannelId === "string" ? body.panelChannelId : body.panelChannelId === null ? null : undefined,
+                responseChannelId: typeof body.responseChannelId === "string" ? body.responseChannelId : body.responseChannelId === null ? null : undefined,
+                buttonLabel: typeof body.buttonLabel === "string" ? body.buttonLabel : undefined,
+                enabled: typeof body.enabled === "boolean" ? body.enabled : undefined,
+                fields: Array.isArray(body.fields) ? body.fields as CustomForm["fields"] : undefined
               } satisfies Partial<CustomForm> & { name: string });
               await this.options.auditLog.record({
                 guildId,
@@ -2166,7 +2182,7 @@ export class ManagementApiServer {
 
             if (method === "POST" && formPublishMatch) {
               const name = decodeURIComponent(formPublishMatch[2] ?? "");
-              const body = await readJson(req).catch(() => ({}));
+              const body = await readJson(req).catch(() => ({} as Record<string, unknown>));
               const result = await this.options.forms!.publish(
                 guildId,
                 name,
