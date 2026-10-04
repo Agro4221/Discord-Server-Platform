@@ -210,7 +210,7 @@ test("Automation ban action bans a bannable member with a rendered reason", asyn
   const engine = new AutomationEngine({} as never);
   const state = engine as unknown as {
     perform: (actions: unknown[], event: { type: "member.join"; guildId: string; userId: string }) => Promise<void>;
-    client: { guilds: { cache: Map<string, { members: { fetch: (userId: string) => Promise<unknown> } } } };
+    client: { guilds: { cache: Map<string, { members: { fetch: (userId: string) => Promise<unknown> } }> } };
   };
   state.client = {
     guilds: {
