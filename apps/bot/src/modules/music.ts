@@ -56,6 +56,9 @@ export function trimMusicQueueToPosition<T>(queue: T[], position: number): T | n
 
 
 class PostgresQueueStore implements QueueStoreManager {
+  private readonly searchSessions = new Map<string, { guildId: string; userId: string; tracks: Track[]; expiresAt: number }>();
+  private searchSequence = 0;
+
   constructor(
     private readonly db: Database,
     private readonly botIdentityId: string
@@ -583,7 +586,7 @@ export class Music implements PlatformModule {
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!interaction.inGuild()) return;
     const directAliases = new Set([
-      "play", "pause", "resume", "previous", "skip", "stop", "shuffle",
+      "play", "search", "pause", "resume", "previous", "skip", "stop", "shuffle",
       "playlist", "favorite", "filter", "queue-policy", "queue", "repeat", "seek", "volume", "autoplay", "247", "providers", "nowplaying", "lyrics"
     ]);
     if (interaction.commandName !== "music" && !directAliases.has(interaction.commandName)) return;
@@ -615,6 +618,9 @@ export class Music implements PlatformModule {
     switch (action) {
       case "play":
         await this.play(interaction, voice?.id ?? null);
+        break;
+      case "search":
+        await this.search(interaction, voice?.id ?? null);
         break;
       case "pause":
         await this.pause(interaction, true);
@@ -678,6 +684,67 @@ export class Music implements PlatformModule {
         await this.lyrics(interaction);
         break;
     }
+  }
+
+  private async search(interaction: ChatInputCommandInteraction, voiceChannelId: string | null): Promise<void> {
+    if (!voiceChannelId) {
+      await interaction.reply({ content: "Сначала зайди в голосовой канал.", ephemeral: true });
+      return;
+    }
+    const query = interaction.options.getString("query", true).trim();
+    if (!query) {
+      await interaction.reply({ content: "Поисковый запрос пуст.", ephemeral: true });
+      return;
+    }
+    if (!this.manager) throw new Error("music_manager_unavailable");
+
+    const existing = this.manager.players.get(interaction.guildId!);
+    const player = existing ?? await this.manager.createPlayer({
+      guildId: interaction.guildId!,
+      voiceChannelId,
+      textChannelId: await this.preferredTextChannelId(interaction.guildId!, interaction.channelId),
+      volume: await this.defaultVolume(interaction.guildId!),
+      selfDeaf: true
+    });
+    if (player.voiceChannelId !== voiceChannelId) throw new Error("music_player_in_other_voice");
+    if (!player.connected) await player.connect();
+
+    const result = await player.search(
+      { query, source: /^https?:\/\//i.test(query) ? undefined : "ytsearch" },
+      interaction.user
+    );
+    const tracks = result.tracks.slice(0, 5);
+    if (!tracks.length) {
+      await interaction.reply({ content: "Ничего не найдено.", ephemeral: true });
+      return;
+    }
+
+    const token = Date.now().toString(36) + "-" + (++this.searchSequence).toString(36);
+    this.searchSessions.set(token, {
+      guildId: interaction.guildId!,
+      userId: interaction.user.id,
+      tracks,
+      expiresAt: Date.now() + 60_000
+    });
+
+    const rows = tracks.map((track, index) =>
+      new ButtonBuilder()
+        .setCustomId("dsp:music:search:" + token + ":" + index)
+        .setLabel(String(index + 1))
+        .setStyle(ButtonStyle.Secondary)
+    );
+
+    const description = tracks.map((track, index) =>
+      "**" + (index + 1) + ".** " + track.info.title.slice(0, 80) +
+      " — " + String(track.info.author ?? "Unknown").slice(0, 50) +
+      " (" + Math.round(Number(track.info.duration ?? 0) / 1000) + "s)"
+    ).join("\n");
+
+    await interaction.reply({
+      embeds: [new EmbedBuilder().setTitle("🔎 Результаты поиска").setDescription(description)],
+      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(...rows)],
+      ephemeral: true
+    });
   }
 
   private async play(interaction: ChatInputCommandInteraction, voiceChannelId: string | null): Promise<void> {
@@ -1886,6 +1953,39 @@ export class Music implements PlatformModule {
   }
 
   private async onInteraction(interaction: Interaction): Promise<void> {
+    if (interaction.isButton() && interaction.customId.startsWith("dsp:music:search:") && interaction.guild) {
+      const parts = interaction.customId.split(":");
+      const token = parts[3];
+      const index = Number(parts[4]);
+      const session = token ? this.searchSessions.get(token) : undefined;
+      if (!session || session.guildId !== interaction.guild.id || session.userId !== interaction.user.id || session.expiresAt < Date.now() || !Number.isInteger(index) || index < 0 || index >= session.tracks.length) {
+        await interaction.reply({ content: "Результаты поиска устарели или недоступны.", ephemeral: true });
+        if (token) this.searchSessions.delete(token);
+        return;
+      }
+
+      const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+      const player = this.manager?.players.get(interaction.guild.id);
+      if (!player || !canControlMusic(member?.voice.channelId ?? null, player.voiceChannelId, interaction.memberPermissions?.has("ManageGuild") ?? false)) {
+        await interaction.reply({ content: "Выбор результата нужно подтверждать из того же голосового канала.", ephemeral: true });
+        return;
+      }
+
+      const selected = session.tracks[index];
+      if (!selected) {
+        await interaction.reply({ content: "Результат больше недоступен.", ephemeral: true });
+        return;
+      }
+      player.queue.add(selected);
+      if (!player.playing) await player.play();
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      this.searchSessions.delete(token);
+      await interaction.update({ content: "✅ Добавлено: **" + selected.info.title + "**", embeds: [], components: [] });
+      return;
+    }
+
+
     if (!interaction.isButton() || !interaction.customId.startsWith("dsp:music:") || !interaction.guild) return;
 
     const player = this.manager?.players.get(interaction.guild.id);
