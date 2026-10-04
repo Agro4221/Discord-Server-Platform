@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 type VoiceChannel = { id: string; name: string; type?: number };
 type Track = { title: string; author: string; durationMs: number };
+type MusicProvider = "auto" | "youtube" | "youtube_music" | "soundcloud";
 type MusicState = {
   enabled: boolean;
   initialized: boolean;
@@ -43,6 +44,7 @@ export function MusicPanel({
 }) {
   const [state, setState] = useState<MusicState>(EMPTY);
   const [query, setQuery] = useState("");
+  const [provider, setProvider] = useState<MusicProvider>("auto");
   const [voiceChannelId, setVoiceChannelId] = useState("");
   const [seek, setSeek] = useState("");
   const [busy, setBusy] = useState(false);
@@ -104,7 +106,7 @@ export function MusicPanel({
       setError("Выбери голосовой канал.");
       return;
     }
-    await control("play", { query: query.trim(), voiceChannelId });
+    await control("play", { query: query.trim(), voiceChannelId, provider });
     setQuery("");
   }
 
@@ -152,13 +154,19 @@ export function MusicPanel({
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,1fr) 170px auto", gap: 8, marginTop: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,1fr) 150px 170px auto", gap: 8, marginTop: 12 }}>
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Трек / исполнитель / URL"
             style={inputStyle}
           />
+          <select value={provider} onChange={(event) => setProvider(event.target.value as MusicProvider)} style={inputStyle}>
+            <option value="auto">Auto</option>
+            <option value="youtube">YouTube</option>
+            <option value="youtube_music">YouTube Music</option>
+            <option value="soundcloud">SoundCloud</option>
+          </select>
           <select value={voiceChannelId} onChange={(event) => setVoiceChannelId(event.target.value)} style={inputStyle}>
             <option value="">Voice-канал…</option>
             {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
@@ -265,6 +273,7 @@ function formatMusicError(error: unknown): string {
     music_player_in_other_voice: "Плеер уже работает в другом voice-канале.",
     music_query_required: "Укажи трек или URL.",
     music_track_not_found: "Трек не найден.",
+    invalid_music_provider: "Некорректный источник поиска.",
     music_queue_too_short: "В очереди недостаточно треков.",
     invalid_repeat_mode: "Некорректный repeat mode.",
     invalid_seek: "Некорректная позиция seek.",
