@@ -841,3 +841,13 @@ Never write credentials, tokens or private user data here.
 - AutoMod rule-level `ban` remains green from CI #1823.
 ### Next concrete work
 - Continue the functional Automation/moderation breadth rather than documentation-only checkpoints.
+
+
+## 2026-10-05 — Automation moderation breadth verified
+- CI #1839 passed completely: dependency/audit, source/deployment contracts, bot typecheck, tests and all builds.
+- Automation now has rule actions `set-nickname` and `ban` in Domain, Core, Management API and Dashboard.
+- `set-nickname` supports `@event` and explicit user IDs, the Discord 32-character nickname limit, hierarchy-safe `manageable` guard and clearing via an empty nickname.
+- `ban` supports `@event` and explicit user IDs, reason rendering and a 500-character reason limit; runtime requires Discord `bannable`.
+- Fleet failover detail/audit and AutoMod rule-level ban remain verified by earlier green runs.
+### Next concrete work
+- Continue functional breadth with remaining moderation/community actions, then return to Music/Fleet/VPS production depth and final live acceptance.
