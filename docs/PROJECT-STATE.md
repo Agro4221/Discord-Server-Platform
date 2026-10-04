@@ -374,3 +374,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Durable Music player snapshots are preserved when a destroyed player still contains a current or queued track, protecting failover/recovery state from premature deletion.
 - Empty-player destruction still clears durable state.
 - Regression coverage and CI #1677 verify the change; latest verified code: `2d2cb93c064249ec24a628552482ecc69f05744a`.
+
+
+## 2026-10-04 — Music cold-recovery + Fleet stale-heartbeat checkpoint
+- Music durable sessions are now reconciled after startup/node connection when no resumed Lavalink player exists; queue, current track, filters, repeat and approximate position are recovered from PostgreSQL.
+- Active playback position advances from the persisted snapshot timestamp and is bounded before resume; queued-only sessions can restart without requiring a current track.
+- Fleet exposes stale starting/ready heartbeats as degraded, allowing the Windows reconciler to restart a running unhealthy secondary container.
+- CI #1682 passed the complete automated pipeline; latest verified code: `e8c8467d5d4c890199227a1634299606666fe0e0`.

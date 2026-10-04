@@ -294,3 +294,13 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ CI #1677 passed typecheck, 105/105 bot tests, dependency/source/deployment/observability checks, and domain/bot/Dashboard builds.
 - ⚠ Real Lavalink node loss, migration timing and audio continuity remain live release-gate cases.
 - ☐ Next: Music resume/current-position/queue reconciliation; then Fleet failure paths and live release gates.
+
+
+## 2026-10-04 — Music cold-recovery + Fleet heartbeat verification
+- ✅ Durable Music players are reconciled after startup/node connection when no active Lavalink-resumed player exists.
+- ✅ Resume position advances only for active playback and stays bounded to track duration.
+- ✅ Queue-only durable sessions are considered restorable; empty snapshots are ignored.
+- ✅ Stale Fleet `starting`/ `ready` heartbeats become `degraded` and are eligible for container restart by the local reconciler.
+- ✅ CI #1682 passed typecheck, bot tests, domain/bot/Dashboard builds and all static contracts.
+- ⚠ Real Lavalink node loss/session expiry and Windows/Docker secondary-process restart remain live acceptance tests.
+- ☐ Next: Music multi-session/node-loss reconciliation, AutoMod final response edges, then live release gates.

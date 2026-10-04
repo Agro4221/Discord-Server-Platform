@@ -509,3 +509,17 @@ Never write credentials, tokens or private user data here.
 - Music: deeper current-position/queue continuity and multi-session failure paths, especially resumed-player state reconciliation.
 - Fleet: reconciliation/failover failure paths and real multi-bot Windows/Docker acceptance.
 - Final live release gate: Discord permissions/hierarchy, real Lavalink/providers, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Music cold-recovery + Fleet stale-heartbeat checkpoint
+- Music now reconciles durable `music_players` after bot startup/node connection when Lavalink session resuming does not recreate the player; saved queue/current track, repeat, filters and approximate playback position are restored onto a connected node.
+- Active playback position is advanced from the last persisted snapshot while paused position remains fixed; restore is bounded to the track duration.
+- Queue-only durable sessions are also restarted, while empty snapshots are discarded.
+- Fleet status now marks stale `starting` and `ready` heartbeats as `degraded`; the Windows Fleet reconciler restarts a running secondary container when Fleet status is no longer healthy.
+- Added deterministic regression coverage for Music position/recovery decisions and stale Fleet heartbeat classification.
+- CI run #1682 passed the complete automated pipeline on commit `e8c8467d5d4c890199227a1634299606666fe0e0`.
+### Next concrete work
+- Music: harden multi-session/node-loss reconciliation and failure reporting without duplicating or losing queue state.
+- AutoMod: final warn/response delivery edge cases.
+- Fleet: multi-bot runtime/Discord acceptance and reconciliation failure injection.
+- Final live release gate: real Discord permissions/hierarchy, Lavalink/providers, soak/chaos/recovery and clean-host deployment.
