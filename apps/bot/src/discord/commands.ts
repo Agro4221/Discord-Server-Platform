@@ -700,6 +700,18 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addIntegerOption((o) => o.setName("seconds").setDescription("Position in seconds").setMinValue(0).setMaxValue(86400).setRequired(true))
       )
       .addSubcommand((sub) => sub.setName("queue").setDescription("Show queue"))
+      .addSubcommand((sub) => sub
+        .setName("remove")
+        .setDescription("Remove a queued track")
+        .addIntegerOption((o) => o.setName("position").setDescription("Queue position, starting from 1").setMinValue(1).setMaxValue(100).setRequired(true))
+      )
+      .addSubcommand((sub) => sub
+        .setName("move")
+        .setDescription("Move a queued track")
+        .addIntegerOption((o) => o.setName("from").setDescription("Current queue position").setMinValue(1).setMaxValue(100).setRequired(true))
+        .addIntegerOption((o) => o.setName("to").setDescription("New queue position").setMinValue(1).setMaxValue(100).setRequired(true))
+      )
+      .addSubcommand((sub) => sub.setName("clear").setDescription("Clear the upcoming queue"))
       .addSubcommand((sub) => sub.setName("nowplaying").setDescription("Show current track"))
       .addSubcommand((sub) =>
         sub

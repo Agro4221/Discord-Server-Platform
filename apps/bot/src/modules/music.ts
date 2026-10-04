@@ -440,8 +440,8 @@ export class Music implements PlatformModule {
 
   async dashboardControl(
     guildId: string,
-    action: "play" | "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay",
-    input: { query?: string; voiceChannelId?: string; value?: number; mode?: string; enabled?: boolean; provider?: string }
+    action: "play" | "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay" | "remove" | "move" | "clear",
+    input: { query?: string; voiceChannelId?: string; value?: number; mode?: string; enabled?: boolean; provider?: string; from?: number; to?: number }
   ): Promise<void> {
     if (!await moduleEnabled(this.db, guildId, "music", false)) throw new Error("music_disabled");
     if (!this.manager || !this.initialized) throw new Error("music_unavailable");
@@ -486,7 +486,18 @@ export class Music implements PlatformModule {
 
     if (!player) throw new Error("music_player_not_started");
 
-    if (action === "pause") {
+    if (action === "remove") {
+      const position = normalizeMusicQueuePosition(Number(input.value), player.queue.tracks.length);
+      if (position === null) throw new Error("invalid_queue_position");
+      await Promise.resolve(player.queue.remove(position));
+    } else if (action === "move") {
+      const move = normalizeMusicQueueMove(Number(input.from), Number(input.to), player.queue.tracks.length);
+      if (!move) throw new Error("invalid_queue_move");
+      await Promise.resolve(player.queue.move(move.from, move.to));
+    } else if (action === "clear") {
+      if (player.queue.tracks.length === 0) throw new Error("music_queue_empty");
+      await Promise.resolve(player.queue.clear());
+    } else if (action === "pause") {
       await player.pause();
     } else if (action === "resume") {
       await player.resume();
@@ -593,6 +604,15 @@ export class Music implements PlatformModule {
         break;
       case "nowplaying":
         await this.nowPlaying(interaction);
+        break;
+      case "remove":
+        await this.removeQueuedTrack(interaction);
+        break;
+      case "move":
+        await this.moveQueuedTrack(interaction);
+        break;
+      case "clear":
+        await this.clearQueue(interaction);
         break;
     }
   }
@@ -829,6 +849,67 @@ export class Music implements PlatformModule {
     return Boolean(djRole && member.roles.cache.has(djRole));
   }
 
+  private async removeQueuedTrack(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Очередь пуста.", ephemeral: true });
+      return;
+    }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
+    const position = normalizeMusicQueuePosition(interaction.options.getInteger("position", true), player.queue.tracks.length);
+    if (position === null) {
+      await interaction.reply({ content: "Такой позиции в очереди нет.", ephemeral: true });
+      return;
+    }
+    const removed = player.queue.tracks[position] as Track | undefined;
+    await Promise.resolve(player.queue.remove(position));
+    await this.persistPlayer(player);
+    await interaction.reply({
+      content: removed ? `🗑️ Удалён трек #${position + 1}: **${removed.info.title}**` : "🗑️ Трек удалён.",
+      ephemeral: true
+    });
+  }
+
+  private async moveQueuedTrack(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Очередь пуста.", ephemeral: true });
+      return;
+    }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
+    const move = normalizeMusicQueueMove(interaction.options.getInteger("from", true), interaction.options.getInteger("to", true), player.queue.tracks.length);
+    if (!move) {
+      await interaction.reply({ content: "Некорректные позиции очереди.", ephemeral: true });
+      return;
+    }
+    await Promise.resolve(player.queue.move(move.from, move.to));
+    await this.persistPlayer(player);
+    await interaction.reply({
+      content: `↕️ Трек перемещён: **#${move.from + 1} → #${move.to + 1}**`,
+      ephemeral: true
+    });
+  }
+
+  private async clearQueue(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Очередь пуста.", ephemeral: true });
+      return;
+    }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
+    const count = player.queue.tracks.length;
+    if (count === 0) {
+      await interaction.reply({ content: "Очередь уже пуста.", ephemeral: true });
+      return;
+    }
+    await Promise.resolve(player.queue.clear());
+    await this.persistPlayer(player);
+    await interaction.reply({
+      content: `🧹 Очередь очищена. Удалено треков: **${count}**.`,
+      ephemeral: true
+    });
+  }
+
   private async queue(interaction: ChatInputCommandInteraction): Promise<void> {
     const player = this.manager?.players.get(interaction.guildId!);
     if (!player) {
@@ -916,7 +997,7 @@ export class Music implements PlatformModule {
     const action = aliases[commandName] ?? commandName;
     const supported = new Set([
       "play", "pause", "resume", "skip", "stop", "shuffle",
-      "queue", "nowplaying", "repeat", "seek", "volume", "autoplay"
+      "queue", "nowplaying", "repeat", "seek", "volume", "autoplay", "remove", "move", "clear"
     ]);
     if (!supported.has(action)) return false;
 
@@ -1020,6 +1101,34 @@ export class Music implements PlatformModule {
       await Promise.resolve(player.queue.shuffle());
       await this.persistPlayer(player);
       await message.reply("🔀 Очередь перемешана.");
+    } else if (action === "remove") {
+      const position = normalizeMusicQueuePosition(Number(args[0]), player.queue.tracks.length);
+      if (position === null) {
+        await message.reply("Использование: !music remove <позиция>.");
+        return true;
+      }
+      const removed = player.queue.tracks[position] as Track | undefined;
+      await Promise.resolve(player.queue.remove(position));
+      await this.persistPlayer(player);
+      await message.reply("🗑️ Удалён трек #" + (position + 1) + ": " + (removed?.info.title ?? "unknown") + ".");
+    } else if (action === "move") {
+      const move = normalizeMusicQueueMove(Number(args[0]), Number(args[1]), player.queue.tracks.length);
+      if (!move) {
+        await message.reply("Использование: !music move <от> <куда>.");
+        return true;
+      }
+      await Promise.resolve(player.queue.move(move.from, move.to));
+      await this.persistPlayer(player);
+      await message.reply("↕️ Трек перемещён: #" + (move.from + 1) + " → #" + (move.to + 1) + ".");
+    } else if (action === "clear") {
+      if (player.queue.tracks.length === 0) {
+        await message.reply("Очередь уже пуста.");
+        return true;
+      }
+      const count = player.queue.tracks.length;
+      await Promise.resolve(player.queue.clear());
+      await this.persistPlayer(player);
+      await message.reply("🧹 Очередь очищена. Удалено треков: " + count + ".");
     } else if (action === "queue") {
       const tracks = player.queue.tracks.slice(0, 15);
       const lines = tracks.map((track, index) => (index + 1) + ". **" + track.info.title + "** — " + track.info.author);
@@ -1790,6 +1899,19 @@ async function searchMusicWithFallback(
     });
   }
   return null;
+}
+
+export function normalizeMusicQueuePosition(value: number, queueLength: number): number | null {
+  if (!Number.isInteger(value) || !Number.isInteger(queueLength) || queueLength < 1) return null;
+  if (value < 1 || value > queueLength) return null;
+  return value - 1;
+}
+
+export function normalizeMusicQueueMove(from: number, to: number, queueLength: number): { from: number; to: number } | null {
+  const normalizedFrom = normalizeMusicQueuePosition(from, queueLength);
+  const normalizedTo = normalizeMusicQueuePosition(to, queueLength);
+  if (normalizedFrom === null || normalizedTo === null || normalizedFrom === normalizedTo) return null;
+  return { from: normalizedFrom, to: normalizedTo };
 }
 
 export function canControlMusic(
