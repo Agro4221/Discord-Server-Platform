@@ -38,7 +38,8 @@ test("Automation validation rejects malformed message action references", () => 
 test("Automation validation covers channel management actions", () => {
   assert.doesNotThrow(() => validateAutomationRule("message.create", [], [
     { type: "set-slowmode", channelId: "@event", seconds: 30 },
-    { type: "set-channel-topic", channelId: "@event", topic: "Topic {content}" }
+    { type: "set-channel-topic", channelId: "@event", topic: "Topic {content}" },
+    { type: "set-channel-name", channelId: "@event", name: "ticket-{userId}" }
   ]));
   assert.throws(() => validateAutomationRule("message.create", [], [
     { type: "set-slowmode", channelId: "@event", seconds: 21601 }
@@ -46,4 +47,10 @@ test("Automation validation covers channel management actions", () => {
   assert.throws(() => validateAutomationRule("message.create", [], [
     { type: "set-channel-topic", channelId: "@event", topic: "x".repeat(1025) }
   ]), /automation_topic_too_long/);
+  assert.throws(() => validateAutomationRule("message.create", [], [
+    { type: "set-channel-name", channelId: "@event", name: " ".repeat(10) }
+  ]), /invalid_channel_name/);
+  assert.throws(() => validateAutomationRule("message.create", [], [
+    { type: "set-channel-name", channelId: "@event", name: "x".repeat(101) }
+  ]), /invalid_channel_name/);
 });

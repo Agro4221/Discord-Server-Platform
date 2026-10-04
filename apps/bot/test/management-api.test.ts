@@ -33,6 +33,7 @@ test("Management API accepts the full current Automation builder catalog", () =>
       { type: "remove-reaction", channelId: "@event", messageId: "@event", emoji: "🚨" },
       { type: "pin-message", channelId: "@event", messageId: "@event" },
       { type: "unpin-message", channelId: "@event", messageId: "@event" },
+      { type: "set-channel-name", channelId: "@event", name: "incident-{content}" },
       { type: "log", message: "security event" }
     ]
   ));

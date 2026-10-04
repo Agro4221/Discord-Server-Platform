@@ -52,6 +52,7 @@ export type AutomationAction =
   | { type: "unpin-message"; channelId: string; messageId: string }
   | { type: "set-slowmode"; channelId: string; seconds: number }
   | { type: "set-channel-topic"; channelId: string; topic: string }
+  | { type: "set-channel-name"; channelId: string; name: string }
   | { type: "log"; message: string };
 
 export type AutomationRule = {

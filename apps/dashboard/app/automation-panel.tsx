@@ -21,6 +21,7 @@ type Action =
   | { type: "pin-message" | "unpin-message"; channelId: string; messageId: string }
   | { type: "set-slowmode"; channelId: string; seconds: number }
   | { type: "set-channel-topic"; channelId: string; topic: string }
+  | { type: "set-channel-name"; channelId: string; name: string }
   | { type: "log"; message: string };
 
 type Rule = {
@@ -198,6 +199,7 @@ export function AutomationPanel({
       type === "pin-message" || type === "unpin-message" ? { type, channelId: "@event", messageId: "@event" } :
       type === "set-slowmode" ? { type, channelId: "@event", seconds: 0 } :
       type === "set-channel-topic" ? { type, channelId: "@event", topic: "" } :
+      type === "set-channel-name" ? { type, channelId: "@event", name: "" } :
       { type: "log", message: "" };
     setActions((current) => current.map((item, i) => i === index ? next : item));
   }
@@ -387,6 +389,7 @@ export function AutomationPanel({
               <option value="unpin-message">unpin-message</option>
               <option value="set-slowmode">set-slowmode</option>
               <option value="set-channel-topic">set-channel-topic</option>
+              <option value="set-channel-name">set-channel-name</option>
               <option value="log">log</option>
             </select>
 
@@ -471,6 +474,16 @@ export function AutomationPanel({
                   {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
                 </select>
                 <input value={action.topic} maxLength={1024} onChange={(e) => updateAction(index, { topic: e.target.value })} placeholder="Новый topic" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "set-channel-name" && (
+              <div style={actionGrid}>
+                <select value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} style={inputStyle}>
+                  <option value="@event">Канал события</option>
+                  {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                </select>
+                <input value={action.name} maxLength={100} onChange={(e) => updateAction(index, { name: e.target.value })} placeholder="Новое имя · ticket-{userId}" style={inputStyle} />
               </div>
             )}
 

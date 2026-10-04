@@ -2531,6 +2531,12 @@ export function validateAutomationPayload(
           throw new RequestInputError("invalid_topic_action", 400);
         }
         break;
+      case "set-channel-name":
+        if (typeof item.channelId !== "string" || (item.channelId !== "@event" && !/^\d{17,20}$/.test(item.channelId)) ||
+            typeof item.name !== "string" || !item.name.trim() || item.name.length > 100) {
+          throw new RequestInputError("invalid_channel_name_action", 400);
+        }
+        break;
       default:
         throw new RequestInputError("unsupported_automation_action", 400);
     }

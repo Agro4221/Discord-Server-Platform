@@ -794,6 +794,16 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
+        if (action.type === "set-channel-name") {
+          const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
+          const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
+          if (channel && "setName" in channel) {
+            const name = renderTemplate(action.name, event).trim().slice(0, 100);
+            if (name) await channel.setName(name);
+          }
+          continue;
+        }
+
       } catch (error) {
         logger.warn("Automation action failed", {
           guildId: event.guildId,
@@ -887,6 +897,10 @@ export function validateAutomationRule(
       case "set-channel-topic":
         if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_topic_channel");
         if (action.topic.length > 1024) throw new Error("automation_topic_too_long");
+        break;
+      case "set-channel-name":
+        if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_channel_name_channel");
+        if (!action.name.trim() || action.name.length > 100) throw new Error("invalid_channel_name");
         break;
       case "log":
         if (!action.message || action.message.length > 1000) throw new Error("invalid_log_action");
