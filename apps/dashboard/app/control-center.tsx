@@ -20,6 +20,7 @@ import { TicketFormPanel } from "./ticket-form-panel";
 import { RolePanelsEditor } from "./role-panels-editor";
 import { FormsPanel } from "./forms-panel";
 import { OnboardingPanel } from "./onboarding-panel";
+import { ModuleActivityPanel } from "./module-activity-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -1557,6 +1558,13 @@ function ModulePage(props: {
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {props.module?.key && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="История модуля" eyebrow="MODULE ACTIVITY" />
+          <ModuleActivityPanel guildId={props.guildId} moduleKey={props.module.key} />
         </section>
       )}
 
