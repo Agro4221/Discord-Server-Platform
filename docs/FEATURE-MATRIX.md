@@ -329,7 +329,7 @@ Music должен стремиться к функциональности си
 | Полный module/function catalog | ✅ / расширять |
 | Единые permissions per command/action | ✅ |
 | Function-level permission editor | ✅ | Full command-level allow/deny scopes for roles/channels, Prefix/Slash, cooldown and help visibility in Dashboard |
-| Dashboard previews и test actions | 🟡 |
+| Dashboard previews и test actions | ✅ | Welcome preview, Automation dry-run, Onboarding flow dry-run и operational hierarchy test actions; дополнительные module-specific previews могут расширяться дальше |
 | Permission / hierarchy diagnostics | ✅ |
 | Audit trail / activity viewer | ✅ | Durable audit storage with Dashboard filtering and cursor pagination; remaining gap is auditing any future mutation paths before release.
 | Per-module activity/error history | 🟡 | Central audit viewer is ready; module-specific operational histories remain deeper follow-up.

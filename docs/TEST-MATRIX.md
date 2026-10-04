@@ -213,3 +213,10 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - CI `#1857`: 123 bot tests passed; bot typecheck, domain build, bot build and Dashboard production build passed.
 - Migration 85 and onboarding persistence coverage are part of the passing suite.
 - Remaining unchecked items are intentionally live Discord validation: permissions/hierarchy, DM failure handling, lifecycle timing and restart behavior.
+
+
+## 2026-10-05 — Dashboard previews / test actions verified
+- CI `#1862` passed after adding the Onboarding dry-run surface.
+- The current platform now has multiple read-only/testable Dashboard operations: Automation dry-run, Onboarding flow validation/dry-run, plus existing Welcome preview and Security hierarchy diagnostics.
+- The Onboarding dry-run checks live guild resources, role hierarchy, channel send permissions and Verification dependency without performing member changes or message delivery.
+- Remaining module-specific preview UX can be extended later without changing the shared action/API contract.

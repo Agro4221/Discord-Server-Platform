@@ -479,3 +479,9 @@ Live validation, требующая пользовательского окру�
 - Completed and CI-verified: configurable onboarding triggers, ordered role/channel/DM steps, persistence, export/import, Management API and Control Center builder.
 - Final source HEAD: `de06195a8d70c18a01536231f3b587008f1309ba`; CI `#1857` passed.
 - Do not reopen broad polish work before selecting exactly one next backlog module.
+
+
+### 2026-10-05 — Dashboard previews / test actions closed
+- Completed and CI-verified the next Administration slice.
+- Current implementation checkpoint: `35660b0f5291104c4d66bc80463dfa768f2f2174`.
+- Next unfinished high-priority item in Administration is **per-module activity/error history**; then reusable server configuration presets.

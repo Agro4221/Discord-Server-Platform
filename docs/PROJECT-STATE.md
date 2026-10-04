@@ -325,3 +325,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Final source HEAD: `de06195a8d70c18a01536231f3b587008f1309ba`.
 - CI `#1857` is green: 123/123 bot tests passed; typecheck, domain build, bot build and Dashboard production build passed.
 - Onboarding Flow Builder is complete for the automated gate; live Discord behavior remains an environment-dependent release-gate item.
+
+
+## 2026-10-05 — Dashboard previews / test actions verified
+- Current HEAD before documentation close: `35660b0f5291104c4d66bc80463dfa768f2f2174`.
+- CI #1862 passed.
+- Dashboard now includes a true side-effect-free Onboarding dry-run in addition to existing Welcome preview, Automation dry-run and Security hierarchy diagnostics.

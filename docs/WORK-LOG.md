@@ -482,3 +482,12 @@ Never write credentials, tokens or private user data here.
 - Automated result: 123 tests passed; bot typecheck, domain build, bot build and Dashboard production build passed.
 - The only CI correction after feature implementation was the pre-existing Audit Center `buttonStyle` function misuse exposed by the PR merge build; fixed with a one-line style-factory call.
 - Onboarding slice is closed. Next work must start from exactly one next backlog module.
+
+
+## 2026-10-05 — Dashboard previews / test actions
+- Added Onboarding dry-run validation as a real read-only Dashboard test action.
+- Validation checks flow enabled state, trigger dependencies, role existence/manageability/hierarchy, text-channel existence and bot ViewChannel + SendMessages permissions.
+- DM steps are rendered as previews but explicitly reported as runtime-dependent because Discord user privacy/settings can block delivery.
+- Dashboard displays structured issues and a rendered step preview.
+- CI `#1862` passed: 123 tests, bot typecheck, domain build, bot build and Dashboard production build.
+- Dashboard preview/test-actions backlog item is now considered implemented; future modules may add their own test surfaces using the same Management API/action conventions.
