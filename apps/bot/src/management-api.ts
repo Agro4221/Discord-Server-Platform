@@ -2711,6 +2711,10 @@ export class ManagementApiServer {
             const selectionMode = typeof selectionModeValue === "string" && ["toggle","exclusive","max"].includes(selectionModeValue)
               ? selectionModeValue as "toggle" | "exclusive" | "max"
               : "toggle";
+            const componentTypeValue = body.componentType;
+            const componentType = typeof componentTypeValue === "string" && ["buttons","select"].includes(componentTypeValue)
+              ? componentTypeValue as "buttons" | "select"
+              : "buttons";
             const maxSelectionsValue = body.maxSelections;
             const maxSelections = typeof maxSelectionsValue === "number" && Number.isFinite(maxSelectionsValue)
               ? Math.trunc(maxSelectionsValue)
@@ -2767,7 +2771,8 @@ export class ManagementApiServer {
               roles,
               selectionMode,
               maxSelections,
-              durationMinutes
+              durationMinutes,
+              componentType
             };
 
             const helpers = {
