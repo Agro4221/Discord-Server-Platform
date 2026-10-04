@@ -265,6 +265,25 @@ try {
   Import-EnvFile
   Ensure-Node
   Ensure-NpmDependencies
+
+  # Build before starting Lavalink/bot so the first-run compiler spike does not
+  # happen at the same time as the runtime services.
+  $botBuildMarker = Join-Path (Get-Location) "apps\bot\dist\main.js"
+  if ($Rebuild -or -not (Test-Path $botBuildMarker)) {
+    Write-Host "Building domain + bot..."
+    & npm.cmd run build:domain
+    if ($LASTEXITCODE -ne 0) { throw "Domain build failed." }
+    & npm.cmd run build:bot
+    if ($LASTEXITCODE -ne 0) { throw "Bot build failed." }
+  }
+
+  $dashboardBuildMarker = Join-Path (Get-Location) "apps\dashboard\.next\BUILD_ID"
+  if ($Dashboard -and ($Rebuild -or -not (Test-Path $dashboardBuildMarker))) {
+    Write-Host "Building Dashboard..."
+    & npm.cmd run build -w apps/dashboard
+    if ($LASTEXITCODE -ne 0) { throw "Dashboard build failed." }
+  }
+
   Ensure-Postgres
 
   $java = Ensure-Java
@@ -324,24 +343,6 @@ try {
 
   $env:LAVALINK_NODES = ($nodes | ConvertTo-Json -Compress)
   $env:SERVER_PORT = "2333"
-
-  # Build before starting Lavalink/bot so the first-run compiler spike does not
-  # happen at the same time as the runtime services.
-  $botBuildMarker = Join-Path (Get-Location) "apps\bot\dist\main.js"
-  if ($Rebuild -or -not (Test-Path $botBuildMarker)) {
-    Write-Host "Building domain + bot..."
-    & npm.cmd run build:domain
-    if ($LASTEXITCODE -ne 0) { throw "Domain build failed." }
-    & npm.cmd run build:bot
-    if ($LASTEXITCODE -ne 0) { throw "Bot build failed." }
-  }
-
-  $dashboardBuildMarker = Join-Path (Get-Location) "apps\dashboard\.next\BUILD_ID"
-  if ($Dashboard -and ($Rebuild -or -not (Test-Path $dashboardBuildMarker))) {
-    Write-Host "Building Dashboard..."
-    & npm.cmd run build -w apps/dashboard
-    if ($LASTEXITCODE -ne 0) { throw "Dashboard build failed." }
-  }
 
   Start-NativeProcess "bot" "npm.cmd" @("run", "start", "-w", "apps/bot") (Get-Location).Path "bot"
 
