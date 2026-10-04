@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Tickets, isOpenTicketConflict, validateTicketFormSubmission, type TicketFormField } from "../src/modules/tickets.js";
+import { Tickets, isOpenTicketConflict, normalizeTicketPanelInput, validateTicketFormSubmission, type TicketFormField } from "../src/modules/tickets.js";
 import { PlatformEventBus } from "../src/events.js";
 
 test("Tickets performs stale closure recovery during initialization", async () => {
@@ -196,4 +196,44 @@ test("ticket form validation enforces required, minimum and maximum lengths", ()
   assert.match(validateTicketFormSubmission(fields, { subject: "ok!", details: "short" }) ?? "", /слишком короткое/);
   assert.match(validateTicketFormSubmission(fields, { subject: "ok!", details: "x".repeat(101) }) ?? "", /слишком длинное/);
   assert.equal(validateTicketFormSubmission(fields, { subject: "Тема", details: "1234567890" }), null);
+});
+
+
+test("Ticket Panels normalize safe Discord-facing values", () => {
+  assert.deepEqual(
+    normalizeTicketPanelInput({
+      channelId: "123456789012345678",
+      title: "  Support  ",
+      description: "  Open a support ticket.  ",
+      buttonLabel: " Create ",
+      enabled: false
+    }),
+    {
+      channelId: "123456789012345678",
+      title: "Support",
+      description: "Open a support ticket.",
+      buttonLabel: "Create",
+      enabled: false
+    }
+  );
+
+  assert.throws(
+    () => normalizeTicketPanelInput({
+      channelId: "bad",
+      title: "Support",
+      description: "Open",
+      buttonLabel: "Create"
+    }),
+    /invalid_ticket_panel/
+  );
+
+  assert.throws(
+    () => normalizeTicketPanelInput({
+      channelId: "123456789012345678",
+      title: "Support",
+      description: "Open",
+      buttonLabel: ""
+    }),
+    /invalid_ticket_panel/
+  );
 });
