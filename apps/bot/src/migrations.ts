@@ -1347,7 +1347,6 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_server_config_presets_guild_updated ON server_config_presets(guild_id,updated_at DESC);"
     ])
   },
-  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
