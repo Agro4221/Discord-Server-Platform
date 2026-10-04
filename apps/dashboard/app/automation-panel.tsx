@@ -16,7 +16,6 @@ type Action =
   | { type: "dm-user"; userId: string; content: string }
   | { type: "add-role" | "remove-role"; userId: string; roleId: string }
   | { type: "timeout"; userId: string; durationSeconds: number; reason: string }
-  | { type: "ban"; userId: string; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
   | { type: "add-reaction" | "remove-reaction"; channelId: string; messageId: string; emoji: string }
   | { type: "pin-message" | "unpin-message"; channelId: string; messageId: string }
