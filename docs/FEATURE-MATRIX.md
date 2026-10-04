@@ -1,6 +1,6 @@
 # Feature Matrix / Product Backlog
 
-Этот документ — единый backlog Discord Server Platform. Он собирает текущую реализацию и целевой набор функций, который должен заменить несколько специализированных ботов без платных ограничений.
+Этот документ — единый backlog продукта **Discord Server Platform — self-hosted бот-платформа для Discord-серверов**. Он собирает текущую реализацию и целевой набор функций, который должен заменить несколько специализированных ботов без платных ограничений.
 
 Принцип: сначала надёжная базовая функция, затем UX, затем расширенные сценарии. Для каждого модуля Dashboard и Discord должны использовать одну и ту же модель настроек и прав.
 
@@ -355,23 +355,23 @@ Music должен стремиться к функциональности си
 | Autoban rules | ✅ | AutoMod rules can directly apply a ban through the existing Moderation case/audit pipeline |
 | Auto-purge / scheduled cleanup | ✅ | Persistent per-channel cleanup schedules with bounded bulk deletion, worker claiming and Dashboard controls |
 | Lockdown presets / incident response playbooks | ✅ | Manual all-text incident lockdown with persistent restoration state, audit and Dashboard controls |
-| Moderation presets/templates | 🟡 |
+| Moderation presets/templates | ✅ |
 
 #### Server utilities / customisation
 | Функция | План |
 |---|---|
 | Custom commands | ✅ |
-| Autoresponder / keyword triggers | 🟡 |
+| Autoresponder / keyword triggers | ✅ |
 | Reusable tags/templates/snippets | ✅ / расширять |
 | Rich embed builder | ✅ / расширять |
 | Scheduled messages / automessages | ✅ / расширять |
 | Sticky messages | ✅ |
 | Reminders | ✅ |
 | Channel tools / lock / slowmode / cleanup | ✅ |
-| Forms | 🟡 |
+| Forms | ✅ | Ticket intake forms use persistent Discord Modal fields; generic form-builder toolkit remains a separate backlog item.
 | Interactive buttons/selects/modals toolkit | 🟡 |
-| Custom help/menu pages | 🟡 |
-| Server info / user info / role/channel utility suite | 🟡 |
+| Custom help/menu pages | ✅ |
+| Server info / user info / role/channel utility suite | ✅ |
 | AFK / away system | ✅ |
 
 #### Roles / onboarding
@@ -384,8 +384,8 @@ Music должен стремиться к функциональности си
 | Timed roles | ✅ |
 | Exclusive/max-selection role groups | ✅ |
 | Joinable ranks / self-service role menus | 🟡 |
-| Voice-role links | 🟡 |
-| Delayed autoroles | 🟡 |
+| Voice-role links | ✅ |
+| Delayed autoroles | ✅ |
 | Onboarding / verification flow builder | 🟡 |
 | Welcome/goodbye customization and images | ✅ |
 
@@ -399,11 +399,11 @@ Music должен стремиться к функциональности си
 | Auto-close | ✅ |
 | Per-user limits | ✅ |
 | Intake forms | ✅ | Up to 5 Discord modal fields with persistent answers and Dashboard editor | |
-| Custom form fields / validation | 🟡 |
+| Custom form fields / validation | ✅ | Per-field required/min/max length validation with server-side submit checks.
 | Custom ticket buttons/messages | ✅ | Dashboard-configurable panel title/description and create/claim/close button labels, used by ticket flows |
 | Linked/related panels | 🟡 |
 | Ticket tags / priorities / assignment state | ✅ | Persistent priority/tags with staff queue, existing claim/status state and Dashboard editing |
-| Staff SLA / reminders / escalation | 🟡 |
+| Staff SLA / reminders / escalation | ✅ | Durable SLA timestamps, periodic worker processing and optional escalation role.
 
 #### Community / Engagement
 | Функция | План |
