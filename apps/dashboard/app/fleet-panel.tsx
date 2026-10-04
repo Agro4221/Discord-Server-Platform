@@ -136,7 +136,7 @@ export function FleetPanel({
       setError("Укажи Application / Client ID Discord-бота.");
       return;
     }
-    if (botUsername.trim().length < 2 || botUsername.trim().length > 32) {
+    if (botUsername.trim() && (botUsername.trim().length < 2 || botUsername.trim().length > 32)) {
       setError("Username бота должен содержать от 2 до 32 символов.");
       return;
     }
@@ -146,9 +146,9 @@ export function FleetPanel({
       const payload: Record<string, unknown> = {
         clientId: botClientId.trim(),
         enabled: botEnabled,
-        presenceName: botPresence.trim() || null,
-        username: botUsername.trim()
+        presenceName: botPresence.trim() || null
       };
+      if (botUsername.trim()) payload.username = botUsername.trim();
       if (botToken.trim()) payload.token = botToken.trim();
       if (botAvatarData !== null) payload.avatarData = botAvatarData;
       if (botBannerData !== null) payload.bannerData = botBannerData;
