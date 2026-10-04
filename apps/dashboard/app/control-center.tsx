@@ -265,6 +265,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Intake form", description: "До 5 полей Discord Modal: short/paragraph, required, placeholder и лимит длины." },
       { title: "Persistent answers", description: "Ответы формы сохраняются вместе с тикетом и попадают в transcript." },
       { title: "Staff workflow", description: "Claim, close/reopen, category routing и ограничения на открытые тикеты." },
+      { title: "Ticket Panels", description: "Несколько независимых точек входа в одну Ticket-систему с отдельным каналом и оформлением." },
       { title: "Transcripts", description: "HTML transcript сохраняется и может быть опубликован в transcript channel." }
     ],
     kind: "full"
@@ -1579,7 +1580,11 @@ function ModulePage(props: {
       {props.module?.key === "tickets" && (
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Ticket Intake Form" eyebrow="SUPPORT FORM" />
-          <TicketFormPanel guildId={props.guildId} onChanged={props.onAudit} />
+          <TicketFormPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            onChanged={props.onAudit}
+          />
         </section>
       )}
 
