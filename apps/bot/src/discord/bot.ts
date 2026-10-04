@@ -9,6 +9,7 @@ import {
 import type { AppConfig } from "../config.js";
 import type { Database } from "../database.js";
 import { logger } from "../logger.js";
+import { getGuildLocale, t } from "../localization.js";
 import { buildCommands, handleCommand } from "./commands.js";
 import { TemporaryVoice } from "../modules/temporary-voice.js";
 import { Moderation } from "../modules/moderation.js";
@@ -238,8 +239,11 @@ export async function routeCommand(
       error: String(error)
     });
 
+    const locale = interaction.guildId
+      ? await getGuildLocale(db, interaction.guildId)
+      : "ru";
     const reply = {
-      content: "Произошла внутренняя ошибка.",
+      content: t(locale, "internal-error"),
       ephemeral: true
     };
 
