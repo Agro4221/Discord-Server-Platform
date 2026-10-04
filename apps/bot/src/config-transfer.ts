@@ -46,7 +46,8 @@ const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
   { table: "help_pages", fields: ["slug","title","content","enabled"] },
   { table: "role_panels", fields: ["channel_id","message_id","title","roles","selection_mode","max_selections","duration_minutes","component_type"] },
   { table: "stream_alerts", fields: ["platform","target","channel_id","mention_role_id","enabled","interval_seconds","message_template"] },
-  { table: "tickets", fields: ["channel_id","creator_id","claimed_by","status","priority","tags","created_at","closed_at","last_activity_at"] },
+  { table: "tickets", fields: ["channel_id","creator_id","claimed_by","status","priority","tags","created_at","closed_at","last_activity_at","panel_id"] },
+  { table: "ticket_panels", fields: ["channel_id","message_id","title","description","button_label","enabled"] },
   { table: "notification_feeds", fields: ["channel_id","url","enabled","interval_seconds","last_item_key","last_polled_at","message_template","include_keywords","exclude_keywords"] },
   { table: "role_automation_rules", fields: ["trigger","channel_id","role_id","delay_seconds","enabled"] },
   { table: "custom_forms", fields: ["name","title","description","panel_channel_id","response_channel_id","button_label","enabled","fields"] }
@@ -200,6 +201,29 @@ export class ConfigTransferService {
         }
       }
 
+      const ticketPanels = ticketsModule?.settings.ticket_panels;
+      if (ticketPanels !== undefined && !Array.isArray(ticketPanels)) {
+        throw new Error("invalid_ticket_panels");
+      }
+      if (Array.isArray(ticketPanels)) {
+        const normalizedPanels = ticketPanels.map((panel) => normalizeImportedTicketPanel(panel));
+        await client.query("DELETE FROM ticket_panels WHERE guild_id=$1", [targetGuildId]);
+        for (const panel of normalizedPanels) {
+          await client.query(
+            "INSERT INTO ticket_panels(guild_id,channel_id,message_id,title,description,button_label,enabled) VALUES($1,$2,$3,$4,$5,$6,$7)",
+            [
+              targetGuildId,
+              panel.channelId,
+              panel.messageId,
+              panel.title,
+              panel.description,
+              panel.buttonLabel,
+              panel.enabled
+            ]
+          );
+        }
+      }
+
       const ticketsModule = data.modules.find((module) => module.key === "tickets");
       const exportedTickets = ticketsModule?.settings.tickets;
       if (exportedTickets !== undefined && !Array.isArray(exportedTickets)) {
@@ -221,7 +245,8 @@ export class ConfigTransferService {
               ticket.tags,
               ticket.createdAt,
               ticket.closedAt,
-              ticket.lastActivityAt
+              ticket.lastActivityAt,
+              ticket.panelId
             ]
           );
         }
@@ -863,6 +888,7 @@ type NormalizedTicket = {
   createdAt: string;
   closedAt: string | null;
   lastActivityAt: string | null;
+  panelId: number | null;
 };
 
 function normalizeImportedTicket(value: unknown): NormalizedTicket {
@@ -895,7 +921,43 @@ function normalizeImportedTicket(value: unknown): NormalizedTicket {
     tags,
     createdAt: object.created_at,
     closedAt: typeof object.closed_at === "string" ? object.closed_at : null,
-    lastActivityAt: typeof object.last_activity_at === "string" ? object.last_activity_at : null
+    lastActivityAt: typeof object.last_activity_at === "string" ? object.last_activity_at : null,
+    panelId: typeof object.panel_id === "number" && Number.isSafeInteger(object.panel_id) && object.panel_id > 0
+      ? object.panel_id
+      : null
+  };
+}
+
+type ImportedTicketPanel = {
+  channelId: string;
+  messageId: string | null;
+  title: string;
+  description: string;
+  buttonLabel: string;
+  enabled: boolean;
+};
+
+function normalizeImportedTicketPanel(value: unknown): ImportedTicketPanel {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_ticket_panel");
+  const object = value as Record<string, unknown>;
+  if (
+    typeof object.channel_id !== "string" || !/^\d{17,20}$/.test(object.channel_id) ||
+    (object.message_id !== null && object.message_id !== undefined &&
+      (typeof object.message_id !== "string" || !/^\d{17,20}$/.test(object.message_id))) ||
+    typeof object.title !== "string" || !object.title.trim() || object.title.length > 256 ||
+    typeof object.description !== "string" || !object.description.trim() || object.description.length > 4096 ||
+    typeof object.button_label !== "string" || !object.button_label.trim() || object.button_label.length > 80 ||
+    typeof object.enabled !== "boolean"
+  ) {
+    throw new Error("invalid_ticket_panel");
+  }
+  return {
+    channelId: object.channel_id,
+    messageId: typeof object.message_id === "string" ? object.message_id : null,
+    title: object.title.trim(),
+    description: object.description.trim(),
+    buttonLabel: object.button_label.trim(),
+    enabled: object.enabled
   };
 }
 
