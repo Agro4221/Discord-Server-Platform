@@ -1251,12 +1251,21 @@ const migrations = [
     ])
   },
   {
-    version: 83,
-    name: "role_panel_select_components",
+    version: 80,
+    name: "welcome_embed_images",
     sql: q([
-      "ALTER TABLE role_panels ADD COLUMN IF NOT EXISTS component_type text NOT NULL DEFAULT 'buttons';",
-      "ALTER TABLE role_panels DROP CONSTRAINT IF EXISTS role_panels_component_type_check;",
-      "ALTER TABLE role_panels ADD CONSTRAINT role_panels_component_type_check CHECK(component_type IN ('buttons','select'));"
+      "ALTER TABLE welcome_settings ADD COLUMN IF NOT EXISTS image_url text;",
+      "ALTER TABLE welcome_settings ADD COLUMN IF NOT EXISTS goodbye_image_url text;"
+    ])
+  },
+  {
+    version: 81,
+    name: "verification_panel_customization",
+    sql: q([
+      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS panel_title text NOT NULL DEFAULT '✅ Проверка участника';",
+      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS panel_description text NOT NULL DEFAULT 'Нажми кнопку, получи одноразовый код и подтверди его через кнопку ниже.';",
+      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS issue_button_label text NOT NULL DEFAULT 'Получить код';",
+      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS confirm_button_label text NOT NULL DEFAULT 'Подтвердить';"
     ])
   },
   {
@@ -1292,23 +1301,14 @@ const migrations = [
     ])
   },
   {
-    version: 81,
-    name: "verification_panel_customization",
+    version: 83,
+    name: "role_panel_select_components",
     sql: q([
-      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS panel_title text NOT NULL DEFAULT '✅ Проверка участника';",
-      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS panel_description text NOT NULL DEFAULT 'Нажми кнопку, получи одноразовый код и подтверди его через кнопку ниже.';",
-      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS issue_button_label text NOT NULL DEFAULT 'Получить код';",
-      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS confirm_button_label text NOT NULL DEFAULT 'Подтвердить';"
+      "ALTER TABLE role_panels ADD COLUMN IF NOT EXISTS component_type text NOT NULL DEFAULT 'buttons';",
+      "ALTER TABLE role_panels DROP CONSTRAINT IF EXISTS role_panels_component_type_check;",
+      "ALTER TABLE role_panels ADD CONSTRAINT role_panels_component_type_check CHECK(component_type IN ('buttons','select'));"
     ])
   },
-  {
-    version: 80,
-    name: "welcome_embed_images",
-    sql: q([
-      "ALTER TABLE welcome_settings ADD COLUMN IF NOT EXISTS image_url text;",
-      "ALTER TABLE welcome_settings ADD COLUMN IF NOT EXISTS goodbye_image_url text;"
-    ])
-  }
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
