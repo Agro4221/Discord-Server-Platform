@@ -93,10 +93,11 @@ async function main(): Promise<void> {
     health.set({ database: "ready" });
     if (discordClientId) {
       await identities.heartbeat("starting", 0).catch((error) => {
-      logger.warn("Initial fleet heartbeat failed", { identityId: config.botIdentityId, error: String(error) });
-          });
-    }
-    }
+        logger.warn("Initial fleet heartbeat failed", {
+          identityId: config.botIdentityId,
+          error: String(error)
+        });
+      });
     }
   } catch (error) {
     health.set({ database: "down", status: "degraded", lastError: "database startup failed" });
@@ -172,11 +173,12 @@ async function main(): Promise<void> {
 
     if (runtimeConfig.discordClientId) {
       await identities.heartbeat("stopped", client.guilds.cache.size).catch((error) => {
-      logger.warn("Stopped fleet heartbeat failed", {
-        identityId: config.botIdentityId,
-        error: String(error)
+        logger.warn("Stopped fleet heartbeat failed", {
+          identityId: config.botIdentityId,
+          error: String(error)
+        });
       });
-    });
+    }
 
     await modules.shutdownAll();
     await commandPolicy.shutdown();
@@ -266,13 +268,14 @@ async function main(): Promise<void> {
     });
     if (runtimeConfig.discordClientId) {
       void identities.heartbeat(status === "ready" ? "ready" : "degraded", client.guilds.cache.size).catch((error) => {
-      logger.warn("Fleet heartbeat update failed", {
-        identityId: config.botIdentityId,
-        status,
-        guildCount: client.guilds.cache.size,
-        error: String(error)
+        logger.warn("Fleet heartbeat update failed", {
+          identityId: config.botIdentityId,
+          status,
+          guildCount: client.guilds.cache.size,
+          error: String(error)
+        });
       });
-    });
+    }
   });
   supervisor.start();
 
