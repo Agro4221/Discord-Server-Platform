@@ -73,7 +73,7 @@ export class RolePanels implements PlatformModule {
 
   async list(guildId: string): Promise<RolePanelRecord[]> {
     const result = await this.db.query<{ id: string; guild_id: string; channel_id: string; message_id: string | null; title: string; roles: PanelRole[]; selection_mode: RoleSelectionMode; max_selections: number; duration_minutes: number; component_type: RolePanelComponentType | null }>(
-      "SELECT id,guild_id,channel_id,message_id,title,roles,selection_mode,max_selections,duration_minutes FROM role_panels WHERE guild_id=$1 ORDER BY id DESC",
+      "SELECT id,guild_id,channel_id,message_id,title,roles,selection_mode,max_selections,duration_minutes,component_type FROM role_panels WHERE guild_id=$1 ORDER BY id DESC",
       [guildId]
     );
     return result.rows.map((row) => ({
@@ -228,15 +228,16 @@ export class RolePanels implements PlatformModule {
     roles: PanelRole[],
     title: string,
     selectionMode: RoleSelectionMode | (PanelMessageCallbacks & {
-      editMessage: (channelId: string, messageId: string, content: string, components: ActionRowBuilder<ButtonBuilder>[]) => Promise<void>;
+      editMessage: (channelId: string, messageId: string, content: string, components: PanelComponentRow[]) => Promise<void>;
     }) = "toggle",
     maxSelections: number | (PanelMessageCallbacks & {
-      editMessage: (channelId: string, messageId: string, content: string, components: ActionRowBuilder<ButtonBuilder>[]) => Promise<void>;
+      editMessage: (channelId: string, messageId: string, content: string, components: PanelComponentRow[]) => Promise<void>;
     }) = 1,
     durationMinutes = 0,
     callbacks?: PanelMessageCallbacks & {
-      editMessage: (channelId: string, messageId: string, content: string, components: ActionRowBuilder<ButtonBuilder>[]) => Promise<void>;
-    }
+      editMessage: (channelId: string, messageId: string, content: string, components: PanelComponentRow[]) => Promise<void>;
+    },
+    componentType: RolePanelComponentType = "buttons"
   ): Promise<RolePanelRecord | null> {
     if (typeof selectionMode !== "string") {
       callbacks = selectionMode;
