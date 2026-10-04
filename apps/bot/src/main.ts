@@ -373,9 +373,26 @@ async function main(): Promise<void> {
           if (claimed.length) {
             logger.warn("Primary fleet failover claimed stale guilds", {
               identityId: config.botIdentityId,
-              guildIds: claimed,
+              guildIds: claimed.map((item) => item.guildId),
               count: claimed.length
             });
+            for (const item of claimed) {
+              await auditLog.record({
+                guildId: item.guildId,
+                source: "system",
+                action: "fleet.guild.failover",
+                targetType: "bot-identity",
+                targetId: config.botIdentityId,
+                metadata: {
+                  reason: "stale-heartbeat",
+                  previousIdentityId: item.previousIdentityId,
+                  newIdentityId: config.botIdentityId
+                }
+              }).catch((auditError) => logger.warn("Fleet guild failover audit failed", {
+                guildId: item.guildId,
+                error: String(auditError)
+              }));
+            }
           }
         } catch (error) {
           logger.warn("Primary fleet failover check failed", {
@@ -389,9 +406,26 @@ async function main(): Promise<void> {
           if (claimed.length) {
             logger.warn("Fleet failover claimed stale guilds", {
               identityId: config.botIdentityId,
-              guildIds: claimed,
+              guildIds: claimed.map((item) => item.guildId),
               count: claimed.length
             });
+            for (const item of claimed) {
+              await auditLog.record({
+                guildId: item.guildId,
+                source: "system",
+                action: "fleet.guild.failover",
+                targetType: "bot-identity",
+                targetId: config.botIdentityId,
+                metadata: {
+                  reason: "stale-heartbeat",
+                  previousIdentityId: item.previousIdentityId,
+                  newIdentityId: config.botIdentityId
+                }
+              }).catch((auditError) => logger.warn("Fleet guild failover audit failed", {
+                guildId: item.guildId,
+                error: String(auditError)
+              }));
+            }
           }
         } catch (error) {
           logger.warn("Fleet failover check failed", {
@@ -406,9 +440,27 @@ async function main(): Promise<void> {
         if (claimedMusic.length) {
           logger.warn("Fleet Music failover claimed stale voice assignments", {
             identityId: config.botIdentityId,
-            guildIds: claimedMusic,
+            guildIds: claimedMusic.map((item) => item.guildId),
             count: claimedMusic.length
           });
+          for (const item of claimedMusic) {
+            await auditLog.record({
+              guildId: item.guildId,
+              source: "system",
+              action: "fleet.music.failover",
+              targetType: "voice-channel",
+              targetId: item.voiceChannelId,
+              metadata: {
+                reason: "stale-heartbeat",
+                previousIdentityId: item.previousIdentityId,
+                newIdentityId: config.botIdentityId
+              }
+            }).catch((auditError) => logger.warn("Fleet Music failover audit failed", {
+              guildId: item.guildId,
+              voiceChannelId: item.voiceChannelId,
+              error: String(auditError)
+            }));
+          }
         }
       } catch (error) {
         logger.warn("Fleet Music failover check failed", {
