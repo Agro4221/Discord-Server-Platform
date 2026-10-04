@@ -66,7 +66,10 @@ test("Tickets removes a persisted open row when Discord channel publication fail
             transcript_channel_id: null,
             max_open_per_user: 1,
             auto_close_minutes: 0,
-            form_fields: [],
+            form_fields: [
+              { id: "subject", label: "Тема", type: "short", required: true, placeholder: "", minLength: 3, maxLength: 100 },
+              { id: "details", label: "Описание", type: "paragraph", required: true, placeholder: "", minLength: 3, maxLength: 2000 }
+            ],
             panel_title: null,
             panel_description: null,
             create_button_label: null,
