@@ -639,3 +639,11 @@ Never write credentials, tokens or private user data here.
 - Added `scripts/reconcile-fleet-native.ps1`: registered secondary identities are supervised as ordinary Node processes, with PID/log tracking, restart-request handling and fail-closed Management API access.
 - Added `scripts/release-gate-native.ps1` for read-only native runtime acceptance checks.
 - Updated native/local setup documentation and CI deployment contracts.
+
+
+## 2026-10-04 — Native release-gate / Control Center cleanup
+- Native release gate now checks `.native-runtime/fleet.pid` so a dead Fleet supervisor cannot be mistaken for a healthy native runtime.
+- Removed obsolete Dashboard logout action and `/login` redirect.
+- Added deployment-contract regression coverage for the removed end-user auth UI and native supervisor health check.
+- Synchronized Local Setup documentation with the native-first runtime and read-only native release gate.
+- CI #1717 passed the preceding Discord bot registration rate-limit checkpoint; this cleanup is the current verification target.

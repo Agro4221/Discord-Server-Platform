@@ -39,6 +39,29 @@ for (const contract of [
   }
 }
 
+const dashboardClient = await readFile("apps/dashboard/app/dashboard-client.tsx", "utf8");
+for (const forbidden of [
+  "async function logout",
+  "/api/auth/logout",
+  'window.location.href = "/login"',
+  ">Выйти<"
+]) {
+  if (dashboardClient.includes(forbidden)) {
+    throw new Error("Dashboard must not expose legacy end-user auth: " + forbidden);
+  }
+}
+
+const nativeReleaseGate = await readFile("scripts/release-gate-native.ps1", "utf8");
+for (const expected of [
+  "native Fleet supervisor",
+  "fleet.pid",
+  "NATIVE RELEASE GATE PASSED"
+]) {
+  if (!nativeReleaseGate.includes(expected)) {
+    throw new Error("Native release-gate contract missing: " + expected);
+  }
+}
+
 console.log("Deployment contract passed.");
 
 const fleetSupervisor = await readFile("scripts/reconcile-fleet.ps1", "utf8");

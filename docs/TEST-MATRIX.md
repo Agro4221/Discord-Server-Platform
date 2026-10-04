@@ -409,3 +409,12 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ☐ Native release gate: Bot health, Management API 401/authenticated access, secondary PID state, optional Dashboard and Lavalink readiness.
 - ☐ Real Windows process lifetime, Discord Gateway, permissions/hierarchy and Lavalink audio continuity remain environment-dependent.
 - Automated CI verification is the next checkpoint.
+
+
+## 2026-10-04 — Native release-gate / Control Center verification
+- ✅ Native release gate checks both primary Bot and native Fleet supervisor PID state.
+- ✅ Dashboard no longer exposes the removed logout/login UI.
+- ✅ Deployment contract prevents reintroduction of `/api/auth/logout` or `/login` redirect behavior.
+- ✅ Local Setup no longer instructs for a Dashboard admin password and points to native release-gate preflight.
+- ☐ Real Windows process lifetime and live Discord/Lavalink acceptance remain environment-dependent.
+- ☐ Full CI verification for this checkpoint is pending.

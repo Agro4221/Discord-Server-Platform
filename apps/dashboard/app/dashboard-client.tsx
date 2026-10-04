@@ -294,10 +294,6 @@ export function DashboardClient() {
     }
   }
 
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
-  }
 
   const filteredCatalog = catalog.filter((item) => {
     if (moduleGroup !== "all" && MODULE_GROUP[item.key] !== moduleGroup) return false;
@@ -387,7 +383,6 @@ export function DashboardClient() {
               const file = event.target.files?.[0]; if (file) void importConfig(file); event.currentTarget.value = "";
             }} />
           </label>
-          <button type="button" onClick={() => void logout()} style={buttonStyle("secondary")}>Выйти</button>
         </div>
 
         {actionMessage && <Notice tone="success" message={actionMessage} />}

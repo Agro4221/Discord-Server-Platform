@@ -62,6 +62,7 @@ Write-Host "Health: $healthPort  Management: $managementPort  Dashboard: $dashbo
 Write-Host ""
 
 Assert-PidAlive (Join-Path $runtimeRoot "bot.pid") "primary bot"
+Assert-PidAlive (Join-Path $runtimeRoot "fleet.pid") "native Fleet supervisor"
 
 $health = Get-Json ("http://127.0.0.1:" + $healthPort + "/health")
 Assert-Ok ($health.status -eq "ready") "Bot health status is ready"

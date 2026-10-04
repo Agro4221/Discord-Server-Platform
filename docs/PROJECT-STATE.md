@@ -458,3 +458,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Added the native non-destructive release gate for Bot/Fleet/Management API/Dashboard/Lavalink readiness.
 - This checkpoint is designed for low-overhead local use and does not require Docker Desktop.
 - Automated verification for this checkpoint is the next CI target.
+
+
+## 2026-10-04 — Native release-gate / Control Center cleanup
+- Native release gate now requires the dedicated Fleet supervisor process to be alive in addition to the primary Bot process.
+- Removed the obsolete Control Center logout button/redirect; local Dashboard has no end-user login flow.
+- Deployment contract locks both checks against regression.
+- Local setup instructions now use native Windows as the normal local path and the native release gate as the operator preflight.
+- The preceding registration-rate-limit checkpoint was verified by CI #1717; this cleanup is the next verification target.
