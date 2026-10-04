@@ -74,3 +74,14 @@ for (const contract of [
     throw new Error("Local release-gate contract missing: " + contract);
   }
 }
+
+for (const forbidden of [
+  "docker compose up",
+  "docker compose down",
+  "Start-Process",
+  "Set-EnvValue"
+]) {
+  if (releaseGate.includes(forbidden)) {
+    throw new Error("Local release-gate must remain non-destructive; found: " + forbidden);
+  }
+}
