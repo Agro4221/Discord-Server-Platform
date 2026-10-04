@@ -2,6 +2,7 @@ import { EmbedBuilder, type Client } from "discord.js";
 import type { Database } from "./database.js";
 
 export type AuditEvent = {
+
   guildId?: string | null;
   actorUserId?: string | null;
   source: "discord" | "dashboard" | "system";
@@ -9,6 +10,14 @@ export type AuditEvent = {
   targetType?: string | null;
   targetId?: string | null;
   metadata?: Record<string, unknown>;
+};
+
+export type AuditQuery = {
+  limit?: number;
+  source?: AuditEvent["source"];
+  action?: string;
+  actorUserId?: string;
+  before?: string;
 };
 
 export class AuditLog {
@@ -70,6 +79,20 @@ export class AuditLog {
   }
 
   async recent(guildId: string, limit = 50): Promise<Record<string, unknown>[]> {
+    return this.query(guildId, { limit });
+  }
+
+  async query(guildId: string, options: AuditQuery = {}): Promise<Record<string, unknown>[]> {
+    const safeLimit = Math.min(Math.max(options.limit ?? 50, 1), 200);
+    const values: unknown[] = [guildId];
+    const conditions = ["guild_id=$1"];
+
+    if (options.source) {
+      values.push(options.source);
+      conditions.push("source=$" + values.length);
+    }
+    if (options.action) {
+      values.push("%" + options.action.trim().replace(/[%_]/g, "\\  async recent(guildId: string, limit = 50): Promise<Record<string, unknown>[]> {
     const safeLimit = Math.min(Math.max(limit, 1), 200);
     const result = await this.db.query(
       `SELECT id,guild_id,actor_user_id,source,action,target_type,target_id,metadata,created_at
@@ -78,6 +101,31 @@ export class AuditLog {
        ORDER BY created_at DESC
        LIMIT $2`,
       [guildId, safeLimit]
+    );
+    return result.rows;
+  }") + "%");
+      conditions.push("action ILIKE $" + values.length + " ESCAPE '\\'");
+    }
+    if (options.actorUserId) {
+      values.push(options.actorUserId);
+      conditions.push("actor_user_id=$" + values.length);
+    }
+    if (options.before) {
+      const parsed = new Date(options.before);
+      if (!Number.isNaN(parsed.getTime())) {
+        values.push(parsed.toISOString());
+        conditions.push("created_at < $" + values.length);
+      }
+    }
+
+    values.push(safeLimit);
+    const result = await this.db.query(
+      `SELECT id,guild_id,actor_user_id,source,action,target_type,target_id,metadata,created_at
+         FROM audit_events
+        WHERE ${conditions.join(" AND ")}
+        ORDER BY created_at DESC,id DESC
+        LIMIT ${values.length}`,
+      values
     );
     return result.rows;
   }
