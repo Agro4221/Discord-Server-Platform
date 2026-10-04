@@ -451,3 +451,12 @@ Never write credentials, tokens or private user data here.
 - Added migration 84 for encrypted bot credentials and regression coverage for credential round-trip/encryption plus credential-less bootstrap.
 - Known validation status at the end of this increment: CI run for the latest test-fix commit is in progress; the preceding run passed Typecheck but failed three stale/regression tests, which were corrected in this increment.
 - Architecture decision: the first registered identity is the existing `primary` bot identity; secondary identities remain fleet infrastructure and are not exposed as a new registration flow in this increment.
+
+
+## 2026-10-04 — Audit activity center
+- Restored the missing Dashboard proxy for the existing Management API audit endpoint.
+- Added filtered audit queries by source, action substring, actor user ID and cursor timestamp without changing the durable `audit_events` schema.
+- Dashboard Audit page now shows source/actor/target context, filter controls, refresh/reset and cursor-based "load more" pagination.
+- Added regression coverage for the filtered audit query and legacy bounded `recent()` behavior.
+- Audit remains DB-backed source of truth; Discord channel delivery is still best-effort and separately observable.
+- Current increment is limited to Administration/Audit; no other module feature work was introduced.
