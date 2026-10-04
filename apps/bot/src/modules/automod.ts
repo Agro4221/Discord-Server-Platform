@@ -214,6 +214,7 @@ export class AutoMod implements PlatformModule {
     if (!supported.has(detector)) throw new Error("unsupported_automod_detector");
 
     const action = input.action ?? "delete";
+    if (action === "log" && !input.logChannelId) throw new Error("automod_log_channel_required");
     const threshold = input.threshold === undefined || input.threshold === null ? null : Number(input.threshold);
     const windowSeconds = input.windowSeconds === undefined || input.windowSeconds === null ? null : Math.floor(input.windowSeconds);
     const timeoutMinutes = Math.min(Math.max(Math.floor(input.timeoutMinutes ?? 0),0),40320);
