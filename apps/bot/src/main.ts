@@ -312,21 +312,42 @@ async function main(): Promise<void> {
       update: async (input) => {
         const saved = await identities.saveSettings(input);
         const credentials = await identities.credentials();
-        if (saved.enabled) {
-          if (!credentials?.token || !credentials.clientId) throw new Error("bot_credentials_incomplete");
-          await connectDiscord({
-            clientId: credentials.clientId,
-            token: credentials.token,
-            enabled: saved.enabled,
-            presenceName: saved.presenceName
-          });
-        } else {
-          await connectDiscord({
+        try {
+          if (saved.enabled) {
+            if (!credentials?.token || !credentials.clientId) throw new Error("bot_credentials_incomplete");
+            await connectDiscord({
+              clientId: credentials.clientId,
+              token: credentials.token,
+              enabled: saved.enabled,
+              presenceName: saved.presenceName
+            });
+          } else {
+            await connectDiscord({
+              clientId: saved.clientId,
+              token: credentials?.token ?? "",
+              enabled: false,
+              presenceName: saved.presenceName
+            });
+          }
+        } catch (error) {
+          await auditLog.record({
+            source: "dashboard",
+            action: "bot.credentials.connection_failed",
+            targetType: "bot-identity",
+            targetId: saved.id,
+            metadata: {
+              clientId: saved.clientId,
+              enabled: saved.enabled,
+              tokenConfigured: saved.tokenConfigured,
+              error: String(error)
+            }
+          }).catch((auditError) => logger.warn("Bot credential failure audit delivery failed", { error: String(auditError) }));
+          logger.error("Discord bot reconnect after credential update failed", {
+            identityId: saved.id,
             clientId: saved.clientId,
-            token: credentials?.token ?? "",
-            enabled: false,
-            presenceName: saved.presenceName
+            error: String(error)
           });
+          throw error;
         }
         return saved;
       },
