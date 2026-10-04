@@ -233,6 +233,7 @@ async function main(): Promise<void> {
   }): Promise<void> => {
     if (!credentials.enabled) {
       client.destroy();
+      botEnabled = false;
       health.set({ discord: "stopped", status: "degraded" });
       await identities.heartbeat("stopped", client.guilds.cache.size);
       logger.info("Discord bot disabled from Control Center", { identityId: config.botIdentityId });
@@ -500,7 +501,10 @@ async function main(): Promise<void> {
   fleetTimer = setInterval(() => {
     void identities.refreshAssignments()
       .then(() => runtimeConfig.discordClientId
-        ? identities.heartbeat(modulesHealthy ? "ready" : "degraded", client.guilds.cache.size)
+        ? identities.heartbeat(
+          botEnabled ? (modulesHealthy ? "ready" : "degraded") : "stopped",
+          client.guilds.cache.size
+        )
         : undefined)
       .catch((error) => logger.warn("Fleet heartbeat failed", {
         identityId: config.botIdentityId,
