@@ -358,5 +358,5 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 
 
 ## 2026-10-05 — Per-guild integration credentials verified
-- Final automated gate for the credential slice: CI #1917 / #1920 chain completed with typecheck, tests and builds green.
+- Final automated gate for the credential slice: CI #1917 completed successfully with typecheck, tests and builds green.
 - Multiple encrypted credentials per guild are now implemented; integration diagnostics remains the next unfinished item in Notifications / Integrations.
