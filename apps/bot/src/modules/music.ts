@@ -1170,9 +1170,7 @@ export class Music implements PlatformModule {
       [this.config.botIdentityId]
     );
 
-    const connectedNodeId = preferredNodeId && this.connectedNodes.has(preferredNodeId)
-      ? preferredNodeId
-      : [...this.connectedNodes][0] ?? null;
+    const connectedNodeId = [...this.connectedNodes][0] ?? null;
     if (!connectedNodeId) return;
 
     for (const row of result.rows) {
