@@ -399,3 +399,16 @@ Never write credentials, tokens or private user data here.
 - Both paths emit the existing `moderation.case` event after successful persistence; failed Discord timeouts do not create false cases.
 ### Next concrete work
 - Continue the remaining AutoMod/Security response workflow depth, then return to broader Fleet/release-gate validation.
+
+## 2026-10-04 — AutoMod/Security consistency hardening
+- Development HEAD for this checkpoint: `83755f29b9ac747b278bce919d97397441a96d00`.
+- AutoMod rule-based `repeated-text` now honors `windowSeconds` for its effective detection window instead of counting every retained repeat equally.
+- The AutoMod repeated-text rule uses timestamped recent messages and keeps the existing guild-wide `repeatedWindowSeconds` as the safe upper bound; per-rule windows may narrow it.
+- Added deterministic regression coverage for repeated-text inside/outside the rule window.
+- Security incident resolution now returns an explicit success/failure result; `clearIncidents` reports only incidents that were actually marked resolved.
+- Added regression coverage for partial cleanup failure so the Control Center/command result cannot over-report closed incidents.
+- Verification state: fresh GitHub commit status currently exposes no checks for the latest direct development HEAD, so this checkpoint is **not** marked CI-verified yet.
+### Next concrete work
+- AutoMod: tighten the `action=log` configuration contract and review `warn` action semantics.
+- Security: decide/pin the intended lifecycle for executor roles removed by anti-nuke response and add persistence/restoration if the intended behavior is reversible.
+- Then deepen Music/Fleet failure-path coverage and move through the live Discord/Windows/Lavalink release-gate matrix.
