@@ -734,13 +734,18 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
-        if (action.type === "add-reaction") {
+        if (action.type === "add-reaction" || action.type === "remove-reaction" || action.type === "pin-message" || action.type === "unpin-message") {
           const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
           const messageId = action.messageId === "@event" ? event.messageId : action.messageId;
           const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
           if (channel?.isTextBased() && "messages" in channel && messageId) {
             const message = await channel.messages.fetch(messageId).catch(() => null);
-            if (message) await message.react(action.emoji);
+            if (message) {
+              if (action.type === "add-reaction") await message.react(action.emoji);
+              else if (action.type === "remove-reaction") await message.reactions.cache.get(action.emoji)?.remove();
+              else if (action.type === "pin-message") await message.pin("Automation rule");
+              else await message.unpin("Automation rule");
+            }
           }
           continue;
         }
@@ -821,9 +826,15 @@ export function validateAutomationRule(
         if (action.messageId !== "@event" && !/^\d{17,20}$/.test(action.messageId)) throw new Error("invalid_delete_message");
         break;
       case "add-reaction":
+      case "remove-reaction":
         if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_reaction_channel");
         if (action.messageId !== "@event" && !/^\d{17,20}$/.test(action.messageId)) throw new Error("invalid_reaction_message");
         if (!action.emoji.trim() || action.emoji.length > 100) throw new Error("invalid_reaction_emoji");
+        break;
+      case "pin-message":
+      case "unpin-message":
+        if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_message_action_channel");
+        if (action.messageId !== "@event" && !/^\d{17,20}$/.test(action.messageId)) throw new Error("invalid_message_action_message");
         break;
       case "log":
         if (!action.message || action.message.length > 1000) throw new Error("invalid_log_action");

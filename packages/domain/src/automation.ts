@@ -44,6 +44,9 @@ export type AutomationAction =
   | { type: "timeout"; userId: string; durationSeconds: number; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
   | { type: "add-reaction"; channelId: string; messageId: string; emoji: string }
+  | { type: "remove-reaction"; channelId: string; messageId: string; emoji: string }
+  | { type: "pin-message"; channelId: string; messageId: string }
+  | { type: "unpin-message"; channelId: string; messageId: string }
   | { type: "log"; message: string };
 
 export type AutomationRule = {

@@ -17,7 +17,8 @@ type Action =
   | { type: "add-role" | "remove-role"; userId: string; roleId: string }
   | { type: "timeout"; userId: string; durationSeconds: number; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
-  | { type: "add-reaction"; channelId: string; messageId: string; emoji: string }
+  | { type: "add-reaction" | "remove-reaction"; channelId: string; messageId: string; emoji: string }
+  | { type: "pin-message" | "unpin-message"; channelId: string; messageId: string }
   | { type: "log"; message: string };
 
 type Rule = {
@@ -190,7 +191,8 @@ export function AutomationPanel({
       type === "add-role" || type === "remove-role" ? { type, userId: "@event", roleId: "" } :
       type === "timeout" ? { type, userId: "@event", durationSeconds: 60, reason: "" } :
       type === "delete-message" ? { type, channelId: "@event", messageId: "@event" } :
-      type === "add-reaction" ? { type, channelId: "@event", messageId: "@event", emoji: "👍" } :
+      type === "add-reaction" || type === "remove-reaction" ? { type, channelId: "@event", messageId: "@event", emoji: "👍" } :
+      type === "pin-message" || type === "unpin-message" ? { type, channelId: "@event", messageId: "@event" } :
       { type: "log", message: "" };
     setActions((current) => current.map((item, i) => i === index ? next : item));
   }
@@ -375,6 +377,9 @@ export function AutomationPanel({
               <option value="timeout">timeout</option>
               <option value="delete-message">delete-message</option>
               <option value="add-reaction">add-reaction</option>
+              <option value="remove-reaction">remove-reaction</option>
+              <option value="pin-message">pin-message</option>
+              <option value="unpin-message">unpin-message</option>
               <option value="log">log</option>
             </select>
 
@@ -421,7 +426,7 @@ export function AutomationPanel({
               </div>
             )}
 
-            {action.type === "add-reaction" && (
+            {(action.type === "add-reaction" || action.type === "remove-reaction") && (
               <div style={actionGrid}>
                 <select value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} style={inputStyle}>
                   <option value="@event">Канал события</option>
@@ -429,6 +434,16 @@ export function AutomationPanel({
                 </select>
                 <input value={action.messageId} onChange={(e) => updateAction(index, { messageId: e.target.value })} placeholder="@event или message ID" style={inputStyle} />
                 <input value={action.emoji} maxLength={100} onChange={(e) => updateAction(index, { emoji: e.target.value })} placeholder="Emoji, например 👍" style={inputStyle} />
+              </div>
+            )}
+
+            {(action.type === "pin-message" || action.type === "unpin-message") && (
+              <div style={actionGrid}>
+                <select value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} style={inputStyle}>
+                  <option value="@event">Канал события</option>
+                  {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                </select>
+                <input value={action.messageId} onChange={(e) => updateAction(index, { messageId: e.target.value })} placeholder="@event или message ID" style={inputStyle} />
               </div>
             )}
 
