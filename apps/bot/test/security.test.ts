@@ -47,7 +47,55 @@ test("Security incident duration is bounded to safe operator values", () => {
 });
 
 
-test("Security anti-nuke tracks channel/role create and delete audit actions", () => {
+test("Security clear reports only incidents that were actually resolved", async () => {
+  const queries: string[] = [];
+  const db = {
+    async query<T>(text: string, values: readonly unknown[] = []) {
+      queries.push(text);
+      if (text.startsWith("SELECT id FROM security_incidents")) {
+        return { rows: [{ id: "1" }, { id: "2" }] } as { rows: T[] };
+      }
+      if (text.startsWith("SELECT user_id,role_id FROM security_quarantine_assignments")) {
+        return String(values[0]) === "2"
+          ? { rows: [{ user_id: "456789012345678901", role_id: "999999999999999999" }] }
+          : { rows: [] };
+      }
+      if (text.startsWith("SELECT incident_id FROM security_quarantine_assignments")) {
+        return { rows: [] };
+      }
+      if (text.startsWith("UPDATE security_incidents SET resolved_at")) {
+        return { rows: [], rowCount: 1 };
+      }
+      if (text.startsWith("UPDATE security_quarantine_assignments SET restored_at")) {
+        return { rows: [], rowCount: 1 };
+      }
+      return { rows: [] };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const security = new (await import("../src/modules/security.js")).Security(db);
+  const member = {
+    roles: {
+      cache: { has: () => true },
+      remove: async () => { throw new Error("role removal failed"); }
+    }
+  };
+  const guild = {
+    members: {
+      fetch: async () => member
+    },
+    roles: {
+      cache: new Map([["999999999999999999", { id: "999999999999999999" }]])
+    }
+  };
+  (security as unknown as { client: { guilds: { cache: Map<string, unknown> } } }).client = {
+    guilds: { cache: new Map([["guild-1", guild]]) }
+  };
+
+  assert.equal(await security.clearIncidents("guild-1"), 1);
+  assert.equal(queries.filter((query) => query.startsWith("UPDATE security_incidents SET resolved_at")).length, 1);
+});
+\ntest("Security anti-nuke tracks channel/role create and delete audit actions", () => {
   assert.equal(securityAuditLogEventType("channel.create"), AuditLogEvent.ChannelCreate);
   assert.equal(securityAuditLogEventType("channel.delete"), AuditLogEvent.ChannelDelete);
   assert.equal(securityAuditLogEventType("role.create"), AuditLogEvent.RoleCreate);
