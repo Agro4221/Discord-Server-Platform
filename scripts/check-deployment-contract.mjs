@@ -66,6 +66,7 @@ for (const contract of [
   "docker compose ps",
   "/health",
   "/api/fleet",
+  "unauthenticated",
   "restartRequired",
   "credentialConfigured",
   "dsp-bot-fleet-",

@@ -58,6 +58,22 @@ Assert-Ok (-not ($moduleStatuses -contains "down")) "No bot module reports down 
 
 $managementKey = Get-EnvValue "MANAGEMENT_API_KEY"
 Assert-Ok (-not [string]::IsNullOrWhiteSpace($managementKey)) "Management API key is configured"
+
+try {
+  Invoke-WebRequest -Uri ("http://127.0.0.1:" + $managementPort + "/api/fleet") -UseBasicParsing -Method Get -TimeoutSec 10 | Out-Null
+  throw "Management API unexpectedly allowed an unauthenticated request"
+} catch {
+  $unauthorizedStatus = 0
+  if ($_.Exception.Response) {
+    try { $unauthorizedStatus = [int]$_.Exception.Response.StatusCode } catch { $unauthorizedStatus = 0 }
+  }
+  if ($unauthorizedStatus -eq 401) {
+    Write-Host "OK: Management API rejects unauthenticated requests"
+  } else {
+    throw "RELEASE GATE FAILED: Management API unauthenticated check returned status $unauthorizedStatus"
+  }
+}
+
 $headers = @{ Authorization = "Bearer " + $managementKey }
 $fleet = Get-Json ("http://127.0.0.1:" + $managementPort + "/api/fleet") $headers
 Assert-Ok ($null -ne $fleet.identities) "Fleet endpoint responds with identity state"
