@@ -20,7 +20,8 @@ export type ServerModuleKey =
   | "reputation"
   | "birthdays"
   | "invite-tracking"
-  | "stream-alerts";
+  | "stream-alerts"
+  | "forms";
 
 export type ServerModuleConfig = {
   key: ServerModuleKey;
