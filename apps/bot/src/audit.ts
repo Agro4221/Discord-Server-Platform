@@ -187,4 +187,5 @@ export class AuditLog {
       values
     );
     return result.rows;
-  }}
+  }
+}
