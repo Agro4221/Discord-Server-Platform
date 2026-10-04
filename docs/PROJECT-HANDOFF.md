@@ -1,4 +1,4 @@
-# PROJECT HANDOFF — Discord Server Platform
+# PROJECT HANDOFF — Discord Server Bot Platform
 
 > Канонический файл непрерывности между чатами. Новый чат при продолжении разработки **обязан сначала прочитать этот файл**, затем `docs/PROJECT-STATE.md`, `docs/WORK-LOG.md` и `docs/TEST-MATRIX.md` перед тем, как предлагать новый план или задавать вопросы о уже зафиксированных решениях.
 
