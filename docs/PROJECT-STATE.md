@@ -314,3 +314,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Rule-based and base AutoMod timeouts now create durable moderation history only after successful Discord enforcement.
 - Timeout cases retain the effective AutoMod reason and expiration timestamp and emit the standard moderation event.
 - CI run #1623 is green; live Discord hierarchy/permission and timeout acceptance remains environment-dependent.
+
+## 2026-10-04 — AutoMod/Security consistency hardening
+- AutoMod `repeated-text` rule windows are now time-aware; per-rule `windowSeconds` can narrow the configured global repeat-history window.
+- Security manual incident clearing now reports only successfully resolved incidents.
+- Both changes have regression coverage.
+- Latest development HEAD: `83755f29b9ac747b278bce919d97397441a96d00`.
+- Automated verification is pending because the latest direct development HEAD currently has no attached CI checks.
