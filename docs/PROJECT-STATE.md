@@ -342,3 +342,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Security incident-count reporting is accurate after partial cleanup failure.
 - Security detection/audit lookback supports the full configured one-hour window.
 - CI failures #1647 and #1651 were diagnosed from Actions logs and repaired; latest code fix: `f079a866aa2294ad211d7234fa6396c8c052e643`.
+
+## 2026-10-04 — AutoMod Dashboard checkpoint
+- Dashboard log-rule configuration now matches the enforced Core/API contract.
+- The response template field is rendered as an actual editable control instead of a stale placeholder.
+- CI #1657 is green for the complete automated pipeline.
+- Latest verified development commit: `4c2ba68c0c45700a7f1f13f48942c9452de2c7dc`.
