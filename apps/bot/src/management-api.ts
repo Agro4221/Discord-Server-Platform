@@ -44,6 +44,9 @@ type ApiOptions = {
       token?: string;
       enabled?: boolean;
       presenceName?: string | null;
+      username?: string;
+      avatarData?: string | null;
+      bannerData?: string | null;
     }) => Promise<unknown>;
   };
   guildAccess?: (guildId: string) => boolean;
