@@ -285,3 +285,12 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ⚠ Real Discord role hierarchy, malicious-executor behavior and manual post-incident role reconciliation remain live acceptance cases.
 - ✅ CI #1675 passed the complete automated pipeline: typecheck, 105/105 bot tests, dependency/source/deployment/observability checks, and domain/bot/Dashboard builds.
 - ☐ Next: AutoMod response-delivery edge cases, then Music/Fleet failure paths and live release-gate validation.
+
+
+## 2026-10-04 — Music failover durable-state verification
+- ✅ Current-track and queued-track player destruction retains durable `music_players` state.
+- ✅ Empty-player destruction still clears durable player state.
+- ✅ Regression coverage added for all three retention/cleanup cases.
+- ✅ CI #1677 passed typecheck, 105/105 bot tests, dependency/source/deployment/observability checks, and domain/bot/Dashboard builds.
+- ⚠ Real Lavalink node loss, migration timing and audio continuity remain live release-gate cases.
+- ☐ Next: Music resume/current-position/queue reconciliation; then Fleet failure paths and live release gates.

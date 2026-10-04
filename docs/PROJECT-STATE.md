@@ -368,3 +368,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Added regression coverage for restart reconstruction and durable role-removal recording.
 - CI #1675 passed the complete automated pipeline, including 105/105 bot tests and all domain/bot/Dashboard builds.
 - Latest verified development code: `357052808974403abbfb1abb68586787798ae7c0`.
+
+
+## 2026-10-04 — Music failover durable-state checkpoint
+- Durable Music player snapshots are preserved when a destroyed player still contains a current or queued track, protecting failover/recovery state from premature deletion.
+- Empty-player destruction still clears durable state.
+- Regression coverage and CI #1677 verify the change; latest verified code: `2d2cb93c064249ec24a628552482ecc69f05744a`.

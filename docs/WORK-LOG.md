@@ -498,3 +498,14 @@ Never write credentials, tokens or private user data here.
 - Music: deeper failover/current-position/queue continuity and multi-session failure paths.
 - Fleet: reconciliation/failover failure paths and real multi-bot Windows/Docker acceptance.
 - Final live release gate: Discord permissions/hierarchy, real Lavalink/providers, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Music failover durable-state checkpoint
+- Music `playerDestroy` no longer deletes `music_players` when a player still has a current track or queued tracks; this preserves the latest durable snapshot across Lavalink node-loss/failover destruction.
+- Empty players are still removed from durable storage, preserving explicit stop/idle cleanup behavior.
+- Added deterministic regression coverage for current-track, queued-track and empty-player retention decisions.
+- CI run #1677 passed the complete automated pipeline on commit `2d2cb93c064249ec24a628552482ecc69f05744a`.
+### Next concrete work
+- Music: deeper current-position/queue continuity and multi-session failure paths, especially resumed-player state reconciliation.
+- Fleet: reconciliation/failover failure paths and real multi-bot Windows/Docker acceptance.
+- Final live release gate: Discord permissions/hierarchy, real Lavalink/providers, soak/chaos/recovery and clean-host deployment.
