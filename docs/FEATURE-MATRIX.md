@@ -368,7 +368,7 @@ Music должен стремиться к функциональности си
 | Sticky messages | ✅ |
 | Reminders | ✅ |
 | Channel tools / lock / slowmode / cleanup | ✅ |
-| Forms | ✅ | Ticket intake forms use persistent Discord Modal fields; generic form-builder toolkit remains a separate backlog item.
+| Forms | ✅ | Универсальный Forms-модуль: Dashboard builder, Discord Modal, persistent answers и staff response channel; generic select-menu toolkit remains a separate backlog item.
 | Interactive buttons/selects/modals toolkit | 🟡 |
 | Custom help/menu pages | ✅ |
 | Server info / user info / role/channel utility suite | ✅ |
