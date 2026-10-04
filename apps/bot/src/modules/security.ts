@@ -326,6 +326,7 @@ export class Security implements PlatformModule {
     if (this.destructiveIncidents.get(guildId)?.id === incidentId) this.destructiveIncidents.delete(guildId);
 
     await this.audit(guildId, "security.incident-resolved", { incidentId });
+    return true;
   }
 
   async dashboardSnapshot(guildId: string): Promise<{
