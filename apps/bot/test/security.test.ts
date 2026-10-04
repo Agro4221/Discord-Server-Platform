@@ -268,7 +268,8 @@ test("Security configure persists executor timeout policy", async () => {
 
   const insert = calls.find((entry) => entry.text.startsWith("INSERT INTO security_settings"));
   assert.ok(insert);
-  assert.equal(insert?.values.at(-1), 30);
+  assert.equal(insert?.values.at(-2), 30);
+  assert.equal(insert?.values.at(-1), false);
   assert.match(insert?.text ?? "", /executor_timeout_minutes/);
 });
 
