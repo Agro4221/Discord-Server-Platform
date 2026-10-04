@@ -1251,6 +1251,15 @@ const migrations = [
     ])
   },
   {
+    version: 83,
+    name: "role_panel_select_components",
+    sql: q([
+      "ALTER TABLE role_panels ADD COLUMN IF NOT EXISTS component_type text NOT NULL DEFAULT 'buttons';",
+      "ALTER TABLE role_panels DROP CONSTRAINT IF EXISTS role_panels_component_type_check;",
+      "ALTER TABLE role_panels ADD CONSTRAINT role_panels_component_type_check CHECK(component_type IN ('buttons','select'));"
+    ])
+  },
+  {
     version: 82,
     name: "custom_forms",
     sql: q([
