@@ -387,3 +387,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - CI #1955 is green.
 - Custom member rewards / milestones are now surfaced in Control Center on top of the existing Leveling reward runtime.
 - Next high-value slice: **Community social widgets / engagement depth**.
+
+
+## 2026-10-05 — Community Hub verified
+- Source checkpoint: `2c1502e441097c40bbde9d431d1059b8d5a1855a`.
+- CI #1964 is green.
+- Social/community engagement widgets are now implemented in Control Center using existing community modules.
+- Next high-value slice: **Additional social feeds**.
