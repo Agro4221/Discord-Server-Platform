@@ -23,6 +23,13 @@ import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 
 type MusicRepeatMode = "off" | "track" | "queue";
+export type MusicSearchProvider = "auto" | "youtube" | "youtube_music" | "soundcloud";
+
+const MUSIC_PROVIDER_SOURCES: Record<Exclude<MusicSearchProvider, "auto">, string> = {
+  youtube: "ytsearch",
+  youtube_music: "ytmsearch",
+  soundcloud: "scsearch"
+};
 
 class PostgresQueueStore implements QueueStoreManager {
   constructor(
@@ -392,7 +399,7 @@ export class Music implements PlatformModule {
   async dashboardControl(
     guildId: string,
     action: "play" | "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay",
-    input: { query?: string; voiceChannelId?: string; value?: number; mode?: string; enabled?: boolean }
+    input: { query?: string; voiceChannelId?: string; value?: number; mode?: string; enabled?: boolean; provider?: string }
   ): Promise<void> {
     if (!await moduleEnabled(this.db, guildId, "music", false)) throw new Error("music_disabled");
     if (!this.manager || !this.initialized) throw new Error("music_unavailable");
@@ -421,10 +428,12 @@ export class Music implements PlatformModule {
       if (player.voiceChannelId !== voiceChannelId) throw new Error("music_player_in_other_voice");
       if (!player.connected) await player.connect();
 
-      const query = String(input.query ?? "").trim();
-      if (!query) throw new Error("music_query_required");
-      const source = /^https?:\/\//i.test(query) ? undefined : "ytsearch";
-      const result = await player.search(source ? { query, source } : { query }, this.client?.user);
+      const query = String(input.query ?? "");
+      const provider = normalizeMusicSearchProvider(String(input.provider ?? "auto"));
+      if (!provider) throw new Error("invalid_music_provider");
+      const search = buildMusicSearch(provider, query);
+      if (!search) throw new Error("music_query_required");
+      const result = await player.search(search, this.client?.user);
       if (!result.tracks.length) throw new Error("music_track_not_found");
 
       player.queue.add(result.tracks[0]!);
@@ -553,6 +562,11 @@ export class Music implements PlatformModule {
     }
 
     const query = interaction.options.getString("query", true).trim();
+    const provider = normalizeMusicSearchProvider(interaction.options.getString("provider") ?? "auto");
+    if (!provider) {
+      await interaction.reply({ content: "Неизвестный источник поиска.", ephemeral: true });
+      return;
+    }
     if (!query) {
       await interaction.reply({ content: "Поисковый запрос пуст.", ephemeral: true });
       return;
@@ -568,11 +582,12 @@ export class Music implements PlatformModule {
       await player.connect();
     }
 
-    const source = /^https?:\/\//i.test(query) ? undefined : "ytsearch";
-    const result = await player.search(
-      source ? { query, source } : { query },
-      interaction.user
-    );
+    const search = buildMusicSearch(provider, query);
+    if (!search) {
+      await interaction.reply({ content: "Поисковый запрос пуст.", ephemeral: true });
+      return;
+    }
+    const result = await player.search(search, interaction.user);
 
     if (!result.tracks.length) {
       await interaction.reply({ content: "Ничего не найдено.", ephemeral: true });
