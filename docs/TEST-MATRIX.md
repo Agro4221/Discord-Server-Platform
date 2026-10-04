@@ -258,3 +258,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Added shared LocalizationService-style dictionary with ru/en normalization and guild locale lookup from existing guild_settings.locale.
 - Core Help/Embed responses and the global command error boundary now honor the configured guild locale.
 - The locale architecture is intentionally incremental: module-specific responses can migrate to the same keys without another translation framework.
+
+## 2026-10-05 — Ticket Panels automated gate
+- CI #1949 passed: typecheck, tests, domain build, bot build and Dashboard production build.
+- Migration 88 and ticket panel config round-trip coverage are included in the passing suite.
+- Remaining live validation is Discord-side panel permissions, message refresh/deletion behavior and real ticket creation from multiple panels.
