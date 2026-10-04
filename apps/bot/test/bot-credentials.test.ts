@@ -37,6 +37,7 @@ test("credential vault encrypts and decrypts without plaintext storage", async (
         };
       }
       if (text.startsWith("INSERT INTO bot_credentials")) {
+        if (stored.value) return { rows: [], rowCount: 0 };
         stored.value = {
           token_ciphertext: values?.[1],
           token_iv: values?.[2],
