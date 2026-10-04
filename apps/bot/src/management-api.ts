@@ -2348,9 +2348,9 @@ export function validateAutomationPayload(
   const guild = client.guilds.cache.get(guildId);
   if (!guild) throw new RequestInputError("guild_not_found", 404);
 
-  const stringFields = new Set(["content","userId","channelId","messageId","guildId"]);
+  const stringFields = new Set(["content","userId","channelId","previousChannelId","messageId","guildId"]);
   const numericFields = new Set([
-    "memberCount","messageLength","mentionCount","previousLength",
+    "memberCount","messageLength","mentionCount","previousLength","attachmentCount","embedCount","stickerCount",
     "giveawayId","winnerCount","rolePosition","incidentId","actionCount","joinCount",
     "timestamp","minute","hour","dayOfWeek","dayOfMonth"
   ]);
