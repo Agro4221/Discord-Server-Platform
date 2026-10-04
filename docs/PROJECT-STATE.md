@@ -329,3 +329,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Regression coverage exists for all three consistency fixes.
 - Current development HEAD: `7121d7557063772d712c47006bdbb9845c99d1b9`.
 - CI status for the direct development HEAD is currently pending/no attached check.
+
+## 2026-10-04 — Security detection-window checkpoint
+- Security detection windows are normalized to 5–3600 seconds.
+- Detection history retention now covers the full supported one-hour window.
+- Boundary regression coverage added.
+- Latest development code checkpoint: `a915418cab191a58100849aff95264b49311fb74`.
