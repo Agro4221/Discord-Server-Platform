@@ -85,7 +85,7 @@ export function MusicPanel({
   }, [guildId]);
 
   async function control(
-    action: "play" | "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay" | "remove" | "move" | "clear",
+    action: "play" | "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay" | "remove" | "move" | "clear" | "filter",
     input: Record<string, unknown> = {}
   ) {
     setBusy(true);
