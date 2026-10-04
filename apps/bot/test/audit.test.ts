@@ -73,7 +73,7 @@ test("audit module activity uses bounded action prefixes", async () => {
     "123456789012345678",
     "role-panel.%",
     "role.%",
-    "role_automation.%",
+    "role\\_automation.%",
     "2026-10-05T00:00:00.000Z",
     40
   ]);
