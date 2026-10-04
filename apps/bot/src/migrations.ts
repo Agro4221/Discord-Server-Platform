@@ -1309,6 +1309,13 @@ const migrations = [
       "ALTER TABLE role_panels ADD CONSTRAINT role_panels_component_type_check CHECK(component_type IN ('buttons','select'));"
     ])
   },
+  {
+    version: 84,
+    name: "bot_identity_credentials",
+    sql: q([
+      "ALTER TABLE bot_identities ADD COLUMN IF NOT EXISTS token_ciphertext text;"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
