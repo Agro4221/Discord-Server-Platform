@@ -362,3 +362,13 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ CI #1699 passed all automated checks, 105/105 bot tests and all builds.
 - ⚠ Actual Docker Desktop shutdown-failure injection remains live acceptance.
 - ☐ Next: static release-gate audit and live-test boundary cleanup.
+
+
+## 2026-10-04 — Local release-gate preflight verification
+- ✅ Non-destructive local release gate checks Docker Compose availability.
+- ✅ Gate checks Bot health/readiness, Discord and database readiness, and module down-state absence.
+- ✅ Gate checks authenticated Fleet state, credential readiness and pending-restart state.
+- ✅ Gate checks Dashboard and both local Lavalink nodes.
+- ✅ Deployment contract covers the gate script and CI #1702 passed all automated stages.
+- ⚠ Real Discord/Lavalink/Windows-Docker runtime behavior remains live acceptance.
+- ☐ Next: run the gate on the actual local host, then execute the live failure/soak matrix.

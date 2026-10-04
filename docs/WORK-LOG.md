@@ -590,3 +590,12 @@ Never write credentials, tokens or private user data here.
 ### Next concrete work
 - Static release-gate audit: command/permission contracts, health/readiness semantics, clean shutdown, deployment contract consistency and live-test boundaries.
 - Live acceptance remains external: real Discord permissions/hierarchy, Lavalink/node loss, Windows/Docker multi-bot runtime, soak/chaos/recovery.
+
+
+## 2026-10-04 — Local release-gate preflight checkpoint
+- Added `scripts/release-gate.ps1` as a non-destructive local preflight for the current deployment stack.
+- The gate checks Docker Compose reachability, Bot health (`ready` + Discord + PostgreSQL readiness), absence of module `down` states, authenticated Management API/Fleet state, credential/restart readiness for enabled identities, Dashboard reachability and both local Lavalink `/version` endpoints.
+- Added deployment-contract coverage so the release-gate script remains part of CI-checked infrastructure contracts.
+- CI run #1702 passed the complete automated pipeline on commit `ff052ebf277184e9164e77d7cfc3e2cc3a0d9c6f`.
+### Live release boundary
+- Automated code/deployment contracts are now green; remaining acceptance is genuinely environment-dependent: real Discord permissions/hierarchy, real Lavalink node loss/session expiry/audio continuity, Windows/Docker multi-bot runtime, chaos/recovery and clean-host deployment.

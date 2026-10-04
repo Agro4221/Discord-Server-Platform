@@ -419,3 +419,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-04 — Local shutdown failure propagation checkpoint
 - Local launcher shutdown now propagates Fleet reconciler and Docker Compose cleanup failures through its process exit code.
 - CI #1699 verified the complete pipeline; latest verified code: `149d6ea598427d6ded426baa8b0624ca333bf2bd`.
+
+
+## 2026-10-04 — Local release-gate preflight checkpoint
+- Added a non-destructive `scripts/release-gate.ps1` covering Docker Compose, Bot health/readiness, Management API/Fleet, Dashboard and both local Lavalink nodes.
+- Deployment contract now verifies the gate script is present and contains its core checks.
+- CI #1702 passed the complete automated pipeline; latest verified code: `ff052ebf277184e9164e77d7cfc3e2cc3a0d9c6f`.
+- Remaining release work is environment-dependent rather than an unverified code TODO.
