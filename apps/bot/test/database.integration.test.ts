@@ -22,10 +22,10 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1)",
       [[
         "guild_modules","automod_settings","verification_settings","automation_rules",
-        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs","moderation_presets","ticket_sla_settings","help_pages","analytics_settings","music_history","custom_forms","custom_form_submissions","onboarding_flows","server_config_presets"
+        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs","moderation_presets","ticket_sla_settings","help_pages","analytics_settings","music_history","custom_forms","custom_form_submissions","onboarding_flows","server_config_presets","ticket_panels"
       ]]
     );
-    assert.equal(tables.rows.length, 27);
+    assert.equal(tables.rows.length, 28);
     const version = (await db.query("SELECT max(version) AS version FROM schema_migrations")).rows[0]?.version;
     const retryColumn = await db.query(
       "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='automation_delayed_jobs' AND column_name='dead_lettered_at'"
@@ -38,9 +38,9 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
     assert.equal(feedColumns.rows.length, 3);
     const ticketColumns = await db.query(
       "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='tickets' AND column_name = ANY($1)",
-      [["priority","tags","updated_at"]]
+      [["priority","tags","updated_at","panel_id"]]
     );
-    assert.equal(ticketColumns.rows.length, 3);
+    assert.equal(ticketColumns.rows.length, 4);
     const slaColumns = await db.query(
       "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='tickets' AND column_name = ANY($1)",
       [["sla_reminded_at","sla_escalated_at"]]
