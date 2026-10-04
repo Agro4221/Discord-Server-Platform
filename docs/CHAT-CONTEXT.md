@@ -7,7 +7,7 @@
 
 Репозиторий: `Agro4221/Discord-Server-Platform`
 Ветка: `development`
-Последний известный HEAD на момент обновления этого файла: `4c69d5644b5e35fd5497619c008642c74ece02dd`
+Последний известный HEAD на момент обновления этого файла: `afeb5c184cbb1d19b1033c9600593f0274326453`
 Тип: self-hosted Discord Server Platform / единый Discord-бот.
 Основной локальный runtime: Native Windows.
 Docker: дополнительный путь для локального/VPS-развёртывания.
@@ -109,7 +109,7 @@ Carl-bot, Juniper, MEE6, ProBot, Jockie Music и похожие боты.
 - добавлены validator/runtime regression tests.
 
 ### Security
-Добавлена опциональная реакция executorTimeoutMinutes для подтверждённого destructive executor; успешный timeout создаёт moderation case, неуспешный не создаёт ложную запись.
+Security response policy теперь имеет опциональный `executorTimeoutMinutes` и `executorBanEnabled` для подтверждённого destructive executor; ban при включении имеет приоритет, а timeout используется как fallback. Успешное действие создаёт moderation case, неуспешное не создаёт ложную запись.
 
 Audit-log ingestion расширен для:
 - member kicks;
@@ -202,6 +202,7 @@ Audit-log ingestion расширен для:
 - `autoQuarantine`
 - `removeExecutorRoles`
 - `executorTimeoutMinutes`
+- `executorBanEnabled`
 
 `respondToExecutor` сейчас:
 - загружает executor member;
