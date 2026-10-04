@@ -2336,7 +2336,8 @@ export function validateAutomationPayload(
 ): void {
   const supportedEvents = new Set([
     "member.join","member.leave","member.role.add","member.role.remove",
-    "message.create","message.delete","message.edit","reaction.add",
+    "message.create","message.delete","message.edit","reaction.add","reaction.remove",
+    "channel.update","role.update",
     "voice.join","voice.leave","voice.move","moderation.case",
     "ticket.create","ticket.close","giveaway.end","schedule",
     "channel.create","channel.delete","role.create","role.delete",

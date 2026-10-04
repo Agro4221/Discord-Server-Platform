@@ -27,7 +27,8 @@ type RuntimeEvent = {
 
 const SUPPORTED_EVENTS: AutomationEvent[] = [
   "member.join","member.leave","member.role.add","member.role.remove",
-  "message.create","message.delete","message.edit","reaction.add",
+  "message.create","message.delete","message.edit","reaction.add","reaction.remove",
+  "channel.update","role.update",
   "voice.join","voice.leave","voice.move","moderation.case",
   "ticket.create","ticket.close","giveaway.end","schedule",
   "channel.create","channel.delete","role.create","role.delete",
@@ -102,6 +103,16 @@ export class AutomationEngine implements PlatformModule {
           numeric: { reactionCount: reaction.count ?? 0 }
         });
       }),
+
+      context.events.on("reaction.remove", ({ reaction, user }) => {
+        if (!reaction.message.guildId) return;
+        return this.execute({
+          type: "reaction.remove", guildId: reaction.message.guildId, userId: user.id,
+          channelId: reaction.message.channelId, messageId: reaction.message.id,
+          content: reaction.emoji.name ?? reaction.emoji.identifier,
+          numeric: { reactionCount: reaction.count ?? 0 }
+        });
+      }),
       context.events.on("voice.state", ({ oldState, newState }) => this.executeFromVoice(oldState, newState)),
       context.events.on("moderation.case", (event) => this.execute({ type: "moderation.case", ...event })),
       context.events.on("ticket.create", (event) => this.execute({ type: "ticket.create", ...event })),
@@ -140,6 +151,21 @@ export class AutomationEngine implements PlatformModule {
         guildId: role.guild.id,
         content: role.id,
         numeric: { rolePosition: role.position }
+      })),
+
+      context.events.on("channel.update", ({ oldChannel, newChannel }) => {
+        if (!newChannel.guildId) return;
+        return this.execute({
+          type: "channel.update",
+          guildId: newChannel.guildId,
+          channelId: newChannel.id,
+          content: newChannel.name ?? undefined
+        });
+      }),
+      context.events.on("role.update", ({ oldRole, newRole }) => this.execute({
+        type: "role.update",
+        guildId: newRole.guild.id,
+        content: newRole.id
       })),
       context.events.on("member.ban", (event) => this.execute({
         type: "member.ban",
