@@ -819,6 +819,12 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
+        if (action.type === "clear-cooldown") {
+          const key = renderTemplate(action.key, event).trim();
+          if (key) this.keyedCooldowns.delete(event.guildId + ":" + key);
+          continue;
+        }
+
         if (action.type === "set-channel-name") {
           const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
           const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
@@ -928,6 +934,9 @@ export function validateAutomationRule(
       case "set-channel-name":
         if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_channel_name_channel");
         if (!action.name.trim() || action.name.length > 100) throw new Error("invalid_channel_name");
+        break;
+      case "clear-cooldown":
+        if (!action.key || action.key.length > 100) throw new Error("invalid_clear_cooldown_key");
         break;
       case "log":
         if (!action.message || action.message.length > 1000) throw new Error("invalid_log_action");
