@@ -737,6 +737,12 @@ Never write credentials, tokens or private user data here.
 - Dashboard now lets an administrator request a restart for a secondary identity.
 - The operation only sets restart_required; an external/supervisor process remains responsible for performing the actual process restart.
 
+## 2026-10-04 — Automation event field breadth checkpoint
+- Message-created/edited/deleted Automation events now expose attachment, embed and sticker counts for numeric conditions.
+- Voice join/leave/move events expose the previous voice channel where applicable, enabling transition-aware rules.
+- Management API and Dashboard field catalogs are aligned with the runtime event payload.
+- Regression coverage now exercises the new numeric/text field selectors.
+
 ## 2026-10-04 — Automation channel naming checkpoint
 - Added `set-channel-name` as a native Automation action.
 - Core validates channel references and a bounded non-empty channel name, then applies rendered names through the Discord channel API.
