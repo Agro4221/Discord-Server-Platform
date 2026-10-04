@@ -426,3 +426,10 @@ Never write credentials, tokens or private user data here.
 - Music: deeper failover/queue/current-position continuity and multi-session failure paths.
 - Fleet: failover/reconciliation edge cases and multi-bot Windows/Docker acceptance.
 - Final release gate: live Discord permissions/hierarchy, real Lavalink/provider behavior, soak/chaos/recovery, clean-host deployment.
+
+## 2026-10-04 — Security detection-window hardening
+- Development code checkpoint: `a915418cab191a58100849aff95264b49311fb74`.
+- Security raid/destructive detection windows are now normalized to 5–3600 seconds when read from configuration, preventing invalid/oversized values from bypassing bounded cache retention.
+- In-memory Security event buckets now retain up to the full supported one-hour detection horizon instead of a hard-coded five minutes.
+- Added regression coverage for window lower/upper bounds and invalid values.
+- CI verification is still pending for the latest direct development HEAD.
