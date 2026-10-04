@@ -8,6 +8,8 @@ test("Automation validation accepts richer safe primitives and event-relative bu
     { type: "starts-with", left: "content", right: "!" },
     { type: "ends-with", left: "content", right: "?" },
     { type: "number-eq", left: "mentionCount", right: 0 },
+    { type: "number-gt", left: "attachmentCount", right: 0 },
+    { type: "number-lt", left: "memberCount", right: 1000 },
     { type: "number-gte", left: "attachmentCount", right: 1 },
     { type: "contains", left: "previousChannelId", right: "123456789012345678" },
     { type: "has-role", userId: "@event", roleId: "123456789012345678" }
@@ -55,4 +57,19 @@ test("Automation validation covers channel management actions", () => {
   assert.throws(() => validateAutomationRule("message.create", [], [
     { type: "set-channel-name", channelId: "@event", name: "x".repeat(101) }
   ]), /invalid_channel_name/);
+});
+
+
+test("Automation numeric comparison conditions use strict greater-than and less-than semantics", () => {
+  assert.doesNotThrow(() => validateAutomationRule("message.create", [
+    { type: "number-gt", left: "attachmentCount", right: 1 },
+    { type: "number-lt", left: "messageLength", right: 1000 }
+  ], [
+    { type: "log", message: "numeric comparison" }
+  ]));
+  assert.throws(() => validateAutomationRule("message.create", [
+    { type: "number-gt", left: "attachmentCount", right: Number.NaN }
+  ], [
+    { type: "log", message: "numeric comparison" }
+  ]), /invalid_numeric_condition/);
 });
