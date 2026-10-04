@@ -480,3 +480,14 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Verified statically: native Fleet supervisor lifecycle, native release-gate PID checks, native diagnostics, no-login Control Center cleanup, endpoint-scoped bot-registration throttling and native-first documentation.
 - The repository-side local runtime path is now consistently documented as native Windows first; Docker remains optional for VPS/reproducible deployment.
 - Live target-machine acceptance remains the next boundary: real Discord Gateway/permissions, secondary-bot process behavior, Lavalink audio continuity, restart/chaos/soak and clean-host validation.
+
+## 2026-10-04 — Feature completeness audit checkpoint
+- Explicitly audited the planned feature set and corrected the release-state interpretation: the project has all major module families represented, but it is not accurate to call the entire original feature set 100% complete yet.
+- Implemented functional families currently present include Core/Discord lifecycle, persistence/migrations, Control Center, Moderation, Temporary Voice, Tickets/Transcripts, Role Panels, Giveaways, Starboard, Economy, Reminders/AFK/Utility, Leveling, Welcome/Verification, Notifications, Analytics, Backup/Restore, Import/Export, Automation, AutoMod, Security/Anti-Raid/Anti-Nuke, Music/Lavalink, multi-bot Music/Fleet, Bot credential registration and native Windows runtime tooling.
+- Remaining engineering scope is now explicitly classified as targeted completion rather than missing foundational modules: richer AutoMod/Security response/policy workflows; broader Automation conditions/actions; additional Music providers and complete multi-node failover; deeper Fleet orchestration/failover; fuller VPS install/upgrade/production tooling; and the final E2E/chaos/soak/live acceptance cycle.
+- The repository must distinguish three separate states: feature family exists, planned feature breadth is fully implemented, and live environment has validated the behavior. These are not interchangeable.
+- Current repository-side baseline: `807af06529ff0a95313db2d5454475e8574dcf53`; CI #1720 is green. No source-code change is introduced by this audit checkpoint.
+### Current boundary
+- Major platform functionality exists and is integrated.
+- Full 100% feature completeness is not yet established.
+- Live runtime acceptance remains environment-dependent and is tracked independently of feature completeness.
