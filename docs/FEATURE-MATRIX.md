@@ -333,10 +333,10 @@ Music должен стремиться к функциональности си
 | Permission / hierarchy diagnostics | ✅ |
 | Audit trail / activity viewer | ✅ | Durable audit storage with Dashboard filtering and cursor pagination; remaining gap is auditing any future mutation paths before release.
 | Per-module activity/error history | ✅ / расширять | Module pages now query module-scoped Audit Log activity with bounded pagination and error-like event highlighting; future mutation paths can add richer module-specific diagnostics |
-| Mass configuration / reusable server presets | 🟡 |
+| Mass configuration / reusable server presets | ✅ | Named per-guild configuration snapshots reuse the existing ConfigTransfer contract and can be saved/applied/deleted from Control Center |
 | Import/export с корректным resource remapping | ✅ / расширять |
 | Multi-server / fleet administration | ✅ / расширять |
-| Configurable bot identity (name/avatar/status/banner где разрешено) | 🟡 |
+| Configurable bot identity (name/avatar/status/banner где разрешено) | ✅ / расширять | Fleet registration now supports optional username, presence and local avatar/banner uploads with live Discord application; Discord rate limits remain an external constraint |
 
 #### Moderation / AutoMod / Security
 | Функция | План |

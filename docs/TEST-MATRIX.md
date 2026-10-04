@@ -228,3 +228,17 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Management API exposes `GET /api/guilds/:guildId/modules/:moduleKey/activity`.
 - Control Center shows module-scoped activity with pagination and error-like action highlighting.
 - This intentionally reuses the durable Audit Log rather than introducing another event store.
+
+
+## 2026-10-05 — Server configuration presets verified
+- CI `#1883` passed: migration, tests, typecheck and all builds.
+- Named per-guild presets persist the full existing ConfigTransfer payload and can be repeatedly applied to the same guild.
+- Dashboard provides save/apply/delete operations; no second configuration model was introduced.
+
+
+## 2026-10-05 — Configurable bot identity/profile verified
+- CI `#1889` passed: typecheck, 123 bot tests, domain build, bot build and Dashboard production build.
+- Fleet registration now accepts optional bot username plus local PNG/JPEG/GIF avatar and banner data.
+- Management API applies the profile through the current Discord ClientUser after credential reconnect; secrets remain hidden and avatar/banner files are not stored in PostgreSQL.
+- Username changes remain subject to Discord's external rate limits.
+- Live validation remains necessary for real Discord profile editing and permission/account-specific restrictions.

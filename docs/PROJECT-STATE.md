@@ -337,3 +337,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Code checkpoint: `2bdd9e7f092da349b8caed846459dc95fb9ffdd7`.
 - CI #1873 passed completely.
 - The next unfinished high-priority Administration item is reusable server configuration presets.
+
+
+## 2026-10-05 — Administration foundation completion pass
+- Reusable server configuration presets: implemented and CI-verified (#1883).
+- Configurable bot identity/profile: implemented and CI-verified (#1889), using the existing Fleet registration path.
+- Administration backlog now moves to deployment foundation: Docker/VPS.

@@ -501,3 +501,19 @@ Never write credentials, tokens or private user data here.
 - Error-like actions are highlighted when audit actions contain fail/error/denied/blocked; this is an audit-derived operational signal, not a replacement for internal structured error telemetry.
 - Added regression coverage for prefix query construction and wildcard escaping.
 - CI `#1873` passed.
+
+
+## 2026-10-05 — Server configuration presets
+- Implemented `ServerConfigPresetService` on top of the existing `ConfigTransferService`.
+- Migration 86 added `server_config_presets` with per-guild unique names and indexed update time.
+- Added Management API CRUD/apply endpoints and Control Center panel.
+- Added preset name validation and database migration coverage.
+- CI #1883 passed.
+
+
+## 2026-10-05 — Configurable bot identity/profile
+- Extended existing Fleet bot registration rather than introducing another identity system.
+- Bot profile controls now include optional username and local avatar/banner file selection plus existing presence.
+- Management API validates profile payloads, keeps the general JSON request limit at 64 KiB, and raises it to 8 MiB only for the bot profile endpoint.
+- Discord profile changes are applied through the current logged-in bot user; avatar/banner payloads are transient and not persisted in the database.
+- CI #1889 passed completely.
