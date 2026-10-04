@@ -28,6 +28,13 @@ export function OnboardingPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [validation, setValidation] = useState<{
+    ok: boolean;
+    flowEnabled: boolean;
+    trigger: OnboardingTrigger;
+    issues: Array<{ step: number | null; severity: "error" | "warning"; code: string; message: string }>;
+    preview: string[];
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,6 +105,26 @@ export function OnboardingPanel({
       if (moved) steps.splice(target, 0, moved);
       return { ...current, steps };
     });
+  }
+
+  async function validateFlow() {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch(
+        "/api/guilds/" + encodeURIComponent(guildId) + "/onboarding/validate",
+        { cache: "no-store" }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(String(body.error ?? "onboarding_validate_failed"));
+      setValidation(body.validation ?? null);
+      setNotice(body.validation?.ok ? "Dry-run: flow готов к запуску." : "Dry-run: найдены проблемы.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось проверить onboarding flow.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function save() {
@@ -247,7 +274,48 @@ export function OnboardingPanel({
             ))}
           </section>
 
+          {validation && (
+            <section style={boxStyle}>
+              <div style={titleRow}>
+                <div>
+                  <div style={eyebrow}>DRY-RUN RESULT</div>
+                  <strong style={{ fontSize: 13 }}>{validation.ok ? "Flow проверен" : "Flow требует исправления"}</strong>
+                </div>
+                <span style={{ color: validation.ok ? "#8fe0a8" : "#f0a7aa", fontSize: 10 }}>
+                  {validation.ok ? "READY" : "ISSUES"}
+                </span>
+              </div>
+              {validation.issues.length > 0 && (
+                <div style={{ display: "grid", gap: 6 }}>
+                  {validation.issues.map((issue, index) => (
+                    <div key={index} style={{
+                      padding: "7px 9px",
+                      borderRadius: 8,
+                      border: "1px solid " + (issue.severity === "error" ? "#63292d" : "#5b5230"),
+                      background: issue.severity === "error" ? "#32191b" : "#2a2618",
+                      color: issue.severity === "error" ? "#f1c3c5" : "#e3d59e",
+                      fontSize: 9
+                    }}>
+                      {issue.step ? "#" + issue.step + " · " : ""}{issue.message}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {validation.preview.length > 0 && (
+                <div style={{ display: "grid", gap: 5 }}>
+                  <div style={eyebrow}>PREVIEW</div>
+                  {validation.preview.map((line, index) => (
+                    <div key={index} style={{ padding: "6px 8px", borderRadius: 8, background: "#0c1118", border: "1px solid #1d2430", fontSize: 9, color: "#9ba5b5" }}>
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            <button type="button" disabled={busy} onClick={() => void validateFlow()} style={secondaryButton}>Проверить flow</button>
             <button type="button" disabled={busy || flow.steps.length >= 10 || !manageableRoles.length} onClick={addRoleStep} style={secondaryButton}>+ Роль</button>
             <button type="button" disabled={busy || flow.steps.length >= 10 || !textChannels.length} onClick={addChannelStep} style={secondaryButton}>+ Сообщение</button>
             <button type="button" disabled={busy || flow.steps.length >= 10} onClick={addDmStep} style={secondaryButton}>+ ЛС</button>
