@@ -553,6 +553,84 @@ test("AutoMod warn does not delete or timeout and always attempts a warning resp
   );
 });
 
+test("AutoMod warn keeps the moderation case when warning response delivery fails", async () => {
+  const sentAttempts: string[] = [];
+  const auditEvents: unknown[] = [];
+  const moderationEvents: unknown[] = [];
+
+  const db = {
+    async query<T>(text: string, values: readonly unknown[] = []) {
+      if (text.startsWith("INSERT INTO automod_events")) return { rows: [], rowCount: 1 } as { rows: T[] };
+      if (text.startsWith("INSERT INTO moderation_cases")) return { rows: [{ id: "88" }], rowCount: 1 } as { rows: T[] };
+      throw new Error("unexpected query: " + text);
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const events = new (await import("../src/events.js")).PlatformEventBus();
+  events.on("moderation.case", (event) => moderationEvents.push(event));
+
+  const automod = new AutoMod(db);
+  await automod.init({
+    client: {} as never,
+    db,
+    events,
+    auditLog: {
+      record: async (event: unknown) => { auditEvents.push(event); }
+    } as never,
+    identityId: "primary"
+  });
+
+  const message = {
+    id: "223456789012345678",
+    guild: { id: "234567890123456789" },
+    channelId: "345678901234567890",
+    author: { id: "556789012345678901", username: "tester", bot: false },
+    member: null,
+    channel: {
+      send: async () => {
+        sentAttempts.push("attempted");
+        throw new Error("response delivery failed");
+      }
+    },
+    delete: async () => {
+      throw new Error("warn must not delete");
+    }
+  };
+
+  await (automod as unknown as {
+    applyRule: (
+      message: unknown,
+      rule: {
+        detector: string;
+        action: "delete" | "timeout" | "warn" | "log";
+        timeoutMinutes: number;
+        logChannelId: string | null;
+        messageTemplate: string;
+      }
+    ) => Promise<boolean>;
+  }).applyRule(message, {
+    detector: "blocked_word",
+    action: "warn",
+    timeoutMinutes: 0,
+    logChannelId: null,
+    messageTemplate: "⚠️ {mention}, warning"
+  });
+
+  await automod.shutdown();
+
+  assert.deepEqual(sentAttempts, ["attempted"]);
+  assert.deepEqual(moderationEvents[0], {
+    guildId: "234567890123456789",
+    userId: "556789012345678901",
+    action: "warn",
+    caseId: 88
+  });
+  assert.equal(
+    (auditEvents[0] as { metadata?: { responseDelivered?: boolean } })?.metadata?.responseDelivered,
+    false
+  );
+});
+
 test("AutoMod log rules require a configured log channel", async () => {
   let writes = 0;
   const db = {
