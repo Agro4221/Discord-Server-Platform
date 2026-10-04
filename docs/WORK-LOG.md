@@ -543,5 +543,5 @@ Never write credentials, tokens or private user data here.
 - Added Management API CRUD, credential selection on Stream Alerts and foreign-key cleanup when credentials are deleted.
 - Stream Alerts now resolves provider secrets per alert and caches Twitch/Kick OAuth tokens per credential instead of sharing one global token.
 - Added Dashboard credential management and per-alert credential selection.
-- CI #1917 passed the typecheck/build path before the final dashboard/UI completion; CI #1920 is the final complete gate for this slice.
+- CI #1917 is the final complete automated gate for this slice.
 - Final code checkpoint before diagnostics work: `81dcc01269d34c90af9091d59d32c521d56dec98`.
