@@ -26,7 +26,7 @@ const CONFIG_TABLES: ExportTable[] = [
   { table: "security_settings", fields: [
     "enabled","max_joins","window_seconds","max_destructive_actions",
     "destructive_window_seconds","quarantine_role_id","log_channel_id",
-    "incident_duration_seconds","auto_quarantine","remove_executor_roles","executor_timeout_minutes"
+    "incident_duration_seconds","auto_quarantine","remove_executor_roles","executor_timeout_minutes","executor_ban_enabled"
   ] },
   { table: "verification_settings", fields: ["enabled","channel_id","verified_role_id","quarantine_role_id","log_channel_id","code_ttl_minutes"] },
   { table: "leveling_settings", fields: ["enabled","xp_per_message","cooldown_seconds","announce_level_up"] },
