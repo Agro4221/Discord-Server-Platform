@@ -402,6 +402,22 @@ async function main(): Promise<void> {
       }
 
       try {
+        const claimedMusic = await identities.claimStaleMusicAssignments(connectedGuildIds, config.botIdentityId === "primary" ? 100 : 20);
+        if (claimedMusic.length) {
+          logger.warn("Fleet Music failover claimed stale voice assignments", {
+            identityId: config.botIdentityId,
+            guildIds: claimedMusic,
+            count: claimedMusic.length
+          });
+        }
+      } catch (error) {
+        logger.warn("Fleet Music failover check failed", {
+          identityId: config.botIdentityId,
+          error: String(error)
+        });
+      }
+
+      try {
         await identities.refreshAssignments();
       } catch (error) {
         logger.warn("Fleet assignment refresh failed", {

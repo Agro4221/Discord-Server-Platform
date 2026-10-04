@@ -285,3 +285,48 @@ test("secondary cannot perform primary takeover", async () => {
   const secondary = new BotIdentityRepository(db, "secondary");
   assert.deepEqual(await secondary.claimStaleGuildsAsPrimary(["111111111111111111"], 10), []);
 });
+
+
+test("primary failover claims stale Music voice assignments without duplicating its guild assignment", async () => {
+  let transactionCalls = 0;
+  const queries: string[] = [];
+  const db = {
+    transaction: async (fn: (client: never) => Promise<unknown>) => {
+      transactionCalls += 1;
+      const client = {
+        query: async (sql: string) => {
+          queries.push(sql);
+          return { rows: [{ guild_id: "222222222222222222" }] };
+        }
+      };
+      return fn(client as never);
+    }
+  } as never;
+
+  const primary = new BotIdentityRepository(db, "primary");
+  assert.deepEqual(
+    await primary.claimStaleMusicAssignments(["222222222222222222"], 10),
+    ["222222222222222222"]
+  );
+  assert.equal(transactionCalls, 1);
+  assert.match(queries[0] ?? "", /UPDATE guild_music_bot_assignments/);
+  assert.match(queries[0] ?? "", /NOT EXISTS/);
+});
+
+test("secondary Music failover requires failover_enabled", async () => {
+  let transactionCalls = 0;
+  const db = {
+    query: async <T>() => ({ rows: [{ enabled: true, failover_enabled: false }] }) as { rows: T[] },
+    transaction: async () => {
+      transactionCalls += 1;
+      throw new Error("transaction_should_not_run");
+    }
+  } as never;
+
+  const secondary = new BotIdentityRepository(db, "secondary");
+  assert.deepEqual(
+    await secondary.claimStaleMusicAssignments(["222222222222222222"], 10),
+    []
+  );
+  assert.equal(transactionCalls, 0);
+});

@@ -142,6 +142,49 @@ export class BotIdentityRepository {
     return result.rows[0]?.bot_identity_id ?? null;
   }
 
+  async claimStaleMusicAssignments(guildIds: string[], limit = 20): Promise<string[]> {
+    if (this.identityId !== "primary") {
+      const identity = await this.db.query<{ failover_enabled: boolean; enabled: boolean }>(
+        "SELECT failover_enabled,enabled FROM bot_identities WHERE id=$1",
+        [this.identityId]
+      );
+      if (!identity.rows[0]?.enabled || !identity.rows[0].failover_enabled) return [];
+    }
+    if (guildIds.length === 0) return [];
+
+    const safeLimit = clampFailoverBatchLimit(limit);
+    return this.db.transaction(async (client) => {
+      const result = await client.query<{ guild_id: string }>(
+        `WITH candidates AS (
+           SELECT a.guild_id,a.bot_identity_id,a.voice_channel_id
+             FROM guild_music_bot_assignments a
+             LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=a.bot_identity_id
+            WHERE a.guild_id = ANY($1::text[])
+              AND a.bot_identity_id <> $2
+              AND (bh.last_seen_at IS NULL OR bh.last_seen_at < now()-interval '${FLEET_HEARTBEAT_STALE_SECONDS} seconds')
+              AND NOT EXISTS (
+                SELECT 1
+                  FROM guild_music_bot_assignments current_owner
+                 WHERE current_owner.guild_id=a.guild_id
+                   AND current_owner.bot_identity_id=$2
+              )
+            ORDER BY a.updated_at ASC
+            LIMIT $3
+            FOR UPDATE OF a SKIP LOCKED
+         )
+         UPDATE guild_music_bot_assignments a
+            SET bot_identity_id=$2,updated_at=now()
+           FROM candidates
+          WHERE a.guild_id=candidates.guild_id
+            AND a.bot_identity_id=candidates.bot_identity_id
+            AND a.voice_channel_id=candidates.voice_channel_id
+          RETURNING a.guild_id`,
+        [guildIds, this.identityId, safeLimit]
+      );
+      return result.rows.map((row) => row.guild_id);
+    });
+  }
+
   async listMusicAssignments(guildId: string): Promise<Array<{
     botIdentityId: string;
     voiceChannelId: string;
