@@ -354,6 +354,7 @@ function normalizeId(value: unknown): string | null {
 
 export function normalizeFormFields(value: unknown): FormField[] {
   const raw = Array.isArray(value) ? value : [];
+  if (raw.length > 5) throw new Error("invalid_form_fields");
   const normalized: FormField[] = [];
   const seen = new Set<string>();
   for (const item of raw) {
