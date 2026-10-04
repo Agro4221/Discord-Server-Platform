@@ -46,3 +46,24 @@ test("notification feed filters normalize and templates render supported fields"
     true
   );
 });
+
+
+test("social feed presets generate provider-specific RSS URLs and reject invalid targets", async () => {
+  const { buildSocialFeedUrl } = await import("../src/modules/notifications.js");
+
+  assert.equal(
+    buildSocialFeedUrl("reddit", "r/discordapp"),
+    "https://www.reddit.com/r/discordapp/new/.rss"
+  );
+  assert.equal(
+    buildSocialFeedUrl("youtube", "UC1234567890123456789012"),
+    "https://www.youtube.com/feeds/videos.xml?channel_id=UC1234567890123456789012"
+  );
+  assert.equal(
+    buildSocialFeedUrl("mastodon", "https://mastodon.social/@example"),
+    "https://mastodon.social/@example.rss"
+  );
+  assert.throws(() => buildSocialFeedUrl("reddit", "bad target"), /invalid_reddit_target/);
+  assert.throws(() => buildSocialFeedUrl("youtube", "not-a-channel"), /invalid_youtube_channel/);
+  assert.throws(() => buildSocialFeedUrl("mastodon", "https://mastodon.social/"), /invalid_mastodon_target/);
+});
