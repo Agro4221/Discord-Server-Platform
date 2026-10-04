@@ -20,6 +20,7 @@ import { TicketFormPanel } from "./ticket-form-panel";
 import { RolePanelsEditor } from "./role-panels-editor";
 import { FormsPanel } from "./forms-panel";
 import { OnboardingPanel } from "./onboarding-panel";
+import { LevelingRewardsPanel } from "./leveling-rewards-panel";
 import { ModuleActivityPanel } from "./module-activity-panel";
 import { ConfigPresetsPanel } from "./config-presets-panel";
 
@@ -281,9 +282,10 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "XP", description: "Начисление опыта за сообщения." },
       { title: "Cooldown", description: "Ограничение частоты начисления XP." },
       { title: "Rank", description: "Просмотр собственного или чужого ранга." },
-      { title: "Leaderboard", description: "Таблица лидеров сервера." }
+      { title: "Leaderboard", description: "Таблица лидеров сервера." },
+      { title: "Custom rewards", description: "Награды за уровни: роли, снятие предыдущих наград, DM и milestone-сообщение." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   giveaways: {
     icon: "🎁",
@@ -1656,6 +1658,17 @@ function ModulePage(props: {
           <RolePanelsEditor
             guildId={props.guildId}
             channels={props.resources.channels.filter((item) => item.type === 0)}
+            roles={props.resources.roles}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "leveling" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Level Rewards & Milestones" eyebrow="LEVELING REWARDS" />
+          <LevelingRewardsPanel
+            guildId={props.guildId}
             roles={props.resources.roles}
             onChanged={props.onAudit}
           />
