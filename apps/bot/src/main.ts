@@ -454,6 +454,22 @@ async function main(): Promise<void> {
       end: async (guildId, giveawayId) => giveaways.endGiveaway(giveawayId, guildId),
       reroll: async (guildId, giveawayId) => giveaways.rerollGiveaway(giveawayId, guildId)
     },
+    community: {
+      overview: async (guildId) => ({
+        reputation: await reputation.dashboardLeaderboard(guildId, 8),
+        leveling: await leveling.leaderboard(guildId, 8),
+        giveaways: (await giveaways.list(guildId))
+          .filter((item) => item.status === "running")
+          .slice(0, 5)
+          .map((item) => ({
+            id: item.id,
+            prize: item.prize,
+            winners: item.winners,
+            endsAt: item.endsAt
+          })),
+        polls: await polls.dashboardOpenPolls(guildId, 8)
+      })
+    },
     analytics: {
       report: async (guildId, hours) => analytics.report(guildId, hours),
       getSettings: async (guildId) => analytics.getSettings(guildId),
