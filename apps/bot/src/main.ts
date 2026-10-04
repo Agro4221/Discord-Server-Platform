@@ -234,7 +234,7 @@ async function main(): Promise<void> {
     if (!credentials.enabled) {
       client.destroy();
       botEnabled = false;
-      health.set({ discord: "stopped", status: "degraded" });
+      health.set({ discord: "down", status: "degraded" });
       await identities.heartbeat("stopped", client.guilds.cache.size);
       logger.info("Discord bot disabled from Control Center", { identityId: config.botIdentityId });
       return;
@@ -544,7 +544,7 @@ async function main(): Promise<void> {
       presenceName: storedCredentials?.presenceName
     });
   } else {
-    health.set({ discord: "stopped", status: "degraded", lastError: "Discord bot credentials are not configured" });
+    health.set({ discord: "down", status: "degraded", lastError: "Discord bot credentials are not configured" });
     logger.warn("Discord bot is not configured; Control Center remains available for registration", {
       identityId: config.botIdentityId
     });
