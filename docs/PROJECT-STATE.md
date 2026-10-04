@@ -1,6 +1,10 @@
 # Project State
 
 ## Target
+Self-hosted Discord Server Platform whose central mission is to replace a typical collection of third-party bots and their premium subscriptions with one unified bot/platform under our control. The reference feature pool includes the best useful capabilities found across Carl-bot, Juniper, MEE6, ProBot, Jockie Music and similar bots, implemented independently in our own architecture without proprietary-code copying or artificial premium walls.
+
+**Product north star:** when a server needs moderation, AutoMod, security, utility, roles, community systems, tickets, automation, notifications, analytics or music, the default answer should be **our platform**, not another bot or another subscription.
+
 Self-hosted Discord Server Platform: local-first, resilient, modular, no artificial premium wall, simple UX, optional VPS deployment, optional multi-bot scaling for multiple voice channels.
 
 ## Current branch
