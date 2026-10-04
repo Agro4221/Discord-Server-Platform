@@ -700,3 +700,9 @@ Never write credentials, tokens or private user data here.
 - Core supports event-relative or explicit message targets and keeps failures isolated per action.
 - Dashboard now exposes all three actions.
 - Regression coverage extends the validator with the new message-control references.
+
+## 2026-10-04 — Music playlist/search breadth checkpoint
+- Search results are now enqueued as a bounded multi-track set instead of silently discarding playlist results after the first track.
+- Added a 100-track safety cap for one search result.
+- Auto provider mode now falls back from YouTube text search to YouTube Music and SoundCloud when needed.
+- Slash, prefix and Dashboard playback paths share the same search/queue behavior.

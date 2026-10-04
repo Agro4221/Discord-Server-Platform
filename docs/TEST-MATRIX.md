@@ -486,3 +486,8 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ New action types compile through the shared domain model and validation path.
 - ✅ Dashboard exposes event-relative message targets.
 - ⚠ Actual Discord permissions and message-state behavior remain live-runtime gates.
+
+## 2026-10-04 — Music playlist/search verification
+- ✅ Multi-track result enqueue and 100-track bounding are covered.
+- ✅ Auto provider fallback ordering is covered.
+- ⚠ Actual provider availability and playlist loading remain live Lavalink/provider gates.

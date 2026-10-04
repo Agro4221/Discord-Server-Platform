@@ -25,6 +25,7 @@ import { logger } from "../logger.js";
 
 type MusicRepeatMode = "off" | "track" | "queue";
 export type MusicSearchProvider = "auto" | "youtube" | "youtube_music" | "soundcloud";
+export const MAX_MUSIC_ENQUEUE_TRACKS = 100;
 type MusicSearchSource = "ytsearch" | "ytmsearch" | "scsearch";
 
 const MUSIC_PROVIDER_SOURCES: Record<Exclude<MusicSearchProvider, "auto">, MusicSearchSource> = {
@@ -472,12 +473,12 @@ export class Music implements PlatformModule {
       const query = String(input.query ?? "");
       const provider = normalizeMusicSearchProvider(String(input.provider ?? "auto"));
       if (!provider) throw new Error("invalid_music_provider");
-      const search = buildMusicSearch(provider, query);
-      if (!search) throw new Error("music_query_required");
-      const result = await player.search(search, this.client?.user);
-      if (!result.tracks.length) throw new Error("music_track_not_found");
+      const result = await searchMusicWithFallback(player, provider, query, this.client?.user);
+      if (!result) throw new Error("music_track_not_found");
 
-      player.queue.add(result.tracks[0]!);
+      for (const track of selectMusicEnqueueTracks(result.tracks)) {
+        player.queue.add(track);
+      }
       if (!player.playing) await player.play();
       await this.persistPlayer(player);
       return;
@@ -623,23 +624,21 @@ export class Music implements PlatformModule {
       await player.connect();
     }
 
-    const search = buildMusicSearch(provider, query);
-    if (!search) {
-      await interaction.reply({ content: "Поисковый запрос пуст.", ephemeral: true });
-      return;
-    }
-    const result = await player.search(search, interaction.user);
+    const result = await searchMusicWithFallback(player, provider, query, interaction.user);
 
-    if (!result.tracks.length) {
+    if (!result) {
       await interaction.reply({ content: "Ничего не найдено.", ephemeral: true });
       return;
     }
 
-    player.queue.add(result.tracks[0]!);
+    const tracks = selectMusicEnqueueTracks(result.tracks);
+    for (const track of tracks) player.queue.add(track);
     if (!player.playing) await player.play();
 
+    const firstTrack = tracks[0]!;
+    const suffix = tracks.length > 1 ? ` Добавлено треков: **${tracks.length}** (лимит ${MAX_MUSIC_ENQUEUE_TRACKS}).` : "";
     await interaction.reply({
-      content: `Добавлено в очередь: **${result.tracks[0]!.info.title}** — ${result.tracks[0]!.info.author}`,
+      content: `Добавлено в очередь: **${firstTrack.info.title}** — ${firstTrack.info.author}.${suffix}`,
       ephemeral: true
     });
   }
@@ -974,16 +973,20 @@ export class Music implements PlatformModule {
       }
       if (!nextPlayer.connected) await nextPlayer.connect();
 
-      const source = /^https?:\/\//i.test(query) ? undefined : "ytsearch";
-      const result = await nextPlayer.search(source ? { query, source } : { query }, message.author);
-      if (!result.tracks.length) {
+      const result = await searchMusicWithFallback(nextPlayer, "auto", query, message.author);
+      if (!result) {
         await message.reply("Ничего не найдено.");
         return true;
       }
 
-      nextPlayer.queue.add(result.tracks[0]!);
+      const tracks = selectMusicEnqueueTracks(result.tracks);
+      for (const track of tracks) nextPlayer.queue.add(track);
       if (!nextPlayer.playing) await nextPlayer.play();
-      await message.reply("🎵 Добавлено: " + result.tracks[0]!.info.title + " — " + result.tracks[0]!.info.author);
+      const firstTrack = tracks[0]!;
+      await message.reply(
+        "🎵 Добавлено: " + firstTrack.info.title + " — " + firstTrack.info.author +
+        (tracks.length > 1 ? " · треков добавлено: " + tracks.length : "")
+      );
       return true;
     }
 
@@ -1731,6 +1734,62 @@ export function buildMusicSearch(
   const normalizedQuery = query.replace(/^(ytsearch|ytmsearch|scsearch):\s*/i, "");
   if (!normalizedQuery) return null;
   return { query: normalizedQuery, source: MUSIC_PROVIDER_SOURCES[provider] };
+}
+
+export function buildMusicSearchCandidates(
+  provider: MusicSearchProvider,
+  rawQuery: string
+): Array<{ query: string; source?: MusicSearchSource }> {
+  const primary = buildMusicSearch(provider, rawQuery);
+  if (!primary) return [];
+  if (provider !== "auto" || /^https?:\/\//i.test(rawQuery.trim()) || primary.source !== "ytsearch") {
+    return [primary];
+  }
+  const query = primary.query;
+  return [
+    primary,
+    { query, source: "ytmsearch" },
+    { query, source: "scsearch" }
+  ];
+}
+
+export function selectMusicEnqueueTracks<T>(
+  tracks: readonly T[],
+  limit = MAX_MUSIC_ENQUEUE_TRACKS
+): T[] {
+  const safeLimit = Number.isInteger(limit)
+    ? Math.min(Math.max(limit, 1), MAX_MUSIC_ENQUEUE_TRACKS)
+    : MAX_MUSIC_ENQUEUE_TRACKS;
+  return tracks.filter(Boolean).slice(0, safeLimit);
+}
+
+async function searchMusicWithFallback(
+  player: Player,
+  provider: MusicSearchProvider,
+  rawQuery: string,
+  requester: Parameters<Player["search"]>[1]
+): Promise<{ tracks: Track[] } | null> {
+  let lastError: unknown = null;
+  for (const search of buildMusicSearchCandidates(provider, rawQuery)) {
+    try {
+      const result = await player.search(search, requester);
+      if (result.tracks.length > 0) return result;
+    } catch (error) {
+      lastError = error;
+      logger.warn("Music search provider failed", {
+        provider,
+        source: search.source ?? "url",
+        error: String(error)
+      });
+    }
+  }
+  if (lastError) {
+    logger.warn("Music search exhausted all providers", {
+      provider,
+      error: String(lastError)
+    });
+  }
+  return null;
 }
 
 export function canControlMusic(

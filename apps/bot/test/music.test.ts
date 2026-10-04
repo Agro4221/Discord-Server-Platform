@@ -13,7 +13,10 @@ import {
   hasPersistedMusicPlayback,
   createMusicRecoveryGate,
   normalizeMusicSearchProvider,
-  shouldAutoplayAfterQueueEnd
+  shouldAutoplayAfterQueueEnd,
+  buildMusicSearchCandidates,
+  selectMusicEnqueueTracks,
+  MAX_MUSIC_ENQUEUE_TRACKS
 } from "../src/modules/music.js";
 
 test("music controls require the same voice channel unless Manage Server is granted", () => {
@@ -163,4 +166,29 @@ test("Music player node identity helper is safe for missing and invalid node met
   assert.equal(musicPlayerNodeId({ node: null }), null);
   assert.equal(musicPlayerNodeId({}), null);
   assert.equal(musicPlayerNodeId({ node: { id: "" } }), null);
+});
+
+test("Music auto search falls back across built-in text providers", () => {
+  assert.deepEqual(
+    buildMusicSearchCandidates("auto", "Daft Punk"),
+    [
+      { query: "Daft Punk", source: "ytsearch" },
+      { query: "Daft Punk", source: "ytmsearch" },
+      { query: "Daft Punk", source: "scsearch" }
+    ]
+  );
+  assert.deepEqual(
+    buildMusicSearchCandidates("auto", "ytmsearch: Daft Punk"),
+    [{ query: "ytmsearch: Daft Punk" }]
+  );
+  assert.deepEqual(
+    buildMusicSearchCandidates("soundcloud", "Daft Punk"),
+    [{ query: "Daft Punk", source: "scsearch" }]
+  );
+});
+
+test("Music queue selection enqueues complete search results up to the safety cap", () => {
+  assert.deepEqual(selectMusicEnqueueTracks(["a", "b", "c"], 2), ["a", "b"]);
+  assert.equal(selectMusicEnqueueTracks(Array.from({ length: 150 }, (_, i) => i)).length, MAX_MUSIC_ENQUEUE_TRACKS);
+  assert.equal(MAX_MUSIC_ENQUEUE_TRACKS, 100);
 });

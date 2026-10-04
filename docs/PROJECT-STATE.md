@@ -506,3 +506,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 
 ## 2026-10-04 — Automation message controls
 - Automation now supports remove-reaction plus pin/unpin message actions in the persisted rule model and Dashboard builder.
+
+## 2026-10-04 — Music playlist/search breadth
+- Multi-track Music search results are preserved up to a bounded 100-track queue insertion limit.
+- Auto text search can fall back across the built-in YouTube, YouTube Music and SoundCloud sources.
