@@ -45,7 +45,7 @@ import { ContextCommandService } from "./context-commands.js";
 let fatalCleanup: (() => Promise<void>) | undefined;
 
 async function main(): Promise<void> {
-  const config = loadConfig();
+  let config = loadConfig();
   const health = new HealthServer();
   const database = new Database(config.databaseUrl);
   const moduleSettings = new ModuleSettingsRepository(database);
@@ -71,8 +71,17 @@ async function main(): Promise<void> {
   try {
     await database.ping();
     await migrate(database);
+    const runtimeCredentials = await botCredentials.resolveRuntimeCredentials(
+      config.botIdentityId,
+      config.discordToken || undefined,
+      config.discordClientId || undefined
+    );
+    config = {
+      ...config,
+      discordToken: runtimeCredentials.token,
+      discordClientId: runtimeCredentials.clientId
+    };
     await identities.ensureIdentity(config.botIdentityId, config.discordClientId);
-    await botCredentials.bootstrapFromEnvironment(config.botIdentityId, config.discordToken);
     await identities.refreshAssignments();
     health.set({ database: "ready" });
     await identities.heartbeat("starting", 0).catch((error) => {

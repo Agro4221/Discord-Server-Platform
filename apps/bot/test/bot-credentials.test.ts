@@ -17,11 +17,24 @@ test("Discord token input is bounded", () => {
 });
 
 test("credential vault encrypts and decrypts without plaintext storage", async () => {
-  const stored: Record<string, unknown> = {};
+  const stored: Record<string, any> = {};
   const db = {
     query: async (text: string, values?: unknown[]) => {
       if (text.startsWith("SELECT token_ciphertext")) {
-        return { rows: stored.value ? [stored.value] : [] };
+        return { rows: stored.value ? [stored.value] : [], rowCount: stored.value ? 1 : 0 };
+      }
+      if (text.startsWith("SELECT bi.client_id")) {
+        return {
+          rows: stored.identity
+            ? [{
+                client_id: stored.identity.client_id,
+                token_ciphertext: stored.value?.token_ciphertext ?? null,
+                token_iv: stored.value?.token_iv ?? null,
+                token_auth_tag: stored.value?.token_auth_tag ?? null
+              }]
+            : [],
+          rowCount: stored.identity ? 1 : 0
+        };
       }
       if (text.startsWith("INSERT INTO bot_credentials")) {
         stored.value = {
@@ -29,23 +42,66 @@ test("credential vault encrypts and decrypts without plaintext storage", async (
           token_iv: values?.[2],
           token_auth_tag: values?.[3]
         };
+        return { rows: [], rowCount: 1 };
       }
-      return { rows: [] };
+      return { rows: [], rowCount: 1 };
     },
     transaction: async () => undefined
   } as never;
 
   const vault = new BotCredentialsService(db, KEY);
-  await vault.bootstrapFromEnvironment("primary", TOKEN);
-  const cipher = String((stored.value as Record<string, unknown>).token_ciphertext);
+  stored.identity = { client_id: "123456789012345678" };
+
+  assert.equal(await vault.bootstrapFromEnvironment("primary", TOKEN), true);
+  const cipher = String(stored.value.token_ciphertext);
   assert.equal(cipher.includes(TOKEN), false);
   assert.notEqual(cipher, TOKEN);
   assert.equal(await vault.getToken("primary"), TOKEN);
+
+  const runtime = await vault.resolveRuntimeCredentials(
+    "primary",
+    "synthetic-environment-token-" + "y".repeat(40),
+    "999999999999999999"
+  );
+  assert.equal(runtime.source, "database");
+  assert.equal(runtime.token, TOKEN);
+  assert.equal(runtime.clientId, "123456789012345678");
+
+  assert.equal(await vault.bootstrapFromEnvironment("primary", "synthetic-environment-token-" + "y".repeat(40)), false);
 });
 
 test("vault rejects invalid encryption keys", () => {
   assert.throws(
     () => new BotCredentialsService({} as never, "not-a-key"),
     /BOT_CREDENTIALS_ENCRYPTION_KEY/
+  );
+});
+
+
+test("runtime credential resolution fails closed after stored credential corruption", async () => {
+  const stored: Record<string, any> = {
+    value: {
+      token_ciphertext: "bad",
+      token_iv: "bad",
+      token_auth_tag: "bad"
+    },
+    identity: { client_id: "123456789012345678" }
+  };
+  const db = {
+    query: async (text: string) => {
+      if (text.startsWith("SELECT bi.client_id")) return { rows: [{
+        client_id: stored.identity.client_id,
+        token_ciphertext: stored.value.token_ciphertext,
+        token_iv: stored.value.token_iv,
+        token_auth_tag: stored.value.token_auth_tag
+      }] };
+      return { rows: [] };
+    },
+    transaction: async () => undefined
+  } as never;
+  const vault = new BotCredentialsService(db, KEY);
+  await assert.rejects(
+    vault.resolveRuntimeCredentials("primary", "synthetic-new-token-" + "z".repeat(30)),
+    /invalid_stored_bot_credential/
   );
 });

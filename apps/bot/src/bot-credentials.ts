@@ -49,20 +49,64 @@ export class BotCredentialsService {
     this.key = Buffer.from(normalized, "hex");
   }
 
-  async bootstrapFromEnvironment(identityId: string, token: string): Promise<void> {
+  async bootstrapFromEnvironment(identityId: string, token: string): Promise<boolean> {
     const encrypted = this.encrypt(token);
-    await this.db.query(
+    const result = await this.db.query(
       `INSERT INTO bot_credentials(
          bot_identity_id,token_ciphertext,token_iv,token_auth_tag,token_fingerprint
        ) VALUES($1,$2,$3,$4,$5)
-       ON CONFLICT(bot_identity_id)
-       DO UPDATE SET token_ciphertext=EXCLUDED.token_ciphertext,
-                     token_iv=EXCLUDED.token_iv,
-                     token_auth_tag=EXCLUDED.token_auth_tag,
-                     token_fingerprint=EXCLUDED.token_fingerprint,
-                     updated_at=now()`,
+       ON CONFLICT(bot_identity_id) DO NOTHING`,
       [identityId, encrypted.ciphertext, encrypted.iv, encrypted.authTag, encrypted.fingerprint]
     );
+    return result.rowCount === 1;
+  }
+
+  async resolveRuntimeCredentials(
+    identityId: string,
+    environmentToken?: string,
+    environmentClientId?: string
+  ): Promise<{ token: string; clientId: string; source: "database" | "bootstrap" }> {
+    const identityResult = await this.db.query<{
+      client_id: string;
+      token_ciphertext: string | null;
+      token_iv: string | null;
+      token_auth_tag: string | null;
+    }>(
+      `SELECT bi.client_id,bc.token_ciphertext,bc.token_iv,bc.token_auth_tag
+         FROM bot_identities bi
+         LEFT JOIN bot_credentials bc ON bc.bot_identity_id=bi.id
+        WHERE bi.id=$1`,
+      [identityId]
+    );
+
+    const row = identityResult.rows[0];
+    if (
+      row &&
+      row.token_ciphertext !== null &&
+      row.token_iv !== null &&
+      row.token_auth_tag !== null
+    ) {
+      const token = this.decrypt({
+        token_ciphertext: row.token_ciphertext,
+        token_iv: row.token_iv,
+        token_auth_tag: row.token_auth_tag
+      });
+      return { token, clientId: row.client_id, source: "database" };
+    }
+
+    if (!environmentToken?.trim()) {
+      throw new Error("discord_credentials_not_configured");
+    }
+
+    const result = await this.register({
+      identityId,
+      token: environmentToken,
+      ...(environmentClientId?.trim() ? { clientId: environmentClientId.trim() } : {})
+    });
+    const token = await this.getToken(identityId);
+    if (!token) throw new Error("discord_credentials_bootstrap_failed");
+
+    return { token, clientId: result.clientId, source: "bootstrap" };
   }
 
   async getToken(identityId: string): Promise<string | null> {

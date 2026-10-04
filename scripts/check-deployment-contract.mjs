@@ -12,6 +12,7 @@ if (!versions.length || versions.some((version, index) => version !== index + 1)
 const envExample = await readFile(".env.example", "utf8");
 const requiredEnv = [
   "MANAGEMENT_API_KEY",
+  "BOT_CREDENTIALS_ENCRYPTION_KEY",
   "DATABASE_URL",
   "LAVALINK_PASSWORD"
 ];
