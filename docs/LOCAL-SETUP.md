@@ -1,6 +1,6 @@
 # Local Setup
 
-This project is local-first. The supported everyday setup is Docker Compose on the user's PC; the same topology can later move to a VPS.
+This project is local-first. The supported everyday setup is native Windows without Docker Desktop; the same application architecture can later move to a VPS. Docker Compose remains an optional deployment path.
 
 ## Native Windows mode
 
@@ -14,37 +14,45 @@ Use -Lavalink2 only when you explicitly need a second Lavalink node for redundan
 
 ## Windows: one-command local start
 
-Install Docker Desktop, clone the repository, and from the repository directory run:
+Install Node.js 24.17+, PostgreSQL, Java compatible with the selected Lavalink release and a Lavalink JAR. Clone the repository, then run:
 
-    powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1
+    .\start-native.bat
 
-On the first launch the script creates `.env`, asks for the Discord bot token, Discord client ID and Dashboard admin password, then generates the local management/database/Lavalink/session secrets.
+Use `-Dashboard` when you need the local Control Center and `-Lavalink2` only for a two-node redundancy run.
 
-After the services become healthy it opens the local Control Center automatically:
+On the first launch the native launcher creates `.env`, asks only for the Discord bot token and Discord client ID, then generates the Management API key, bot-credential encryption key and Lavalink password. The local Control Center has no end-user login.
+
+When `-Dashboard` is requested and the services become healthy, it opens the local Control Center automatically:
 
     http://127.0.0.1:3000/
 
-The Management API remains bound to loopback and is not intended to be exposed directly to the internet.
+The Management API and Dashboard are bound to loopback in native mode and are not intended to be exposed directly to the internet.
+
+After startup, run the read-only native release gate:
+
+    powershell -ExecutionPolicy Bypass -File .\scripts\release-gate-native.ps1
 
 ## Useful launcher options
 
-    powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1 -Rebuild
+    .\start-native.bat -Dashboard
 
-Rebuild images before starting the stack.
+Start the Control Center.
 
-    powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1 -NoOpen
+    .\start-native.bat -Lavalink2
 
-Start everything without opening the browser.
+Start the optional second Lavalink node.
 
-    powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1 -Down
+    .\start-native.bat -Rebuild
 
-Stop the local stack.
+Rebuild native domain/bot output before starting.
+
+    .\start-native.bat -Down
+
+Stop the native Bot, Fleet supervisor, Dashboard and Lavalink processes started by the launcher.
 
 ## What runs locally
 
-Docker Compose starts PostgreSQL, two Lavalink nodes, the bot and the Next.js Control Center. Persistent PostgreSQL data is stored in the `dsp-postgres` Docker volume.
-
-The bot exposes health and Management API ports only on `127.0.0.1`. The Dashboard is also loopback-only by default.
+Native mode uses the separately installed PostgreSQL service, Java/Lavalink process(es), Node.js Bot process, optional Next.js Control Center and a lightweight PowerShell Fleet supervisor. No Docker Desktop or WSL layer is required.
 
 ## First Discord setup
 
@@ -54,25 +62,18 @@ For command development, set `DISCORD_TEST_GUILD_ID` in `.env` so slash commands
 
 ## Troubleshooting
 
-See container state with:
+Native process state and logs are stored under `.native-runtime/`.
 
-    docker compose ps
+Bot logs:
 
-See bot logs with:
+    .native-runtime/logs/bot.out.log
+    .native-runtime/logs/bot.err.log
 
-    docker compose logs -f bot
+Fleet logs:
 
-See Dashboard logs with:
+    .native-runtime/logs/fleet-reconciler.log
 
-    docker compose logs -f dashboard
-
-Restart the stack with:
-
-    docker compose restart
-
-Remove containers without deleting the PostgreSQL volume with:
-
-    docker compose down
+Run the read-only release gate to identify which prerequisite is failing.
 
 Do not commit `.env`. Secrets stay in the local environment.
 

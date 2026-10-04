@@ -400,3 +400,12 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Authenticated Fleet inspection remains protected by the internal bearer key.
 - ✅ CI #1708 passed all automated checks, tests and builds.
 - ⚠ Final live acceptance remains environment-dependent: real Discord, Lavalink, Windows/Docker multi-bot runtime, chaos/soak/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Native Windows runtime / Fleet verification
+- ☐ Native launcher bootstrap: Bot credentials, required secrets and Lavalink process startup.
+- ☐ Native Fleet: secondary identity registration → process start → heartbeat ready → restart-required rotation → process replacement.
+- ☐ Native Fleet outage: Management API unavailable must fail the reconciliation cycle without destroying healthy processes.
+- ☐ Native release gate: Bot health, Management API 401/authenticated access, secondary PID state, optional Dashboard and Lavalink readiness.
+- ☐ Real Windows process lifetime, Discord Gateway, permissions/hierarchy and Lavalink audio continuity remain environment-dependent.
+- Automated CI verification is the next checkpoint.

@@ -230,8 +230,11 @@ try {
   if ($Down) {
     Stop-NativeProcess "dashboard"
     Stop-NativeProcess "bot"
+    Stop-NativeProcess "fleet"
     Stop-NativeProcess "lavalink2"
     Stop-NativeProcess "lavalink"
+    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ".\scripts\reconcile-fleet-native.ps1" -Down
+    if ($LASTEXITCODE -ne 0) { throw "Native Bot Fleet cleanup failed with exit code $LASTEXITCODE." }
     Write-Host "Native Vexa processes stopped."
     exit 0
   }
@@ -255,12 +258,8 @@ try {
     Set-EnvValue "DISCORD_CLIENT_ID" $clientId
   }
 
-  if ([string]::IsNullOrWhiteSpace((Get-EnvValue "DASHBOARD_AUTH_REQUIRED"))) {
-    Set-EnvValue "DASHBOARD_AUTH_REQUIRED" "false"
-  }
-
   Ensure-Secret "MANAGEMENT_API_KEY" 48
-  Ensure-Secret "DASHBOARD_SESSION_SECRET" 48
+  Ensure-Secret "BOT_CREDENTIALS_ENCRYPTION_KEY" 64
   Ensure-Secret "LAVALINK_PASSWORD" 24
 
   Import-EnvFile
@@ -360,8 +359,10 @@ try {
     $dashboardPort = Get-EnvValue "DASHBOARD_PORT"
     if ([string]::IsNullOrWhiteSpace($dashboardPort)) { $dashboardPort = "3000" }
 
+    $managementPort = Get-EnvValue "MANAGEMENT_API_PORT"
+    if ([string]::IsNullOrWhiteSpace($managementPort)) { $managementPort = "3002" }
     $env:BOT_HEALTH_URL = $healthUrl
-    $env:MANAGEMENT_API_URL = "http://127.0.0.1:3002"
+    $env:MANAGEMENT_API_URL = "http://127.0.0.1:$managementPort"
 
     Start-NativeProcess "dashboard" "npm.cmd" @("run", "start", "-w", "apps/dashboard") (Get-Location).Path "dashboard"
 
@@ -380,6 +381,11 @@ try {
   Write-Host "Bot health: $healthUrl"
   Write-Host "Logs: $logRoot"
 
+  & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ".\scripts\reconcile-fleet-native.ps1" -Loop
+  if ($LASTEXITCODE -ne 0) {
+    throw "Native Bot Fleet supervisor could not be started."
+  }
+
   if ($Dashboard) {
     Write-Host "Control Center: $dashboardUrl"
     if (-not $NoOpen) { Start-Process $dashboardUrl }
@@ -388,6 +394,7 @@ try {
   }
 
   Write-Host ""
+  Write-Host "Native Fleet supervisor: enabled for registered secondary Bot Identities."
   Write-Host "For Sea of Thieves + OBS/RTMP, keep the default single-Lavalink mode."
   exit 0
 } catch {

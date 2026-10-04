@@ -21,6 +21,8 @@ The second Lavalink node is optional:
 
     start-native.bat -Lavalink2
 
+Registered secondary Bot Identities are supervised natively by the launcher without Docker. Each secondary process uses its own `BOT_IDENTITY_ID`, reads its encrypted Discord token from PostgreSQL and writes its PID/logs under `.native-runtime/`.
+
 For a single-PC gaming setup, the default one-node mode is the normal choice. The second node exists for redundancy/failover scenarios and is not required for ordinary music playback.
 
 ## Native requirements
@@ -57,6 +59,16 @@ Stop only the Vexa processes started by the native launcher:
     start-native.bat -Down
 
 The launcher stores temporary PIDs and logs under .native-runtime/, which is ignored by Git.
+
+## Native release gate
+
+Run the non-destructive native preflight after startup:
+
+    powershell -ExecutionPolicy Bypass -File .\scripts\release-gate-native.ps1
+
+Add `-Dashboard` when the Control Center is expected to be running. Add `-RequireLavalink2` only for a two-node acceptance run.
+
+The native gate checks the primary Bot process, Bot health/readiness, Management API authentication, enabled Fleet identities, native secondary-process PID state, Dashboard reachability when requested and the configured Lavalink nodes.
 
 ## Docker mode
 

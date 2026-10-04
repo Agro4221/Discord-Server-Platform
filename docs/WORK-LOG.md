@@ -630,3 +630,12 @@ Never write credentials, tokens or private user data here.
 - CI #1708 passed the complete automated pipeline on commit `c37fc2ef7919544c32457574abf9c5707d0cdb1a`.
 ### Current boundary
 - Repository-side release-gate hardening is complete for the implemented local architecture; remaining work is live environment acceptance.
+
+
+## 2026-10-04 — Native Windows runtime / Fleet checkpoint
+- Switched the documented everyday local workflow to native Windows; Docker is now explicitly optional.
+- Fixed native startup secret bootstrap: `BOT_CREDENTIALS_ENCRYPTION_KEY` is generated, while removed Dashboard session/auth state is no longer created.
+- Fixed native Dashboard wiring to use the configured `MANAGEMENT_API_PORT` instead of the Docker-default port.
+- Added `scripts/reconcile-fleet-native.ps1`: registered secondary identities are supervised as ordinary Node processes, with PID/log tracking, restart-request handling and fail-closed Management API access.
+- Added `scripts/release-gate-native.ps1` for read-only native runtime acceptance checks.
+- Updated native/local setup documentation and CI deployment contracts.

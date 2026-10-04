@@ -60,6 +60,41 @@ if (!localLauncher.includes("reconcile-fleet.ps1")) {
   throw new Error("Local launcher must reconcile the registered Bot Fleet");
 }
 
+const nativeLauncher = await readFile("scripts/start-native.ps1", "utf8");
+for (const expected of [
+  "BOT_CREDENTIALS_ENCRYPTION_KEY",
+  "reconcile-fleet-native.ps1",
+  "MANAGEMENT_API_URL = \"http://127.0.0.1:$managementPort\""
+]) {
+  if (!nativeLauncher.includes(expected)) {
+    throw new Error("Native launcher contract missing: " + expected);
+  }
+}
+for (const forbidden of [
+  "DASHBOARD_SESSION_SECRET",
+  "DASHBOARD_AUTH_REQUIRED"
+]) {
+  if (nativeLauncher.includes(forbidden)) {
+    throw new Error("Native launcher must not recreate removed Dashboard auth state: " + forbidden);
+  }
+}
+
+const nativeFleet = await readFile("scripts/reconcile-fleet-native.ps1", "utf8");
+for (const expected of [
+  "api/fleet",
+  "BOT_IDENTITY_ID",
+  ".native-runtime",
+  "Start-Process",
+  "taskkill.exe",
+  "-Loop",
+  "-Down",
+  "ERROR management API unavailable"
+]) {
+  if (!nativeFleet.includes(expected)) {
+    throw new Error("Native Fleet reconciler contract missing: " + expected);
+  }
+}
+
 const releaseGate = await readFile("scripts/release-gate.ps1", "utf8");
 for (const contract of [
   "Get-EnvValue",

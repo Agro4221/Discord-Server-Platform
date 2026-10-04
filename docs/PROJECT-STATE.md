@@ -448,3 +448,13 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-04 — Release-gate authentication verification
 - Management API unauthenticated access is rejected by the local release gate before credentialed Fleet inspection.
 - CI #1708 passed the complete automated pipeline; latest verified development code: `c37fc2ef7919544c32457574abf9c5707d0cdb1a`.
+
+
+## 2026-10-04 — Native Windows runtime becomes the primary local path
+- Native Windows mode is now treated as the primary everyday local deployment path; Docker remains optional for VPS/reproducible deployment.
+- Native startup now generates the required `BOT_CREDENTIALS_ENCRYPTION_KEY` and no longer creates removed Dashboard end-user authentication state.
+- Native Dashboard Management API URL now follows `MANAGEMENT_API_PORT` instead of a hard-coded Docker-era port.
+- Added a native Fleet supervisor that starts/stops/restarts registered secondary Bot Identities as ordinary Windows processes using encrypted PostgreSQL credentials.
+- Added the native non-destructive release gate for Bot/Fleet/Management API/Dashboard/Lavalink readiness.
+- This checkpoint is designed for low-overhead local use and does not require Docker Desktop.
+- Automated verification for this checkpoint is the next CI target.
