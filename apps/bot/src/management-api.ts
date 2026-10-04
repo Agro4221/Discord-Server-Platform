@@ -174,7 +174,8 @@ export class ManagementApiServer {
         });
 
         try {
-          if (!this.allowedRate(ip)) {
+          const requestRateLimit = requestPath === "/api/fleet/register" ? 10 : 120;
+          if (!this.allowedRate(ip, requestRateLimit)) {
             this.json(res, 429, { error: "rate_limited" });
             return;
           }
@@ -2266,7 +2267,7 @@ export class ManagementApiServer {
     return received.length === expected.length && timingSafeEqual(received, expected);
   }
 
-  private allowedRate(key: string): boolean {
+  private allowedRate(key: string, limit = 120): boolean {
     const now = Date.now();
     const window = this.rateWindows.get(key);
 
@@ -2276,7 +2277,7 @@ export class ManagementApiServer {
     }
 
     window.count += 1;
-    return window.count <= 120;
+    return window.count <= limit;
   }
 
   private json(res: ServerResponse, status: number, body: unknown): void {
