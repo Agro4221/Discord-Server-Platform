@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canControlMusic, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
+import {
+  buildMusicSearch,
+  canControlMusic,
+  musicNodeHealth,
+  normalizeMusicRepeatMode,
+  normalizeMusicSearchProvider,
+  shouldAutoplayAfterQueueEnd
+} from "../src/modules/music.js";
 
 test("music controls require the same voice channel unless Manage Server is granted", () => {
   assert.equal(canControlMusic("voice-1", "voice-1", false), true);
@@ -43,3 +50,22 @@ test("Music node health is degraded only when every Lavalink node is unavailable
 });
 
 
+
+
+test("Music provider normalization supports the built-in Lavalink search sources", () => {
+  assert.equal(normalizeMusicSearchProvider("auto"), "auto");
+  assert.equal(normalizeMusicSearchProvider("YouTube"), "youtube");
+  assert.equal(normalizeMusicSearchProvider("youtube_music"), "youtube_music");
+  assert.equal(normalizeMusicSearchProvider("SoundCloud"), "soundcloud");
+  assert.equal(normalizeMusicSearchProvider("spotify"), null);
+});
+
+test("Music search builder preserves URLs, explicit prefixes and provider selection", () => {
+  assert.deepEqual(buildMusicSearch("auto", "ytmsearch: Daft Punk"), { query: "ytmsearch: Daft Punk" });
+  assert.deepEqual(buildMusicSearch("auto", "Daft Punk"), { query: "Daft Punk", source: "ytsearch" });
+  assert.deepEqual(buildMusicSearch("youtube", "Daft Punk"), { query: "Daft Punk", source: "ytsearch" });
+  assert.deepEqual(buildMusicSearch("youtube_music", "ytsearch: Daft Punk"), { query: "Daft Punk", source: "ytmsearch" });
+  assert.deepEqual(buildMusicSearch("soundcloud", "Daft Punk"), { query: "Daft Punk", source: "scsearch" });
+  assert.deepEqual(buildMusicSearch("soundcloud", "https://soundcloud.com/example/track"), { query: "https://soundcloud.com/example/track" });
+  assert.equal(buildMusicSearch("auto", "   "), null);
+});
