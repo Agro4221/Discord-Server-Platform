@@ -47,7 +47,18 @@ export function nextMusicQueueRepeatMode(mode: MusicRepeatMode): MusicRepeatMode
 export function clampMusicVolume(value: number): number {
   return Math.min(200, Math.max(0, Math.round(value)));
 }
-export function buildMusicQueueExport(tracks: Track[]): string {
+type MusicQueueTrackLike = {
+  info: {
+    identifier?: string;
+    title?: string;
+    author?: string | null;
+    duration?: number;
+    uri?: string | null;
+  };
+  requester?: { id?: string };
+};
+
+export function buildMusicQueueExport(tracks: MusicQueueTrackLike[]): string {
   return JSON.stringify({
     schemaVersion: 1,
     exportedAt: new Date().toISOString(),
@@ -63,7 +74,7 @@ export function buildMusicQueueExport(tracks: Track[]): string {
   }, null, 2);
 }
 
-export function buildMusicQueueShare(tracks: Track[]): string {
+export function buildMusicQueueShare(tracks: MusicQueueTrackLike[]): string {
   const lines = tracks.map((track, index) => {
     const requester = typeof track.requester?.id === "string" ? " · <@" + track.requester.id + ">" : "";
     const uri = (track.info as typeof track.info & { uri?: string | null }).uri;
