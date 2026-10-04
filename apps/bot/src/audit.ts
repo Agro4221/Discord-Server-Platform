@@ -134,28 +134,19 @@ export class AuditLog {
     }
 
     if (options.action) {
-      const pattern = "%" + options.action.trim().replace(/[%_]/g, "\\    if (options.action) {
       const pattern = "%" + options.action.trim().replace(/[%_]/g, "\\$&") + "%";
-      values.push(pattern);
-      conditions.push("action ILIKE $" + values.length + " ESCAPE '\\'");
-    }
-
-    if (options.actorUserId) {") + "%";
       values.push(pattern);
       conditions.push("action ILIKE $" + values.length + " ESCAPE '\\'");
     }
 
     if (options.actionPrefixes?.length) {
-      const prefixes = [...new Set(options.actionPrefixes.map((value) => value.trim()).filter(Boolean))].slice(0, 20);
+      const prefixes = [...new Set(
+        options.actionPrefixes.map((value) => value.trim()).filter(Boolean)
+      )].slice(0, 20);
+
       if (prefixes.length) {
         const prefixConditions = prefixes.map((prefix) => {
-          values.push(prefix.replace(/[%_]/g, "\\    if (options.action) {
-      const pattern = "%" + options.action.trim().replace(/[%_]/g, "\\$&") + "%";
-      values.push(pattern);
-      conditions.push("action ILIKE $" + values.length + " ESCAPE '\\'");
-    }
-
-    if (options.actorUserId) {") + "%");
+          values.push(prefix.replace(/[%_]/g, "\\$&") + "%");
           return "action ILIKE $" + values.length + " ESCAPE '\\'";
         });
         conditions.push("(" + prefixConditions.join(" OR ") + ")");
@@ -196,5 +187,4 @@ export class AuditLog {
       values
     );
     return result.rows;
-  }
-}
+  }}
