@@ -23,6 +23,7 @@ type SecurityConfig = {
   removeExecutorRoles: boolean;
   executorTimeoutMinutes: number;
   executorBanEnabled: boolean;
+  autoLockdown: boolean;
 };
 
 export class Security implements PlatformModule {
@@ -133,8 +134,9 @@ export class Security implements PlatformModule {
       remove_executor_roles: boolean;
       executor_timeout_minutes: number;
       executor_ban_enabled: boolean;
+      auto_lockdown: boolean;
     }>(
-      "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id,incident_duration_seconds,auto_quarantine,remove_executor_roles,executor_timeout_minutes,executor_ban_enabled FROM security_settings WHERE guild_id=$1",
+      "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id,incident_duration_seconds,auto_quarantine,remove_executor_roles,executor_timeout_minutes,executor_ban_enabled,auto_lockdown FROM security_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -150,7 +152,8 @@ export class Security implements PlatformModule {
       autoQuarantine: row?.auto_quarantine ?? true,
       removeExecutorRoles: row?.remove_executor_roles ?? true,
       executorTimeoutMinutes: clampSecurityExecutorTimeoutMinutes(row?.executor_timeout_minutes ?? 0),
-      executorBanEnabled: row?.executor_ban_enabled ?? false
+      executorBanEnabled: row?.executor_ban_enabled ?? false,
+      autoLockdown: row?.auto_lockdown ?? false
     };
   }
 
@@ -160,9 +163,9 @@ export class Security implements PlatformModule {
     await this.db.query(
       `INSERT INTO security_settings(
         guild_id,enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,
-        quarantine_role_id,log_channel_id,incident_duration_seconds,auto_quarantine,remove_executor_roles,executor_timeout_minutes,executor_ban_enabled
+        quarantine_role_id,log_channel_id,incident_duration_seconds,auto_quarantine,remove_executor_roles,executor_timeout_minutes,executor_ban_enabled,auto_lockdown
       )
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
       ON CONFLICT(guild_id) DO UPDATE SET
         enabled=EXCLUDED.enabled,
         max_joins=EXCLUDED.max_joins,
@@ -176,6 +179,7 @@ export class Security implements PlatformModule {
         remove_executor_roles=EXCLUDED.remove_executor_roles,
         executor_timeout_minutes=EXCLUDED.executor_timeout_minutes,
         executor_ban_enabled=EXCLUDED.executor_ban_enabled,
+        auto_lockdown=EXCLUDED.auto_lockdown,
         updated_at=now()`,
       [
         guildId,
@@ -190,7 +194,8 @@ export class Security implements PlatformModule {
         next.autoQuarantine,
         next.removeExecutorRoles,
         clampSecurityExecutorTimeoutMinutes(next.executorTimeoutMinutes),
-        next.executorBanEnabled
+        next.executorBanEnabled,
+        next.autoLockdown
       ]
     );
     await this.db.query(
@@ -199,6 +204,49 @@ export class Security implements PlatformModule {
        ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=now()`,
       [guildId, next.enabled]
     );
+  }
+
+  private async applyIncidentLockdown(guild: import("discord.js").Guild, incidentId: number, config: SecurityConfig): Promise<void> {
+    if (!config.autoLockdown) return;
+
+    const botMember = guild.members.me;
+    if (!botMember?.permissions.has(PermissionFlagsBits.ManageChannels)) return;
+    const everyone = guild.roles.everyone;
+
+    for (const channel of guild.channels.cache.values()) {
+      if (!channel.isTextBased() || !("permissionOverwrites" in channel)) continue;
+      const channelPermissions = channel.permissionsFor(botMember);
+      if (!channelPermissions?.has(PermissionFlagsBits.ManageChannels)) continue;
+
+      try {
+        const existing = await this.db.query<{ incident_id: string }>(
+          "SELECT incident_id FROM security_channel_locks WHERE guild_id=$1 AND channel_id=$2 AND restored_at IS NULL LIMIT 1",
+          [guild.id, channel.id]
+        );
+        const owned = existing.rows.length === 0;
+        const previous = channel.permissionsFor(everyone)?.has(PermissionFlagsBits.SendMessages) ?? null;
+
+        await this.db.query(
+          "INSERT INTO security_channel_locks(incident_id,guild_id,channel_id,previous_send_messages,owned) VALUES($1,$2,$3,$4,$5) ON CONFLICT(incident_id,channel_id) DO NOTHING",
+          [incidentId, guild.id, channel.id, owned ? previous : null, owned]
+        );
+
+        if (owned) {
+          await channel.permissionOverwrites.edit(
+            everyone,
+            { SendMessages: false },
+            { reason: "Security incident lockdown" }
+          );
+        }
+      } catch (error) {
+        logger.warn("Security incident channel lockdown failed", {
+          guildId: guild.id,
+          incidentId,
+          channelId: channel.id,
+          error: String(error)
+        });
+      }
+    }
   }
 
   private async restoreActiveIncidents(): Promise<void> {
@@ -351,6 +399,50 @@ export class Security implements PlatformModule {
       await this.db.query(
         "UPDATE security_quarantine_assignments SET restored_at=now() WHERE incident_id=$1 AND user_id=$2 AND role_id=$3",
         [incidentId, assignment.user_id, assignment.role_id]
+      );
+    }
+
+    const lockAssignments = await this.db.query<{
+      channel_id: string;
+      previous_send_messages: boolean | null;
+      owned: boolean;
+    }>(
+      "SELECT channel_id,previous_send_messages,owned FROM security_channel_locks WHERE incident_id=$1 AND restored_at IS NULL",
+      [incidentId]
+    );
+
+    for (const assignment of lockAssignments.rows) {
+      if (assignment.owned) {
+        const otherLock = await this.db.query<{ incident_id: string }>(
+          "SELECT incident_id FROM security_channel_locks WHERE guild_id=$1 AND channel_id=$2 AND incident_id<>$3 AND restored_at IS NULL AND owned=true LIMIT 1",
+          [guildId, assignment.channel_id, incidentId]
+        );
+        if (!otherLock.rows.length) {
+          const channel = guild.channels.cache.get(assignment.channel_id);
+          if (channel?.isTextBased() && "permissionOverwrites" in channel) {
+            try {
+              await channel.permissionOverwrites.edit(
+                guild.roles.everyone,
+                { SendMessages: assignment.previous_send_messages },
+                { reason: "Security incident ended" }
+              );
+            } catch (error) {
+              cleanupFailed = true;
+              logger.warn("Security lockdown channel restore failed", {
+                guildId,
+                incidentId,
+                channelId: assignment.channel_id,
+                error: String(error)
+              });
+              continue;
+            }
+          }
+        }
+      }
+
+      await this.db.query(
+        "UPDATE security_channel_locks SET restored_at=now() WHERE incident_id=$1 AND channel_id=$2 AND restored_at IS NULL",
+        [incidentId, assignment.channel_id]
       );
     }
 
@@ -507,6 +599,7 @@ export class Security implements PlatformModule {
       joins: bucket.length,
       windowSeconds: config.windowSeconds
     });
+    await this.applyIncidentLockdown(member.guild, incident.id, config);
     const raidMetadata = { joins: bucket.length, windowSeconds: config.windowSeconds, incidentId: incident.id, incidentDurationSeconds: config.incidentDurationSeconds };
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'raid-detected',$2::jsonb)",
@@ -583,6 +676,8 @@ export class Security implements PlatformModule {
       actions: bucket.length,
       windowSeconds: config.destructiveWindowSeconds
     });
+    const incidentGuild = this.client?.guilds.cache.get(guildId);
+    if (incidentGuild) await this.applyIncidentLockdown(incidentGuild, incident.id, config);
     const burstMetadata = { type, actions: bucket.length, windowSeconds: config.destructiveWindowSeconds, incidentId: incident.id, incidentDurationSeconds: config.incidentDurationSeconds };
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'destructive-burst',$2::jsonb)",
