@@ -606,13 +606,15 @@ export class RolePanels implements PlatformModule {
     componentType: RolePanelComponentType = "buttons"
   ): PanelComponentRow {
     if (componentType === "select") {
-      const maxValues = selectionMode === "max"
-        ? Math.min(Math.max(Math.trunc(maxSelections), 1), roles.length)
-        : 1;
+      const maxValues = selectionMode === "exclusive"
+        ? 1
+        : selectionMode === "max"
+          ? Math.min(Math.max(Math.trunc(maxSelections), 1), roles.length)
+          : roles.length;
       return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId("dsp:role-select:" + panelId)
-          .setPlaceholder(selectionMode === "max" ? "Выберите роли" : "Выберите роль")
+          .setPlaceholder(selectionMode === "exclusive" ? "Выберите роль" : "Выберите роли")
           .setMinValues(0)
           .setMaxValues(maxValues)
           .addOptions(roles.slice(0,5).map((role) => ({ label: role.label.slice(0,100), value: role.roleId })))
@@ -713,9 +715,11 @@ export class RolePanels implements PlatformModule {
 
     const allowed = new Set((row.roles ?? []).map((entry) => entry.roleId));
     const selected = [...new Set(interaction.values)].filter((roleId) => allowed.has(roleId));
-    const maxSelections = row.selection_mode === "max"
-      ? Math.min(Math.max(Number(row.max_selections ?? 1), 1), allowed.size || 1)
-      : 1;
+    const maxSelections = row.selection_mode === "exclusive"
+      ? 1
+      : row.selection_mode === "max"
+        ? Math.min(Math.max(Number(row.max_selections ?? 1), 1), allowed.size || 1)
+        : allowed.size || 1;
     if (selected.length > maxSelections) {
       await interaction.reply({ content: "Превышен максимальный выбор ролей.", ephemeral: true });
       return;
