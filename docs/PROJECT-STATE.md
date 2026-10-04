@@ -537,3 +537,13 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 
 ## 2026-10-04 — Automation event/action breadth
 - Automation now consumes reaction removal and channel/role update events and can apply slowmode/topic channel actions.
+
+
+## 2026-10-04 — Security executor timeout response checkpoint
+- Security now supports a configurable executor timeout as an additional Anti-Nuke response, alongside existing role stripping and quarantine.
+- executorTimeoutMinutes is persisted in security_settings, surfaced in the Control Center, and included in config export/import.
+- The response is hierarchy-safe: it only targets a member accepted by the existing manageable/administrator/owner guards and requires member.moderatable before timeout.
+- Successful timeout enforcement creates the normal durable moderation timeout case and emits moderation.case; failed Discord enforcement does not create a false case.
+- Migration 49 and regression tests cover the new policy.
+- Development feature commit: 0722ed241e3a677b27c73dac8bd41edc20e93c29.
+- Fresh CI verification is pending for this development tree.
