@@ -51,6 +51,10 @@ fi
 
 read -r -p "Dashboard Basic Auth username [admin]: " DASHBOARD_BASIC_AUTH_USER
 DASHBOARD_BASIC_AUTH_USER="${DASHBOARD_BASIC_AUTH_USER:-admin}"
+if [[ ! "${DASHBOARD_BASIC_AUTH_USER}" =~ ^[A-Za-z0-9._-]{1,64}$ ]]; then
+  echo "Invalid Dashboard Basic Auth username." >&2
+  exit 1
+fi
 
 read -r -s -p "Dashboard Basic Auth password (min 12 chars): " DASHBOARD_BASIC_AUTH_PASSWORD
 echo
@@ -59,19 +63,14 @@ if [[ "${#DASHBOARD_BASIC_AUTH_PASSWORD}" -lt 12 || "${DASHBOARD_BASIC_AUTH_PASS
   exit 1
 fi
 
-DASHBOARD_BASIC_AUTH_HASH="$(
-  docker run --rm caddy:2-alpine caddy hash-password \
-    --algorithm argon2id \
-    --plaintext "${DASHBOARD_BASIC_AUTH_PASSWORD}"
-)"
+DASHBOARD_BASIC_AUTH_HASH="$(docker run --rm caddy:2-alpine caddy hash-password --algorithm argon2id --plaintext "${DASHBOARD_BASIC_AUTH_PASSWORD}")"
 
 set_env() {
-  local key="$1" value="$2" escaped
-  escaped="$(printf '%s' "${value}" | sed 's/[\\&|]/\\&/g')"
+  local key="$1" value="$2"
   if grep -qE "^${key}=" .env; then
-    sed -i "s|^${key}=.*|${key}=${escaped}|" .env
+    sed -i "s|^${key}=.*|${key}='${value}'|" .env
   else
-    printf '%s=%s\n' "${key}" "${value}" >> .env
+    printf "%s='%s'\n" "${key}" "${value}" >> .env
   fi
 }
 
