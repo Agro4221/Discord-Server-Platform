@@ -199,3 +199,11 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - API contract: diagnostics endpoint returns bounded operational metadata without event/action payloads.
 - Dashboard: diagnostics section loads beside Automation rules/templates and supports refresh.
 - Release gate still requires live Discord execution checks for Automation actions and delayed-job behavior; CI does not replace that validation.
+
+
+## 2026-10-05 — Onboarding Flow Builder gate
+- Deterministic coverage: trigger validation, ordered step normalization, duplicate-role rejection and ten-step limit.
+- Database integration: migration 85 and flow persistence round-trip.
+- Verification emits `verification.passed`; Onboarding consumes it through the shared Event Bus.
+- Management API exposes GET/PUT `/api/guilds/:guildId/onboarding`; Control Center exposes the Flow Builder.
+- Live release gate remains for Discord role hierarchy, channel permissions, DM failures, lifecycle ordering and restart behavior.

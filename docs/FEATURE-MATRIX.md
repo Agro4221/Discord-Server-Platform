@@ -386,7 +386,7 @@ Music должен стремиться к функциональности си
 | Joinable ranks / self-service role menus | ✅ | Role Panels support persistent self-service role selection through buttons or select menus, with exclusive/max modes and timed assignments.
 | Voice-role links | ✅ |
 | Delayed autoroles | ✅ |
-| Onboarding / verification flow builder | 🟡 |
+| Onboarding / verification flow builder | ✅ | Configurable member.join / verification.passed triggers with ordered role, channel-message and DM steps |
 | Welcome/goodbye customization and images | ✅ |
 
 #### Tickets / Support / Forms

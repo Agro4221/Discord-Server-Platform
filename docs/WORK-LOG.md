@@ -460,3 +460,17 @@ Never write credentials, tokens or private user data here.
 - Added regression coverage for the filtered audit query and legacy bounded `recent()` behavior.
 - Audit remains DB-backed source of truth; Discord channel delivery is still best-effort and separately observable.
 - Current increment is limited to Administration/Audit; no other module feature work was introduced.
+
+
+## 2026-10-05 — Onboarding Flow Builder
+- Branch: `feature/music-v2`.
+- Added first-class Onboarding module without duplicating Welcome, Verification or Role Panel responsibilities.
+- Triggers: `member.join`, `verification.passed`.
+- Steps: role assignment, channel message, DM; maximum 10 ordered steps.
+- Added migration 85 and atomic durable flow/module configuration.
+- Verification emits `verification.passed`; Onboarding handles the event via the shared Event Bus.
+- Added hierarchy checks, per-step failure isolation, template rendering and aggregated audit events without storing message contents.
+- Added Management API and Control Center builder.
+- Added deterministic tests and PostgreSQL persistence coverage.
+- Source implementation checkpoint: `f772b0503f3f5e5b9f9abb5f30625bacf5801068`.
+- CI #1854 is the verification gate for this slice; no adjacent feature work was added.

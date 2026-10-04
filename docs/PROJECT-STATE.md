@@ -309,3 +309,13 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Stored bot tokens are encrypted at rest; Dashboard reads only `tokenConfigured`, never the secret value.
 - The bot process may start in a database/Control Center-only state and can connect after credentials are registered.
 - Existing environment credentials are retained for backward compatibility and initial bootstrap.
+
+
+## 2026-10-05 — Onboarding Flow Builder
+- Onboarding is implemented as a first-class server module on `feature/music-v2`.
+- Welcome, Verification and Role Panels retain their existing responsibilities; Onboarding only orchestrates additional ordered actions.
+- Supported triggers: `member.join`, `verification.passed`.
+- Supported steps: role, channel message, DM; max 10.
+- Control Center has the Flow Builder; Management API exposes GET/PUT.
+- Config export/import carries `onboarding_flows`.
+- Source checkpoint: `f772b0503f3f5e5b9f9abb5f30625bacf5801068`; live Discord behavior is still release-gate validation.

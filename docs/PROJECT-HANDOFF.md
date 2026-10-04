@@ -206,7 +206,7 @@ Premium parity = **совокупность сильных функций раз
 - joinable ranks;
 - voice-role links;
 - delayed autoroles;
-- onboarding flow builder;
+- onboarding flow builder (implemented 2026-10-05);
 - richer welcome/goodbye customization.
 
 ### Tickets / Forms
@@ -466,3 +466,10 @@ Live validation, требующая пользовательского окру�
 - Safe dry-run/test execution is implemented through the existing Automation engine and Dashboard builder.
 - It validates and previews rules without executing side effects; numeric/role event context can be supplied for deterministic tests.
 - Next automation work can focus on richer operational diagnostics/observability rather than another execution path.
+
+
+### 2026-10-05 — Latest implementation slice
+- Onboarding Flow Builder is implemented on `feature/music-v2`.
+- Do not reopen broad polish work before selecting the next single backlog module.
+- Source checkpoint: `f772b0503f3f5e5b9f9abb5f30625bacf5801068`.
+- CI #1854 is the automated verification gate; live Discord validation remains environment-dependent.
