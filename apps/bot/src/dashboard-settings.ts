@@ -68,7 +68,8 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "panelDescription", label: "Описание панели", type: "textarea", maxLength: 4096 },
       { key: "issueButtonLabel", label: "Кнопка получения кода", type: "text", maxLength: 80 },
       { key: "confirmButtonLabel", label: "Кнопка подтверждения", type: "text", maxLength: 80 }
-    ]
+    ],
+    actions: [{ id: "publish-panel", label: "Опубликовать Verification panel", kind: "safe" }]
   },
   {
     key: "welcome",
