@@ -456,7 +456,7 @@ Music должен стремиться к функциональности си
 | Per-feed filters / keywords | ✅ | Include/exclude title keyword filters with bounded persisted lists and Dashboard controls |
 | Rich notification templates / embeds | ✅ | Persisted feed templates support {title}, {url} and {timestamp}; embed composer remains outside this increment |
 | Multiple credentials/providers per guild | ✅ | Per-guild encrypted Twitch/YouTube/Kick credentials can be managed and selected independently for stream alerts |
-| Integration test/diagnostics UI | 🟡 |
+| Integration test/diagnostics UI | ✅ | Per-guild provider credential health-checks with safe status/latency output and audit trail |
 
 #### Analytics / observability
 | Функция | План |

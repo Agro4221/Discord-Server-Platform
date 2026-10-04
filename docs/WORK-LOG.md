@@ -545,3 +545,14 @@ Never write credentials, tokens or private user data here.
 - Added Dashboard credential management and per-alert credential selection.
 - CI #1917 is the final complete automated gate for this slice.
 - Final code checkpoint before diagnostics work: `81dcc01269d34c90af9091d59d32c521d56dec98`.
+
+
+## 2026-10-05 — Integration diagnostics
+- Completed the Notifications/Integrations credential diagnostics slice.
+- Added provider health-checks for stored Twitch, YouTube and Kick credentials without exposing secret values in API responses or audit metadata.
+- Management API exposes `POST /api/guilds/:guildId/integration-credentials/:id/test` with safe status/latency output.
+- Stream Alerts Dashboard lists credentials, supports test action, shows bounded diagnostic result and lets each alert select its own credential.
+- Added deterministic diagnostics test with injected fetcher.
+- CI #1923 passed completely.
+- Final source checkpoint: `22f8e4856ef83120a5ebd2f678b826cad712c869`.
+- Next single backlog slice: **Configurable analytics counters**.

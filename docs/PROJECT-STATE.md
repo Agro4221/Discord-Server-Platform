@@ -360,3 +360,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-05 — Per-guild integration credentials verified
 - Final automated gate for the credential slice: CI #1917 completed successfully with typecheck, tests and builds green.
 - Multiple encrypted credentials per guild are now implemented; integration diagnostics remains the next unfinished item in Notifications / Integrations.
+
+
+## 2026-10-05 — Integration diagnostics verified
+- Final checkpoint: `22f8e4856ef83120a5ebd2f678b826cad712c869`.
+- CI #1923 is green.
+- Notifications/Integrations now has encrypted per-guild credentials plus a safe credential diagnostics surface.
+- Next high-value slice: configurable Analytics counters.

@@ -515,3 +515,9 @@ Live validation, требующая пользовательского окру�
 - Per-guild integration credentials for Twitch/YouTube/Kick are implemented and selected per Stream Alert.
 - The next single backlog slice is **Integration test/diagnostics UI**.
 - Continue from branch `feature/music-v2`; do not reopen completed credentials work.
+
+
+### 2026-10-05 — Current checkpoint after integration diagnostics
+- Current source HEAD: `22f8e4856ef83120a5ebd2f678b826cad712c869`.
+- Per-guild integration credentials and provider diagnostics are complete and CI-verified (#1923).
+- Next single module: **Configurable analytics counters**.
