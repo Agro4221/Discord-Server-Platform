@@ -61,9 +61,9 @@ test("Security restores destructive history after a process restart", async () =
       if (text.startsWith("SELECT guild_id,event_type,metadata,created_at FROM security_events")) {
         return {
           rows: [
-            { guild_id: "guild-1", event_type: "destructive-action", metadata: { type: "channel.create" }, created_at: new Date(now - 61 * 60_000).toISOString() },
-            { guild_id: "guild-1", event_type: "destructive-action", metadata: { type: "channel.create" }, created_at: new Date(now - 50_000).toISOString() },
             { guild_id: "guild-1", event_type: "destructive-action", metadata: { type: "member.ban", targetUserId: "user-1" }, created_at: new Date(now - 10_000).toISOString() },
+            { guild_id: "guild-1", event_type: "destructive-action", metadata: { type: "channel.create" }, created_at: new Date(now - 50_000).toISOString() },
+            { guild_id: "guild-1", event_type: "destructive-action", metadata: { type: "channel.create" }, created_at: new Date(now - 61 * 60_000).toISOString() },
             { guild_id: "guild-2", event_type: "security.executor-role-removed", metadata: { type: "role.delete" }, created_at: new Date(now - 5_000).toISOString() }
           ]
         } as { rows: T[] };
