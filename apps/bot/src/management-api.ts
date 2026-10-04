@@ -75,6 +75,14 @@ type ApiOptions = {
       intervalSeconds: number,
       options?: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[] }
     ) => Promise<unknown>;
+    createSocial: (
+      guildId: string,
+      provider: "reddit" | "youtube" | "mastodon",
+      target: string,
+      channelId: string,
+      intervalSeconds: number,
+      options?: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[] }
+    ) => Promise<unknown>;
     update: (
       guildId: string,
       feedId: number,
@@ -814,6 +822,49 @@ export class ManagementApiServer {
               targetId: String(giveawayId)
             });
             this.json(res, 200, { ok: true, result });
+            return;
+          }
+
+          const socialFeedsMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds\/social$/);
+          if (method === "POST" && socialFeedsMatch) {
+            if (!this.options.notifications) {
+              this.json(res, 500, { error: "notifications_unavailable" });
+              return;
+            }
+            const guildId = socialFeedsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const provider = body.provider;
+            if (provider !== "reddit" && provider !== "youtube" && provider !== "mastodon") {
+              throw new RequestInputError("invalid_social_provider", 400);
+            }
+            const target = typeof body.target === "string" ? body.target : "";
+            const channelId = typeof body.channelId === "string" ? body.channelId : "";
+            const intervalSeconds = Number(body.intervalSeconds ?? 300);
+            if (!target || target.length > 300 || !/^\d{17,20}$/.test(channelId) || !Number.isFinite(intervalSeconds)) {
+              throw new RequestInputError("invalid_social_feed", 400);
+            }
+            const feed = await this.options.notifications.createSocial(
+              guildId,
+              provider,
+              target,
+              channelId,
+              intervalSeconds,
+              {
+                messageTemplate: typeof body.messageTemplate === "string" ? body.messageTemplate : undefined,
+                includeKeywords: Array.isArray(body.includeKeywords) ? body.includeKeywords.filter((v): v is string => typeof v === "string") : undefined,
+                excludeKeywords: Array.isArray(body.excludeKeywords) ? body.excludeKeywords.filter((v): v is string => typeof v === "string") : undefined
+              }
+            );
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "feed.social.created",
+              targetType: "notification-feed", targetId: String((feed as { id: number }).id),
+              metadata: { provider }
+            });
+            this.json(res, 200, { ok: true, guildId, feed });
             return;
           }
 
