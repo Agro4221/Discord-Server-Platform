@@ -401,7 +401,7 @@ Music должен стремиться к функциональности си
 | Intake forms | ✅ | Up to 5 Discord modal fields with persistent answers and Dashboard editor | |
 | Custom form fields / validation | ✅ | Per-field required/min/max length validation with server-side submit checks.
 | Custom ticket buttons/messages | ✅ | Dashboard-configurable panel title/description and create/claim/close button labels, used by ticket flows |
-| Linked/related panels | 🟡 |
+| Linked/related panels | ✅ | Multiple persistent Ticket Panels can target separate channels and share the existing form, lifecycle, SLA and transcript pipeline |
 | Ticket tags / priorities / assignment state | ✅ | Persistent priority/tags with staff queue, existing claim/status state and Dashboard editing |
 | Staff SLA / reminders / escalation | ✅ | Durable SLA timestamps, periodic worker processing and optional escalation role.
 
