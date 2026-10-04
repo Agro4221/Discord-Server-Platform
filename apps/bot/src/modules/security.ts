@@ -746,6 +746,17 @@ export function securityResponseThreshold(maxDestructiveActions: number): number
   return Math.max(2, Math.ceil(maxDestructiveActions / 2));
 }
 
+export function securityAuditLogEventType(type: string): AuditLogEvent {
+  switch (type) {
+    case "channel.create": return AuditLogEvent.ChannelCreate;
+    case "channel.delete": return AuditLogEvent.ChannelDelete;
+    case "role.create": return AuditLogEvent.RoleCreate;
+    case "role.delete": return AuditLogEvent.RoleDelete;
+    case "member.ban": return AuditLogEvent.MemberBanAdd;
+    default: throw new Error("Unsupported security audit event type: " + type);
+  }
+}
+
 export function securityAuditLookbackCutoff(now: number, windowSeconds: number): number {
   return now - Math.min(Math.max(windowSeconds, 5), 300) * 1000;
 }
