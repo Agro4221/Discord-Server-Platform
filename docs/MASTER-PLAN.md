@@ -1,7 +1,19 @@
 # Master Plan / Technical Specification
 
 ## Product goal
-Build a self-hosted Discord Server Platform that replaces the need for several third-party bots for normal server administration, community features, temporary voice rooms, automation, support workflows, notifications, and music.
+Build a self-hosted Discord Server Platform whose primary purpose is to **replace the typical stack of third-party Discord bots and paid premium subscriptions** with one first-party bot/platform under our control.
+
+The target is to combine the strongest useful functionality commonly found across products such as **Carl-bot, Juniper, MEE6, ProBot, Jockie Music and similar Discord bots**: moderation, automations, community tools, tickets, roles, utilities, notifications, music, security, analytics and administration — while avoiding artificial premium walls for functionality that should belong to the platform itself.
+
+The project should not copy proprietary code or closed implementations. We implement equivalent or better capabilities in our own modular architecture, with a single configuration model, shared persistence, consistent permissions, diagnostics, recovery and one Control Center.
+
+### Product principles
+- **One platform instead of a pile of bots.** Prefer integrating a useful feature into the platform instead of requiring another external bot.
+- **No mandatory paid subscription for core functionality.** The platform is self-hosted and should not depend on third-party premium plans for its intended feature set.
+- **Best-of-breed feature selection.** Pull the strongest practical ideas from the ecosystem rather than blindly copying one bot's feature list.
+- **Own the full stack.** Configuration, persistence, automation, moderation, music, security and administration remain under our control.
+- **Better integration over feature accumulation.** Cross-module workflows, shared permissions, auditability, recovery and a unified UI are part of the product, not afterthoughts.
+
 
 ## Operating model
 The same deployment must run on a local PC and later on a small VPS without changing application architecture. Dockerized services and persistent volumes are part of the design from the beginning.
