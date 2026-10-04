@@ -2539,6 +2539,11 @@ export function validateAutomationPayload(
           throw new RequestInputError("invalid_channel_name_action", 400);
         }
         break;
+      case "clear-cooldown":
+        if (typeof item.key !== "string" || !item.key.trim() || item.key.length > 100) {
+          throw new RequestInputError("invalid_clear_cooldown_key", 400);
+        }
+        break;
       default:
         throw new RequestInputError("unsupported_automation_action", 400);
     }
