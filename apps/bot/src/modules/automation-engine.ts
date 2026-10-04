@@ -690,6 +690,16 @@ export class AutomationEngine implements PlatformModule {
           if (value === undefined || value !== condition.right) return false;
           break;
         }
+        case "number-gt": {
+          const value = event.numeric?.[String(condition.left)];
+          if (value === undefined || value <= condition.right) return false;
+          break;
+        }
+        case "number-lt": {
+          const value = event.numeric?.[String(condition.left)];
+          if (value === undefined || value >= condition.right) return false;
+          break;
+        }
         case "has-role": {
           const guild = this.client?.guilds.cache.get(event.guildId);
           const userId = resolveUserReference(condition.userId, event.userId);
@@ -854,6 +864,8 @@ export function validateAutomationRule(
       case "number-gte":
       case "number-lte":
       case "number-eq":
+      case "number-gt":
+      case "number-lt":
         if (String(condition.left).length > 64 || !Number.isFinite(condition.right)) throw new Error("invalid_numeric_condition");
         break;
       case "has-role":
