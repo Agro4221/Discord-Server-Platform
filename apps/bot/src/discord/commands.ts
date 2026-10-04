@@ -631,6 +631,17 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addChannelOption((o) => o.setName("channel").setDescription("Panel channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
       ),
     new SlashCommandBuilder()
+      .setName("form")
+      .setDescription("Reusable server forms")
+      .addSubcommand((sub) =>
+        sub
+          .setName("publish")
+          .setDescription("Publish a saved form")
+          .addStringOption((o) => o.setName("name").setDescription("Form name").setMaxLength(40).setRequired(true))
+          .addChannelOption((o) => o.setName("channel").setDescription("Optional panel channel").addChannelTypes(ChannelType.GuildText))
+      ),
+
+    new SlashCommandBuilder()
       .setName("poll")
       .setDescription("Interactive polls")
       .addSubcommand((sub) =>
