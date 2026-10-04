@@ -949,6 +949,7 @@ function normalizeImportedTicketPanel(value: unknown): ImportedTicketPanel {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_ticket_panel");
   const object = value as Record<string, unknown>;
   if (
+    typeof object.id !== "number" || !Number.isSafeInteger(object.id) || object.id < 1 ||
     typeof object.channel_id !== "string" || !/^\d{17,20}$/.test(object.channel_id) ||
     (object.message_id !== null && object.message_id !== undefined &&
       (typeof object.message_id !== "string" || !/^\d{17,20}$/.test(object.message_id))) ||
