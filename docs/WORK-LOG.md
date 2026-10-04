@@ -579,3 +579,13 @@ Never write credentials, tokens or private user data here.
 - CI #1949 passed completely.
 - Final source checkpoint: `879b684c418fda2d2e2ceaebd38852e9341feaa0`.
 - Next single backlog slice: **Custom member rewards / milestones**.
+
+
+## 2026-10-05 — Custom member rewards / milestones
+- Verified the existing Leveling reward runtime and completed its missing administrative surface.
+- Control Center now exposes a dedicated Level Rewards & Milestones builder using the existing persistent `leveling_rewards` table and Leveling runtime.
+- Builder supports level, manageable role, previous-reward removal, optional DM and milestone message with `{level}`.
+- Existing server-side hierarchy and bounds validation remain authoritative.
+- CI #1955 passed completely.
+- Final source checkpoint: `856e11e84539ed8c66a899bc792e9dc8bf45b832`.
+- Next single backlog slice: **Community social widgets / engagement depth**.

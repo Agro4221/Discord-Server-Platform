@@ -380,3 +380,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - CI #1949 is green.
 - Tickets now supports multiple persistent entry panels with per-panel channel/appearance and ticket source tracking.
 - Next high-value slice: **Custom member rewards / milestones**.
+
+
+## 2026-10-05 — Leveling rewards verified
+- Source checkpoint: `856e11e84539ed8c66a899bc792e9dc8bf45b832`.
+- CI #1955 is green.
+- Custom member rewards / milestones are now surfaced in Control Center on top of the existing Leveling reward runtime.
+- Next high-value slice: **Community social widgets / engagement depth**.

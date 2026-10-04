@@ -263,3 +263,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - CI #1949 passed: typecheck, tests, domain build, bot build and Dashboard production build.
 - Migration 88 and ticket panel config round-trip coverage are included in the passing suite.
 - Remaining live validation is Discord-side panel permissions, message refresh/deletion behavior and real ticket creation from multiple panels.
+
+
+## 2026-10-05 — Custom rewards automated gate
+- CI #1955 passed: typecheck, tests, domain build, bot build and Dashboard production build.
+- Leveling reward builder uses the existing reward application path; live Discord role hierarchy and DM delivery remain environment-dependent.

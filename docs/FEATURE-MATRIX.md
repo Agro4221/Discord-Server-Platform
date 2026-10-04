@@ -423,7 +423,7 @@ Music должен стремиться к функциональности си
 | Server counters / statistics | ✅ |
 | Economy / shop / ledger | ✅ |
 | Social/community engagement widgets | 🟡 |
-| Custom member rewards / milestones | 🟡 |
+| Custom member rewards / milestones | ✅ | Level-based role rewards with previous-role cleanup, optional DM and milestone messages are managed from Control Center and applied by Leveling runtime |
 
 #### Automation / workflows
 | Функция | План |

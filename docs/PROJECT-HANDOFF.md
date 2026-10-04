@@ -532,3 +532,9 @@ Live validation, требующая пользовательского окру�
 - Ticket linked/related panels are complete and CI-verified (#1949).
 - Next single module: **Custom member rewards / milestones**.
 - Do not reopen completed Ticket Panels or Analytics/Integration work.
+
+
+### 2026-10-05 — Current checkpoint after Leveling rewards
+- Custom member rewards / milestones are complete and CI-verified (#1955).
+- Next single module: **Community social widgets / engagement depth**.
+- Do not reopen completed rewards, Ticket Panels, Analytics or Integration work.
