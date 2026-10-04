@@ -327,3 +327,12 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Migration 48 and regression coverage passed in CI #1689.
 - ⚠ Real Docker container restart and live Discord token rotation remain environment-dependent acceptance cases.
 - ☐ Next: Fleet restart/start failure injection and stale-heartbeat race coverage.
+
+
+## 2026-10-04 — Fleet reconciler failure verification
+- ✅ Docker remove/start failures are accumulated and returned as a non-zero reconciliation result.
+- ✅ Failed container removal does not trigger a conflicting second start attempt.
+- ✅ `-Down` reports cleanup failure through its exit status.
+- ✅ CI #1691 passed all static checks, typecheck, bot tests and builds.
+- ⚠ Real Docker Desktop failure injection remains a live acceptance test.
+- ☐ Next: concurrent Fleet failover ownership / split-brain coverage.

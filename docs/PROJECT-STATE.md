@@ -397,3 +397,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Management API/Dashboard expose the pending restart state; Fleet reconciler restarts the affected secondary container.
 - Migration 48 and regression tests are verified by CI #1689.
 - Latest verified code: `9e328270f378fb81a7de86b821745b82e9a9ef19`.
+
+
+## 2026-10-04 — Fleet reconciler failure propagation checkpoint
+- Local Fleet cleanup/start failures are now surfaced through the reconciler exit code while other identities continue processing.
+- Failed container removal blocks the corresponding restart attempt for that cycle.
+- CI #1691 verified the change; latest code: `7f7dae95a43028cde27f083c7b397c3a2a2a9da8`.

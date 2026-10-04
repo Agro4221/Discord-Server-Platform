@@ -549,3 +549,14 @@ Never write credentials, tokens or private user data here.
 - Fleet: failure injection around restart/start failures and stale heartbeat races; harden recovery without masking an unavailable Docker/runtime.
 - Music: simultaneous node-loss/session-recovery de-duplication and cross-identity queue continuity.
 - Final live release gate: real Discord permissions/hierarchy, Lavalink/providers, Windows/Docker multi-bot runtime, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Fleet reconciler failure propagation checkpoint
+- Local Fleet reconciliation now propagates Docker remove/start failures with a non-zero exit code after processing the rest of the desired fleet.
+- A failed `docker rm -f` no longer falls through into a second start attempt using the same container name; the failed identity is left for the next reconciliation cycle.
+- `-Down` also reports cleanup failures instead of always returning success.
+- CI run #1691 passed the complete automated pipeline on commit `7f7dae95a43028cde27f083c7b397c3a2a2a9da8`.
+### Next concrete work
+- Fleet: concurrent failover/assignment ownership and split-brain prevention across primary/secondary identities.
+- Music: simultaneous node-loss/session-recovery de-duplication.
+- Final live release gate: Discord permissions/hierarchy, Lavalink/providers, Windows/Docker multi-bot runtime, soak/chaos/recovery and clean-host deployment.
