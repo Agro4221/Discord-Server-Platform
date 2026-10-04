@@ -697,15 +697,20 @@ export class Security implements PlatformModule {
           (role) => !role.managed && role.id !== guild.id && role.position < botMember.roles.highest.position
         )
       : member.roles.cache.filter(() => false);
+
+    const removedRoleIds: string[] = [];
     for (const role of removable.values()) {
-      await member.roles.remove(role, "Security destructive burst response").catch((error) => {
+      try {
+        await member.roles.remove(role, "Security destructive burst response");
+        removedRoleIds.push(role.id);
+      } catch (error) {
         logger.warn("Security role removal failed", {
           guildId,
           userId,
           roleId: role.id,
           error: String(error)
         });
-      });
+      }
     }
 
     await this.trackQuarantine(incidentId, member, config);
@@ -714,7 +719,8 @@ export class Security implements PlatformModule {
       userId,
       trigger: type,
       executorCount,
-      removedRoles: removable.size,
+      removedRoles: removedRoleIds.length,
+      removedRoleIds,
       quarantine: Boolean(config.quarantineRoleId)
     };
     await this.db.query(
