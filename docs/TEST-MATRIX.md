@@ -268,3 +268,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-05 — Custom rewards automated gate
 - CI #1955 passed: typecheck, tests, domain build, bot build and Dashboard production build.
 - Leveling reward builder uses the existing reward application path; live Discord role hierarchy and DM delivery remain environment-dependent.
+
+
+## 2026-10-05 — Community Hub automated gate
+- CI #1964 passed: typecheck, tests, domain build, bot build and Dashboard production build.
+- Live browser freshness and live Discord-backed community data remain environment-dependent validation items.
