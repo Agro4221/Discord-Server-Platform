@@ -286,13 +286,13 @@ export class BotIdentityRepository {
   }
 }
 
-export function resolveIdentityEnv(identityId: string): { token: string; clientId: string } {
+export function resolveIdentityEnv(identityId: string): { token?: string; clientId?: string } {
   const prefix = identityId.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
   const tokenEnv = "DISCORD_TOKEN_" + prefix;
   const clientIdEnv = "DISCORD_CLIENT_ID_" + prefix;
   const token = process.env[tokenEnv] ?? (identityId === "primary" ? process.env.DISCORD_TOKEN : undefined);
   const clientId = process.env[clientIdEnv] ?? (identityId === "primary" ? process.env.DISCORD_CLIENT_ID : undefined);
-  if (!token || !clientId) {
+  if (identityId !== "primary" && (!token || !clientId)) {
     throw new Error("Missing Discord credentials for identity " + identityId);
   }
   return { token, clientId };
