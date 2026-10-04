@@ -47,7 +47,7 @@ const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
   { table: "role_panels", fields: ["channel_id","message_id","title","roles","selection_mode","max_selections","duration_minutes","component_type"] },
   { table: "stream_alerts", fields: ["platform","target","channel_id","mention_role_id","enabled","interval_seconds","message_template"] },
   { table: "tickets", fields: ["channel_id","creator_id","claimed_by","status","priority","tags","created_at","closed_at","last_activity_at","panel_id"] },
-  { table: "ticket_panels", fields: ["channel_id","message_id","title","description","button_label","enabled"] },
+  { table: "ticket_panels", fields: ["id","channel_id","message_id","title","description","button_label","enabled"] },
   { table: "notification_feeds", fields: ["channel_id","url","enabled","interval_seconds","last_item_key","last_polled_at","message_template","include_keywords","exclude_keywords"] },
   { table: "role_automation_rules", fields: ["trigger","channel_id","role_id","delay_seconds","enabled"] },
   { table: "custom_forms", fields: ["name","title","description","panel_channel_id","response_channel_id","button_label","enabled","fields"] }
@@ -210,8 +210,9 @@ export class ConfigTransferService {
         await client.query("DELETE FROM ticket_panels WHERE guild_id=$1", [targetGuildId]);
         for (const panel of normalizedPanels) {
           await client.query(
-            "INSERT INTO ticket_panels(guild_id,channel_id,message_id,title,description,button_label,enabled) VALUES($1,$2,$3,$4,$5,$6,$7)",
+            "INSERT INTO ticket_panels(id,guild_id,channel_id,message_id,title,description,button_label,enabled) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
             [
+              panel.id,
               targetGuildId,
               panel.channelId,
               panel.messageId,
@@ -843,6 +844,7 @@ function normalizeImportedRolePanel(value: unknown): ImportedRolePanel {
   });
 
   return {
+    id: object.id,
     channelId: object.channel_id,
     messageId: typeof object.message_id === "string" ? object.message_id : null,
     title: object.title.trim().slice(0, 100) || "Выберите роли",
@@ -895,6 +897,7 @@ function normalizeImportedTicket(value: unknown): NormalizedTicket {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_ticket");
   const object = value as Record<string, unknown>;
   if (
+    typeof object.id !== "number" || !Number.isSafeInteger(object.id) || object.id < 1 ||
     typeof object.channel_id !== "string" || !/^\d{17,20}$/.test(object.channel_id) ||
     typeof object.creator_id !== "string" || !/^\d{17,20}$/.test(object.creator_id) ||
     (object.claimed_by !== null && object.claimed_by !== undefined && (typeof object.claimed_by !== "string" || !/^\d{17,20}$/.test(object.claimed_by))) ||
@@ -929,6 +932,7 @@ function normalizeImportedTicket(value: unknown): NormalizedTicket {
 }
 
 type ImportedTicketPanel = {
+  id: number;
   channelId: string;
   messageId: string | null;
   title: string;
