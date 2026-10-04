@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Tickets, isOpenTicketConflict } from "../src/modules/tickets.js";
+import test from "node:test";
+import { Tickets, isOpenTicketConflict, validateTicketFormSubmission, type TicketFormField } from "../src/modules/tickets.js";
 import { PlatformEventBus } from "../src/events.js";
 
 test("Tickets performs stale closure recovery during initialization", async () => {
@@ -183,6 +184,6 @@ test("ticket form validation enforces required, minimum and maximum lengths", ()
   assert.match(validateTicketFormSubmission(fields, { subject: "", details: "0123456789" }) ?? "", /обязательное/);
   assert.match(validateTicketFormSubmission(fields, { subject: "a", details: "0123456789" }) ?? "", /слишком короткое/);
   assert.match(validateTicketFormSubmission(fields, { subject: "ok!", details: "short" }) ?? "", /слишком короткое/);
-  assert.match(validateTicketFormSubmission(fields, { subject: "ok!", details: "0123456789" }) ?? "", /max/i);
+  assert.match(validateTicketFormSubmission(fields, { subject: "ok!", details: "x".repeat(101) }) ?? "", /слишком длинное/);
   assert.equal(validateTicketFormSubmission(fields, { subject: "Тема", details: "1234567890" }), null);
 });
