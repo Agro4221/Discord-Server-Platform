@@ -415,6 +415,33 @@ export class Polls implements PlatformModule {
     return true;
   }
 
+  async dashboardOpenPolls(guildId: string, limit = 8): Promise<Array<{
+    id: number;
+    question: string;
+    optionCount: number;
+    voterCount: number;
+    endsAt: string | null;
+  }>> {
+    const safe = Math.min(Math.max(Math.floor(limit), 1), 25);
+    const result = await this.db.query<{
+      id: string;
+      question: string;
+      options: unknown;
+      voter_count: string;
+      ends_at: string | null;
+    }>(
+      "SELECT id,question,options,(SELECT count(*) FROM jsonb_object_keys(votes))::text AS voter_count,ends_at FROM polls WHERE guild_id=$1 AND status='open' ORDER BY id DESC LIMIT $2",
+      [guildId, safe]
+    );
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      question: row.question,
+      optionCount: Array.isArray(row.options) ? row.options.length : 0,
+      voterCount: Number(row.voter_count ?? 0),
+      endsAt: row.ends_at
+    }));
+  }
+
   private embed(poll: PollRecord): EmbedBuilder {
     const counts = poll.options.map((_, index) => Object.values(poll.votes).reduce(
       (total, selections) => total + (Array.isArray(selections) && selections.includes(index) ? 1 : 0),
