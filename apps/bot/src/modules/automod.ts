@@ -562,6 +562,7 @@ export class AutoMod implements PlatformModule {
       detector: string;
       action: "delete" | "timeout" | "warn" | "log";
       timeoutMinutes: number;
+      logChannelId: string | null;
       messageTemplate: string;
     }
   ): Promise<boolean> {
