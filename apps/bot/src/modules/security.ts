@@ -253,9 +253,9 @@ export class Security implements PlatformModule {
     return incident;
   }
 
-  private async resolveIncident(incidentId: number, guildId: string): Promise<void> {
+  private async resolveIncident(incidentId: number, guildId: string): Promise<boolean> {
     const guild = this.client?.guilds.cache.get(guildId);
-    if (!guild) return;
+    if (!guild) return false;
 
     const assignments = await this.db.query<{
       user_id: string;
@@ -314,13 +314,13 @@ export class Security implements PlatformModule {
       );
     }
 
-    if (cleanupFailed) return;
+    if (cleanupFailed) return false;
 
     const result = await this.db.query(
       "UPDATE security_incidents SET resolved_at=now() WHERE id=$1 AND guild_id=$2 AND resolved_at IS NULL",
       [incidentId, guildId]
     );
-    if (result.rowCount !== 1) return;
+    if (result.rowCount !== 1) return false;
 
     if (this.raidIncidents.get(guildId)?.id === incidentId) this.raidIncidents.delete(guildId);
     if (this.destructiveIncidents.get(guildId)?.id === incidentId) this.destructiveIncidents.delete(guildId);
@@ -343,10 +343,11 @@ export class Security implements PlatformModule {
       "SELECT id FROM security_incidents WHERE guild_id=$1 AND resolved_at IS NULL ORDER BY id",
       [guildId]
     );
+    let cleared = 0;
     for (const row of result.rows) {
-      await this.resolveIncident(Number(row.id), guildId);
+      if (await this.resolveIncident(Number(row.id), guildId)) cleared += 1;
     }
-    return result.rows.length;
+    return cleared;
   }
 
   async getActiveIncidents(guildId: string): Promise<Array<{ id: number; eventType: string; expiresAt: string }>> {
