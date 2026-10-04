@@ -119,7 +119,7 @@
 | YouTube start alerts | ✅ |
 | VK Video Live alerts | ✅ |
 | Stream alert templates | ✅ |
-| Multiple provider credentials per guild | 🟡 |
+| Multiple provider credentials per guild | ✅ | Encrypted per-guild Twitch/YouTube/Kick credentials are selectable per Stream Alert |
 | Reddit / TikTok / Kick adapters | 🟡 |
 | GitHub notifications | ✅ | `/feed github` для releases и commits через существующий RSS/Atom worker |
 | Twitch / YouTube / VK stream alerts | ✅ | Dashboard + persistent polling |
@@ -452,7 +452,7 @@ Music должен стремиться к функциональности си
 | Stream templates | ✅ |
 | GitHub feeds | ✅ |
 | Secure feed validation / SSRF protection | ✅ |
-| Additional social feeds | 🟡 |
+| Additional social feeds | ✅ | Notifications supports Reddit, YouTube channel RSS and Mastodon profile RSS through the existing safe feed worker |
 | Per-feed filters / keywords | ✅ | Include/exclude title keyword filters with bounded persisted lists and Dashboard controls |
 | Rich notification templates / embeds | ✅ | Persisted feed templates support {title}, {url} and {timestamp}; embed composer remains outside this increment |
 | Multiple credentials/providers per guild | ✅ | Per-guild encrypted Twitch/YouTube/Kick credentials can be managed and selected independently for stream alerts |
