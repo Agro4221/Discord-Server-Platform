@@ -1331,6 +1331,23 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_onboarding_flows_updated ON onboarding_flows(updated_at DESC);"
     ])
   },
+  {
+    version: 86,
+    name: "server_config_presets",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS server_config_presets (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  name text NOT NULL,",
+      "  payload jsonb NOT NULL,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  UNIQUE(guild_id,name)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_server_config_presets_guild_updated ON server_config_presets(guild_id,updated_at DESC);"
+    ])
+  },
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
