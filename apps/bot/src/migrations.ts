@@ -1347,6 +1347,25 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_server_config_presets_guild_updated ON server_config_presets(guild_id,updated_at DESC);"
     ])
   },
+  {
+    version: 87,
+    name: "integration_credentials",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS integration_credentials (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  provider text NOT NULL CHECK(provider IN ('twitch','youtube','kick')),",
+      "  label text NOT NULL,",
+      "  secret_ciphertext text NOT NULL,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  UNIQUE(guild_id,provider,label)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_integration_credentials_guild_provider ON integration_credentials(guild_id,provider);",
+      "ALTER TABLE stream_alerts ADD COLUMN IF NOT EXISTS credential_id bigint REFERENCES integration_credentials(id) ON DELETE SET NULL;",
+      "CREATE INDEX IF NOT EXISTS idx_stream_alerts_credential_id ON stream_alerts(credential_id);"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
