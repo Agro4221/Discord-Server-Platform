@@ -13,9 +13,7 @@ const envExample = await readFile(".env.example", "utf8");
 const requiredEnv = [
   "MANAGEMENT_API_KEY",
   "DATABASE_URL",
-  "LAVALINK_PASSWORD",
-  "DASHBOARD_SESSION_SECRET",
-  "DASHBOARD_ADMIN_PASSWORD"
+  "LAVALINK_PASSWORD"
 ];
 
 for (const name of requiredEnv) {
@@ -31,9 +29,9 @@ if (!envExample.includes("DISCORD_TOKEN_MUSIC2") || !envExample.includes("DISCOR
 const localLauncher = await readFile("scripts/start-local.ps1", "utf8");
 for (const contract of [
   "docker compose up -d",
-  "DASHBOARD_ADMIN_PASSWORD",
   "MANAGEMENT_API_KEY",
-  "DASHBOARD_SESSION_SECRET",
+  "Control Center",
+  "Bot Fleet",
   "127.0.0.1",
   "Start-Process"
 ]) {
