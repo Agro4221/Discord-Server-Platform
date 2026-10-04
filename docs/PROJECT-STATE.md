@@ -335,3 +335,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Detection history retention now covers the full supported one-hour window.
 - Boundary regression coverage added.
 - Latest development code checkpoint: `a915418cab191a58100849aff95264b49311fb74`.
+
+## 2026-10-04 — Security/AutoMod hardening checkpoint
+- AutoMod repeat-rule windows are now independent from the base repeat detector window and bounded to one hour of retained history.
+- AutoMod log actions require a log channel before persistence.
+- Security incident-count reporting is accurate after partial cleanup failure.
+- Security detection/audit lookback supports the full configured one-hour window.
+- CI failures #1647 and #1651 were diagnosed from Actions logs and repaired; latest code fix: `f079a866aa2294ad211d7234fa6396c8c052e643`.
