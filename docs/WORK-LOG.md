@@ -425,3 +425,10 @@ Never write credentials, tokens or private user data here.
 - Discord exposes `/form publish`; public users launch the saved form through a button and submit answers through a Discord Modal.
 - Answers are persisted separately and can be delivered to a configured response channel; configuration participates in export/import.
 - Generic select-menu tooling remains outside this increment.
+
+
+### 2026-10-04 — Role Panel select menus
+- Role Panels now support both button and Discord select-menu components using the same persistent role definitions and selection modes.
+- Select menus preserve toggle-style multi-selection, exclusive one-role selection and bounded max-selection behavior; timed role assignments continue to use the existing expiration worker.
+- Dashboard editor and `/roles panel` expose the component choice, while config export/import preserves it.
+- Legacy role panels default to buttons through migration compatibility.
