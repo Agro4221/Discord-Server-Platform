@@ -599,3 +599,8 @@ Never write credentials, tokens or private user data here.
 - CI #1964 passed completely.
 - Final source checkpoint: `2c1502e441097c40bbde9d431d1059b8d5a1855a`.
 - Next single backlog slice: **Additional social feeds**.
+
+
+## 2026-10-05 — Documentation reconciliation
+- Reconciled stale Matrix rows for per-guild provider credentials and Additional social feeds; both were already implemented and CI-verified.
+- Current code checkpoint before the next Music slice: `0056f930327f06c23f567ac81229617b4b79dd40`.
