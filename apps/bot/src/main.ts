@@ -35,6 +35,7 @@ import { PlatformEventBus } from "./events.js";
 import { BotIdentityRepository } from "./bot-identity.js";
 import { ConfigTransferService } from "./config-transfer.js";
 import { ServerConfigPresetService } from "./config-presets.js";
+import { IntegrationCredentialRepository } from "./integration-credentials.js";
 import { BackupService } from "./backup.js";
 import { CustomCommandService } from "./custom-commands.js";
 import { AutoResponder } from "./modules/autoresponder.js";
@@ -86,6 +87,7 @@ async function main(): Promise<void> {
   const identities = new BotIdentityRepository(database, config.botIdentityId, config.managementApiKey);
   const transfer = new ConfigTransferService(database);
   const configPresets = new ServerConfigPresetService(database);
+  const integrationCredentials = new IntegrationCredentialRepository(database, config.managementApiKey);
   const backups = new BackupService(
     database,
     config.backupDirectory,
@@ -158,7 +160,7 @@ async function main(): Promise<void> {
   const starboard = new Starboard(database);
   const security = new Security(database);
   const notifications = new Notifications(database);
-  const streamAlerts = new StreamAlerts(database, config.streamAlerts, auditLog);
+  const streamAlerts = new StreamAlerts(database, config.streamAlerts, integrationCredentials, auditLog);
   const verification = new Verification(database, (guildId) => client.guilds.cache.get(guildId));
   const onboarding = new Onboarding(database);
   const analytics = new Analytics(database);
@@ -407,6 +409,7 @@ async function main(): Promise<void> {
     settings: dashboardSettings,
     transfer,
     presets: configPresets,
+    integrationCredentials,
     backups,
     customCommands,
     autoResponder,
