@@ -615,11 +615,18 @@ Never write credentials, tokens or private user data here.
 - Local release gate now verifies all five core Compose services are actually running before proceeding.
 - It also rejects running orphaned `dsp-bot-fleet-*` containers that do not correspond to an enabled, credentialed secondary identity in the Management API.
 - This closes a local split-brain/stale-secondary visibility gap without mutating the Docker stack.
-- Fresh CI verification is pending for this checkpoint.
+- CI #1706 passed the complete automated pipeline on commit `3fa75c40548a6656d6a2f09f4c4b458f01198b59`.
 
 
 ## 2026-10-04 — Release documentation contract cleanup
 - Updated Master Plan, implementation order and test strategy to match the implemented local Control Center security model: no end-user login/session/CSRF layer; Management API uses internal bearer authentication and rate limiting.
 - Removed stale OAuth/dashboard-session test expectations so future release work targets the real architecture.
 - CI #1706 passed the preceding release-gate hardening checkpoint.
-- Documentation-only verification is pending for this cleanup commit.
+- CI #1708 passed the complete automated pipeline on the final release-gate hardening tree.
+
+
+## 2026-10-04 — Release-gate authentication verification
+- Management API unauthenticated Fleet requests are explicitly checked for HTTP 401 before the authenticated gate path is exercised.
+- CI #1708 passed the complete automated pipeline on commit `c37fc2ef7919544c32457574abf9c5707d0cdb1a`.
+### Current boundary
+- Repository-side release-gate hardening is complete for the implemented local architecture; remaining work is live environment acceptance.

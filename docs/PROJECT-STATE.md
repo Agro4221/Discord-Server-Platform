@@ -437,9 +437,14 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-04 — Release-gate Fleet hygiene checkpoint
 - Release gate verifies required local Compose services are running and rejects orphaned secondary Fleet containers.
 - This is read-only diagnostic logic; it does not start, stop or modify services.
-- Fresh CI verification is pending for this checkpoint.
+- CI #1706 passed the complete automated pipeline; latest verified code for this checkpoint: `3fa75c40548a6656d6a2f09f4c4b458f01198b59`.
 
 
 ## 2026-10-04 — Release documentation contract cleanup
 - Architecture/test documentation now reflects the implemented local Dashboard model: no user login sessions or CSRF flow; sensitive operations are protected at the Management API bearer boundary.
 - No runtime behavior changed in this checkpoint.
+
+
+## 2026-10-04 — Release-gate authentication verification
+- Management API unauthenticated access is rejected by the local release gate before credentialed Fleet inspection.
+- CI #1708 passed the complete automated pipeline; latest verified development code: `c37fc2ef7919544c32457574abf9c5707d0cdb1a`.

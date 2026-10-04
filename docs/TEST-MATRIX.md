@@ -378,7 +378,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Reconciler returns exit code 1 when the local Management API is unavailable.
 - ✅ Deployment contract explicitly checks the fail-closed API outage path.
 - ⚠ Real Management API outage injection on Windows/Docker remains a live acceptance case.
-- ☐ Fresh CI for this checkpoint is pending.
+- ✅ CI #1706 passed the complete automated pipeline for the Fleet hygiene checkpoint.
 
 
 ## 2026-10-04 — Release-gate Fleet hygiene verification
@@ -392,4 +392,11 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-04 — Release documentation contract verification
 - ✅ Master Plan and test strategy no longer require removed Dashboard login/RBAC/CSRF flows.
 - ✅ Release verification targets the implemented Management API bearer boundary instead.
-- ☐ Documentation-only cleanup awaits fresh CI.
+- ✅ CI #1708 passed the complete automated pipeline for the aligned release documentation.
+
+
+## 2026-10-04 — Release-gate authentication verification
+- ✅ Unauthenticated Management API access is expected to return HTTP 401.
+- ✅ Authenticated Fleet inspection remains protected by the internal bearer key.
+- ✅ CI #1708 passed all automated checks, tests and builds.
+- ⚠ Final live acceptance remains environment-dependent: real Discord, Lavalink, Windows/Docker multi-bot runtime, chaos/soak/recovery and clean-host deployment.
