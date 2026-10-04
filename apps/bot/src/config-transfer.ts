@@ -849,7 +849,6 @@ function normalizeImportedRolePanel(value: unknown): ImportedRolePanel {
   });
 
   return {
-    id: object.id,
     channelId: object.channel_id,
     messageId: typeof object.message_id === "string" ? object.message_id : null,
     title: object.title.trim().slice(0, 100) || "Выберите роли",
