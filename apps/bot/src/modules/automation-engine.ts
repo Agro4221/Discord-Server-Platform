@@ -789,7 +789,7 @@ export class AutomationEngine implements PlatformModule {
           const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
           const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
           if (channel && "setTopic" in channel) {
-            await channel.setTopic(renderTemplate(action.topic, event), "Automation rule");
+            await channel.setTopic(renderTemplate(action.topic, event));
           }
           continue;
         }
