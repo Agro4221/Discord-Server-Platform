@@ -716,7 +716,7 @@ export class Music implements PlatformModule {
       { query, source: /^https?:\/\//i.test(query) ? undefined : "ytsearch" },
       interaction.user
     );
-    const tracks = result.tracks.slice(0, 5);
+    const tracks = result.tracks.slice(0, 5) as Track[];
     if (!tracks.length) {
       await interaction.reply({ content: "Ничего не найдено.", ephemeral: true });
       return;
@@ -1960,7 +1960,11 @@ export class Music implements PlatformModule {
       const parts = interaction.customId.split(":");
       const token = parts[3];
       const index = Number(parts[4]);
-      const session = token ? this.searchSessions.get(token) : undefined;
+      if (!token) {
+        await interaction.reply({ content: "Результаты поиска устарели или недоступны.", ephemeral: true });
+        return;
+      }
+      const session = this.searchSessions.get(token);
       if (!session || session.guildId !== interaction.guild.id || session.userId !== interaction.user.id || session.expiresAt < Date.now() || !isValidMusicSearchSelection(index, session.tracks.length)) {
         await interaction.reply({ content: "Результаты поиска устарели или недоступны.", ephemeral: true });
         if (token) this.searchSessions.delete(token);
