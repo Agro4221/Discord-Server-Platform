@@ -9,7 +9,7 @@ type Rule = {
   windowSeconds: number | null; action: "delete" | "timeout" | "warn" | "log";
   timeoutMinutes: number; affectedRoleIds: string[]; ignoredRoleIds: string[];
   affectedChannelIds: string[]; ignoredChannelIds: string[];
-  ignoreModerators: boolean; messageTemplate: string;
+  ignoreModerators: boolean; logChannelId: string | null; messageTemplate: string;
 };
 
 const DETECTORS = [
@@ -44,6 +44,7 @@ export function AutoModRulesPanel(props: {
   const [ignoredRoleIds, setIgnoredRoleIds] = useState<string[]>([]);
   const [ignoreModerators, setIgnoreModerators] = useState(true);
   const [messageTemplate, setMessageTemplate] = useState("");
+  const [logChannelId, setLogChannelId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -73,6 +74,7 @@ export function AutoModRulesPanel(props: {
     setAffectedRoleIds([]);
     setIgnoredRoleIds([]);
     setIgnoreModerators(true);
+    setLogChannelId("");
     setMessageTemplate("");
   }
 
@@ -89,6 +91,7 @@ export function AutoModRulesPanel(props: {
     setAffectedRoleIds(rule.affectedRoleIds);
     setIgnoredRoleIds(rule.ignoredRoleIds);
     setIgnoreModerators(rule.ignoreModerators);
+    setLogChannelId(rule.logChannelId ?? "");
     setMessageTemplate(rule.messageTemplate);
     setError("");
   }
@@ -136,6 +139,7 @@ export function AutoModRulesPanel(props: {
         affectedRoleIds,
         ignoredRoleIds,
         ignoreModerators,
+        logChannelId: logChannelId || null,
         messageTemplate
       });
       await load();
@@ -164,6 +168,7 @@ export function AutoModRulesPanel(props: {
         affectedRoleIds: rule.affectedRoleIds,
         ignoredRoleIds: rule.ignoredRoleIds,
         ignoreModerators: rule.ignoreModerators,
+        logChannelId: rule.logChannelId,
         messageTemplate: rule.messageTemplate
       });
       await load();
@@ -223,7 +228,17 @@ export function AutoModRulesPanel(props: {
         <MultiSelect label="Игнорировать роли" values={ignoredRoleIds} resources={props.roles} onToggle={(id) => toggleSelection(ignoredRoleIds, id, setIgnoredRoleIds)} />
       </div>
 
-      <label style={boxStyle}><span>Response / template</span><textarea value={messageTemplate} onChange={(e) => setMessageTemplate(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} placeholder="{mention} ..." /></label>
+      <label style={boxStyle}>
+        <span>Log channel (для action=log)</span>
+        <select value={logChannelId} onChange={(e) => setLogChannelId(e.target.value)} style={inputStyle} disabled={action !== "log"}>
+          <option value="">В текущий канал / только audit</option>
+          {props.channels.filter((channel) => channel.type !== 4).map((channel) => (
+            <option key={channel.id} value={channel.id}>{channel.name}</option>
+          ))}
+        </select>
+      </label>
+
+      RESPONSE_LABEL_PLACEHOLDER
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button type="button" disabled={busy} onClick={() => void save()} style={buttonStyle}>{busy ? "Сохраняем…" : editingId !== null ? "Сохранить изменения" : "Создать rule"}</button>

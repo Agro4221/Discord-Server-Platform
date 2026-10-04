@@ -145,6 +145,7 @@ export class AutoMod implements PlatformModule {
     affectedChannelIds: string[];
     ignoredChannelIds: string[];
     ignoreModerators: boolean;
+    logChannelId: string | null;
     messageTemplate: string;
   }>> {
     const result = await this.db.query<{
@@ -160,9 +161,10 @@ export class AutoMod implements PlatformModule {
       affected_channel_ids: string[];
       ignored_channel_ids: string[];
       ignore_moderators: boolean;
+      log_channel_id: string | null;
       message_template: string;
     }>(
-      "SELECT id,detector,enabled,threshold,window_seconds,action,timeout_minutes,affected_role_ids,ignored_role_ids,affected_channel_ids,ignored_channel_ids,ignore_moderators,message_template FROM automod_rules WHERE guild_id=$1 ORDER BY detector",
+      "SELECT id,detector,enabled,threshold,window_seconds,action,timeout_minutes,affected_role_ids,ignored_role_ids,affected_channel_ids,ignored_channel_ids,ignore_moderators,log_channel_id,message_template FROM automod_rules WHERE guild_id=$1 ORDER BY detector",
       [guildId]
     );
 
@@ -179,6 +181,7 @@ export class AutoMod implements PlatformModule {
       affectedChannelIds: row.affected_channel_ids ?? [],
       ignoredChannelIds: row.ignored_channel_ids ?? [],
       ignoreModerators: row.ignore_moderators,
+      logChannelId: row.log_channel_id ?? null,
       messageTemplate: row.message_template
     }));
   }
@@ -197,6 +200,7 @@ export class AutoMod implements PlatformModule {
       affectedChannelIds?: string[];
       ignoredChannelIds?: string[];
       ignoreModerators?: boolean;
+      logChannelId?: string | null;
       messageTemplate?: string;
     }
   ): Promise<void> {
@@ -213,7 +217,7 @@ export class AutoMod implements PlatformModule {
     const timeoutMinutes = Math.min(Math.max(Math.floor(input.timeoutMinutes ?? 0),0),40320);
 
     await this.db.query(
-      "INSERT INTO automod_rules(guild_id,detector,enabled,threshold,window_seconds,action,timeout_minutes,affected_role_ids,ignored_role_ids,affected_channel_ids,ignored_channel_ids,ignore_moderators,message_template) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(guild_id,detector) DO UPDATE SET enabled=EXCLUDED.enabled,threshold=EXCLUDED.threshold,window_seconds=EXCLUDED.window_seconds,action=EXCLUDED.action,timeout_minutes=EXCLUDED.timeout_minutes,affected_role_ids=EXCLUDED.affected_role_ids,ignored_role_ids=EXCLUDED.ignored_role_ids,affected_channel_ids=EXCLUDED.affected_channel_ids,ignored_channel_ids=EXCLUDED.ignored_channel_ids,ignore_moderators=EXCLUDED.ignore_moderators,message_template=EXCLUDED.message_template,updated_at=now()",
+      "INSERT INTO automod_rules(guild_id,detector,enabled,threshold,window_seconds,action,timeout_minutes,affected_role_ids,ignored_role_ids,affected_channel_ids,ignored_channel_ids,ignore_moderators,log_channel_id,message_template) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT(guild_id,detector) DO UPDATE SET enabled=EXCLUDED.enabled,threshold=EXCLUDED.threshold,window_seconds=EXCLUDED.window_seconds,action=EXCLUDED.action,timeout_minutes=EXCLUDED.timeout_minutes,affected_role_ids=EXCLUDED.affected_role_ids,ignored_role_ids=EXCLUDED.ignored_role_ids,affected_channel_ids=EXCLUDED.affected_channel_ids,ignored_channel_ids=EXCLUDED.ignored_channel_ids,ignore_moderators=EXCLUDED.ignore_moderators,log_channel_id=EXCLUDED.log_channel_id,message_template=EXCLUDED.message_template,updated_at=now()",
       [
         guildId,
         detector,
@@ -227,6 +231,7 @@ export class AutoMod implements PlatformModule {
         cleanIds(input.affectedChannelIds),
         cleanIds(input.ignoredChannelIds),
         input.ignoreModerators !== false,
+        input.logChannelId ?? null,
         (input.messageTemplate ?? "").slice(0,1000)
       ]
     );
@@ -389,9 +394,10 @@ export class AutoMod implements PlatformModule {
       affected_channel_ids: string[];
       ignored_channel_ids: string[];
       ignore_moderators: boolean;
+      log_channel_id: string | null;
       message_template: string;
     }>(
-      "SELECT detector,threshold,window_seconds,action,timeout_minutes,affected_role_ids,ignored_role_ids,affected_channel_ids,ignored_channel_ids,ignore_moderators,message_template " +
+      "SELECT detector,threshold,window_seconds,action,timeout_minutes,affected_role_ids,ignored_role_ids,affected_channel_ids,ignored_channel_ids,ignore_moderators,log_channel_id,message_template " +
       "FROM automod_rules WHERE guild_id=$1 AND enabled=true ORDER BY id",
       [message.guild.id]
     );
@@ -429,6 +435,7 @@ export class AutoMod implements PlatformModule {
         detector: rule.detector,
         action: rule.action,
         timeoutMinutes: rule.timeout_minutes,
+        logChannelId: rule.log_channel_id ?? null,
         messageTemplate: rule.message_template
       });
       return;
@@ -611,13 +618,62 @@ export class AutoMod implements PlatformModule {
       metadata: { detector: rule.detector, action: rule.action, deleted }
     }).catch(() => undefined);
 
-    if (rule.messageTemplate) {
+    let logDelivered = false;
+    if (rule.action === "log" && rule.logChannelId) {
+      const logChannel = message.guild!.channels.cache.get(rule.logChannelId);
+      if (logChannel?.isTextBased() && "send" in logChannel) {
+        const rendered = (rule.messageTemplate || (
+          "⚠️ AutoMod: **" + rule.detector + "** triggered for <@" + message.author.id + "> in <#" + message.channelId + "> (message " + message.id + ")."
+        ))
+          .replaceAll("{mention}", "<@" + message.author.id + ">")
+          .replaceAll("{user}", message.author.username)
+          .replaceAll("{channel}", "<#" + message.channelId + ">");
+        await logChannel.send({
+          content: rendered,
+          allowedMentions: { users: [message.author.id], roles: [], repliedUser: false }
+        }).then(() => { logDelivered = true; }).catch((error) => {
+          logger.warn("AutoMod log delivery failed", {
+            guildId: message.guild!.id,
+            userId: message.author.id,
+            messageId: message.id,
+            detector: rule.detector,
+            logChannelId: rule.logChannelId,
+            error: String(error)
+          });
+        });
+      }
+    }
+
+    if (rule.messageTemplate && rule.action !== "log") {
       const rendered = rule.messageTemplate
         .replaceAll("{mention}", "<@" + message.author.id + ">")
         .replaceAll("{user}", message.author.username)
         .replaceAll("{channel}", "<#" + message.channelId + ">");
-      if ("send" in message.channel) await message.channel.send(rendered).catch(() => undefined);
+      if ("send" in message.channel) {
+        await message.channel.send({
+          content: rendered,
+          allowedMentions: { users: [message.author.id], roles: [], repliedUser: false }
+        }).catch((error) => {
+          logger.warn("AutoMod response delivery failed", {
+            guildId: message.guild!.id,
+            userId: message.author.id,
+            messageId: message.id,
+            detector: rule.detector,
+            error: String(error)
+          });
+        });
+      }
     }
+
+    await this.auditLog?.record({
+      guildId: message.guild!.id,
+      source: "system",
+      action: "automod.rule.triggered",
+      targetType: "user",
+      targetId: message.author.id,
+      metadata: { detector: rule.detector, action: rule.action, deleted, logDelivered }
+    }).catch(() => undefined);
+
     return true;
   }
 

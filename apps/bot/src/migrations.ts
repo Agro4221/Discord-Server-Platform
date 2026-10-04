@@ -803,6 +803,13 @@ const migrations = [
       "  updated_at timestamptz NOT NULL DEFAULT now()",
       ");"
     ])
+  },
+  {
+    version: 47,
+    name: "automod_log_channel",
+    sql: q([
+      "ALTER TABLE automod_rules ADD COLUMN IF NOT EXISTS log_channel_id text;"
+    ])
   }
 ] as const;
 
