@@ -156,7 +156,7 @@ sequenceDiagram
 
 **Music** — интеграция через Lavalink. Модуль умеет persistent queue/player state, request channel, playlist loading до 500 треков, repeat/autoplay, previous/seek, pagination, emoji-controller, favorites, saved playlists и EQ/effects. Для текстов подключён LavaLyrics. Для дополнительных источников подключён LavaSrc: Spotify, Apple Music, Deezer, Yandex Music, VK Music, Tidal, Qobuz, yt-dlp и JioSaavn доступны как opt-in источники после настройки credentials.
 
-**Control Center** — управление сервером, конфигурацией, модулями, ролями, каналами, backup/import/export и диагностикой.
+**Control Center** — локальное управление сервером, конфигурацией, модулями, ролями, каналами, backup/import/export, диагностикой и регистрацией Discord-бота.
 
 ## 🚀 Быстрый старт
 
