@@ -35,6 +35,8 @@ export type AutomationCondition =
   | { type: "number-gte"; left: string; right: number }
   | { type: "number-lte"; left: string; right: number }
   | { type: "number-eq"; left: string; right: number }
+  | { type: "number-gt"; left: string; right: number }
+  | { type: "number-lt"; left: string; right: number }
   | { type: "has-role"; userId: string; roleId: string }
   | { type: "channel-is"; channelId: string }
   | { type: "cooldown-clear"; key: string };
