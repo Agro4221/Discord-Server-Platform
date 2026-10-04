@@ -186,7 +186,17 @@ export class Forms implements PlatformModule {
       });
       await interaction.reply({ content: "Форма опубликована в <#" + result.channelId + ">.", ephemeral: true });
     } catch (error) {
-      logger.warn("Form publish failed", { guildId: interaction.guild!.id, error: String(error) });
+      const formName = interaction.options.getString("name", true).trim().toLowerCase();
+      logger.warn("Form publish failed", { guildId: interaction.guild!.id, form: formName, error: String(error) });
+      await this.auditLog?.record({
+        guildId: interaction.guild!.id,
+        actorUserId: interaction.user.id,
+        source: "discord",
+        action: "forms.publish_failed",
+        targetType: "form",
+        targetId: formName,
+        metadata: { error: String(error) }
+      }).catch((auditError) => logger.warn("Form publish failure audit delivery failed", { error: String(auditError) }));
       await interaction.reply({ content: "Не удалось опубликовать форму: " + String(error instanceof Error ? error.message : error), ephemeral: true });
     }
   }
