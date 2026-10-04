@@ -270,7 +270,10 @@ export class Forms implements PlatformModule {
     }
 
     const answers: Record<string, string> = {};
-    for (const field of form.fields) answers[field.id] = interaction.fields.getTextInputValue("form:" + field.id);
+    for (const field of form.fields) {
+      const rawAnswer = interaction.fields.getTextInputValue("form:" + field.id);
+      answers[field.id] = typeof rawAnswer === "string" ? rawAnswer : "";
+    }
     const validation = validateSubmission(form.fields, answers);
     if (validation) {
       await interaction.reply({ content: validation, ephemeral: true });
@@ -299,7 +302,7 @@ export class Forms implements PlatformModule {
           .setDescription("Новая отправка от <@" + interaction.user.id + ">")
           .setTimestamp();
         for (const field of form.fields) {
-          embed.addFields({ name: field.label, value: (answers[field.id] || "—").slice(0, 1024) });
+          embed.addFields({ name: field.label, value: (answers[field.id] ?? "—").slice(0, 1024) });
         }
         await channel.send({ embeds: [embed] }).catch(async (error) => {
           logger.warn("Form response delivery failed", { guildId: interaction.guild!.id, form: form.name, error: String(error) });
