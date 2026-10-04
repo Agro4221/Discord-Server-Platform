@@ -48,10 +48,12 @@ export class Security implements PlatformModule {
     this.incidentTimer.unref();
     const a = context.events.on("member.add", (member) => this.onJoin(member));
     const b = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
-    const c = context.events.on("channel.delete", (channel) => this.onDestructive(channel.guildId, "channel.delete"));
-    const d = context.events.on("role.delete", (role) => this.onDestructive(role.guild.id, "role.delete"));
-    const e = context.events.on("member.ban", ({ guildId, userId }) => this.onDestructive(guildId, "member.ban", userId));
-    this.unsubscribe = () => { a(); b(); c(); d(); e(); };
+    const c = context.events.on("channel.create", (channel) => this.onDestructive(channel.guildId, "channel.create"));
+    const d = context.events.on("channel.delete", (channel) => this.onDestructive(channel.guildId, "channel.delete"));
+    const e = context.events.on("role.create", (role) => this.onDestructive(role.guild.id, "role.create"));
+    const f = context.events.on("role.delete", (role) => this.onDestructive(role.guild.id, "role.delete"));
+    const g = context.events.on("member.ban", ({ guildId, userId }) => this.onDestructive(guildId, "member.ban", userId));
+    this.unsubscribe = () => { a(); b(); c(); d(); e(); f(); g(); };
   }
 
   async shutdown(): Promise<void> {
@@ -655,10 +657,7 @@ export class Security implements PlatformModule {
     if (!guild) return [];
     await new Promise((resolve) => setTimeout(resolve, 350));
 
-    const auditType =
-      type === "channel.delete" ? AuditLogEvent.ChannelDelete :
-      type === "role.delete" ? AuditLogEvent.RoleDelete :
-      AuditLogEvent.MemberBanAdd;
+    const auditType = securityAuditLogEventType(type);
     const logs = await guild.fetchAuditLogs({ limit: 25, type: auditType }).catch((error) => {
       logger.warn("Security audit-log fetch failed", { guildId, type, error: String(error) });
       return null;

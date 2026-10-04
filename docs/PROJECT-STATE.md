@@ -281,3 +281,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - CI run #1592 passed the full automated pipeline: source/deployment/observability contracts, bot typecheck/tests/build, domain build and Dashboard production build.
 - Local launcher now reconciles enabled secondary identities with stored credentials into separate `dsp-bot-fleet-*` containers.
 - Live Windows/Docker Desktop execution with real Discord identities remains the environment-dependent acceptance gate.
+
+
+## 2026-10-04 — Security anti-nuke response expansion
+- Security destructive-burst monitoring now also observes channel creation and role creation bursts, in addition to channel/role deletion and member bans.
+- Executor correlation maps the expanded event types to Discord audit-log categories before response actions are applied.
+- Existing quarantine/removal response and incident lifecycle are unchanged; live Discord validation remains required.

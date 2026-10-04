@@ -188,3 +188,9 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ CI run #1592 passed the complete automated pipeline.
 - ✅ Fleet launcher/reconciler contract validation passed.
 - ⚠ Real multi-bot Windows/Docker runtime and Discord Gateway behavior still require live acceptance with user-owned bot credentials.
+
+
+## 2026-10-04 — Security anti-nuke event coverage
+- ✅ Regression coverage added for channel/role create/delete audit-log mapping.
+- ✅ Existing destructive-burst executor response pipeline remains reused.
+- ⚠ Live Discord audit-log timing and real admin-action correlation require acceptance testing.

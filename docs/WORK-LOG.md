@@ -339,3 +339,9 @@ Never write credentials, tokens or private user data here.
 - CI run #1592 passed on `03ad5eec1c186b4a76af0cf7c7775457ba3bf4d4`.
 - Fleet launcher/reconciler static contract and all backend/frontend automated checks are green.
 - Documentation now explicitly distinguishes implemented local orchestration from live Windows/Discord acceptance.
+
+
+## 2026-10-04 — Security anti-nuke response expansion
+- Security module pass: extended anti-nuke event coverage to `channel.create` and `role.create`.
+- Kept the existing `destructive-burst` incident model to avoid unnecessary schema churn; event type is retained in incident/security-event metadata.
+- Added regression coverage for audit-log event mapping.

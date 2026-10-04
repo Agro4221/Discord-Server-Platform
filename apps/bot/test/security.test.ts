@@ -5,8 +5,10 @@ import {
   shouldTriggerSecurityIncident,
   securityIncidentCooldownUntil,
   securityResponseThreshold,
-  clampSecurityIncidentDuration
+  clampSecurityIncidentDuration,
+  securityAuditLogEventType
 } from "../src/modules/security.js";
+import { AuditLogEvent } from "discord.js";
 
 test("Security burst incident is opened only at threshold and outside active window", () => {
   assert.equal(shouldTriggerSecurityIncident(100, 0, 5, 5), true);
@@ -42,4 +44,13 @@ test("Security incident duration is bounded to safe operator values", () => {
   assert.equal(clampSecurityIncidentDuration(300), 300);
   assert.equal(clampSecurityIncidentDuration(5000), 3600);
   assert.equal(clampSecurityIncidentDuration(Number.NaN), 300);
+});
+
+
+test("Security anti-nuke tracks channel/role create and delete audit actions", () => {
+  assert.equal(securityAuditLogEventType("channel.create"), AuditLogEvent.ChannelCreate);
+  assert.equal(securityAuditLogEventType("channel.delete"), AuditLogEvent.ChannelDelete);
+  assert.equal(securityAuditLogEventType("role.create"), AuditLogEvent.RoleCreate);
+  assert.equal(securityAuditLogEventType("role.delete"), AuditLogEvent.RoleDelete);
+  assert.equal(securityAuditLogEventType("member.ban"), AuditLogEvent.MemberBanAdd);
 });
