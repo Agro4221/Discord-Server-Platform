@@ -283,5 +283,5 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Destructive-action history is restored from durable `security_events` across process restart for the supported one-hour detection horizon.
 - ✅ Regression tests cover both restart reconstruction and durable executor-role removal recording.
 - ⚠ Real Discord role hierarchy, malicious-executor behavior and manual post-incident role reconciliation remain live acceptance cases.
-- ⚠ Fresh CI for this checkpoint is pending.
+- ✅ CI #1675 passed the complete automated pipeline: typecheck, 105/105 bot tests, dependency/source/deployment/observability checks, and domain/bot/Dashboard builds.
 - ☐ Next: AutoMod response-delivery edge cases, then Music/Fleet failure paths and live release-gate validation.

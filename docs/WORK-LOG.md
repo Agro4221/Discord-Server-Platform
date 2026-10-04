@@ -492,7 +492,7 @@ Never write credentials, tokens or private user data here.
 - Every destructive action now gets a durable `destructive-action` event; startup reconstructs the in-memory anti-nuke history from the last supported one-hour window after process restart.
 - Destructive history reconstruction is capped at 50,000 rows and uses the existing durable `security_events` pipeline; no additional schema table was introduced.
 - Added deterministic regression coverage for destructive-history restart reconstruction and durable executor-role removal recording.
-- Verification state: this checkpoint awaits the fresh GitHub Actions result.
+- CI run #1675 passed the complete automated pipeline on commit `357052808974403abbfb1abb68586787798ae7c0` (105/105 bot tests passed).
 ### Next concrete work
 - AutoMod: richer response-delivery failure coverage and final warn semantics review.
 - Music: deeper failover/current-position/queue continuity and multi-session failure paths.

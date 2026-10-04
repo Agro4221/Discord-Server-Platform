@@ -366,4 +366,5 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Successful stripped roles are durably recorded as per-role `security.executor-role-removed` events, including incident/user/role identifiers and the pinned non-reversible policy.
 - Destructive Security events are durably appended to `security_events` and reconstructed into the one-hour in-memory detection window after restart.
 - Added regression coverage for restart reconstruction and durable role-removal recording.
-- Fresh CI verification is pending for this checkpoint.
+- CI #1675 passed the complete automated pipeline, including 105/105 bot tests and all domain/bot/Dashboard builds.
+- Latest verified development code: `357052808974403abbfb1abb68586787798ae7c0`.
