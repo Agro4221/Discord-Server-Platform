@@ -473,3 +473,14 @@ Never write credentials, tokens or private user data here.
 - Music: deeper failover/current-position/queue continuity.
 - Fleet: reconciliation/failover failure paths and multi-bot Windows/Docker acceptance.
 - Final live release gate: real Discord permissions/hierarchy, Lavalink/provider behavior, soak/chaos/recovery and clean-host deployment.
+
+## 2026-10-04 — Security restart-resilience checkpoint
+- Added regression coverage for `restoreActiveIncidents`: after restart, active raid/destructive incidents are restored from PostgreSQL, and when multiple active incidents of the same type exist for a guild, the one with the latest expiry is retained in memory.
+- CI run #1667 passed the complete automated pipeline on commit `87e893c2d7e3454b97a5cda3caf0d7109ef3f401`.
+- Security response accounting, detection-window bounds and AutoMod contract hardening from the preceding checkpoints remain verified.
+### Remaining after this checkpoint
+- Security: durable lifecycle policy for executor-role removals/restoration and whether destructive burst history needs durable reconstruction across restart.
+- AutoMod: richer response-delivery failure coverage and final warn semantics review.
+- Music: deeper failover/current-position/queue continuity and multi-session failure paths.
+- Fleet: reconciliation/failover failure paths and real multi-bot Windows/Docker acceptance.
+- Final live release gate: Discord permissions/hierarchy, real Lavalink/providers, soak/chaos/recovery and clean-host deployment.
