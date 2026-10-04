@@ -575,3 +575,9 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ AutoMod ban runtime behavior is covered by repository tests.
 - ✅ Automation cooldown set/clear runtime behavior is covered by repository tests.
 - ⚠ Live Discord hierarchy/permission behavior and full multi-process failover remain release-gate environment checks.
+
+## 2026-10-05 — Verification
+- ✅ Automation set-nickname validation + runtime.
+- ✅ Automation ban validation + runtime.
+- ✅ Fleet failover previous-owner detail tests.
+- ✅ CI #1837 full pipeline.

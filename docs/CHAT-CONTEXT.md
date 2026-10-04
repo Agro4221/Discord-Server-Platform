@@ -7,7 +7,7 @@
 
 Репозиторий: `Agro4221/Discord-Server-Platform`
 Ветка: `development`
-Последний известный HEAD на момент обновления этого файла: `2f70a1ead925c9774519431e8fcd53210646d87b`
+Последний известный HEAD на момент обновления этого файла: `d1e0b2114f67ebdf188bc11b6600e1ee6a93440b`
 Тип: self-hosted Discord Server Platform / единый Discord-бот.
 Основной локальный runtime: Native Windows.
 Docker: дополнительный путь для локального/VPS-развёртывания.
@@ -253,3 +253,9 @@ Audit-log ingestion расширен для:
 - Automation: `set-cooldown` + `clear-cooldown` runtime is green under CI #1819.
 - Fleet: stale Music voice assignment takeover is green under CI #1824.
 - Next target: deeper Fleet orchestration, then remaining Music/VPS production breadth.
+
+### 2026-10-05 — Latest verified checkpoint
+- CI #1837: **success**.
+- Automation: `set-nickname` and `ban` green.
+- Fleet failover detail/audit changes present.
+- Next work stays on functional breadth.

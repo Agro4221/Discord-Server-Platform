@@ -578,3 +578,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - AutoMod rule responses include delete, timeout, warn, log and verified ban.
 - Fleet now fails over both guild ownership and stale Music voice assignments.
 - CI #1824 is green on the current feature tree.
+
+## 2026-10-05 — Current verified implementation
+- Automation: `set-nickname` + `ban` are implemented end-to-end and covered by runtime/validation tests.
+- Fleet: stale guild and stale Music voice takeover are active; takeover records previous owner detail for durable audit.
+- AutoMod: rule-level `ban` is verified.
+- CI #1837 is green.

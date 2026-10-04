@@ -833,3 +833,11 @@ Never write credentials, tokens or private user data here.
 
 ### Next concrete work
 - Continue Fleet orchestration depth, then remaining Music node/provider failover and VPS production tooling, followed by live/E2E/chaos/soak acceptance.
+
+## 2026-10-05 — Automation / Fleet verified checkpoint
+- CI #1837 passed completely on `d1e0b2114f67ebdf188bc11b6600e1ee6a93440b`: dependency/audit, source/deployment contracts, bot typecheck, tests and all builds.
+- Automation now has verified `set-nickname` and `ban` actions, alongside the existing role, timeout, message, reaction, pin, channel, cooldown and logging actions.
+- Fleet failover detail/audit work is present: guild and Music takeover paths retain previous identity context and emit durable failover audit events; CI #1829 verified the fixture fixes.
+- AutoMod rule-level `ban` remains green from CI #1823.
+### Next concrete work
+- Continue the functional Automation/moderation breadth rather than documentation-only checkpoints.
