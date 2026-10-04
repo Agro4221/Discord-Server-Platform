@@ -196,7 +196,7 @@ export function RolePanelsEditor({
     <div style={{ display: "grid", gap: 18 }}>
       <div>
         <h3 style={{ margin: 0, fontSize: 18 }}>Role Panels</h3>
-        <div style={{ marginTop: 6, opacity: 0.48, fontSize: 12 }}>Панель публикуется в выбранный текстовый канал и использует кнопки для выдачи/снятия ролей.</div>
+        <div style={{ marginTop: 6, opacity: 0.48, fontSize: 12 }}>Панель публикуется в выбранный текстовый канал. Можно использовать кнопки или select menu; selection mode и срок действия ролей сохраняются.</div>
       </div>
       {error && <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d" }}>{error}</div>}
       <input value={title} maxLength={100} onChange={(event) => setTitle(event.target.value)} placeholder="Заголовок панели" style={inputStyle} />
