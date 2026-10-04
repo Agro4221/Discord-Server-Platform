@@ -985,6 +985,7 @@ export function ControlCenter() {
                 <div style={{ marginTop: 14 }}>
                   <CommunityHubPanel guildId={guildId} />
                 </div>
+              )}
               </>
             )}
 
