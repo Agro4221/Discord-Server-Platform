@@ -13,6 +13,18 @@ type TicketSummary = {
   createdAt: string;
   closedAt: string | null;
   lastActivityAt: string | null;
+  panelId: number | null;
+};
+
+type TicketPanel = {
+  id: number;
+  guildId: string;
+  channelId: string;
+  messageId: string | null;
+  title: string;
+  description: string;
+  buttonLabel: string;
+  enabled: boolean;
 };
 
 type Field = {
@@ -59,7 +71,16 @@ const DEFAULT_CUSTOMIZATION: Customization = {
   closeButtonLabel: "Закрыть"
 };
 
-export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onChanged?: () => void | Promise<void> }) {
+export function TicketFormPanel({
+  guildId,
+  channels,
+  onChanged
+}: {
+  guildId: string;
+  channels: { id: string; name: string; type?: number }[];
+  onChanged?: () => void | Promise<void>;
+}) {
+  const textChannels = channels.filter((channel) => channel.type === 0);
   const [fields, setFields] = useState<Field[]>([]);
   const [customization, setCustomization] = useState<Customization>(DEFAULT_CUSTOMIZATION);
   const [sla, setSla] = useState<SlaConfig>({
@@ -74,28 +95,45 @@ export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onCha
   const [ticketFilter, setTicketFilter] = useState<"open" | "closed" | "closing" | "all">("open");
   const [ticketEdits, setTicketEdits] = useState<Record<number, { priority: TicketSummary["priority"]; tags: string }>>({});
   const [busy, setBusy] = useState(false);
+  const [panels, setPanels] = useState<TicketPanel[]>([]);
+  const [panelForm, setPanelForm] = useState({
+    channelId: "",
+    title: "🎫 Поддержка",
+    description: "Нажми кнопку ниже — Vexa откроет форму тикета.",
+    buttonLabel: "Создать тикет",
+    enabled: true
+  });
+  const [editingPanelId, setEditingPanelId] = useState<number | null>(null);
 
   async function load() {
     const ticketQuery = ticketFilter === "all" ? "" : "?status=" + ticketFilter;
-    const [formResponse, customizationResponse, slaResponse, ticketsResponse] = await Promise.all([
+    const [formResponse, customizationResponse, slaResponse, ticketsResponse, panelsResponse] = await Promise.all([
       fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/form", { cache: "no-store" }),
       fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/customization", { cache: "no-store" }),
       fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/sla", { cache: "no-store" }),
-      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets" + ticketQuery, { cache: "no-store" })
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets" + ticketQuery, { cache: "no-store" }),
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tickets/panels", { cache: "no-store" })
     ]);
     const formBody = await formResponse.json().catch(() => ({}));
     const customizationBody = await customizationResponse.json().catch(() => ({}));
     const slaBody = await slaResponse.json().catch(() => ({}));
     const ticketsBody = await ticketsResponse.json().catch(() => ({}));
+    const panelsBody = await panelsResponse.json().catch(() => ({}));
     if (!formResponse.ok) throw new Error(formBody.error ?? "ticket_form_failed");
     if (!customizationResponse.ok) throw new Error(customizationBody.error ?? "ticket_customization_failed");
     if (!slaResponse.ok) throw new Error(slaBody.error ?? "ticket_sla_failed");
     if (!ticketsResponse.ok) throw new Error(ticketsBody.error ?? "tickets_failed");
+    if (!panelsResponse.ok) throw new Error(panelsBody.error ?? "ticket_panels_failed");
     setFields((formBody.fields ?? []) as Field[]);
     setCustomization((customizationBody.customization ?? DEFAULT_CUSTOMIZATION) as Customization);
     setSla((slaBody.sla ?? sla) as SlaConfig);
     const nextTickets = (ticketsBody.tickets ?? []) as TicketSummary[];
     setTickets(nextTickets);
+    const nextPanels = (panelsBody.panels ?? []) as TicketPanel[];
+    setPanels(nextPanels);
+    if (!editingPanelId && nextPanels.length === 0 && textChannels[0]) {
+      setPanelForm((current) => ({ ...current, channelId: current.channelId || textChannels[0].id }));
+    }
     setTicketEdits(Object.fromEntries(nextTickets.map((ticket) => [
       ticket.id,
       { priority: ticket.priority, tags: ticket.tags.join(", ") }
@@ -129,6 +167,76 @@ export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onCha
       return;
     }
     setFields((current) => current.filter((_, i) => i !== index));
+  }
+
+  function resetPanelForm() {
+    setEditingPanelId(null);
+    setPanelForm({
+      channelId: textChannels[0]?.id ?? "",
+      title: customization.panelTitle,
+      description: customization.panelDescription,
+      buttonLabel: customization.createButtonLabel,
+      enabled: true
+    });
+  }
+
+  function editPanel(panel: TicketPanel) {
+    setEditingPanelId(panel.id);
+    setPanelForm({
+      channelId: panel.channelId,
+      title: panel.title,
+      description: panel.description,
+      buttonLabel: panel.buttonLabel,
+      enabled: panel.enabled
+    });
+  }
+
+  async function savePanel() {
+    setBusy(true);
+    setStatus("");
+    try {
+      const isEdit = editingPanelId !== null;
+      const response = await fetch(
+        "/api/guilds/" + encodeURIComponent(guildId) + "/tickets/panels" + (isEdit ? "/" + editingPanelId : ""),
+        {
+          method: isEdit ? "PUT" : "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(panelForm)
+        }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "ticket_panel_save_failed");
+      setStatus(isEdit ? "Ticket Panel обновлена." : "Ticket Panel опубликована.");
+      resetPanelForm();
+      await load();
+      await onChanged?.();
+    } catch (caught) {
+      setStatus(caught instanceof Error ? caught.message : "Не удалось сохранить Ticket Panel.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deletePanel(panel: TicketPanel) {
+    if (!window.confirm("Удалить Ticket Panel «" + panel.title + "» и её опубликованное сообщение?")) return;
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await fetch(
+        "/api/guilds/" + encodeURIComponent(guildId) + "/tickets/panels/" + panel.id,
+        { method: "DELETE" }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "ticket_panel_delete_failed");
+      setStatus("Ticket Panel удалена.");
+      if (editingPanelId === panel.id) resetPanelForm();
+      await load();
+      await onChanged?.();
+    } catch (caught) {
+      setStatus(caught instanceof Error ? caught.message : "Не удалось удалить Ticket Panel.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function saveTicketMetadata(ticket: TicketSummary) {
@@ -230,6 +338,51 @@ export function TicketFormPanel({ guildId, onChanged }: { guildId: string; onCha
   return (
     <div style={{ display: "grid", gap: 10 }}>
       {status && <div style={notice}>{status}</div>}
+      <section style={sectionStyle}>
+        <div style={sectionTitle}>Ticket Panels · несколько входов в одну Ticket-систему</div>
+        <div style={{ color: "#697486", fontSize: 9 }}>
+          Каждая панель публикуется в отдельный канал и использует общий Ticket lifecycle, форму, SLA и transcript настройки.
+        </div>
+        {!panels.length ? (
+          <div style={{ color: "#697486", fontSize: 10 }}>Панелей пока нет.</div>
+        ) : panels.map((panel) => (
+          <div key={panel.id} style={card}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+              <div>
+                <strong style={{ fontSize: 11 }}>#{panel.id} · {panel.title}</strong>
+                <div style={{ color: "#697486", fontSize: 9 }}>{panel.enabled ? "активна" : "выключена"} · канал {panel.channelId} · message {panel.messageId ?? "—"}</div>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button type="button" disabled={busy} onClick={() => editPanel(panel)} style={secondary}>Изменить</button>
+                <button type="button" disabled={busy} onClick={() => void deletePanel(panel)} style={danger}>Удалить</button>
+              </div>
+            </div>
+          </div>
+        ))}
+        <div style={card}>
+          <div style={sectionTitle}>{editingPanelId === null ? "Новая панель" : "Редактирование панель #" + editingPanelId}</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            <label style={label}>
+              <span>Канал</span>
+              <select value={panelForm.channelId} onChange={(e) => setPanelForm((current) => ({ ...current, channelId: e.target.value }))} style={input} disabled={busy}>
+                <option value="">Выбери канал</option>
+                {textChannels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+              </select>
+            </label>
+            <label style={label}><span>Заголовок</span><input value={panelForm.title} maxLength={256} onChange={(e) => setPanelForm((current) => ({ ...current, title: e.target.value }))} style={input} disabled={busy} /></label>
+            <label style={label}><span>Описание</span><textarea value={panelForm.description} maxLength={4096} onChange={(e) => setPanelForm((current) => ({ ...current, description: e.target.value }))} style={{ ...input, minHeight: 65 }} disabled={busy} /></label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+              <label style={label}><span>Текст кнопки</span><input value={panelForm.buttonLabel} maxLength={80} onChange={(e) => setPanelForm((current) => ({ ...current, buttonLabel: e.target.value }))} style={input} disabled={busy} /></label>
+              <label style={{ ...check, paddingTop: 17 }}><input type="checkbox" checked={panelForm.enabled} onChange={(e) => setPanelForm((current) => ({ ...current, enabled: e.target.checked }))} disabled={busy} /> Активна</label>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 7 }}>
+              {editingPanelId !== null && <button type="button" disabled={busy} onClick={resetPanelForm} style={secondary}>Отмена</button>}
+              <button type="button" disabled={busy || !panelForm.channelId || !panelForm.title.trim() || !panelForm.description.trim() || !panelForm.buttonLabel.trim()} onClick={() => void savePanel()} style={primary}>{busy ? "Сохранение…" : editingPanelId === null ? "Опубликовать панель" : "Сохранить панель"}</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section style={sectionStyle}>
         <div style={sectionTitle}>Ticket queue · priority / tags / assignment</div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
