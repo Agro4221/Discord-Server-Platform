@@ -98,11 +98,13 @@ type ApiOptions = {
       intervalSeconds: number;
       enabled?: boolean;
       messageTemplate?: string;
+      credentialId?: number | null;
     }) => Promise<unknown>;
     update: (guildId: string, alertId: number, input: {
       target?: string;
       channelId?: string;
       mentionRoleId?: string | null;
+      credentialId?: number | null;
       intervalSeconds?: number;
       enabled?: boolean;
       messageTemplate?: string;
@@ -945,7 +947,7 @@ export class ManagementApiServer {
             }
             const body = await readJson(req);
             const provider = body.provider;
-            if (!["twitch","youtube","kick"].includes(provider) || typeof body.label !== "string") {
+            if (typeof provider !== "string" || !["twitch","youtube","kick"].includes(provider) || typeof body.label !== "string") {
               throw new RequestInputError("invalid_integration_credential", 400);
             }
             const credential = await this.options.integrationCredentials!.save(guildId, {
@@ -1014,6 +1016,7 @@ export class ManagementApiServer {
             const mentionRoleId = body.mentionRoleId == null ? null : typeof body.mentionRoleId === "string" ? body.mentionRoleId : "";
             const messageTemplate = typeof body.messageTemplate === "string" ? body.messageTemplate.slice(0, 1000) : undefined;
             const intervalSeconds = Number(body.intervalSeconds);
+            const credentialId = body.credentialId == null ? null : Number(body.credentialId);
             if (!["twitch","youtube","vk","kick"].includes(platform) || !target || target.length > 200 || !/^\d{17,20}$/.test(channelId) || (mentionRoleId && !/^\d{17,20}$/.test(mentionRoleId)) || !Number.isFinite(intervalSeconds) || (credentialId !== null && (!Number.isSafeInteger(credentialId) || credentialId < 1))) {
               throw new RequestInputError("invalid_stream_alert", 400);
             }
