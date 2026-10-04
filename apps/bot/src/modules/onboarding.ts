@@ -17,6 +17,21 @@ export type OnboardingFlow = {
   steps: OnboardingStep[];
 };
 
+export type OnboardingValidationIssue = {
+  step: number | null;
+  severity: "error" | "warning";
+  code: string;
+  message: string;
+};
+
+export type OnboardingValidation = {
+  ok: boolean;
+  flowEnabled: boolean;
+  trigger: OnboardingTrigger;
+  issues: OnboardingValidationIssue[];
+  preview: string[];
+};
+
 export class Onboarding implements PlatformModule {
   readonly name = "onboarding";
   private unsubscribe?: () => void;
@@ -92,6 +107,91 @@ export class Onboarding implements PlatformModule {
     });
 
     return { guildId, enabled, trigger, steps };
+  }
+
+  async validate(guildId: string): Promise<OnboardingValidation> {
+    const flow = await this.get(guildId);
+    const guild = this.client?.guilds.cache.get(guildId);
+    if (!guild) throw new Error("guild_not_available");
+
+    const issues: OnboardingValidationIssue[] = [];
+    const preview: string[] = [];
+
+    if (!flow.enabled) {
+      issues.push({ step: null, severity: "warning", code: "flow_disabled", message: "Onboarding выключен." });
+    }
+    if (!flow.steps.length) {
+      issues.push({ step: null, severity: "warning", code: "no_steps", message: "В flow нет шагов." });
+    }
+    if (flow.trigger === "verification.passed" && !await moduleEnabled(this.db, guildId, "verification", false)) {
+      issues.push({
+        step: null,
+        severity: "error",
+        code: "verification_disabled",
+        message: "Триггер verification.passed выбран, но модуль Verification выключен."
+      });
+    }
+
+    const bot = guild.members.me;
+    flow.steps.forEach((step, index) => {
+      const stepNumber = index + 1;
+
+      if (step.type === "role") {
+        const role = guild.roles.cache.get(step.roleId);
+        if (!role) {
+          issues.push({ step: stepNumber, severity: "error", code: "role_missing", message: "Роль " + step.roleId + " не найдена." });
+          return;
+        }
+        if (role.managed || role.id === guild.id) {
+          issues.push({ step: stepNumber, severity: "error", code: "role_unmanageable", message: "Роль " + role.name + " нельзя назначать вручную." });
+          return;
+        }
+        if (!bot || role.position >= bot.roles.highest.position) {
+          issues.push({ step: stepNumber, severity: "error", code: "role_hierarchy", message: "Роль " + role.name + " находится не ниже высшей роли бота." });
+          return;
+        }
+        preview.push(stepNumber + ". Роль → " + role.name);
+        return;
+      }
+
+      if (step.type === "channel-message") {
+        const channel = guild.channels.cache.get(step.channelId);
+        if (!channel || channel.type !== 0) {
+          issues.push({ step: stepNumber, severity: "error", code: "channel_missing", message: "Текстовый канал для шага не найден." });
+          return;
+        }
+        if (!bot || !bot.permissionsIn(channel).has(["ViewChannel", "SendMessages"])) {
+          issues.push({ step: stepNumber, severity: "error", code: "channel_permissions", message: "Бот не имеет View Channel + Send Messages в #" + channel.name + "." });
+          return;
+        }
+        preview.push(stepNumber + ". Канал → #" + channel.name + ": " + renderTemplate(step.content, {
+          mention: "@preview-user",
+          user: "preview-user",
+          server: guild.name
+        }));
+        return;
+      }
+
+      preview.push(stepNumber + ". ЛС → " + renderTemplate(step.content, {
+        mention: "@preview-user",
+        user: "preview-user",
+        server: guild.name
+      }));
+      issues.push({
+        step: stepNumber,
+        severity: "warning",
+        code: "dm_runtime_dependency",
+        message: "Отправка ЛС зависит от настроек приватности/доступности DM самого участника."
+      });
+    });
+
+    return {
+      ok: !issues.some((issue) => issue.severity === "error"),
+      flowEnabled: flow.enabled,
+      trigger: flow.trigger,
+      issues,
+      preview
+    };
   }
 
   private async execute(guildId: string, userId: string, trigger: OnboardingTrigger): Promise<void> {
