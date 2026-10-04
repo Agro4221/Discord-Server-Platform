@@ -965,6 +965,38 @@ export class ManagementApiServer {
             this.json(res, 200, { ok: true, guildId, credential });
             return;
           }
+          if (method === "POST" && integrationCredentialItemMatch) {
+            const guildId = integrationCredentialItemMatch[1] ?? "";
+            const credentialId = Number(integrationCredentialItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(credentialId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_credential_not_found" });
+              return;
+            }
+            try {
+              const result = await this.options.integrationCredentials!.test(guildId, credentialId);
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "integration.credential.tested",
+                targetType: "integration-credential",
+                targetId: String(credentialId),
+                metadata: { provider: result.provider, latencyMs: result.latencyMs }
+              });
+              this.json(res, 200, { ok: true, credentialId, ...result });
+            } catch (error) {
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "integration.credential.test_failed",
+                targetType: "integration-credential",
+                targetId: String(credentialId),
+                metadata: { error: String(error).slice(0, 180) }
+              });
+              this.json(res, 502, { error: error instanceof Error ? error.message : "integration_credential_test_failed" });
+            }
+            return;
+          }
+
           if (method === "DELETE" && integrationCredentialItemMatch) {
             const guildId = integrationCredentialItemMatch[1] ?? "";
             const credentialId = Number(integrationCredentialItemMatch[2]);
