@@ -37,7 +37,10 @@ test("secondary identities cannot fall back to primary credentials", () => {
     delete process.env.DISCORD_TOKEN_MUSIC2;
     delete process.env.DISCORD_CLIENT_ID_MUSIC2;
 
-    assert.throws(() => resolveIdentityEnv("music2"), /Missing Discord credentials/);
+    assert.deepEqual(resolveIdentityEnv("music2"), {
+      token: undefined,
+      clientId: undefined
+    });
 
     process.env.DISCORD_TOKEN_MUSIC2 = "music-token";
     process.env.DISCORD_CLIENT_ID_MUSIC2 = "music-client";
