@@ -301,3 +301,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Self-service role panels now support Discord select menus in addition to the original buttons.
 - Component type, selection mode, max selections and timed assignments share the same durable role-panel model and Dashboard editor.
 - The feature remains backward-compatible: existing panels use buttons by default.
+
+
+## 2026-10-04 — Local bot registration architecture
+- Control Center is intentionally a local self-hosted admin surface without end-user login.
+- Discord bot registration is now part of Fleet rather than a separate auth/account system.
+- Stored bot tokens are encrypted at rest; Dashboard reads only `tokenConfigured`, never the secret value.
+- The bot process may start in a database/Control Center-only state and can connect after credentials are registered.
+- Existing environment credentials are retained for backward compatibility and initial bootstrap.
