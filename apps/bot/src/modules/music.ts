@@ -1191,7 +1191,6 @@ export class Music implements PlatformModule {
         selfDeaf: true
       });
 
-      try {
         if (!player.connected) await player.connect();
         if (typeof state.filters === "object" && state.filters !== null) {
           player.filterManager.data = state.filters as typeof player.filterManager.data;
@@ -1347,7 +1346,6 @@ export class Music implements PlatformModule {
 
       if (!player) continue;
 
-      try {
         if (!player.connected) await player.connect();
         if (typeof data.volume === "number") await player.setVolume(data.volume);
 
