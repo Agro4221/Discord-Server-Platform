@@ -174,8 +174,10 @@ export class ManagementApiServer {
         });
 
         try {
-          const requestRateLimit = requestPath === "/api/fleet/register" ? 10 : 120;
-          if (!this.allowedRate(ip, requestRateLimit)) {
+          const isFleetRegistration = requestPath === "/api/fleet/register";
+          const requestRateLimit = isFleetRegistration ? 10 : 120;
+          const rateKey = isFleetRegistration ? ip + ":fleet-register" : ip;
+          if (!this.allowedRate(rateKey, requestRateLimit)) {
             this.json(res, 429, { error: "rate_limited" });
             return;
           }
