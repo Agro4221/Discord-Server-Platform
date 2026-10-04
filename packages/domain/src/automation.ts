@@ -47,6 +47,7 @@ export type AutomationAction =
   | { type: "add-role"; userId: string; roleId: string }
   | { type: "remove-role"; userId: string; roleId: string }
   | { type: "timeout"; userId: string; durationSeconds: number; reason: string }
+  | { type: "ban"; userId: string; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
   | { type: "add-reaction"; channelId: string; messageId: string; emoji: string }
   | { type: "remove-reaction"; channelId: string; messageId: string; emoji: string }

@@ -16,6 +16,7 @@ type Action =
   | { type: "dm-user"; userId: string; content: string }
   | { type: "add-role" | "remove-role"; userId: string; roleId: string }
   | { type: "timeout"; userId: string; durationSeconds: number; reason: string }
+  | { type: "ban"; userId: string; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
   | { type: "add-reaction" | "remove-reaction"; channelId: string; messageId: string; emoji: string }
   | { type: "pin-message" | "unpin-message"; channelId: string; messageId: string }
@@ -23,6 +24,7 @@ type Action =
   | { type: "set-channel-topic"; channelId: string; topic: string }
   | { type: "set-channel-name"; channelId: string; name: string }
   | { type: "set-nickname"; userId: string; nickname: string }
+  | { type: "ban"; userId: string; reason: string }
   | { type: "clear-cooldown"; key: string }
   | { type: "set-cooldown"; key: string; durationSeconds: number }
   | { type: "log"; message: string };
@@ -204,6 +206,7 @@ export function AutomationPanel({
       type === "set-channel-topic" ? { type, channelId: "@event", topic: "" } :
       type === "set-channel-name" ? { type, channelId: "@event", name: "" } :
       type === "set-nickname" ? { type, userId: "@event", nickname: "" } :
+      type === "ban" ? { type, userId: "@event", reason: "" } :
       type === "clear-cooldown" ? { type, key: "" } :
       type === "set-cooldown" ? { type, key: "", durationSeconds: 60 } :
       { type: "log", message: "" };
@@ -403,6 +406,7 @@ export function AutomationPanel({
               <option value="set-channel-topic">set-channel-topic</option>
               <option value="set-channel-name">set-channel-name</option>
               <option value="set-nickname">set-nickname</option>
+              <option value="ban">ban</option>
               <option value="clear-cooldown">clear-cooldown</option>
               <option value="set-cooldown">set-cooldown</option>
               <option value="log">log</option>
@@ -506,6 +510,13 @@ export function AutomationPanel({
               <div style={actionGrid}>
                 <input value={action.userId} maxLength={20} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event or User ID" style={inputStyle} />
                 <input value={action.nickname} maxLength={32} onChange={(e) => updateAction(index, { nickname: e.target.value })} placeholder="Nickname · {user}" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "ban" && (
+              <div style={actionGrid}>
+                <input value={action.userId} maxLength={20} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event or User ID" style={inputStyle} />
+                <input value={action.reason} maxLength={500} onChange={(e) => updateAction(index, { reason: e.target.value })} placeholder="Причина бана" style={inputStyle} />
               </div>
             )}
 

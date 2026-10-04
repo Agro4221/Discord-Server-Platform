@@ -188,3 +188,44 @@ test("Automation set-nickname updates a manageable member and supports clearing"
     { nickname: null, reason: "Automation rule" }
   ]);
 });
+
+
+test("Automation ban action validates target and reason", () => {
+  assert.doesNotThrow(() => validateAutomationRule("member.join", [], [
+    { type: "ban", userId: "@event", reason: "Automation rule" }
+  ]));
+  assert.throws(() => validateAutomationRule("member.join", [], [
+    { type: "ban", userId: "bad", reason: "Automation rule" }
+  ]), /invalid_ban_user/);
+  assert.throws(() => validateAutomationRule("member.join", [], [
+    { type: "ban", userId: "@event", reason: "" }
+  ]), /invalid_ban_reason/);
+  assert.throws(() => validateAutomationRule("member.join", [], [
+    { type: "ban", userId: "@event", reason: "x".repeat(501) }
+  ]), /invalid_ban_reason/);
+});
+
+test("Automation ban action bans a bannable member with a rendered reason", async () => {
+  const calls: string[] = [];
+  const engine = new AutomationEngine({} as never);
+  const state = engine as unknown as {
+    perform: (actions: unknown[], event: { type: "member.join"; guildId: string; userId: string }) => Promise<void>;
+    client: { guilds: { cache: Map<string, { members: { fetch: (userId: string) => Promise<unknown> } } } };
+  };
+  state.client = {
+    guilds: {
+      cache: new Map([["guild-1", {
+        members: {
+          fetch: async () => ({
+            bannable: true,
+            ban: async ({ reason }: { reason: string }) => calls.push(reason)
+          })
+        }
+      }]])
+    }
+  };
+  await state.perform([
+    { type: "ban", userId: "@event", reason: "Rule for {userId}" }
+  ], { type: "member.join", guildId: "guild-1", userId: "user-1" });
+  assert.deepEqual(calls, ["Rule for user-1"]);
+});

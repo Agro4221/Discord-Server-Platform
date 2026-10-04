@@ -764,6 +764,16 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
+        if (action.type === "ban") {
+          const guild = client?.guilds.cache.get(event.guildId);
+          const userId = resolveUserReference(action.userId, event.userId);
+          const member = userId ? await guild?.members.fetch(userId).catch(() => null) : null;
+          if (member?.bannable) {
+            await member.ban({ reason: renderTemplate(action.reason, event) });
+          }
+          continue;
+        }
+
         if (action.type === "timeout") {
           const guild = client?.guilds.cache.get(event.guildId);
           const userId = resolveUserReference(action.userId, event.userId);
