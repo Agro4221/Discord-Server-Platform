@@ -37,7 +37,16 @@ type Field = {
 type ModuleAction = { id: string; label: string; kind?: "safe" | "danger"; confirmation?: string };
 type Schema = { key: string; title: string; fields: Field[]; actions?: ModuleAction[] };
 type Resource = { id: string; name: string; type?: number; position?: number; manageable?: boolean };
-type AuditEvent = { action: string; target_id: string | null; created_at: string; metadata?: Record<string, unknown> };
+type AuditEvent = {
+  id?: string;
+  action: string;
+  source?: "discord" | "dashboard" | "system";
+  actor_user_id?: string | null;
+  target_type?: string | null;
+  target_id: string | null;
+  created_at: string;
+  metadata?: Record<string, unknown>;
+};
 type CatalogItem = { key: string; title: string; description: string };
 type Health = { status: string; discord: string; database: string } | null;
 
@@ -493,6 +502,11 @@ export function ControlCenter() {
   const [originalValues, setOriginalValues] = useState<Record<string, unknown>>({});
   const [health, setHealth] = useState<Health>(null);
   const [audit, setAudit] = useState<AuditEvent[]>([]);
+  const [auditSource, setAuditSource] = useState("");
+  const [auditAction, setAuditAction] = useState("");
+  const [auditActor, setAuditActor] = useState("");
+  const [auditNextBefore, setAuditNextBefore] = useState<string | null>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
@@ -658,13 +672,37 @@ export function ControlCenter() {
     setSearch("");
   }
 
-  async function reloadAudit() {
+  async function reloadAudit(options: { append?: boolean } = {}) {
     if (!guildId) return;
-    const response = await fetch(
-      "/api/guilds/" + encodeURIComponent(guildId) + "/audit?limit=60",
-      { cache: "no-store" }
-    );
-    if (response.ok) setAudit((await response.json()).events ?? []);
+    setAuditLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: "80" });
+      if (auditSource) params.set("source", auditSource);
+      if (auditAction.trim()) params.set("action", auditAction.trim());
+      if (auditActor.trim()) params.set("actorUserId", auditActor.trim());
+      if (options.append && auditNextBefore) params.set("before", auditNextBefore);
+
+      const response = await fetch(
+        "/api/guilds/" + encodeURIComponent(guildId) + "/audit?" + params.toString(),
+        { cache: "no-store" }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(String(body.error ?? "audit_failed"));
+
+      const nextEvents = (body.events ?? []) as AuditEvent[];
+      setAudit((current) => options.append ? [...current, ...nextEvents] : nextEvents);
+      setAuditNextBefore(typeof body.nextBefore === "string" && body.nextBefore ? body.nextBefore : null);
+    } finally {
+      setAuditLoading(false);
+    }
+  }
+
+  function clearAuditFilters() {
+    setAuditSource("");
+    setAuditAction("");
+    setAuditActor("");
+    setAuditNextBefore(null);
+    void reloadAudit();
   }
 
   async function toggle(moduleKey: string, enabled: boolean) {
@@ -954,7 +992,25 @@ export function ControlCenter() {
               <SystemPage guildId={guildId} health={health} audit={audit} onAudit={() => setView("audit")} />
             )}
 
-            {view === "audit" && <AuditPage audit={audit} />}
+            {view === "audit" && (
+              <AuditPage
+                audit={audit}
+                source={auditSource}
+                action={auditAction}
+                actor={auditActor}
+                loading={auditLoading}
+                hasMore={Boolean(auditNextBefore)}
+                onSource={setAuditSource}
+                onAction={setAuditAction}
+                onActor={setAuditActor}
+                onApply={() => {
+                  setAuditNextBefore(null);
+                  void reloadAudit();
+                }}
+                onClear={clearAuditFilters}
+                onLoadMore={() => void reloadAudit({ append: true })}
+              />
+            )}
           </section>
         </div>
       </div>
@@ -1748,14 +1804,74 @@ function SystemPage(props: { guildId: string; health: Health; audit: AuditEvent[
   );
 }
 
-function AuditPage(props: { audit: AuditEvent[] }) {
+function AuditPage(props: {
+  audit: AuditEvent[];
+  source: string;
+  action: string;
+  actor: string;
+  loading: boolean;
+  hasMore: boolean;
+  onSource: (value: string) => void;
+  onAction: (value: string) => void;
+  onActor: (value: string) => void;
+  onApply: () => void;
+  onClear: () => void;
+  onLoadMore: () => void;
+}) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <PageHeader eyebrow="AUDIT LOG" title="Журнал действий" description="Изменения настроек, модульные операции и служебные действия Dashboard/Core." />
+      <PageHeader
+        eyebrow="AUDIT LOG"
+        title="Журнал действий"
+        description="Административные изменения, действия Discord-пользователей и системные события с серверным хранением."
+      />
+      <section style={{ ...panel, padding: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "160px minmax(180px,1fr) 190px auto auto", gap: 8, alignItems: "center" }}>
+          <select value={props.source} onChange={(event) => props.onSource(event.target.value)} style={selectStyle}>
+            <option value="">Все источники</option>
+            <option value="dashboard">Dashboard</option>
+            <option value="discord">Discord</option>
+            <option value="system">System</option>
+          </select>
+          <input
+            value={props.action}
+            onChange={(event) => props.onAction(event.target.value)}
+            placeholder="Поиск по action…"
+            maxLength={120}
+            style={inputStyle}
+          />
+          <input
+            value={props.actor}
+            onChange={(event) => props.onActor(event.target.value)}
+            placeholder="Actor user ID"
+            maxLength={20}
+            inputMode="numeric"
+            style={inputStyle}
+          />
+          <button type="button" onClick={props.onApply} disabled={props.loading} style={buttonStyle}>
+            {props.loading ? "Загрузка…" : "Применить"}
+          </button>
+          <button type="button" onClick={props.onClear} disabled={props.loading} style={secondaryButtonStyle}>
+            Сбросить
+          </button>
+        </div>
+      </section>
+
       <section style={{ ...panel, padding: 20 }}>
         {props.audit.length
-          ? props.audit.map((event, index) => <AuditCompact key={index} event={event} last={index === props.audit.length - 1} />)
-          : <Empty text="Журнал пуст." />}
+          ? (
+            <>
+              {props.audit.map((event, index) => (
+                <AuditCompact key={event.id ?? event.created_at + ":" + index} event={event} last={index === props.audit.length - 1} />
+              ))}
+              {props.hasMore && (
+                <button type="button" onClick={props.onLoadMore} disabled={props.loading} style={{ ...secondaryButtonStyle, width: "100%", marginTop: 12 }}>
+                  {props.loading ? "Загрузка…" : "Загрузить ещё"}
+                </button>
+              )}
+            </>
+          )
+          : <Empty text={props.loading ? "Загрузка журнала…" : "По заданным фильтрам записей нет."} />}
       </section>
     </div>
   );
@@ -1991,14 +2107,20 @@ function HealthRow(props: { label: string; value: string }) {
 }
 
 function AuditCompact(props: { event: AuditEvent; last: boolean }) {
+  const actor = props.event.actor_user_id ?? "system";
+  const source = props.event.source ?? "system";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: props.last ? "none" : "1px solid #1f2631" }}>
-      <div style={{ width: 28, height: 28, borderRadius: 8, display: "grid", placeItems: "center", background: "#171c25", color: "#8b98aa", fontSize: 10 }}>↗</div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontSize: 10, fontWeight: 620, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{props.event.action}</div>
-        <div style={{ marginTop: 2, color: "#626d7d", fontSize: 8 }}>{props.event.target_id ?? "system"}</div>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: props.last ? "none" : "1px solid #1f2631" }}>
+      <div style={{ width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", background: "#171c25", color: "#8b98aa", fontSize: 9 }}>
+        {source === "discord" ? "DC" : source === "dashboard" ? "UI" : "SYS"}
       </div>
-      <time style={{ color: "#5f6978", fontSize: 8 }}>{new Date(props.event.created_at).toLocaleString("ru-RU")}</time>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 10, fontWeight: 650, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{props.event.action}</div>
+        <div style={{ marginTop: 3, color: "#626d7d", fontSize: 8 }}>
+          {source} · {actor} · {props.event.target_type ?? "system"}:{props.event.target_id ?? "—"}
+        </div>
+      </div>
+      <time style={{ color: "#5f6978", fontSize: 8, whiteSpace: "nowrap" }}>{new Date(props.event.created_at).toLocaleString("ru-RU")}</time>
     </div>
   );
 }
