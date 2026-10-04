@@ -18,6 +18,13 @@ type VerificationConfig = {
   confirmButtonLabel: string;
 };
 
+export const DEFAULT_VERIFICATION_CONFIG: Pick<VerificationConfig, "panelTitle" | "panelDescription" | "issueButtonLabel" | "confirmButtonLabel"> = {
+  panelTitle: "✅ Проверка участника",
+  panelDescription: "Нажми кнопку, получи одноразовый код и подтверди его через кнопку ниже.",
+  issueButtonLabel: "Получить код",
+  confirmButtonLabel: "Подтвердить"
+};
+
 export class Verification implements PlatformModule {
   readonly name = "verification";
   private unsubscribe?: () => void;
@@ -62,10 +69,10 @@ export class Verification implements PlatformModule {
       quarantineRoleId: row?.quarantine_role_id ?? null,
       logChannelId: row?.log_channel_id ?? null,
       codeTtlMinutes: row?.code_ttl_minutes ?? 10,
-      panelTitle: row?.panel_title || defaultConfig.panelTitle,
-      panelDescription: row?.panel_description || defaultConfig.panelDescription,
-      issueButtonLabel: row?.issue_button_label || defaultConfig.issueButtonLabel,
-      confirmButtonLabel: row?.confirm_button_label || defaultConfig.confirmButtonLabel
+      panelTitle: row?.panel_title || DEFAULT_VERIFICATION_CONFIG.panelTitle,
+      panelDescription: row?.panel_description || DEFAULT_VERIFICATION_CONFIG.panelDescription,
+      issueButtonLabel: row?.issue_button_label || DEFAULT_VERIFICATION_CONFIG.issueButtonLabel,
+      confirmButtonLabel: row?.confirm_button_label || DEFAULT_VERIFICATION_CONFIG.confirmButtonLabel
     };
   }
 
@@ -146,6 +153,7 @@ export class Verification implements PlatformModule {
       return;
     }
     if (sub === "panel") {
+      const config = await this.config(interaction.guild!.id);
       const channelOption = interaction.options.getChannel("channel", true);
       const channel = interaction.guild!.channels.cache.get(channelOption.id);
       if (!channel || channel.type !== 0) {
