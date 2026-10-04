@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BotIdentityRepository, clampFailoverBatchLimit, resolveIdentityEnv } from "../src/bot-identity.js";
+import {
+  BotIdentityRepository,
+  clampFailoverBatchLimit,
+  isFleetHeartbeatFresh,
+  resolveIdentityEnv
+} from "../src/bot-identity.js";
 
 test("primary may use legacy Discord credentials", () => {
   const old = {
@@ -114,4 +119,13 @@ test("claimStaleGuilds atomically returns guilds claimed by an enabled failover 
     ["111111111111111111", "222222222222222222"]
   );
   assert.equal(transactionCalls, 1);
+});
+
+
+test("fleet heartbeat freshness uses the shared stale threshold", () => {
+  const now = Date.parse("2026-10-04T10:00:00.000Z");
+  assert.equal(isFleetHeartbeatFresh("2026-10-04T09:59:59.000Z", now), true);
+  assert.equal(isFleetHeartbeatFresh("2026-10-04T09:58:29.000Z", now), false);
+  assert.equal(isFleetHeartbeatFresh(null, now), false);
+  assert.equal(isFleetHeartbeatFresh("not-a-date", now), false);
 });

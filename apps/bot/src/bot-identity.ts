@@ -1,6 +1,8 @@
 import type { Client } from "discord.js";
 import type { Database } from "./database.js";
 
+export const FLEET_HEARTBEAT_STALE_SECONDS = 90;
+
 export type BotIdentityRecord = {
   id: string;
   clientId: string;
@@ -58,18 +60,23 @@ export class BotIdentityRepository {
          LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=bi.id
         ORDER BY bi.id`
     );
-    return result.rows.map((row) => ({
-      id: row.id,
-      clientId: row.client_id,
-      enabled: row.enabled,
-      failoverEnabled: row.failover_enabled,
-      presenceName: row.presence_name,
-      connected: row.status === "ready",
-      status: row.status ?? "stopped",
-      lastSeenAt: row.last_seen_at,
-      guildCount: Number(row.guild_count),
-      credentialConfigured: row.credential_configured
-    }));
+    return result.rows.map((row) => {
+      const rawStatus = row.status ?? "stopped";
+      const heartbeatFresh = isFleetHeartbeatFresh(row.last_seen_at);
+      const status = rawStatus === "ready" && !heartbeatFresh ? "degraded" : rawStatus;
+      return {
+        id: row.id,
+        clientId: row.client_id,
+        enabled: row.enabled,
+        failoverEnabled: row.failover_enabled,
+        presenceName: row.presence_name,
+        connected: status === "ready" && heartbeatFresh,
+        status,
+        lastSeenAt: row.last_seen_at,
+        guildCount: Number(row.guild_count),
+        credentialConfigured: row.credential_configured
+      };
+    });
   }
 
   async assignGuild(guildId: string, botIdentityId: string): Promise<void> {
@@ -118,7 +125,7 @@ export class BotIdentityRepository {
 
   async musicVoiceOwner(guildId: string, voiceChannelId: string): Promise<string | null> {
     const result = await this.db.query<{ bot_identity_id: string }>(
-      "SELECT a.bot_identity_id FROM guild_music_bot_assignments a LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=a.bot_identity_id WHERE a.guild_id=$1 AND a.voice_channel_id=$2 AND (a.bot_identity_id='primary' OR (bh.last_seen_at IS NOT NULL AND bh.last_seen_at >= now()-interval '90 seconds'))",
+      "SELECT a.bot_identity_id FROM guild_music_bot_assignments a LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=a.bot_identity_id WHERE a.guild_id=$1 AND a.voice_channel_id=$2 AND (a.bot_identity_id='primary' OR (bh.last_seen_at IS NOT NULL AND bh.last_seen_at >= now()-interval '${FLEET_HEARTBEAT_STALE_SECONDS} seconds'))",
       [guildId, voiceChannelId]
     );
     return result.rows[0]?.bot_identity_id ?? null;
@@ -162,7 +169,7 @@ export class BotIdentityRepository {
   async refreshAssignments(): Promise<void> {
     const result = this.identityId === "primary"
       ? await this.db.query<{ guild_id: string }>(
-          "SELECT ga.guild_id FROM guild_bot_assignments ga LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id WHERE ga.bot_identity_id='primary' OR (ga.bot_identity_id <> 'primary' AND (bh.last_seen_at IS NULL OR bh.last_seen_at < now()-interval '90 seconds'))",
+          "SELECT ga.guild_id FROM guild_bot_assignments ga LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id WHERE ga.bot_identity_id='primary' OR (ga.bot_identity_id <> 'primary' AND (bh.last_seen_at IS NULL OR bh.last_seen_at < now()-interval '${FLEET_HEARTBEAT_STALE_SECONDS} seconds'))",
           []
         )
       : await this.db.query<{ guild_id: string }>(
@@ -213,7 +220,7 @@ async setFailover(id: string, enabled: boolean): Promise<void> {
              LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id
             WHERE ga.guild_id = ANY($1::text[])
               AND ga.bot_identity_id <> $2
-              AND (bh.last_seen_at IS NULL OR bh.last_seen_at < now()-interval '90 seconds')
+              AND (bh.last_seen_at IS NULL OR bh.last_seen_at < now()-interval '${FLEET_HEARTBEAT_STALE_SECONDS} seconds')
             ORDER BY ga.updated_at ASC
             LIMIT $3
             FOR UPDATE OF ga SKIP LOCKED
@@ -241,6 +248,12 @@ export function resolveIdentityEnv(identityId: string): { token: string; clientI
     throw new Error("Missing Discord credentials for identity " + identityId);
   }
   return { token, clientId };
+}
+
+export function isFleetHeartbeatFresh(lastSeenAt: string | Date | null, now = Date.now()): boolean {
+  if (!lastSeenAt) return false;
+  const timestamp = lastSeenAt instanceof Date ? lastSeenAt.getTime() : Date.parse(lastSeenAt);
+  return Number.isFinite(timestamp) && now - timestamp < FLEET_HEARTBEAT_STALE_SECONDS * 1000;
 }
 
 export function clampFailoverBatchLimit(value: number): number {
