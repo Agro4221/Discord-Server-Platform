@@ -3087,6 +3087,43 @@ export class ManagementApiServer {
             return;
           }
 
+          const moduleActivityMatch = path.match(/^\/api\/guilds\/([^/]+)\/modules\/([^/]+)\/activity$/);
+          if (method === "GET" && moduleActivityMatch) {
+            const guildId = moduleActivityMatch[1] ?? "";
+            const moduleKey = moduleActivityMatch[2] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (!MODULE_CATALOG.some((module) => module.key === moduleKey)) {
+              this.json(res, 400, { error: "unknown_module" });
+              return;
+            }
+
+            const limitRaw = url.searchParams.get("limit");
+            const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 40;
+            if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+              this.json(res, 400, { error: "invalid_limit" });
+              return;
+            }
+            const before = url.searchParams.get("before") || undefined;
+            if (before && Number.isNaN(new Date(before).getTime())) {
+              this.json(res, 400, { error: "invalid_before" });
+              return;
+            }
+
+            const events = await this.options.auditLog.moduleActivity(guildId, moduleKey, limit, before);
+            this.json(res, 200, {
+              guildId,
+              moduleKey,
+              events,
+              nextBefore: events.length === limit
+                ? String((events[events.length - 1] as { created_at?: string })?.created_at ?? "")
+                : null
+            });
+            return;
+          }
+
           const moduleMatch = path.match(/^\/api\/guilds\/([^/]+)\/modules\/([^/]+)$/);
           if (method === "PUT" && moduleMatch) {
             const guildId = moduleMatch[1];
