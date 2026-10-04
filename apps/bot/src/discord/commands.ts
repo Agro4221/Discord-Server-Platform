@@ -11,6 +11,7 @@ import {
 import type { Database } from "../database.js";
 import { logger } from "../logger.js";
 import { PermissionChecker } from "./permissions.js";
+import { getGuildLocale, t } from "../localization.js";
 import { TemporaryVoice } from "../modules/temporary-voice.js";
 import { Moderation } from "../modules/moderation.js";
 import { COMMAND_DEFINITIONS } from "../command-policy.js";
@@ -1054,12 +1055,15 @@ export async function handleCommand(
   moderation: Moderation,
   helpPages?: HelpPages
 ): Promise<void> {
+  const locale = interaction.guildId
+    ? await getGuildLocale(db, interaction.guildId)
+    : "ru";
   if (interaction.commandName === "help") {
     const requestedPage = interaction.options.getString("page")?.trim();
     if (requestedPage && helpPages) {
       const page = await helpPages.get(interaction.guild!.id, requestedPage);
       if (!page || !page.enabled) {
-        await interaction.reply({ content: "Страница помощи не найдена.", ephemeral: true });
+        await interaction.reply({ content: t(locale, "help-page-missing"), ephemeral: true });
         return;
       }
       await interaction.reply({
@@ -1087,8 +1091,8 @@ export async function handleCommand(
       })
       .map((definition) => `/${definition.name}`);
     const text = [
-      "**Vexa — команды**",
-      builtIn.length ? builtIn.map((name) => `/${name}`).join(", ") : "Нет доступных slash-команд.",
+      "**" + t(locale, "help-title") + "**",
+      builtIn.length ? builtIn.map((name) => `/${name}`).join(", ") : t(locale, "help-empty"),
       custom.rows.length ? "\n**Custom Commands**\n" + custom.rows.map((row) => `/${row.name} — ${row.description || "custom command"}`).join("\n") : ""
     ].filter(Boolean).join("\n");
     await interaction.reply({ content: text.slice(0, 3900), ephemeral: true });
@@ -1097,7 +1101,7 @@ export async function handleCommand(
 
   if (interaction.commandName === "embed") {
     if (!interaction.inGuild() || !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-      await interaction.reply({ content: "Нужны права Manage Server и серверный канал.", ephemeral: true });
+      await interaction.reply({ content: t(locale, "embed-permission"), ephemeral: true });
       return;
     }
 
@@ -1110,19 +1114,19 @@ export async function handleCommand(
     const thumbnail = interaction.options.getString("thumbnail");
 
     if (!title && !description && !footer && !image && !thumbnail) {
-      await interaction.reply({ content: "Укажи хотя бы title, description, footer, image или thumbnail.", ephemeral: true });
+      await interaction.reply({ content: t(locale, "embed-empty"), ephemeral: true });
       return;
     }
     if (url && !/^https?:\/\//i.test(url)) {
-      await interaction.reply({ content: "URL должен начинаться с http:// или https://.", ephemeral: true });
+      await interaction.reply({ content: t(locale, "url-http"), ephemeral: true });
       return;
     }
     if (image && !/^https?:\/\//i.test(image)) {
-      await interaction.reply({ content: "Image URL должен начинаться с http:// или https://.", ephemeral: true });
+      await interaction.reply({ content: t(locale, "url-http"), ephemeral: true });
       return;
     }
     if (thumbnail && !/^https?:\/\//i.test(thumbnail)) {
-      await interaction.reply({ content: "Thumbnail URL должен начинаться с http:// или https://.", ephemeral: true });
+      await interaction.reply({ content: t(locale, "url-http"), ephemeral: true });
       return;
     }
 
@@ -1132,7 +1136,7 @@ export async function handleCommand(
     if (url) embed.setURL(url);
     if (color) {
       if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
-        await interaction.reply({ content: "Color укажи в формате #RRGGBB.", ephemeral: true });
+        await interaction.reply({ content: t(locale, "color-format"), ephemeral: true });
         return;
       }
       embed.setColor(parseInt(color.slice(1), 16));
@@ -1142,12 +1146,12 @@ export async function handleCommand(
     if (thumbnail) embed.setThumbnail(thumbnail);
 
     if (!interaction.channel || !interaction.channel.isTextBased() || !("send" in interaction.channel)) {
-      await interaction.reply({ content: "Текущий канал не поддерживает отправку сообщений.", ephemeral: true });
+      await interaction.reply({ content: t(locale, "channel-send-unsupported"), ephemeral: true });
       return;
     }
 
     await interaction.channel.send({ embeds: [embed] });
-    await interaction.reply({ content: "✅ Embed опубликован.", ephemeral: true });
+    await interaction.reply({ content: t(locale, "embed-published"), ephemeral: true });
     return;
   }
 
@@ -1192,7 +1196,7 @@ export async function handleCommand(
     const roleOption = interaction.options.getRole("role", true);
     const role = interaction.guild!.roles.cache.get(roleOption.id);
     if (!role) {
-      await interaction.reply({ content: "Роль не найдена.", ephemeral: true });
+      await interaction.reply({ content: t(locale, "role-missing"), ephemeral: true });
       return;
     }
     const permissions = role.permissions.toArray().slice(0, 18).join(", ") || "Нет";
