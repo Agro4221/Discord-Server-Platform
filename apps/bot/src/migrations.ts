@@ -849,7 +849,8 @@ const migrations = [
       ");",
       "CREATE INDEX IF NOT EXISTS idx_security_channel_locks_cleanup ON security_channel_locks(guild_id,channel_id,restored_at);"
     ])
-  }  {
+  },
+  {
     version: 52,
     name: "automod_ban_action",
     sql: q([
