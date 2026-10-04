@@ -6,7 +6,7 @@ type Resource = { id: string; name: string };
 type Condition =
   | { type: "contains" | "equals" | "starts-with" | "ends-with"; left: string; right: string }
   | { type: "matches"; left: string; pattern: string }
-  | { type: "number-gte" | "number-lte" | "number-eq"; left: string; right: number }
+  | { type: "number-gte" | "number-lte" | "number-eq" | "number-gt" | "number-lt"; left: string; right: number }
   | { type: "has-role"; userId: string; roleId: string }
   | { type: "channel-is"; channelId: string }
   | { type: "cooldown-clear"; key: string };
