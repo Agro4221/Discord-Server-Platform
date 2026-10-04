@@ -323,6 +323,7 @@ export class ConfigTransferService {
             typeof value.title !== "string" || typeof value.description !== "string" ||
             typeof value.button_label !== "string" || !Array.isArray(value.fields)
           ) throw new Error("invalid_custom_form");
+          const normalizedFields = normalizeFormFields(value.fields);
           await client.query(
             "INSERT INTO custom_forms(guild_id,name,title,description,panel_channel_id,response_channel_id,button_label,enabled,fields) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)",
             [
@@ -334,7 +335,7 @@ export class ConfigTransferService {
               typeof value.response_channel_id === "string" ? value.response_channel_id : null,
               value.button_label.slice(0,80),
               value.enabled !== false,
-              JSON.stringify(value.fields)
+              JSON.stringify(normalizedFields)
             ]
           );
         }
