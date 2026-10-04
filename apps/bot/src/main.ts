@@ -425,6 +425,10 @@ async function main(): Promise<void> {
       delete: async (guildId, slug) => helpPages.delete(guildId, slug)
     },
     tickets: {
+      listPanels: async (guildId) => tickets.listPanels(guildId),
+      createPanel: async (guildId, input) => tickets.createPanel(guildId, input),
+      updatePanel: async (guildId, panelId, input) => tickets.updatePanel(guildId, panelId, input),
+      deletePanel: async (guildId, panelId) => tickets.deletePanel(guildId, panelId),
       getFormFields: async (guildId) => tickets.getFormFields(guildId),
       setFormFields: async (guildId, fields) => tickets.setFormFields(guildId, fields),
       getCustomization: async (guildId) => tickets.getCustomization(guildId),
