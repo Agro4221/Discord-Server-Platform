@@ -319,3 +319,10 @@ Never write credentials, tokens or private user data here.
 - Local Control Center no longer has an end-user login/logout flow or dashboard admin password/session secret.
 - Dashboard access remains local-first/loopback by default; server-side requests to the Management API remain protected by the internal bearer key.
 - Legacy login routes and page were removed.
+
+## 2026-10-04 — Bot Registry verified
+- Module 2A/2B complete.
+- Added encrypted Bot Identity credential storage, Control Center registration, Discord token validation and safe metadata-only Fleet responses.
+- PostgreSQL is now authoritative for runtime credentials; stale .env values cannot overwrite an existing stored credential.
+- CI run #1590 passed with 84/84 bot tests and all build/contract stages.
+- Next module: local Bot Fleet process orchestration so additional registered identities can actually run concurrently.

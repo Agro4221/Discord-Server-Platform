@@ -354,3 +354,14 @@ Dashboard является основным способом редактиро�
 - Configure with `/logging setup channel enabled` or `!logging setup #канал`.
 - Dashboard exposes per-event switches for messages, members, voice, deleted channels/roles and bans.
 - Events are retained in the durable audit store as well as sent to the configured Discord log channel.
+
+
+## 2.1. Bot Registry
+
+В **Система → Bot Fleet** можно зарегистрировать или обновить Discord Bot Identity.
+
+При регистрации Dashboard передаёт токен только во внутренний Management API. Core проверяет токен через Discord, связывает его с фактическим Discord user ID бота и сохраняет credential в PostgreSQL в зашифрованном виде. Сам токен не возвращается Dashboard и не показывается в списке Fleet.
+
+После регистрации зашифрованный credential в PostgreSQL является источником истины при запуске выбранной identity. Значения Discord credentials из .env используются только как bootstrap, когда для этой identity ещё нет сохранённого credential. Поэтому старый токен в .env больше не перезаписывает токен, который был обновлён через Control Center.
+
+Важно: текущая архитектура запускает один Node-процесс на одну BOT_IDENTITY_ID. Регистрация дополнительной identity не создаёт отдельный процесс автоматически; запуск нескольких Discord clients из одного локального Control Center — следующий модуль Fleet orchestration.

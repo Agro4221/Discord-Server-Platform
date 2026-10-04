@@ -258,3 +258,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Local Control Center no longer has an end-user login/logout flow or dashboard admin password/session secret.
 - Dashboard access remains local-first/loopback by default; server-side requests to the Management API remain protected by the internal bearer key.
 - Legacy login routes and page were removed.
+
+## 2026-10-04 — Bot Registry verified
+- Development head: `54b0e7ff15c8b6718eb25d7abd0c90bee282f172`.
+- CI run #1590 passed the full automated verification pipeline with 84/84 bot tests, bot/domain/dashboard builds and all static deployment/observability contracts.
+- Local Control Center has no end-user login; Bot Fleet registration validates Discord credentials and stores them encrypted at rest.
+- Runtime resolution is database-first with environment bootstrap only when the selected identity has no stored credential.
+- Credential corruption fails closed rather than silently falling back to environment values.
+- Remaining Fleet gap: one process per BOT_IDENTITY_ID; multi-process/multi-client local orchestration is the next module.

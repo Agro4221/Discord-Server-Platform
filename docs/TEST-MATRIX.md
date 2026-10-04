@@ -165,3 +165,13 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Local Control Center no longer has an end-user login/logout flow or dashboard admin password/session secret.
 - Dashboard access remains local-first/loopback by default; server-side requests to the Management API remain protected by the internal bearer key.
 - Legacy login routes and page were removed.
+
+## 2026-10-04 — Bot Registry verification snapshot
+- ✅ Credential encryption/decryption and plaintext-storage regression coverage.
+- ✅ Registration input normalization and Discord-token validation path.
+- ✅ Database migration is covered by the idempotent PostgreSQL migration test.
+- ✅ DB-first runtime resolution; environment values are bootstrap-only.
+- ✅ Fail-closed behavior for corrupted stored credentials.
+- ✅ CI run #1590: **84/84 bot tests passed**, domain/bot/dashboard builds passed, deployment/observability contracts passed.
+- ⚠ Live Discord credential registration still requires a real user-owned Discord application/token.
+- ⚠ Additional Bot Identity registration does not yet spawn another process; Fleet orchestration remains the next module.
