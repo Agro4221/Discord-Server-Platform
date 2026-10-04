@@ -519,3 +519,6 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 
 ## 2026-10-04 — Security audit coverage
 - Security now consumes dedicated Discord audit-log entry events for additional anti-nuke operations beyond channel/role creation/deletion and bans.
+
+## 2026-10-04 — Automation API parity
+- Management API validation is now aligned with the current Automation domain/runtime catalog, including the newer condition and message-action types.

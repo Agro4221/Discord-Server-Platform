@@ -506,3 +506,8 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ Extended AuditLogEvent mapping is regression-tested.
 - ✅ Shared audit-entry event path is wired from Discord client into PlatformEventBus and Security.
 - ⚠ Audit-log event delivery and executor response still require live Discord validation and correct Gateway permissions.
+
+## 2026-10-04 — Automation API parity verification
+- ✅ Management API accepts the current Automation catalog.
+- ✅ Unsupported Automation condition/action types are rejected.
+- ✅ Dashboard/Core/API catalog alignment is now regression-tested at the API boundary.

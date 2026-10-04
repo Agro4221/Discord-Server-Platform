@@ -726,3 +726,8 @@ Never write credentials, tokens or private user data here.
 - Security anti-nuke response now sees additional destructive actions that do not have a dedicated high-level Discord event: member kicks, webhooks, emojis, stickers, permission overwrites, member prune and integrations.
 - Existing channel/role create-delete and member ban handlers remain separate to avoid double-counting.
 - Added regression coverage for the extended AuditLogEvent mapping.
+
+## 2026-10-04 — Automation API parity checkpoint
+- Synchronized Management API Automation validation with the current Core/Dashboard catalog.
+- Added support for current Automation events, starts-with/ends-with/number-eq conditions, event-relative role/message targets and reaction/pin/unpin actions.
+- Added a dedicated management-api regression test covering accepted and rejected catalog entries.
