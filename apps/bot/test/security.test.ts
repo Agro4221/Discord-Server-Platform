@@ -27,6 +27,33 @@ test("Security response requires at least two destructive actions from one execu
   assert.equal(securityResponseThreshold(100), 50);
 });
 
+test("Security restores the latest active incident per type after restart", async () => {
+  const db = {
+    async query<T>(text: string) {
+      if (text.startsWith("SELECT id,guild_id,event_type,expires_at FROM security_incidents")) {
+        return {
+          rows: [
+            { id: "10", guild_id: "guild-1", event_type: "raid", expires_at: "2026-10-04T13:20:00.000Z" },
+            { id: "11", guild_id: "guild-1", event_type: "raid", expires_at: "2026-10-04T13:25:00.000Z" },
+            { id: "12", guild_id: "guild-1", event_type: "destructive-burst", expires_at: "2026-10-04T13:22:00.000Z" }
+          ]
+        } as { rows: T[] };
+      }
+      return { rows: [] } as { rows: T[] };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const security = new (await import("../src/modules/security.js")).Security(db);
+  await (security as unknown as { restoreActiveIncidents: () => Promise<void> }).restoreActiveIncidents();
+
+  const state = security as unknown as {
+    raidIncidents: Map<string, { id: number; expiresAt: number }>;
+    destructiveIncidents: Map<string, { id: number; expiresAt: number }>;
+  };
+  assert.equal(state.raidIncidents.get("guild-1")?.id, 11);
+  assert.equal(state.destructiveIncidents.get("guild-1")?.id, 12);
+});
+
 test("Security incident cooldown survives a process restart", () => {
   const createdAt = 1_000;
   assert.equal(securityIncidentCooldownUntil(createdAt, 20), 61_000);
