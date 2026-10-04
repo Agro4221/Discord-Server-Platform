@@ -184,7 +184,7 @@ type ApiOptions = {
       callbacks: {
         deleteMessage: (channelId: string, messageId: string) => Promise<void>;
         sendMessage: (channelId: string, content: string, components:
-          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]
+          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[] | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]
           | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => Promise<string>;
       }
     ) => Promise<unknown>;
@@ -194,11 +194,11 @@ type ApiOptions = {
       input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number },
       callbacks: {
         editMessage: (channelId: string, messageId: string, content: string, components:
-          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]
+          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[] | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]
           | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => Promise<void>;
         deleteMessage: (channelId: string, messageId: string) => Promise<void>;
         sendMessage: (channelId: string, content: string, components:
-          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]
+          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[] | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]
           | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => Promise<string>;
       }
     ) => Promise<unknown>;
@@ -2783,7 +2783,7 @@ export class ManagementApiServer {
 
             const helpers = {
               editMessage: async (oldChannelId: string, messageId: string, content: string, components:
-          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]
+          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[] | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]
           | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => {
                 const oldChannel = guild.channels.cache.get(oldChannelId);
                 if (!oldChannel || oldChannel.type !== 0) throw new Error("role_panel_old_channel_missing");
@@ -2796,7 +2796,7 @@ export class ManagementApiServer {
                 await oldChannel.messages.delete(messageId).catch(() => undefined);
               },
               sendMessage: async (newChannelId: string, content: string, components:
-          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]
+          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[] | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]
           | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => {
                 const target = guild.channels.cache.get(newChannelId);
                 if (!target || target.type !== 0) throw new Error("role_panel_channel_missing");
