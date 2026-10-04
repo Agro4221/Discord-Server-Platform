@@ -556,3 +556,14 @@ Never write credentials, tokens or private user data here.
 - CI #1923 passed completely.
 - Final source checkpoint: `22f8e4856ef83120a5ebd2f678b826cad712c869`.
 - Next single backlog slice: **Configurable analytics counters**.
+
+
+## 2026-10-05 — Configurable Analytics counters
+- Completed Analytics configurability on top of the existing persistent analytics system.
+- Existing Dashboard settings now remain the source of truth for visible counters and retention; Discord `/analytics` now honors the same `visibleCounters` selection.
+- Added exported normalization contract with whitelist/deduplication, bounded retention (1–3650 days) and safe fallback when an empty counter set is supplied.
+- Added dedicated regression tests for counter normalization, retention bounds and custom visibility selections.
+- CI #1926 passed completely.
+- Final source checkpoint: `efd8eeef4505e5cf2d21d50c79e792ba83eb4637`.
+- Analytics counters and retention/history settings are now considered implemented; live browser/Discord rendering remains a release-gate check.
+- Next single backlog area: **Tickets / linked-related panels**.

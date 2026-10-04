@@ -468,9 +468,9 @@ Music должен стремиться к функциональности си
 | Per-module health | ✅ |
 | Music/Lavalink health | ✅ |
 | Audit/activity timeline | ✅ | Dashboard exposes recent audit activity with timestamps/source and scoped targets |
-| Configurable metrics/counters | 🟡 |
+| Configurable metrics/counters | ✅ | Dashboard and `/analytics` honor persisted visible counter selection with bounded retention settings |
 | Exportable analytics | ✅ | Dashboard provides authenticated CSV export for selected analytics window |
-| Retention/history settings | 🟡 |
+| Retention/history settings | ✅ | Retention is configurable per guild, enforced by scheduled pruning and bounded analytics report windows |
 
 #### Music
 Music остаётся отдельным крупным направлением внутри общей платформы. Полный backlog описан выше в разделе **Music**, включая advanced queue management, granular DJ permissions, vote-skip/fair queue, emoji-controller, **Loop One**, effects, autoplay/radio, lyrics, shared playlists и расширение источников (Spotify, Apple Music, Deezer, **Yandex Music**, VK Music, Tidal, Qobuz, yt-dlp, JioSaavn).

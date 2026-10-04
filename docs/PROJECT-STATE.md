@@ -367,3 +367,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - CI #1923 is green.
 - Notifications/Integrations now has encrypted per-guild credentials plus a safe credential diagnostics surface.
 - Next high-value slice: configurable Analytics counters.
+
+
+## 2026-10-05 — Analytics configuration verified
+- Source checkpoint: `efd8eeef4505e5cf2d21d50c79e792ba83eb4637`.
+- CI #1926 passed completely.
+- Configurable visible counters and retention are now implemented across Dashboard and Discord analytics reporting.
+- Next single backlog slice: **Tickets / linked-related panels**.
