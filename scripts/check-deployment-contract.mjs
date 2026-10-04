@@ -26,6 +26,31 @@ if (!envExample.includes("DISCORD_TOKEN_MUSIC2") || !envExample.includes("DISCOR
   throw new Error("Secondary Discord credential contract is not documented");
 }
 
+const vpsInstaller = await readFile("scripts/install-vps.sh", "utf8");
+const vpsUpgrade = await readFile("scripts/upgrade.sh", "utf8");
+const vpsCompose = await readFile("docker-compose.vps.yml", "utf8");
+const caddyExample = await readFile("infrastructure/caddy/Caddyfile.example", "utf8");
+const gitignore = await readFile(".gitignore", "utf8");
+
+if (vpsInstaller.includes("DASHBOARD_ADMIN_PASSWORD")) {
+  throw new Error("Legacy Dashboard admin password flow is still present in VPS installer");
+}
+for (const contract of ["DASHBOARD_BASIC_AUTH_HASH", "docker-compose.vps.yml", "caddy:2-alpine"]) {
+  if (!vpsInstaller.includes(contract) && !vpsUpgrade.includes(contract) && !vpsCompose.includes(contract)) {
+    throw new Error("VPS deployment contract missing: " + contract);
+  }
+}
+for (const contract of ['"80:80"', '"443:443"', "dashboard:3000"]) {
+  if (!vpsCompose.includes(contract)) {
+    throw new Error("Public Caddy ingress contract missing: " + contract);
+  }
+}
+if (!caddyExample.includes("basic_auth") || !caddyExample.includes("reverse_proxy dashboard:3000")) {
+  throw new Error("Caddy public ingress example is not protected and proxied correctly");
+}
+if (!gitignore.includes("infrastructure/caddy/Caddyfile")) {
+  throw new Error("Generated Caddy credentials file is not ignored");
+}
 const localLauncher = await readFile("scripts/start-local.ps1", "utf8");
 for (const contract of [
   "docker compose up -d",
