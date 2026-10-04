@@ -259,7 +259,7 @@ export function AutomationPanel({
               </>
             )}
 
-            {(condition.type === "number-gte" || condition.type === "number-lte") && (
+            {(condition.type === "number-gte" || condition.type === "number-lte" || condition.type === "number-eq") && (
               <>
                 <select value={condition.left} onChange={(e) => updateCondition(index, { left: e.target.value })} style={inputStyle}>
                   {NUMBER_FIELDS.map((field) => <option key={field}>{field}</option>)}
@@ -329,7 +329,7 @@ export function AutomationPanel({
               </>
             )}
 
-            {(condition.type === "number-gte" || condition.type === "number-lte") && (
+            {(condition.type === "number-gte" || condition.type === "number-lte" || condition.type === "number-eq") && (
               <>
                 <select value={condition.left} onChange={(e) => updateCondition(index, { left: e.target.value }, true)} style={inputStyle}>
                   {NUMBER_FIELDS.map((field) => <option key={field}>{field}</option>)}
