@@ -170,28 +170,6 @@ function Ensure-Docker {
 
 Ensure-Docker
 
-function Get-ValueLength([string]$Value) {
-  if ($null -eq $Value) { return 0 }
-  return $Value.Length
-}
-
-function Show-DashboardPasswordDiagnostics {
-  $hostPassword = Get-EnvValue "DASHBOARD_ADMIN_PASSWORD"
-  $hostLength = Get-ValueLength $hostPassword
-  Write-Host "Dashboard admin password configured in .env: $([bool](-not [string]::IsNullOrWhiteSpace($hostPassword))); length=$hostLength"
-
-  try {
-    $containerLength = docker compose exec -T dashboard sh -lc 'if [ -n "${DASHBOARD_ADMIN_PASSWORD+x}" ]; then printf "%s" "$DASHBOARD_ADMIN_PASSWORD" | wc -c; else printf "0"; fi'
-    if ($LASTEXITCODE -eq 0) {
-      Write-Host "Dashboard container password: configured; length=$($containerLength.Trim())"
-    } else {
-      Write-Host "Dashboard container password: could not inspect."
-    }
-  } catch {
-    Write-Host "Dashboard container password: could not inspect."
-  }
-}
-
 if ($Down) {
   docker compose down
   exit 0
@@ -202,37 +180,8 @@ if (-not (Test-Path ".env")) {
   Write-Host "Created local .env from .env.example."
 }
 
-$token = Get-EnvValue "DISCORD_TOKEN"
-if ([string]::IsNullOrWhiteSpace($token)) {
-  $token = Read-Host "Discord bot token"
-  if ([string]::IsNullOrWhiteSpace($token)) { throw "DISCORD_TOKEN is required." }
-  Set-EnvValue "DISCORD_TOKEN" $token
-}
-
-$clientId = Get-EnvValue "DISCORD_CLIENT_ID"
-if ([string]::IsNullOrWhiteSpace($clientId)) {
-  $clientId = Read-Host "Discord client ID"
-  if ([string]::IsNullOrWhiteSpace($clientId)) { throw "DISCORD_CLIENT_ID is required." }
-  Set-EnvValue "DISCORD_CLIENT_ID" $clientId
-}
-
-$authRequired = Get-EnvValue "DASHBOARD_AUTH_REQUIRED"
-if ([string]::IsNullOrWhiteSpace($authRequired)) { $authRequired = "false" }
-
-$adminPassword = Get-EnvValue "DASHBOARD_ADMIN_PASSWORD"
-if ($authRequired -eq "true" -and [string]::IsNullOrWhiteSpace($adminPassword)) {
-  $adminPassword = Read-Host "Dashboard admin password"
-  if ([string]::IsNullOrWhiteSpace($adminPassword)) { throw "DASHBOARD_ADMIN_PASSWORD is required when Dashboard auth is enabled." }
-  Set-EnvValue "DASHBOARD_ADMIN_PASSWORD" $adminPassword
-}
-
-if ([string]::IsNullOrWhiteSpace((Get-EnvValue "DASHBOARD_AUTH_REQUIRED"))) {
-  Set-EnvValue "DASHBOARD_AUTH_REQUIRED" "false"
-}
-
 $generated = @{
   "MANAGEMENT_API_KEY" = 48
-  "DASHBOARD_SESSION_SECRET" = 48
   "POSTGRES_PASSWORD" = 24
   "LAVALINK_PASSWORD" = 24
 }
@@ -302,7 +251,6 @@ if ($composeExitCode -ne 0) {
   throw "docker compose up failed with exit code $composeExitCode."
 }
 
-Show-DashboardPasswordDiagnostics
 
 $healthPort = Get-EnvValue "HEALTH_PORT"
 if ([string]::IsNullOrWhiteSpace($healthPort)) { $healthPort = "3001" }
