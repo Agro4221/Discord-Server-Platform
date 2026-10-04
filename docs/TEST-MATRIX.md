@@ -242,3 +242,12 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Management API applies the profile through the current Discord ClientUser after credential reconnect; secrets remain hidden and avatar/banner files are not stored in PostgreSQL.
 - Username changes remain subject to Discord's external rate limits.
 - Live validation remains necessary for real Discord profile editing and permission/account-specific restrictions.
+
+
+## 2026-10-05 — Docker / VPS foundation verified
+- CI #1899 passed the strengthened deployment gate.
+- VPS installer now follows the current Control Center model: Discord bot credentials are registered from Bot Fleet instead of being collected by the installer.
+- Public VPS Dashboard access is protected at the Caddy edge with Basic Auth; the application and Management API remain private.
+- bash -n validation covers VPS install/upgrade scripts and deployment contract validates the VPS Compose overlay.
+- Local Windows Docker flow remains unchanged.
+- Live VPS DNS, TLS issuance, firewall policy and full clean-host deployment remain environment-dependent release-gate checks.

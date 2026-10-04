@@ -497,3 +497,9 @@ Live validation, требующая пользовательского окру�
 - Reusable server presets and configurable bot identity/profile are now implemented and CI-verified.
 - Final profile checkpoint: `b415110795afcc823ebffa64fdf54ca992757d94`.
 - Next single backlog slice: **Docker / VPS foundation**.
+
+
+### 2026-10-05 — Docker / VPS slice closed
+- Docker/VPS foundation is implemented and CI-verified.
+- Final source checkpoint: f466eddb5749c0044c7f1b9fce68b7dd4f9b412c.
+- Next single backlog slice: RU / EN localization.

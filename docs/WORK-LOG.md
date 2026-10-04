@@ -517,3 +517,14 @@ Never write credentials, tokens or private user data here.
 - Management API validates profile payloads, keeps the general JSON request limit at 64 KiB, and raises it to 8 MiB only for the bot profile endpoint.
 - Discord profile changes are applied through the current logged-in bot user; avatar/banner payloads are transient and not persisted in the database.
 - CI #1889 passed completely.
+
+
+## 2026-10-05 — Docker / VPS foundation
+- Removed obsolete VPS Dashboard admin-password handling from scripts/install-vps.sh.
+- Added docker-compose.vps.yml with Caddy public reverse proxy and persistent Caddy data/config volumes.
+- Updated infrastructure/caddy/Caddyfile.example to require hashed Basic Auth before reverse-proxying the Dashboard.
+- VPS installer now prompts for domain + Basic Auth credentials, generates an Argon2id Caddy hash, writes literal quoted Compose env values, creates the local Caddyfile and starts the secure overlay.
+- VPS upgrades automatically reuse the overlay when the generated Caddyfile exists.
+- Generated Caddyfile is ignored by git.
+- Strengthened scripts/check-deployment-contract.mjs with shell syntax and Docker Compose overlay validation.
+- CI #1899 passed completely.

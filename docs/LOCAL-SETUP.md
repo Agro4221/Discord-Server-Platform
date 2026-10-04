@@ -79,3 +79,24 @@ Do not commit `.env`. Secrets stay in the local environment.
 ## VPS
 
 VPS deployment uses the same application architecture. See `scripts/install-vps.sh` and `scripts/upgrade.sh` for the Docker-based deployment path.
+
+
+## VPS deployment with protected public Dashboard
+
+For a VPS deployment, use the installer from a clean Ubuntu/Debian-style host:
+
+    sudo bash scripts/install-vps.sh
+
+The installer creates Docker configuration, generates database/Lavalink/Management API secrets, asks for the Dashboard domain and a dedicated Basic Auth credential, generates a Caddy password hash and starts the VPS Compose overlay.
+
+The installer does not ask for the Discord bot token. After the Dashboard is available at https://<your-domain>/, authenticate with the Basic Auth credential and register the bot through Control Center -> Bot Fleet. The bot token remains encrypted by the application and is not returned to the browser.
+
+The VPS overlay exposes only Caddy on ports 80/443. Bot health, Management API and the direct Dashboard port remain private.
+
+For upgrades:
+
+    sudo bash scripts/upgrade.sh
+
+The upgrade script detects the generated infrastructure/caddy/Caddyfile and automatically uses docker-compose.vps.yml.
+
+Before deployment, make sure the DNS A/AAAA record for the chosen domain points to the VPS and that ports 80/443 are reachable so Caddy can obtain and renew TLS certificates.

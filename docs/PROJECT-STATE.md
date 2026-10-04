@@ -343,3 +343,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Reusable server configuration presets: implemented and CI-verified (#1883).
 - Configurable bot identity/profile: implemented and CI-verified (#1889), using the existing Fleet registration path.
 - Administration backlog now moves to deployment foundation: Docker/VPS.
+
+
+## 2026-10-05 — Docker / VPS foundation verified
+- Final deployment source checkpoint: f466eddb5749c0044c7f1b9fce68b7dd4f9b412c.
+- CI #1899 passed.
+- Administration foundation is now followed by localization work; live VPS clean-host deployment is still a release-gate task.

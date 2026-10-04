@@ -18,7 +18,7 @@
 | Backups / import / export | ✅ |
 | Multi-bot identities | ✅ | Fleet identities, guild assignment, Music voice assignment, heartbeats and Dashboard controls |
 | Native Windows runtime | ✅ |
-| Docker / VPS | 🟡 |
+| Docker / VPS | ✅ / расширять | Local Docker Compose remains loopback-only; VPS installer provisions Caddy HTTPS ingress with hashed Basic Auth while keeping Management API and health private |
 | RU / EN localization | 🟡 |
 
 ## Moderation
