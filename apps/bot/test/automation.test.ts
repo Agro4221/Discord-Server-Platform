@@ -8,6 +8,8 @@ test("Automation validation accepts richer safe primitives and event-relative bu
     { type: "starts-with", left: "content", right: "!" },
     { type: "ends-with", left: "content", right: "?" },
     { type: "number-eq", left: "mentionCount", right: 0 },
+    { type: "number-gte", left: "attachmentCount", right: 1 },
+    { type: "contains", left: "previousChannelId", right: "123456789012345678" },
     { type: "has-role", userId: "@event", roleId: "123456789012345678" }
   ], [
     { type: "send-message", channelId: "@event", content: "Acknowledged {user}." },
