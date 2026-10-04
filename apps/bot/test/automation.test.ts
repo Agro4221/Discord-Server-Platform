@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { validateAutomationRule } from "../src/modules/automation-engine.js";
+import { AutomationEngine, validateAutomationRule } from "../src/modules/automation-engine.js";
 
 test("Automation validation accepts richer safe primitives and event-relative builder references", () => {
   assert.doesNotThrow(() => validateAutomationRule("message.create", [
