@@ -269,3 +269,9 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ `removedRoleIds` is included in response audit/event metadata.
 - ✅ CI #1663 passed typecheck, all bot tests, dependency audit, source/deployment/observability checks, domain/bot builds and Dashboard build.
 - ☐ Next: Security executor-role lifecycle/restart semantics; then Music/Fleet failure paths and live release-gate validation.
+
+## 2026-10-04 — Security restart verification
+- ✅ Active raid/destructive incidents restore from durable PostgreSQL state.
+- ✅ Latest active incident per type is selected deterministically after restart.
+- ✅ CI #1667 passed all automated checks and builds.
+- ☐ Next: Security executor-role lifecycle/restart policy; then Music/Fleet failure-path depth and live release gates.
