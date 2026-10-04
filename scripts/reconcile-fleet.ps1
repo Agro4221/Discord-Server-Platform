@@ -100,13 +100,16 @@ foreach ($entry in $desired.GetEnumerator()) {
   $identityId = $entry.Key
   $containerName = $entry.Value
   $status = Get-ContainerStatus $containerName
+  $fleetIdentity = @($fleet.identities | Where-Object { $_.id -eq $identityId } | Select-Object -First 1)
+  $fleetStatus = if ($fleetIdentity.Count -gt 0 -and $fleetIdentity[0].status) { [string]$fleetIdentity[0].status } else { "unknown" }
 
-  if ($status -eq "running") {
-    Write-FleetLog "healthy container=$containerName identity=$identityId"
+  if ($status -eq "running" -and $fleetStatus -in @("starting", "ready")) {
+    Write-FleetLog "healthy container=$containerName identity=$identityId fleetStatus=$fleetStatus"
     continue
   }
 
   if ($null -ne $status) {
+    Write-FleetLog "restart container=$containerName identity=$identityId containerStatus=$status fleetStatus=$fleetStatus"
     Remove-FleetContainer $containerName
   }
 

@@ -63,7 +63,10 @@ export class BotIdentityRepository {
     return result.rows.map((row) => {
       const rawStatus = row.status ?? "stopped";
       const heartbeatFresh = isFleetHeartbeatFresh(row.last_seen_at);
-      const status = rawStatus === "ready" && !heartbeatFresh ? "degraded" : rawStatus;
+      const status =
+        !heartbeatFresh && (rawStatus === "ready" || rawStatus === "starting")
+          ? "degraded"
+          : rawStatus;
       return {
         id: row.id,
         clientId: row.client_id,

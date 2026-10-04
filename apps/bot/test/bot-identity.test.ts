@@ -122,6 +122,51 @@ test("claimStaleGuilds atomically returns guilds claimed by an enabled failover 
 });
 
 
+test("listFleet marks stale starting and ready heartbeats as degraded", async () => {
+  const now = Date.parse("2026-10-04T10:00:00.000Z");
+  const db = {
+    query: async () => ({
+      rows: [
+        {
+          id: "primary",
+          client_id: "client-1",
+          enabled: true,
+          failover_enabled: false,
+          presence_name: "primary",
+          status: "starting",
+          last_seen_at: new Date(now - 120_000).toISOString(),
+          guild_count: "2",
+          credential_configured: true
+        },
+        {
+          id: "secondary",
+          client_id: "client-2",
+          enabled: true,
+          failover_enabled: true,
+          presence_name: "secondary",
+          status: "ready",
+          last_seen_at: new Date(now - 10_000).toISOString(),
+          guild_count: "3",
+          credential_configured: true
+        }
+      ]
+    })
+  } as never;
+
+  const repo = new BotIdentityRepository(db, "primary");
+  const originalNow = Date.now;
+  Date.now = () => now;
+  try {
+    const fleet = await repo.listFleet();
+    assert.equal(fleet.find((item) => item.id === "primary")?.status, "degraded");
+    assert.equal(fleet.find((item) => item.id === "primary")?.connected, false);
+    assert.equal(fleet.find((item) => item.id === "secondary")?.status, "ready");
+    assert.equal(fleet.find((item) => item.id === "secondary")?.connected, true);
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
 test("fleet heartbeat freshness uses the shared stale threshold", () => {
   const now = Date.parse("2026-10-04T10:00:00.000Z");
   assert.equal(isFleetHeartbeatFresh("2026-10-04T09:59:59.000Z", now), true);
