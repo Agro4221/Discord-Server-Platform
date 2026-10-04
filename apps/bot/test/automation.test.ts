@@ -43,7 +43,8 @@ test("Automation validation covers channel management actions", () => {
   assert.doesNotThrow(() => validateAutomationRule("message.create", [], [
     { type: "set-slowmode", channelId: "@event", seconds: 30 },
     { type: "set-channel-topic", channelId: "@event", topic: "Topic {content}" },
-    { type: "set-channel-name", channelId: "@event", name: "ticket-{userId}" }
+    { type: "set-channel-name", channelId: "@event", name: "ticket-{userId}" },
+    { type: "clear-cooldown", key: "welcome-{userId}" }
   ]));
   assert.throws(() => validateAutomationRule("message.create", [], [
     { type: "set-slowmode", channelId: "@event", seconds: 21601 }
@@ -72,4 +73,14 @@ test("Automation numeric comparison conditions use strict greater-than and less-
   ], [
     { type: "log", message: "numeric comparison" }
   ]), /invalid_numeric_condition/);
+});
+
+
+test("Automation clear-cooldown action is accepted and validates its key", () => {
+  assert.doesNotThrow(() => validateAutomationRule("message.create", [], [
+    { type: "clear-cooldown", key: "welcome-{userId}" }
+  ]));
+  assert.throws(() => validateAutomationRule("message.create", [], [
+    { type: "clear-cooldown", key: "" }
+  ]), /invalid_clear_cooldown_key/);
 });
