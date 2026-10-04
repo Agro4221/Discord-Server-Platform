@@ -238,6 +238,8 @@ export function FleetPanel({
           </button>
         </div>
       </div>
+
+      <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #202530" }}>
         <div style={{ fontSize: 12, fontWeight: 700 }}>Music voice assignments</div>
         <div style={{ marginTop: 4, fontSize: 11, opacity: 0.45 }}>
           Primary обслуживает незакреплённые voice-каналы. Закреплённый channel обслуживается выбранной identity.
