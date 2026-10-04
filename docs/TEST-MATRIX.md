@@ -256,3 +256,9 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ CI #1651: typecheck passed; test suite ran **94 tests / 93 pass / 1 fail** because `clampSecurityIncidentDuration` was imported by `security.test.ts` but not exported by `security.ts`; fixed in `f079a866aa2294ad211d7234fa6396c8c052e643`.
 - ⚠ Fresh CI for the fixed code is currently in progress; full green verification remains pending.
 - ☐ Next: AutoMod warn/response semantics, Security executor-role lifecycle, then Music/Fleet failure paths and live release gates.
+
+## 2026-10-04 — Dashboard/CI verification
+- ✅ AutoMod log-rule UI requires a log channel when `action=log`.
+- ✅ AutoMod response template field is present and editable.
+- ✅ CI #1657 passed all automated stages: dependency audit, source/deployment/observability contracts, bot typecheck/tests, domain build, bot build and Dashboard build.
+- ☐ Next: Security executor-role lifecycle; then Music/Fleet failure-path depth and live release-gate validation.
