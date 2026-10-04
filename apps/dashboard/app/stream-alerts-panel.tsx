@@ -50,6 +50,8 @@ export function StreamAlertsPanel({
     apiKey: ""
   });
   const [showCredentialForm, setShowCredentialForm] = useState(false);
+  const [testingCredentialId, setTestingCredentialId] = useState<number | null>(null);
+  const [diagnostic, setDiagnostic] = useState<{ credentialId: number; ok: boolean; message: string } | null>(null);
   const [target, setTarget] = useState("");
   const [channelId, setChannelId] = useState(channels[0]?.id ?? "");
   const [mentionRoleId, setMentionRoleId] = useState("");
@@ -175,6 +177,40 @@ export function StreamAlertsPanel({
     }
   }
 
+  async function testCredential(credential: Credential) {
+    setTestingCredentialId(credential.id);
+    setDiagnostic(null);
+    setError("");
+    try {
+      const response = await fetch(
+        "/api/guilds/" + encodeURIComponent(guildId) + "/integration-credentials/" + credential.id + "/test",
+        { method: "POST" }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setDiagnostic({
+          credentialId: credential.id,
+          ok: false,
+          message: body.error ?? "Проверка не пройдена."
+        });
+        return;
+      }
+      setDiagnostic({
+        credentialId: credential.id,
+        ok: true,
+        message: body.provider + " OK · " + String(body.latencyMs ?? "?") + " ms"
+      });
+    } catch (reason) {
+      setDiagnostic({
+        credentialId: credential.id,
+        ok: false,
+        message: reason instanceof Error ? reason.message : "Ошибка проверки."
+      });
+    } finally {
+      setTestingCredentialId(null);
+    }
+  }
+
   async function removeCredential(credential: Credential) {
     if (!window.confirm("Удалить credential «" + credential.label + "»? Привязанные stream alerts переключатся на стандартные credentials бота.")) return;
     setBusy(true);
@@ -249,8 +285,14 @@ export function StreamAlertsPanel({
               <div key={credential.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "7px 8px", border: "1px solid #1e2631", borderRadius: 8 }}>
                 <strong style={{ width: 80 }}>{credential.provider}</strong>
                 <span style={{ flex: 1 }}>{credential.label}</span>
+                <button type="button" disabled={busy || testingCredentialId !== null} onClick={() => void testCredential(credential)} style={button("secondary")}>
+                  {testingCredentialId === credential.id ? "Проверка…" : "Проверить"}
+                </button>
                 <button type="button" disabled={busy} onClick={() => setPlatform(credential.provider)} style={button("secondary")}>Использовать</button>
-                <button type="button" disabled={busy} onClick={() => void removeCredential(credential)} style={button("danger")}>Удалить</button>
+                <button type="button" disabled={busy || testingCredentialId !== null} onClick={() => void removeCredential(credential)} style={button("danger")}>Удалить</button>
+                {diagnostic?.credentialId === credential.id && (
+                  <span style={{ fontSize: 10, color: diagnostic.ok ? "#81d69c" : "#ef9a9f" }}>{diagnostic.ok ? "✓ " : "✕ "}{diagnostic.message}</span>
+                )}
               </div>
             ))}
           </div>
