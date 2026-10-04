@@ -230,7 +230,7 @@ export class Security implements PlatformModule {
     for (const row of rows) {
       const timestamp = new Date(row.created_at).getTime();
       if (!Number.isFinite(timestamp) || timestamp < cutoff) continue;
-      const bucket = (this.destructive.get(row.guild_id) ?? []).filter((entry) => entry.timestamp >= cutoff);
+      const bucket = this.destructive.get(row.guild_id) ?? [];
       bucket.push({ timestamp, type: row.metadata?.type ? String(row.metadata.type) : row.event_type });
       this.destructive.set(row.guild_id, bucket);
     }
@@ -554,7 +554,7 @@ export class Security implements PlatformModule {
     const config = await this.config(guildId);
     if (!config.enabled) return;
     const now = Date.now();
-    await this.recordDestructiveAction(guildId, type, targetUserId);
+    void this.recordDestructiveAction(guildId, type, targetUserId);
     const cutoff = now - config.destructiveWindowSeconds * 1000;
     const bucket = (this.destructive.get(guildId) ?? []).filter((entry) => entry.timestamp >= cutoff);
     bucket.push({ timestamp: now, type });
@@ -776,7 +776,7 @@ export class Security implements PlatformModule {
     for (const roleId of removedRoleIds) {
       const role = removable.get(roleId);
       if (role) {
-        await this.recordExecutorRoleRemoval(guildId, incidentId, userId, role.id, role.name);
+        void this.recordExecutorRoleRemoval(guildId, incidentId, userId, role.id, role.name);
       }
     }
 
