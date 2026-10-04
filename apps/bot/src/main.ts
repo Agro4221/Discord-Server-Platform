@@ -34,6 +34,7 @@ import { AuditLog } from "./audit.js";
 import { PlatformEventBus } from "./events.js";
 import { BotIdentityRepository } from "./bot-identity.js";
 import { ConfigTransferService } from "./config-transfer.js";
+import { ServerConfigPresetService } from "./config-presets.js";
 import { BackupService } from "./backup.js";
 import { CustomCommandService } from "./custom-commands.js";
 import { AutoResponder } from "./modules/autoresponder.js";
@@ -56,6 +57,7 @@ async function main(): Promise<void> {
   const dashboardSettings = new DashboardSettingsService(database);
   const identities = new BotIdentityRepository(database, config.botIdentityId, config.managementApiKey);
   const transfer = new ConfigTransferService(database);
+  const configPresets = new ServerConfigPresetService(database);
   const backups = new BackupService(
     database,
     config.backupDirectory,
@@ -362,6 +364,7 @@ async function main(): Promise<void> {
     auditLog,
     settings: dashboardSettings,
     transfer,
+    presets: configPresets,
     backups,
     customCommands,
     autoResponder,
