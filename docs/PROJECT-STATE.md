@@ -584,3 +584,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Fleet: stale guild and stale Music voice takeover are active; takeover records previous owner detail for durable audit.
 - AutoMod: rule-level `ban` is verified.
 - CI #1837 is green.
+
+
+## 2026-10-05 — Current verified state
+- Automation: `set-nickname` and `ban` are green under CI #1839.
+- Security, AutoMod and Fleet breadth previously verified remains active.
+- Current code tree has no known typecheck/test/build failures; live Discord hierarchy and multi-process failover remain environment-gate items.
