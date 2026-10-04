@@ -812,6 +812,13 @@ const migrations = [
     ])
   },
   {
+    version: 49,
+    name: "security_executor_timeout",
+    sql: q([
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS executor_timeout_minutes integer NOT NULL DEFAULT 0 CHECK(executor_timeout_minutes BETWEEN 0 AND 40320);"
+    ])
+  },
+  {
     version: 47,
     name: "automod_log_channel",
     sql: q([
