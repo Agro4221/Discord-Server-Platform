@@ -961,6 +961,7 @@ function normalizeImportedTicketPanel(value: unknown): ImportedTicketPanel {
     throw new Error("invalid_ticket_panel");
   }
   return {
+    id: object.id,
     channelId: object.channel_id,
     messageId: typeof object.message_id === "string" ? object.message_id : null,
     title: object.title.trim(),
