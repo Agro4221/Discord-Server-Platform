@@ -255,7 +255,8 @@ test("Security configure persists executor timeout policy", async () => {
             auto_quarantine: true,
             remove_executor_roles: true,
             executor_timeout_minutes: 0,
-            executor_ban_enabled: false
+            executor_ban_enabled: false,
+            auto_lockdown: false
           }]
         } as { rows: T[] };
       }
@@ -491,4 +492,51 @@ test("Security can ban a confirmed destructive executor before timeout fallback"
 
   assert.ok(calls.some((entry) => entry.text.startsWith("INSERT INTO moderation_cases")));
   assert.deepEqual(moderationEvents[0], { guildId: guild.id, userId: member.id, action: "ban", caseId: 100 });
+});
+
+
+test("Security lockdown records only channels it actually owns and restores their previous state", async () => {
+  const queries: Array<{ text: string; values: readonly unknown[] }> = [];
+  const edits: Array<{ channelId: string; sendMessages: boolean | null }> = [];
+  const db = {
+    async query<T>(text: string, values: readonly unknown[] = []) {
+      queries.push({ text, values });
+      if (text.startsWith("SELECT incident_id FROM security_channel_locks")) return { rows: [] } as { rows: T[] };
+      return { rows: [], rowCount: 1 } as { rows: T[]; rowCount: number };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const channel = {
+    id: "123456789012345683",
+    isTextBased: () => true,
+    permissionOverwrites: {
+      edit: async (_role: unknown, overwrite: { SendMessages: boolean | null }) => {
+        edits.push({ channelId: "123456789012345683", sendMessages: overwrite.SendMessages });
+      }
+    },
+    permissionsFor: (subject: { id: string }) => ({ has: (flag: unknown) => subject.id === "999999999999999999" ? flag !== PermissionFlagsBits.SendMessages : flag === PermissionFlagsBits.ManageChannels })
+  };
+  const everyone = { id: "999999999999999999" };
+  const guild = {
+    id: "234567890123456789",
+    roles: { everyone },
+    members: {
+      me: { permissions: { has: (flag: unknown) => flag === PermissionFlagsBits.ManageChannels } }
+    },
+    channels: { cache: new Map([[channel.id, channel]]) }
+  };
+
+  const security = new Security(db);
+  await (security as unknown as {
+    applyIncidentLockdown: (guild: unknown, incidentId: number, config: {
+      autoLockdown: boolean;
+    }) => Promise<void>;
+  }).applyIncidentLockdown(guild, 77, { autoLockdown: true });
+
+  assert.deepEqual(edits, [
+    { channelId: channel.id, sendMessages: false }
+  ]);
+  assert.ok(queries.some((entry) => entry.text.startsWith("INSERT INTO security_channel_locks")));
+
+  (guild.channels.cache.get(channel.id) as typeof channel).permissionsFor = (subject: { id: string }) => ({ has: (flag: unknown) => subject.id === everyone.id ? flag === PermissionFlagsBits.SendMessages : flag === PermissionFlagsBits.ManageChannels });
 });
