@@ -1235,8 +1235,8 @@ export class Music implements PlatformModule {
       .filter((player) => musicPlayerNodeId(player) === nodeId);
     if (!players.length) return;
 
-    const results = await Promise.allSettled(players.map((player) => this.persistPlayer(player)));
-    const failed = results.filter((result) => result.status === "rejected").length;
+    const results = await Promise.all(players.map((player) => this.persistPlayer(player)));
+    const failed = results.filter((result) => !result).length;
     if (failed) {
       logger.warn("Failed to persist Music players during Lavalink node disconnect", {
         node: nodeId,
@@ -1352,26 +1352,36 @@ export class Music implements PlatformModule {
     voiceChannelId: string | null;
     textChannelId: string | null;
     toJSON(): unknown;
-  }): Promise<void> {
-    await this.db.query(
-      `INSERT INTO music_players(
-        guild_id,bot_identity_id,voice_channel_id,text_channel_id,state
-      )
-      VALUES($1,$2,$3,$4,$5::jsonb)
-      ON CONFLICT(guild_id,bot_identity_id)
-      DO UPDATE SET
-        voice_channel_id=EXCLUDED.voice_channel_id,
-        text_channel_id=EXCLUDED.text_channel_id,
-        state=EXCLUDED.state,
-        updated_at=now()`,
-      [
-        player.guildId,
-        this.config.botIdentityId,
-        player.voiceChannelId ?? null,
-        player.textChannelId ?? null,
-        JSON.stringify(player.toJSON())
-      ]
-    ).catch((error) => logger.warn("Failed to persist music player", { error: String(error) }));
+  }): Promise<boolean> {
+    try {
+      await this.db.query(
+        `INSERT INTO music_players(
+          guild_id,bot_identity_id,voice_channel_id,text_channel_id,state
+        )
+        VALUES($1,$2,$3,$4,$5::jsonb)
+        ON CONFLICT(guild_id,bot_identity_id)
+        DO UPDATE SET
+          voice_channel_id=EXCLUDED.voice_channel_id,
+          text_channel_id=EXCLUDED.text_channel_id,
+          state=EXCLUDED.state,
+          updated_at=now()`,
+        [
+          player.guildId,
+          this.config.botIdentityId,
+          player.voiceChannelId ?? null,
+          player.textChannelId ?? null,
+          JSON.stringify(player.toJSON())
+        ]
+      );
+      return true;
+    } catch (error) {
+      logger.warn("Failed to persist music player", {
+        guildId: player.guildId,
+        identity: this.config.botIdentityId,
+        error: String(error)
+      });
+      return false;
+    }
   }
 
   private async syncController(player: Player): Promise<void> {
