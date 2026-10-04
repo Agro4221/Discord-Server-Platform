@@ -927,6 +927,8 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .setDescription("Show or edit the queue")
           .addStringOption((o) => o.setName("action").setDescription("Queue operation").addChoices(
             { name: "View", value: "view" },
+            { name: "Export queue", value: "export" },
+            { name: "Share queue", value: "share" },
             { name: "Remove track", value: "remove" },
             { name: "Remove range", value: "remove-range" },
             { name: "Move track", value: "move" },
