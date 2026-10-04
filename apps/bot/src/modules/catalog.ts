@@ -22,7 +22,8 @@ export type ModuleKey =
   | "polls"
   | "reputation"
   | "birthdays"
-  | "invite-tracking";
+  | "invite-tracking"
+  | "forms";
 
 export const MODULE_CATALOG: readonly {
   key: ModuleKey;
@@ -53,5 +54,6 @@ export const MODULE_CATALOG: readonly {
   { key: "polls", title: "Polls & Suggestions", description: "Interactive polls and community suggestions", defaultEnabled: false },
   { key: "reputation", title: "Reputation", description: "Community reputation and social profiles", defaultEnabled: false },
   { key: "birthdays", title: "Birthdays", description: "Birthday storage and scheduled announcements", defaultEnabled: false },
-  { key: "invite-tracking", title: "Invite Tracking", description: "Invite attribution and inviter statistics", defaultEnabled: false }
+  { key: "invite-tracking", title: "Invite Tracking", description: "Invite attribution and inviter statistics", defaultEnabled: false },
+  { key: "forms", title: "Forms", description: "Reusable server forms with Discord modals", defaultEnabled: false }
 ];
