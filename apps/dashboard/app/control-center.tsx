@@ -18,6 +18,7 @@ import { NotificationsPanel } from "./notifications-panel";
 import { StreamAlertsPanel } from "./stream-alerts-panel";
 import { TicketFormPanel } from "./ticket-form-panel";
 import { RolePanelsEditor } from "./role-panels-editor";
+import { FormsPanel } from "./forms-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -195,6 +196,21 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Логи", description: "Отдельный канал для событий verification." }
     ],
     kind: "settings"
+  },
+  forms: {
+    icon: "▱",
+    accent: "#82c7f1",
+    title: "Forms",
+    summary: "Универсальные серверные формы на Discord Modal с публикацией и сбором ответов.",
+    category: "server",
+    commands: ["/form publish"],
+    functions: [
+      { title: "Form builder", description: "До 5 настраиваемых полей short/paragraph с required и min/max length." },
+      { title: "Publishing", description: "Публикация кнопки запуска формы в выбранный текстовый канал." },
+      { title: "Response delivery", description: "Сохранение ответов и отправка staff-уведомления в выбранный канал." },
+      { title: "Persistent config", description: "Определения форм хранятся в PostgreSQL и входят в конфигурационный export/import." }
+    ],
+    kind: "full"
   },
   roles: {
     icon: "♢",
@@ -440,7 +456,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "custom-commands", "autoresponder", "automod", "tickets", "embed", "roles", "giveaways", "analytics", "automation", "notifications", "stream-alerts"]);
+const PANEL_KEYS = new Set(["moderation", "custom-commands", "autoresponder", "automod", "tickets", "embed", "roles", "forms", "giveaways", "analytics", "automation", "notifications", "stream-alerts"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -1504,6 +1520,17 @@ function ModulePage(props: {
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Embed Builder" eyebrow="OPERATIONS" />
           <EmbedBuilderPanel guildId={props.guildId} channels={props.resources.channels.filter((item) => item.type === 0)} onChanged={props.onAudit} />
+        </section>
+      )}
+
+      {props.module?.key === "forms" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Universal Forms" eyebrow="INTERACTIVE FORMS" />
+          <FormsPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            onChanged={props.onAudit}
+          />
         </section>
       )}
 
