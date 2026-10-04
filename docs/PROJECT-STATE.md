@@ -394,3 +394,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - CI #1964 is green.
 - Social/community engagement widgets are now implemented in Control Center using existing community modules.
 - Next high-value slice: **Additional social feeds**.
+
+
+## 2026-10-05 — Matrix reconciliation
+- Per-guild provider credentials and Additional social feeds are now marked complete in the Feature Matrix.
+- Remaining yellow items are predominantly advanced Music functionality.
