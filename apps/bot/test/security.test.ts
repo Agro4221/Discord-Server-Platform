@@ -270,3 +270,166 @@ test("Security configure persists executor timeout policy", async () => {
   assert.equal(insert?.values.at(-1), 30);
   assert.match(insert?.text ?? "", /executor_timeout_minutes/);
 });
+
+
+test("Security applies configured executor timeout only at the response threshold", async () => {
+  let timeoutMs = 0;
+  const db = {
+    async query<T>(text: string) {
+      if (text.startsWith("INSERT INTO moderation_cases")) return { rows: [{ id: "99" }] } as { rows: T[] };
+      return { rows: [], rowCount: 1 } as { rows: T[] };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const events = new (await import("../src/events.js")).PlatformEventBus();
+  const moderationEvents: unknown[] = [];
+  events.on("moderation.case", (event) => moderationEvents.push(event));
+
+  const member = {
+    id: "456789012345678901",
+    manageable: true,
+    moderatable: true,
+    permissions: { has: () => false },
+    roles: {
+      cache: {
+        filter: () => new Map()
+      }
+    },
+    timeout: async (duration: number) => {
+      timeoutMs = duration;
+    }
+  };
+  const guild = {
+    id: "234567890123456789",
+    ownerId: "999999999999999999",
+    members: {
+      me: { roles: { highest: { position: 10 } } },
+      fetch: async () => member
+    }
+  };
+
+  const security = new Security(db);
+  (security as unknown as {
+    client: { guilds: { cache: Map<string, unknown> } };
+    events: typeof events;
+  }).client = { guilds: { cache: new Map([[guild.id, guild]]) } };
+  (security as unknown as { events: typeof events }).events = events;
+
+  await (security as unknown as {
+    respondToExecutor: (
+      guildId: string,
+      userId: string,
+      config: {
+        enabled: boolean;
+        maxJoins: number;
+        windowSeconds: number;
+        maxDestructiveActions: number;
+        destructiveWindowSeconds: number;
+        quarantineRoleId: string | null;
+        logChannelId: string | null;
+        incidentDurationSeconds: number;
+        autoQuarantine: boolean;
+        removeExecutorRoles: boolean;
+        executorTimeoutMinutes: number;
+      },
+      type: string,
+      executorCount: number,
+      incidentId: number
+    ) => Promise<void>;
+  }).respondToExecutor(guild.id, member.id, {
+    enabled: true,
+    maxJoins: 10,
+    windowSeconds: 20,
+    maxDestructiveActions: 5,
+    destructiveWindowSeconds: 20,
+    quarantineRoleId: null,
+    logChannelId: null,
+    incidentDurationSeconds: 300,
+    autoQuarantine: false,
+    removeExecutorRoles: false,
+    executorTimeoutMinutes: 30
+  }, "channel.delete", 3, 7);
+
+  assert.equal(timeoutMs, 30 * 60_000);
+  assert.deepEqual(moderationEvents[0], {
+    guildId: guild.id,
+    userId: member.id,
+    action: "timeout",
+    caseId: 99
+  });
+});
+
+test("Security does not persist a timeout case when the Discord timeout fails", async () => {
+  const queries: string[] = [];
+  const db = {
+    async query<T>(text: string) {
+      queries.push(text);
+      return { rows: [], rowCount: 1 } as { rows: T[]; rowCount: number };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const member = {
+    id: "456789012345678901",
+    manageable: true,
+    moderatable: true,
+    permissions: { has: () => false },
+    roles: {
+      cache: {
+        filter: () => new Map()
+      }
+    },
+    timeout: async () => {
+      throw new Error("timeout denied");
+    }
+  };
+  const guild = {
+    id: "234567890123456789",
+    ownerId: "999999999999999999",
+    members: {
+      me: { roles: { highest: { position: 10 } } },
+      fetch: async () => member
+    }
+  };
+
+  const security = new Security(db);
+  (security as unknown as {
+    client: { guilds: { cache: Map<string, unknown> } };
+  }).client = { guilds: { cache: new Map([[guild.id, guild]]) } };
+
+  await (security as unknown as {
+    respondToExecutor: (
+      guildId: string,
+      userId: string,
+      config: {
+        enabled: boolean;
+        maxJoins: number;
+        windowSeconds: number;
+        maxDestructiveActions: number;
+        destructiveWindowSeconds: number;
+        quarantineRoleId: string | null;
+        logChannelId: string | null;
+        incidentDurationSeconds: number;
+        autoQuarantine: boolean;
+        removeExecutorRoles: boolean;
+        executorTimeoutMinutes: number;
+      },
+      type: string,
+      executorCount: number,
+      incidentId: number
+    ) => Promise<void>;
+  }).respondToExecutor(guild.id, member.id, {
+    enabled: true,
+    maxJoins: 10,
+    windowSeconds: 20,
+    maxDestructiveActions: 5,
+    destructiveWindowSeconds: 20,
+    quarantineRoleId: null,
+    logChannelId: null,
+    incidentDurationSeconds: 300,
+    autoQuarantine: false,
+    removeExecutorRoles: false,
+    executorTimeoutMinutes: 30
+  }, "role.delete", 3, 8);
+
+  assert.equal(queries.some((query) => query.startsWith("INSERT INTO moderation_cases")), false);
+});
