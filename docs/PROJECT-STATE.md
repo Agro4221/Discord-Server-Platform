@@ -409,3 +409,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Guild event routing now uses durable DB ownership revalidation with a 1-second cache after the existing in-memory fast filter, reducing the stale-owner split-brain window from the Fleet refresh interval to the ownership-cache interval.
 - Primary failover and secondary ownership rules remain consistent with stale-heartbeat semantics.
 - CI #1693 passed the complete automated pipeline; latest verified code: `6bf8e4423ef4f8fccd1bae497b5c66368bc9b5f0`.
+
+
+## 2026-10-04 — Music recovery concurrency checkpoint
+- Lavalink resumed-player restoration and PostgreSQL cold reconciliation now share a per-guild recovery gate, eliminating duplicate recovery races within a process.
+- CI #1697 passed typecheck, bot tests and all builds/contracts; latest verified code: `345683759b315b0d775fc0752515b11b693a04fb`.

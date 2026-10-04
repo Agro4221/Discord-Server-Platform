@@ -345,3 +345,12 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ CI #1693 passed typecheck, bot tests, static contracts, and all domain/bot/Dashboard builds.
 - ⚠ Exact simultaneous assignment changes across multiple live processes remain an environment-dependent acceptance case.
 - ☐ Next: Music simultaneous node/session failure recovery and de-duplication.
+
+
+## 2026-10-04 — Music recovery concurrency verification
+- ✅ Per-guild recovery lock covers both resumed-player and cold-recovery paths.
+- ✅ Same-guild duplicate recovery is rejected while independent guilds remain concurrent.
+- ✅ Regression coverage added for recovery lock acquisition/release semantics.
+- ✅ CI #1697 passed the complete automated pipeline.
+- ⚠ Real simultaneous Lavalink node reconnect/cold-start behavior remains a live acceptance case.
+- ☐ Next: live release-gate prerequisites and operational acceptance.

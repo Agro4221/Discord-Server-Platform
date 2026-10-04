@@ -571,3 +571,13 @@ Never write credentials, tokens or private user data here.
 - Music: simultaneous Lavalink node/session failures, duplicate recovery suppression and queue/current-state continuity across multi-node events.
 - Fleet: real Windows/Docker multi-bot acceptance plus remaining operational failure injection.
 - Final live release gate: Discord permissions/hierarchy, Lavalink/providers, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Music recovery concurrency checkpoint
+- Added a per-guild recovery gate shared by Lavalink `resumed` handling and PostgreSQL cold-recovery reconciliation.
+- Concurrent recovery paths for the same guild are now serialized, preventing duplicate `createPlayer` calls when node reconnect/resume and cold reconciliation overlap.
+- Added deterministic regression coverage for the recovery gate while keeping independent guilds recoverable concurrently.
+- CI run #1697 passed the complete automated pipeline on commit `345683759b315b0d775fc0752515b11b693a04fb`.
+### Next concrete work
+- Finalize live release-gate prerequisites: Discord permission/hierarchy checklist, Lavalink node-loss/expiry acceptance, Windows/Docker multi-bot runtime and soak/chaos/recovery.
+- Then perform the remaining release-readiness audit without reopening verified module contracts.
