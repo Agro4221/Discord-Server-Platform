@@ -1894,7 +1894,7 @@ function AuditPage(props: {
             inputMode="numeric"
             style={inputStyle}
           />
-          <button type="button" onClick={props.onApply} disabled={props.loading} style={buttonStyle}>
+          <button type="button" onClick={props.onApply} disabled={props.loading} style={buttonStyle("primary")}>
             {props.loading ? "Загрузка…" : "Применить"}
           </button>
           <button type="button" onClick={props.onClear} disabled={props.loading} style={secondaryButtonStyle}>
