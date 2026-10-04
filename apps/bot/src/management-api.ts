@@ -180,7 +180,7 @@ type ApiOptions = {
     list: (guildId: string) => Promise<unknown[]>;
     create: (
       guildId: string,
-      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number },
+      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number; componentType?: "buttons" | "select" },
       callbacks: {
         deleteMessage: (channelId: string, messageId: string) => Promise<void>;
         sendMessage: (channelId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => Promise<string>;
