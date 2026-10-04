@@ -1282,10 +1282,27 @@ export class Music implements PlatformModule {
       const guildId = typeof data.guildId === "string" ? data.guildId : null;
       if (!guildId || data.state?.connected !== true) {
         if (guildId) {
-          await this.db.query(
-            "DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
+          const saved = await this.db.query<{ state: unknown }>(
+            "SELECT state FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
             [guildId, this.config.botIdentityId]
           );
+          const queue = await this.db.query<{ data: unknown }>(
+            "SELECT data FROM music_queue_store WHERE guild_id=$1 AND bot_identity_id=$2",
+            [guildId, this.config.botIdentityId]
+          );
+          const state = normalizePersistedMusicPlayerState(saved.rows[0]?.state);
+          if (!hasPersistedMusicPlayback(state, queue.rows[0]?.data)) {
+            await this.db.query(
+              "DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
+              [guildId, this.config.botIdentityId]
+            );
+          } else {
+            logger.info("Deferring Music player to cold recovery after failed Lavalink resume", {
+              guildId,
+              identity: this.config.botIdentityId,
+              node: nodeId
+            });
+          }
         }
         continue;
       }

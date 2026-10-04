@@ -93,6 +93,35 @@ test("Music resume position advances only while playing and stays inside track d
   assert.equal(musicResumePosition(-100, Number.NaN, false, 0, 1_000), 0);
 });
 
+test("Music failed Lavalink resume keeps durable player state when playback is still recoverable", async () => {
+  const queries: string[] = [];
+  const db = {
+    async query<T>(text: string) {
+      queries.push(text);
+      if (text.startsWith("SELECT state FROM music_players")) {
+        return { rows: [{ state: { track: { encoded: "track" }, paused: false, state: { position: 5_000 } } }] } as { rows: T[] };
+      }
+      if (text.startsWith("SELECT data FROM music_queue_store")) {
+        return { rows: [{ data: { tracks: [{ encoded: "queued" }] } }] } as { rows: T[] };
+      }
+      return { rows: [], rowCount: 0 } as { rows: T[]; rowCount: number };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const music = new Music(db, {} as never, {} as never);
+  await (music as unknown as {
+    restoreResumedPlayers: (nodeId: string, fetchedPlayers: unknown[]) => Promise<void>;
+  }).restoreResumedPlayers("node-1", [{
+    guildId: "guild-1",
+    state: { connected: false }
+  }]);
+
+  assert.equal(
+    queries.some((query) => query.startsWith("DELETE FROM music_players")),
+    false
+  );
+});
+
 test("Music persisted playback detection distinguishes active queue state from an empty snapshot", () => {
   assert.equal(hasPersistedMusicPlayback({ track: { encoded: "track" } }, null), true);
   assert.equal(hasPersistedMusicPlayback({ track: null }, { tracks: [{ info: { title: "Queued" } }] }), true);
