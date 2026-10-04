@@ -156,6 +156,7 @@ type ApiOptions = {
   onboarding?: {
     get: (guildId: string) => Promise<unknown>;
     set: (guildId: string, input: { enabled?: boolean; trigger?: OnboardingTrigger; steps?: OnboardingStep[] }) => Promise<unknown>;
+    validate: (guildId: string) => Promise<unknown>;
   };
   tickets?: {
     getFormFields: (guildId: string) => Promise<TicketFormField[]>;
@@ -2646,6 +2647,28 @@ export class ManagementApiServer {
               return;
             }
             this.json(res, 200, guildResources(this.options.client, guildId));
+            return;
+          }
+
+          const onboardingValidateMatch = path.match(/^\/api\/guilds\/([^/]+)\/onboarding\/validate$/);
+          if (onboardingValidateMatch) {
+            if (!this.options.onboarding) {
+              this.json(res, 500, { error: "onboarding_unavailable" });
+              return;
+            }
+            const guildId = onboardingValidateMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (method !== "GET") {
+              this.json(res, 405, { error: "method_not_allowed" });
+              return;
+            }
+            this.json(res, 200, {
+              guildId,
+              validation: await this.options.onboarding.validate(guildId)
+            });
             return;
           }
 
