@@ -242,7 +242,16 @@ export function AutoModRulesPanel(props: {
         </select>
       </label>
 
-      RESPONSE_LABEL_PLACEHOLDER
+      <label style={boxStyle}>
+        <span>Сообщение ответа (необязательно для log)</span>
+        <textarea
+          value={messageTemplate}
+          onChange={(e) => setMessageTemplate(e.target.value)}
+          style={{ ...inputStyle, minHeight: 70, resize: "vertical" }}
+          maxLength={2000}
+          placeholder="{mention}, {user}, {channel}"
+        />
+      </label>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button type="button" disabled={busy} onClick={() => void save()} style={buttonStyle}>{busy ? "Сохраняем…" : editingId !== null ? "Сохранить изменения" : "Создать rule"}</button>
