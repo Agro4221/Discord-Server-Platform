@@ -516,3 +516,6 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 
 ## 2026-10-04 — Music audio filters
 - Music now includes native built-in audio filter presets exposed consistently across Discord, API and Dashboard.
+
+## 2026-10-04 — Security audit coverage
+- Security now consumes dedicated Discord audit-log entry events for additional anti-nuke operations beyond channel/role creation/deletion and bans.

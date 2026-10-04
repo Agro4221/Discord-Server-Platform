@@ -8,7 +8,8 @@ import {
   clampSecurityIncidentDuration,
   clampSecurityWindowSeconds,
   removeSecurityExecutorRoles,
-  securityAuditLogEventType
+  securityAuditLogEventType,
+  securityAuditDestructiveType
 } from "../src/modules/security.js";
 import { AuditLogEvent } from "discord.js";
 
@@ -200,4 +201,25 @@ test("Security anti-nuke tracks channel/role create and delete audit actions", (
   assert.equal(securityAuditLogEventType("role.delete"), AuditLogEvent.RoleDelete);
   assert.equal(securityAuditLogEventType("member.ban"), AuditLogEvent.MemberBanAdd);
   assert.throws(() => securityAuditLogEventType("unsupported"), /Unsupported security audit event type/);
+});
+
+test("Security maps extended destructive audit actions into anti-nuke event types", () => {
+  assert.equal(securityAuditDestructiveType(AuditLogEvent.MemberKick)?.type, "member.kick");
+  assert.equal(securityAuditDestructiveType(AuditLogEvent.WebhookDelete)?.type, "webhook.delete");
+  assert.equal(securityAuditDestructiveType(AuditLogEvent.EmojiDelete)?.type, "emoji.delete");
+  assert.equal(securityAuditDestructiveType(AuditLogEvent.StickerDelete)?.type, "sticker.delete");
+  assert.equal(securityAuditDestructiveType(AuditLogEvent.ChannelOverwriteUpdate)?.type, "channel.overwrite.update");
+  assert.equal(securityAuditDestructiveType(AuditLogEvent.MemberPrune)?.type, "member.prune");
+  assert.equal(securityAuditDestructiveType(AuditLogEvent.IntegrationDelete)?.type, "integration.delete");
+  assert.equal(securityAuditDestructiveType(AuditLogEvent.GuildUpdate), null);
+});
+
+test("Security audit type resolver covers extended destructive event names", () => {
+  assert.equal(securityAuditLogEventType("member.kick"), AuditLogEvent.MemberKick);
+  assert.equal(securityAuditLogEventType("webhook.delete"), AuditLogEvent.WebhookDelete);
+  assert.equal(securityAuditLogEventType("emoji.delete"), AuditLogEvent.EmojiDelete);
+  assert.equal(securityAuditLogEventType("sticker.delete"), AuditLogEvent.StickerDelete);
+  assert.equal(securityAuditLogEventType("channel.overwrite.delete"), AuditLogEvent.ChannelOverwriteDelete);
+  assert.equal(securityAuditLogEventType("member.prune"), AuditLogEvent.MemberPrune);
+  assert.equal(securityAuditLogEventType("integration.delete"), AuditLogEvent.IntegrationDelete);
 });

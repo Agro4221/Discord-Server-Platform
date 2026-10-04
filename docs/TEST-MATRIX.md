@@ -501,3 +501,8 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ Built-in filter preset validation is covered.
 - ✅ Discord, Management API and Dashboard filter controls are wired.
 - ⚠ Actual filter availability depends on the connected Lavalink node exposing the corresponding native filters; live playback verification remains required.
+
+## 2026-10-04 — Security audit coverage verification
+- ✅ Extended AuditLogEvent mapping is regression-tested.
+- ✅ Shared audit-entry event path is wired from Discord client into PlatformEventBus and Security.
+- ⚠ Audit-log event delivery and executor response still require live Discord validation and correct Gateway permissions.

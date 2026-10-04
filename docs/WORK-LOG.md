@@ -720,3 +720,9 @@ Never write credentials, tokens or private user data here.
 - Each preset resets previous built-in filters first so presets do not stack unexpectedly.
 - Dashboard now reflects the active filter state from Core.
 - Added regression coverage for filter preset normalization.
+
+## 2026-10-04 — Security audit coverage checkpoint
+- Added shared Discord audit-log entry ingestion to the platform event bus.
+- Security anti-nuke response now sees additional destructive actions that do not have a dedicated high-level Discord event: member kicks, webhooks, emojis, stickers, permission overwrites, member prune and integrations.
+- Existing channel/role create-delete and member ban handlers remain separate to avoid double-counting.
+- Added regression coverage for the extended AuditLogEvent mapping.
