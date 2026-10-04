@@ -21,6 +21,7 @@ type SecurityConfig = {
   incidentDurationSeconds: number;
   autoQuarantine: boolean;
   removeExecutorRoles: boolean;
+  executorTimeoutMinutes: number;
 };
 
 export class Security implements PlatformModule {
@@ -129,8 +130,9 @@ export class Security implements PlatformModule {
       incident_duration_seconds: number;
       auto_quarantine: boolean;
       remove_executor_roles: boolean;
+      executor_timeout_minutes: number;
     }>(
-      "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id,incident_duration_seconds,auto_quarantine,remove_executor_roles FROM security_settings WHERE guild_id=$1",
+      "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id,incident_duration_seconds,auto_quarantine,remove_executor_roles,executor_timeout_minutes FROM security_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -144,7 +146,8 @@ export class Security implements PlatformModule {
       logChannelId: row?.log_channel_id ?? null,
       incidentDurationSeconds: row?.incident_duration_seconds ?? 300,
       autoQuarantine: row?.auto_quarantine ?? true,
-      removeExecutorRoles: row?.remove_executor_roles ?? true
+      removeExecutorRoles: row?.remove_executor_roles ?? true,
+      executorTimeoutMinutes: clampSecurityExecutorTimeoutMinutes(row?.executor_timeout_minutes ?? 0)
     };
   }
 
@@ -154,9 +157,9 @@ export class Security implements PlatformModule {
     await this.db.query(
       `INSERT INTO security_settings(
         guild_id,enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,
-        quarantine_role_id,log_channel_id,incident_duration_seconds,auto_quarantine,remove_executor_roles
+        quarantine_role_id,log_channel_id,incident_duration_seconds,auto_quarantine,remove_executor_roles,executor_timeout_minutes
       )
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
       ON CONFLICT(guild_id) DO UPDATE SET
         enabled=EXCLUDED.enabled,
         max_joins=EXCLUDED.max_joins,
@@ -168,6 +171,7 @@ export class Security implements PlatformModule {
         incident_duration_seconds=EXCLUDED.incident_duration_seconds,
         auto_quarantine=EXCLUDED.auto_quarantine,
         remove_executor_roles=EXCLUDED.remove_executor_roles,
+        executor_timeout_minutes=EXCLUDED.executor_timeout_minutes,
         updated_at=now()`,
       [
         guildId,
@@ -180,7 +184,8 @@ export class Security implements PlatformModule {
         next.logChannelId,
         clampSecurityIncidentDuration(next.incidentDurationSeconds),
         next.autoQuarantine,
-        next.removeExecutorRoles
+        next.removeExecutorRoles,
+        clampSecurityExecutorTimeoutMinutes(next.executorTimeoutMinutes)
       ]
     );
     await this.db.query(
@@ -785,6 +790,56 @@ export class Security implements PlatformModule {
       }
     }
 
+    let timedOut = false;
+    if (config.executorTimeoutMinutes > 0 && executorCount >= responseThreshold && member.moderatable) {
+      try {
+        await member.timeout(
+          config.executorTimeoutMinutes * 60_000,
+          "Security destructive burst response"
+        );
+        timedOut = true;
+        const caseResult = await this.db.query<{ id: string }>(
+          "INSERT INTO moderation_cases(guild_id,target_user_id,moderator_user_id,action,reason,expires_at,created_at) VALUES($1,$2,'system','timeout',$3,$4,now()) RETURNING id",
+          [
+            guildId,
+            userId,
+            "Security: destructive burst (" + type + ")",
+            new Date(Date.now() + config.executorTimeoutMinutes * 60_000)
+          ]
+        ).catch((error) => {
+          logger.warn("Security timeout moderation case write failed", {
+            guildId,
+            userId,
+            incidentId,
+            error: String(error)
+          });
+          return null;
+        });
+        const caseId = caseResult?.rows[0]?.id;
+        if (caseId) {
+          await this.events?.emit("moderation.case", {
+            guildId,
+            userId,
+            action: "timeout",
+            caseId: Number(caseId)
+          }).catch((error) => logger.warn("Security timeout moderation event failed", {
+            guildId,
+            userId,
+            incidentId,
+            error: String(error)
+          }));
+        }
+      } catch (error) {
+        logger.warn("Security executor timeout failed", {
+          guildId,
+          userId,
+          incidentId,
+          timeoutMinutes: config.executorTimeoutMinutes,
+          error: String(error)
+        });
+      }
+    }
+
     await this.trackQuarantine(incidentId, member, config);
 
     const responseMetadata = {
@@ -793,7 +848,9 @@ export class Security implements PlatformModule {
       executorCount,
       removedRoles: removedRoleIds.length,
       removedRoleIds,
-      quarantine: Boolean(config.quarantineRoleId)
+      quarantine: Boolean(config.quarantineRoleId),
+      timedOut,
+      timeoutMinutes: timedOut ? config.executorTimeoutMinutes : 0
     };
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'response-applied',$2::jsonb)",
@@ -914,6 +971,11 @@ export function securityAuditLogEventType(type: string): AuditLogEvent {
 
 export function securityAuditLookbackCutoff(now: number, windowSeconds: number): number {
   return now - clampSecurityWindowSeconds(windowSeconds) * 1000;
+}
+
+export function clampSecurityExecutorTimeoutMinutes(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(Math.max(Math.trunc(value), 0), 40320);
 }
 
 export function clampSecurityWindowSeconds(value: number): number {
