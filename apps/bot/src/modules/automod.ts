@@ -546,6 +546,22 @@ export class AutoMod implements PlatformModule {
       [message.guild!.id, message.author.id, message.id, reason]
     ).catch(() => undefined);
 
+    if (timedOut) {
+      const caseResult = await this.db.query<{ id: string }>(
+        "INSERT INTO moderation_cases(guild_id,target_user_id,moderator_user_id,action,reason,expires_at,created_at) VALUES($1,$2,'system','timeout',$3,$4,now()) RETURNING id",
+        [message.guild!.id, message.author.id, "AutoMod: " + reason, new Date(Date.now() + config.timeoutMinutes * 60_000)]
+      ).catch(() => null);
+      const caseId = caseResult?.rows[0]?.id;
+      if (caseId) {
+        await this.events?.emit("moderation.case", {
+          guildId: message.guild!.id,
+          userId: message.author.id,
+          action: "timeout",
+          caseId: Number(caseId)
+        }).catch(() => undefined);
+      }
+    }
+
     await this.auditLog?.record({
       guildId: message.guild!.id,
       source: "system",

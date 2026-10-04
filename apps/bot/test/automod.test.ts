@@ -280,6 +280,80 @@ test("AutoMod timeout rule creates a moderation case only after Discord timeout 
   assert.equal((auditEvents[0] as { metadata?: { action?: string } })?.metadata?.action, "timeout");
 });
 
+
+
+test("AutoMod base timeout creates a moderation case after successful timeout", async () => {
+  const queries: string[] = [];
+  const values: unknown[][] = [];
+  const auditEvents: unknown[] = [];
+  let timeoutMs = 0;
+  const db = {
+    async query<T>(text: string, queryValues: readonly unknown[] = []) {
+      queries.push(text);
+      values.push([...queryValues]);
+      if (text.startsWith("SELECT enabled FROM guild_modules")) return { rows: [{ enabled: true }] } as { rows: T[] };
+      if (text.startsWith("SELECT enabled,blocked_words")) {
+        return { rows: [{
+          enabled: true,
+          blocked_words: ["forbidden"],
+          max_mentions: 6,
+          max_caps_ratio: 0.85,
+          max_repeated_messages: 5,
+          repeated_window_seconds: 10,
+          block_links: false,
+          block_invites: false,
+          max_links: 3,
+          max_emojis: 20,
+          max_line_length: 1000,
+          exempt_channel_ids: "",
+          exempt_role_ids: "",
+          delete_message: false,
+          timeout_minutes: 10
+        }] } as { rows: T[] };
+      }
+      if (text.startsWith("INSERT INTO automod_events")) return { rows: [], rowCount: 1 } as { rows: T[] };
+      if (text.startsWith("INSERT INTO moderation_cases")) return { rows: [{ id: "43" }] } as { rows: T[] };
+      return { rows: [], rowCount: 1 } as { rows: T[] };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const events = new (await import("../src/events.js")).PlatformEventBus();
+  const automod = new AutoMod(db);
+  await automod.init({
+    client: {} as never,
+    db,
+    events,
+    auditLog: { record: async (event: unknown) => { auditEvents.push(event); } } as never,
+    identityId: "primary"
+  });
+
+  const message = {
+    id: "123456789012345678",
+    guild: { id: "234567890123456789" },
+    channelId: "345678901234567890",
+    channel: { isTextBased: () => true, send: async () => undefined },
+    author: { id: "456789012345678901", username: "tester", bot: false },
+    member: {
+      moderatable: true,
+      roles: { cache: { map: () => [] } },
+      timeout: async (duration: number) => { timeoutMs = duration; }
+    },
+    content: "forbidden content",
+    mentions: { users: { size: 0 }, roles: { size: 0 } },
+    delete: async () => undefined
+  };
+
+  await events.emit("message.create", message as never);
+  await automod.shutdown();
+
+  assert.equal(timeoutMs, 10 * 60_000);
+  const index = queries.findIndex((query) => query.startsWith("INSERT INTO moderation_cases"));
+  assert.notEqual(index, -1);
+  assert.equal(values[index]?.[3], "AutoMod: blocked_word");
+  assert.ok(values[index]?.[4] instanceof Date);
+  assert.equal((auditEvents[0] as { metadata?: { timedOut?: boolean } })?.metadata?.timedOut, true);
+});
+
 test("AutoMod exemption parser accepts whitespace- and comma-separated IDs", () => {
   assert.deepEqual(
     [...parseAutoModIdList("channel-1, channel-2\nchannel-3\tchannel-4")],
