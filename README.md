@@ -1,5 +1,9 @@
 # Discord Server Platform
 
+> 🎯 **Главная цель проекта:** создать собственного универсального Discord-бота/платформу, которая объединяет лучшие полезные возможности обычных и премиум-ботов вроде **Carl-bot, Juniper, MEE6, ProBot, Jockie Music** и аналогичных решений — чтобы серверу не требовалась куча сторонних ботов и тем более платные подписки за базовые/расширенные функции.
+>
+> При этом проект не копирует чужой код или закрытые реализации: мы собираем собственную единую архитектуру и реализуем нужные возможности самостоятельно, добавляя нормальную интеграцию, настройки, безопасность, persistence и Control Center.
+
 Self-hosted Discord server platform for administration, moderation, community features, automation, temporary voice rooms, notifications and music.
 
 > Current state: release candidate for live validation. CI/typecheck/tests/builds cover the implemented feature set, including the native Windows runtime path; live Discord/Windows acceptance and optional VPS validation remain environment-dependent.
