@@ -588,7 +588,7 @@ export class AutoMod implements PlatformModule {
     }
   ): Promise<boolean> {
     let deleted = false;
-    if (rule.action === "delete" || rule.action === "timeout") {
+    if (rule.action === "delete" || rule.action === "timeout" || rule.action === "ban") {
       try {
         await message.delete();
         deleted = true;
