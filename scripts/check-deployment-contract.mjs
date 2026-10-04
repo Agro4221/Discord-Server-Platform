@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 
 const migrationSource = await readFile("apps/bot/src/migrations.ts", "utf8");
 const versions = [...migrationSource.matchAll(/version:\s*(\d+)/g)]
@@ -51,6 +52,22 @@ if (!caddyExample.includes("basic_auth") || !caddyExample.includes("reverse_prox
 if (!gitignore.includes("infrastructure/caddy/Caddyfile")) {
   throw new Error("Generated Caddy credentials file is not ignored");
 }
+try {
+  execFileSync("bash", ["-n", "scripts/install-vps.sh"], { stdio: "pipe" });
+  execFileSync("bash", ["-n", "scripts/upgrade.sh"], { stdio: "pipe" });
+} catch {
+  throw new Error("VPS shell scripts failed bash -n validation");
+}
+
+try {
+  execFileSync("docker", ["compose", "-f", "docker-compose.yml", "-f", "docker-compose.vps.yml", "config"], {
+    stdio: "pipe",
+    env: { ...process.env, DOMAIN: "panel.example.com", DASHBOARD_BASIC_AUTH_USER: "admin", DASHBOARD_BASIC_AUTH_HASH: "$argon2id$dummy" }
+  });
+} catch {
+  throw new Error("VPS Compose overlay failed config validation");
+}
+
 const localLauncher = await readFile("scripts/start-local.ps1", "utf8");
 for (const contract of [
   "docker compose up -d",
