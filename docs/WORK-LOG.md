@@ -589,3 +589,13 @@ Never write credentials, tokens or private user data here.
 - CI #1955 passed completely.
 - Final source checkpoint: `856e11e84539ed8c66a899bc792e9dc8bf45b832`.
 - Next single backlog slice: **Community social widgets / engagement depth**.
+
+
+## 2026-10-05 — Community social engagement hub
+- Added a read-only Community Hub to the server Overview.
+- Aggregates existing Reputation leaderboard, Leveling leaderboard, active Giveaways and open Polls; no parallel social data store was introduced.
+- Added Management API `GET /api/guilds/:guildId/community/overview`.
+- Added snapshot methods to Reputation and Polls and a Dashboard Community Hub panel with manual refresh.
+- CI #1964 passed completely.
+- Final source checkpoint: `2c1502e441097c40bbde9d431d1059b8d5a1855a`.
+- Next single backlog slice: **Additional social feeds**.
