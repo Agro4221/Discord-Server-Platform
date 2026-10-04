@@ -1734,6 +1734,14 @@ export class ManagementApiServer {
               throw new RequestInputError("invalid_leveling_exclusion", 400);
             }
             await this.options.leveling!.setExclusion(guildId, kind, refId, body.enabled);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "leveling.exclusion.updated",
+              targetType: kind,
+              targetId: refId,
+              metadata: { enabled: body.enabled }
+            });
             this.json(res, 200, { ok: true, exclusions: await this.options.leveling!.listExclusions(guildId) });
             return;
           }
