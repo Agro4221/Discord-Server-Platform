@@ -55,6 +55,7 @@ const nativeReleaseGate = await readFile("scripts/release-gate-native.ps1", "utf
 for (const expected of [
   "native Fleet supervisor",
   "fleet.pid",
+  '($identity.id + ".pid")',
   "NATIVE RELEASE GATE PASSED"
 ]) {
   if (!nativeReleaseGate.includes(expected)) {

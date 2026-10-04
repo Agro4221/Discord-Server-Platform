@@ -96,7 +96,7 @@ foreach ($identity in $enabled) {
   Assert-Ok ($identity.connected -eq $true) ("Identity " + $identity.id + " reports connected")
 
   if ($identity.id -ne "primary") {
-    $pidPath = Join-Path $runtimeRoot ("fleet" + $identity.id + ".pid")
+    $pidPath = Join-Path (Join-Path $runtimeRoot "fleet") ($identity.id + ".pid")
     Assert-PidAlive $pidPath ("secondary bot " + $identity.id) | Out-Null
   }
 }

@@ -156,7 +156,11 @@ if (-not [string]::IsNullOrWhiteSpace($managementKey)) {
       $report.fleet.error = "invalid_fleet_response"
     }
   } else {
-    $report.fleet.error = $fleet.error ?? ("management_status_" + $fleet.status)
+    if ($fleet.error) {
+      $report.fleet.error = $fleet.error
+    } else {
+      $report.fleet.error = "management_status_" + $fleet.status
+    }
   }
 } else {
   $report.fleet.error = "management_api_key_not_configured"
@@ -203,26 +207,42 @@ if ($Json) {
 
 Write-Host "=== Discord Server Platform native diagnostics ==="
 Write-Host ("UTC: " + $report.timestamp)
-Write-Host ("Node.js: " + ($report.node.version ?? "not found"))
+$nodeVersion = "not found"
+if ($report.node.version) { $nodeVersion = [string]$report.node.version }
+Write-Host ("Node.js: " + $nodeVersion)
 Write-Host ""
 
 foreach ($name in @("primaryBot", "fleetSupervisor", "lavalink", "lavalink2", "dashboard")) {
   if ($report.processes.Contains($name)) {
     $p = $report.processes[$name]
-    Write-Host ("PROCESS {0}: {1} pid={2} process={3}" -f $name, ($p.alive ? "ALIVE" : "DOWN"), ($p.pid ?? "—"), ($p.process ?? "—"))
+    $processState = "DOWN"
+    if ($p.alive) { $processState = "ALIVE" }
+    $processPid = "—"
+    if ($null -ne $p.pid) { $processPid = [string]$p.pid }
+    $processName = "—"
+    if ($p.process) { $processName = [string]$p.process }
+    Write-Host ("PROCESS {0}: {1} pid={2} process={3}" -f $name, $processState, $processPid, $processName)
   }
 }
 
 $botHealth = $report.services.botHealth
-Write-Host ("BOT HEALTH: http={0} status={1}" -f $botHealth.httpStatus, ($botHealth.ok ? "OK" : "FAIL"))
+$botHealthState = "FAIL"
+if ($botHealth.ok) { $botHealthState = "OK" }
+Write-Host ("BOT HEALTH: http={0} status={1}" -f $botHealth.httpStatus, $botHealthState)
 $managementAuth = $report.services.managementUnauthenticated
-Write-Host ("MANAGEMENT AUTH: expected=401 actual={0} status={1}" -f $managementAuth.actualStatus, ($managementAuth.ok ? "OK" : "FAIL"))
-Write-Host ("FLEET AUTHENTICATED: {0} identities={1}" -f ($report.fleet.authenticated ? "YES" : "NO"), @($report.fleet.identities).Count)
+$managementAuthState = "FAIL"
+if ($managementAuth.ok) { $managementAuthState = "OK" }
+Write-Host ("MANAGEMENT AUTH: expected=401 actual={0} status={1}" -f $managementAuth.actualStatus, $managementAuthState)
+$fleetAuthState = "NO"
+if ($report.fleet.authenticated) { $fleetAuthState = "YES" }
+Write-Host ("FLEET AUTHENTICATED: {0} identities={1}" -f $fleetAuthState, @($report.fleet.identities).Count)
 
 foreach ($name in @("dashboard", "lavalink1", "lavalink2")) {
   if ($report.services.Contains($name)) {
     $s = $report.services[$name]
-    Write-Host ("SERVICE {0}: {1} http={2}" -f $name, ($s.ok ? "OK" : "FAIL"), $s.httpStatus)
+    $serviceState = "FAIL"
+    if ($s.ok) { $serviceState = "OK" }
+    Write-Host ("SERVICE {0}: {1} http={2}" -f $name, $serviceState, $s.httpStatus)
   }
 }
 
