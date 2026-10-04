@@ -2482,6 +2482,17 @@ export function validateAutomationPayload(
           throw new RequestInputError("invalid_role_action", 400);
         }
         break;
+      case "kick":
+        if (
+          typeof item.userId !== "string" ||
+          (item.userId !== "@event" && !/^\d{17,20}$/.test(item.userId)) ||
+          typeof item.reason !== "string" ||
+          !item.reason.length ||
+          item.reason.length > 500
+        ) {
+          throw new RequestInputError("invalid_kick_action", 400);
+        }
+        break;
       case "ban":
         if (
           typeof item.userId !== "string" ||

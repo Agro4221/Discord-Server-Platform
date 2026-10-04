@@ -229,3 +229,38 @@ test("Automation ban action bans a bannable member with a rendered reason", asyn
   ], { type: "member.join", guildId: "guild-1", userId: "user-1" });
   assert.deepEqual(calls, ["Rule for user-1"]);
 });
+
+
+test("Automation kick action validates target and reason", () => {
+  assert.doesNotThrow(() => validateAutomationRule("member.join", [], [
+    { type: "kick", userId: "@event", reason: "Rule kick" }
+  ]));
+  assert.throws(() => validateAutomationRule("member.join", [], [
+    { type: "kick", userId: "bad", reason: "Rule kick" }
+  ]), /invalid_kick_action/);
+});
+
+test("Automation kick action kicks a kickable member with a rendered reason", async () => {
+  const calls: string[] = [];
+  const engine = new AutomationEngine({} as never);
+  const state = engine as unknown as {
+    perform: (actions: unknown[], event: { type: "member.join"; guildId: string; userId: string }) => Promise<void>;
+    client: { guilds: { cache: Map<string, { members: { fetch: (userId: string) => Promise<unknown> } } } };
+  };
+  state.client = {
+    guilds: {
+      cache: new Map([["guild-1", {
+        members: {
+          fetch: async () => ({
+            kickable: true,
+            kick: async (reason: string) => calls.push(reason)
+          })
+        }
+      }]])
+    }
+  };
+  await state.perform([
+    { type: "kick", userId: "@event", reason: "Kick {userId}" }
+  ], { type: "member.join", guildId: "guild-1", userId: "user-1" });
+  assert.deepEqual(calls, ["Kick user-1"]);
+});

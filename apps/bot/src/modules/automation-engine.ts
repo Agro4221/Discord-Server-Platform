@@ -764,6 +764,16 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
+        if (action.type === "kick") {
+          const guild = client?.guilds.cache.get(event.guildId);
+          const userId = resolveUserReference(action.userId, event.userId);
+          const member = userId ? await guild?.members.fetch(userId).catch(() => null) : null;
+          if (member?.kickable) {
+            await member.kick(renderTemplate(action.reason, event));
+          }
+          continue;
+        }
+
         if (action.type === "ban") {
           const guild = client?.guilds.cache.get(event.guildId);
           const userId = resolveUserReference(action.userId, event.userId);
@@ -929,6 +939,11 @@ export function validateAutomationRule(
       case "add-role":
       case "remove-role":
         if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !/^\d{17,20}$/.test(action.roleId)) throw new Error("invalid_role_action");
+        break;
+      case "kick":
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !action.reason || action.reason.length > 500) {
+          throw new Error("invalid_kick_action");
+        }
         break;
       case "ban":
         if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !action.reason || action.reason.length > 500) {
