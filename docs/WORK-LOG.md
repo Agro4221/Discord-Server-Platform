@@ -706,3 +706,10 @@ Never write credentials, tokens or private user data here.
 - Added a 100-track safety cap for one search result.
 - Auto provider mode now falls back from YouTube text search to YouTube Music and SoundCloud when needed.
 - Slash, prefix and Dashboard playback paths share the same search/queue behavior.
+
+## 2026-10-04 — Music queue management checkpoint
+- Added remove, move and clear operations for the upcoming Music queue.
+- Slash command /music now exposes queue remove/move/clear; prefix mode supports !music remove/move/clear.
+- Management API validates and forwards the new queue operations.
+- Dashboard exposes queue clear, per-item remove and queue reordering.
+- Added regression coverage for user-facing queue position normalization.

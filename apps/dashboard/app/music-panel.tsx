@@ -49,6 +49,8 @@ export function MusicPanel({
   const [provider, setProvider] = useState<MusicProvider>("auto");
   const [voiceChannelId, setVoiceChannelId] = useState("");
   const [seek, setSeek] = useState("");
+  const [moveFrom, setMoveFrom] = useState("");
+  const [moveTo, setMoveTo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -74,7 +76,7 @@ export function MusicPanel({
   }, [guildId]);
 
   async function control(
-    action: "play" | "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay",
+    action: "play" | "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay" | "remove" | "move" | "clear",
     input: Record<string, unknown> = {}
   ) {
     setBusy(true);
@@ -185,6 +187,7 @@ export function MusicPanel({
           <ActionButton disabled={busy || !state.current} onClick={() => void control("skip")}>Следующий</ActionButton>
           <ActionButton disabled={busy || !state.current} onClick={() => void control("stop")}>Стоп</ActionButton>
           <ActionButton disabled={busy || state.queue.length < 2} onClick={() => void control("shuffle")}>Перемешать</ActionButton>
+          <ActionButton disabled={busy || state.queue.length === 0} onClick={() => void control("clear")}>Очистить очередь</ActionButton>
           <select
             value={state.repeatMode}
             disabled={busy}
@@ -195,6 +198,16 @@ export function MusicPanel({
             <option value="track">Repeat: track</option>
             <option value="queue">Repeat: queue</option>
           </select>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "110px 110px auto", gap: 8, alignItems: "center", marginTop: 10 }}>
+          <input value={moveFrom} onChange={(event) => setMoveFrom(event.target.value)} type="number" min={1} max={100} placeholder="От #" style={inputStyle} />
+          <input value={moveTo} onChange={(event) => setMoveTo(event.target.value)} type="number" min={1} max={100} placeholder="К #" style={inputStyle} />
+          <button type="button" disabled={busy || state.queue.length < 2} onClick={() => {
+            void control("move", { from: Number(moveFrom), to: Number(moveTo) });
+            setMoveFrom("");
+            setMoveTo("");
+          }} style={button("secondary")}>Переместить</button>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 120px auto", gap: 8, alignItems: "center", marginTop: 10 }}>
@@ -241,13 +254,14 @@ export function MusicPanel({
         ) : (
           <div style={{ display: "grid", gap: 1 }}>
             {state.queue.map((track, index) => (
-              <div key={index + track.title} style={{ padding: "8px 0", borderBottom: "1px solid #1d232d", display: "grid", gridTemplateColumns: "35px minmax(0,1fr) 80px", gap: 8, alignItems: "center" }}>
+              <div key={index + track.title} style={{ padding: "8px 0", borderBottom: "1px solid #1d232d", display: "grid", gridTemplateColumns: "35px minmax(0,1fr) 80px 70px", gap: 8, alignItems: "center" }}>
                 <span style={{ color: "#667285", fontSize: 10 }}>#{index + 1}</span>
                 <div>
                   <div style={{ color: "#d5dbe5", fontSize: 11 }}>{track.title}</div>
                   <div style={{ color: "#657082", fontSize: 9, marginTop: 2 }}>{track.author}</div>
                 </div>
                 <span style={{ color: "#697487", fontSize: 10, textAlign: "right" }}>{formatDuration(track.durationMs)}</span>
+                <button type="button" disabled={busy} onClick={() => void control("remove", { value: index + 1 })} style={button("secondary")}>Удалить</button>
               </div>
             ))}
           </div>

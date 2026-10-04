@@ -491,3 +491,8 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ Multi-track result enqueue and 100-track bounding are covered.
 - ✅ Auto provider fallback ordering is covered.
 - ⚠ Actual provider availability and playlist loading remain live Lavalink/provider gates.
+
+## 2026-10-04 — Music queue management verification
+- ✅ User-facing 1-based queue position validation is covered.
+- ✅ Management API and Dashboard expose remove/move/clear.
+- ⚠ Actual Lavalink queue mutation still requires live Discord/Lavalink acceptance.

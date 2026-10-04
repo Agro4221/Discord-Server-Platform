@@ -15,6 +15,8 @@ import {
   normalizeMusicSearchProvider,
   shouldAutoplayAfterQueueEnd,
   buildMusicSearchCandidates,
+  normalizeMusicQueuePosition,
+  normalizeMusicQueueMove,
   selectMusicEnqueueTracks,
   MAX_MUSIC_ENQUEUE_TRACKS
 } from "../src/modules/music.js";
@@ -191,4 +193,14 @@ test("Music queue selection enqueues complete search results up to the safety ca
   assert.deepEqual(selectMusicEnqueueTracks(["a", "b", "c"], 2), ["a", "b"]);
   assert.equal(selectMusicEnqueueTracks(Array.from({ length: 150 }, (_, i) => i)).length, MAX_MUSIC_ENQUEUE_TRACKS);
   assert.equal(MAX_MUSIC_ENQUEUE_TRACKS, 100);
+});
+
+test("Music queue position helpers validate 1-based user positions", () => {
+  assert.equal(normalizeMusicQueuePosition(1, 3), 0);
+  assert.equal(normalizeMusicQueuePosition(3, 3), 2);
+  assert.equal(normalizeMusicQueuePosition(0, 3), null);
+  assert.equal(normalizeMusicQueuePosition(4, 3), null);
+  assert.deepEqual(normalizeMusicQueueMove(1, 3, 3), { from: 0, to: 2 });
+  assert.equal(normalizeMusicQueueMove(2, 2, 3), null);
+  assert.equal(normalizeMusicQueueMove(1, 4, 3), null);
 });

@@ -510,3 +510,6 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-04 — Music playlist/search breadth
 - Multi-track Music search results are preserved up to a bounded 100-track queue insertion limit.
 - Auto text search can fall back across the built-in YouTube, YouTube Music and SoundCloud sources.
+
+## 2026-10-04 — Music queue management
+- Music now has explicit upcoming-queue remove, move and clear controls across Core, Dashboard, Management API and Discord commands.
