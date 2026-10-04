@@ -581,3 +581,12 @@ Never write credentials, tokens or private user data here.
 ### Next concrete work
 - Finalize live release-gate prerequisites: Discord permission/hierarchy checklist, Lavalink node-loss/expiry acceptance, Windows/Docker multi-bot runtime and soak/chaos/recovery.
 - Then perform the remaining release-readiness audit without reopening verified module contracts.
+
+
+## 2026-10-04 — Local shutdown failure propagation checkpoint
+- `scripts/start-local.ps1 -Down` now preserves and returns failures from both Fleet reconciliation cleanup and `docker compose down` instead of always exiting successfully.
+- This closes the local lifecycle reporting chain after the reconciler itself was hardened to propagate remove/start failures.
+- CI run #1699 passed the complete automated pipeline on commit `149d6ea598427d6ded426baa8b0624ca333bf2bd`.
+### Next concrete work
+- Static release-gate audit: command/permission contracts, health/readiness semantics, clean shutdown, deployment contract consistency and live-test boundaries.
+- Live acceptance remains external: real Discord permissions/hierarchy, Lavalink/node loss, Windows/Docker multi-bot runtime, soak/chaos/recovery.

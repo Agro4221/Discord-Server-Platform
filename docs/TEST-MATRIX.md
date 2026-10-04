@@ -354,3 +354,11 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ CI #1697 passed the complete automated pipeline.
 - ⚠ Real simultaneous Lavalink node reconnect/cold-start behavior remains a live acceptance case.
 - ☐ Next: live release-gate prerequisites and operational acceptance.
+
+
+## 2026-10-04 — Local shutdown verification
+- ✅ `start-local.ps1 -Down` preserves Fleet reconciler failure status.
+- ✅ `start-local.ps1 -Down` propagates Compose shutdown failure when Fleet cleanup succeeds.
+- ✅ CI #1699 passed all automated checks, 105/105 bot tests and all builds.
+- ⚠ Actual Docker Desktop shutdown-failure injection remains live acceptance.
+- ☐ Next: static release-gate audit and live-test boundary cleanup.

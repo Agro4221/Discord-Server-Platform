@@ -414,3 +414,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-04 — Music recovery concurrency checkpoint
 - Lavalink resumed-player restoration and PostgreSQL cold reconciliation now share a per-guild recovery gate, eliminating duplicate recovery races within a process.
 - CI #1697 passed typecheck, bot tests and all builds/contracts; latest verified code: `345683759b315b0d775fc0752515b11b693a04fb`.
+
+
+## 2026-10-04 — Local shutdown failure propagation checkpoint
+- Local launcher shutdown now propagates Fleet reconciler and Docker Compose cleanup failures through its process exit code.
+- CI #1699 verified the complete pipeline; latest verified code: `149d6ea598427d6ded426baa8b0624ca333bf2bd`.
