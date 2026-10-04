@@ -21,6 +21,7 @@ import { RolePanelsEditor } from "./role-panels-editor";
 import { FormsPanel } from "./forms-panel";
 import { OnboardingPanel } from "./onboarding-panel";
 import { ModuleActivityPanel } from "./module-activity-panel";
+import { ConfigPresetsPanel } from "./config-presets-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -1836,6 +1837,10 @@ function SystemPage(props: { guildId: string; health: Health; audit: AuditEvent[
       <section style={{ ...panel, padding: 20 }}>
         <SectionHeader title="Bot Fleet" eyebrow="IDENTITIES" />
         <FleetPanel guildId={props.guildId} onChanged={props.onAudit} />
+      </section>
+      <section style={{ ...panel, padding: 20 }}>
+        <SectionHeader title="Server Presets" eyebrow="CONFIGURATION SNAPSHOTS" />
+        <ConfigPresetsPanel guildId={props.guildId} onChanged={props.onAudit} />
       </section>
       <section style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 14 }}>
         <div style={{ ...panel, padding: 20 }}>
