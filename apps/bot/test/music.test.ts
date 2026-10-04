@@ -4,6 +4,7 @@ import {
   buildMusicSearch,
   canControlMusic,
   isMusicFailoverDebugEvent,
+  musicPlayerNodeId,
   musicNodeHealth,
   normalizeMusicRepeatMode,
   normalizeMusicSearchProvider,
@@ -79,4 +80,12 @@ test("Music failover debug filtering covers migration success and failure events
   assert.equal(isMusicFailoverDebugEvent(DebugEvents.PlayerChangeNodeFailNoEligibleNode), true);
   assert.equal(isMusicFailoverDebugEvent(DebugEvents.PlayerDestroyFail), true);
   assert.equal(isMusicFailoverDebugEvent(DebugEvents.QueueEnded), false);
+});
+
+
+test("Music player node identity helper is safe for missing and invalid node metadata", () => {
+  assert.equal(musicPlayerNodeId({ node: { id: "node-a" } }), "node-a");
+  assert.equal(musicPlayerNodeId({ node: null }), null);
+  assert.equal(musicPlayerNodeId({}), null);
+  assert.equal(musicPlayerNodeId({ node: { id: "" } }), null);
 });

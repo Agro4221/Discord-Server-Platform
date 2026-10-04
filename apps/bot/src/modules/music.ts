@@ -294,6 +294,7 @@ export class Music implements PlatformModule {
     this.manager.nodeManager.on("disconnect", (node, reason) => {
       this.connectedNodes.delete(node.id);
       this.publishNodeHealth();
+      void this.persistPlayersForDisconnectedNode(node.id);
       logger.warn("Lavalink node disconnected", {
         node: node.id,
         reason: String(reason)
@@ -1229,6 +1230,29 @@ export class Music implements PlatformModule {
     }
   }
 
+  private async persistPlayersForDisconnectedNode(nodeId: string): Promise<void> {
+    const players = [...(this.manager?.players.values() ?? [])]
+      .filter((player) => musicPlayerNodeId(player) === nodeId);
+    if (!players.length) return;
+
+    const results = await Promise.allSettled(players.map((player) => this.persistPlayer(player)));
+    const failed = results.filter((result) => result.status === "rejected").length;
+    if (failed) {
+      logger.warn("Failed to persist Music players during Lavalink node disconnect", {
+        node: nodeId,
+        identity: this.config.botIdentityId,
+        playerCount: players.length,
+        failed
+      });
+    } else {
+      logger.info("Persisted Music players during Lavalink node disconnect", {
+        node: nodeId,
+        identity: this.config.botIdentityId,
+        playerCount: players.length
+      });
+    }
+  }
+
   private async autoplayEnabled(guildId: string): Promise<boolean> {
     const result = await this.db.query<{ autoplay: boolean }>(
       "SELECT autoplay FROM music_settings WHERE guild_id=$1",
@@ -1419,6 +1443,11 @@ export class Music implements PlatformModule {
   }
 }
 
+
+export function musicPlayerNodeId(player: { node?: { id?: string } | null }): string | null {
+  const id = player.node?.id;
+  return typeof id === "string" && id.length > 0 ? id : null;
+}
 
 export function isMusicFailoverDebugEvent(eventKey: DebugEvents): boolean {
   return eventKey === DebugEvents.PlayerChangeNode ||
