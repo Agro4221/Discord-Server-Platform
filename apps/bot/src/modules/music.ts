@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
@@ -46,6 +47,43 @@ export function nextMusicQueueRepeatMode(mode: MusicRepeatMode): MusicRepeatMode
 export function clampMusicVolume(value: number): number {
   return Math.min(200, Math.max(0, Math.round(value)));
 }
+export function buildMusicQueueExport(tracks: Track[]): string {
+  return JSON.stringify({
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    tracks: tracks.map((track, index) => ({
+      position: index + 1,
+      identifier: track.info.identifier,
+      title: track.info.title,
+      author: track.info.author ?? null,
+      durationMs: Number(track.info.duration ?? 0),
+      uri: (track.info as typeof track.info & { uri?: string | null }).uri ?? null,
+      requesterId: typeof track.requester?.id === "string" ? track.requester.id : null
+    }))
+  }, null, 2);
+}
+
+export function buildMusicQueueShare(tracks: Track[]): string {
+  const lines = tracks.map((track, index) => {
+    const requester = typeof track.requester?.id === "string" ? " · <@" + track.requester.id + ">" : "";
+    const uri = (track.info as typeof track.info & { uri?: string | null }).uri;
+    const target = uri ? " — " + uri : "";
+    return (index + 1) + ". **" + track.info.title + "** — " + (track.info.author ?? "Unknown artist") + requester + target;
+  });
+  const full = "📋 **Music Queue — " + tracks.length + " трек(ов)**\n" + lines.join("\n");
+  if (full.length <= 1900) return full;
+  const visible: string[] = [];
+  let length = 45;
+  for (const line of lines) {
+    if (length + line.length + 1 > 1750) break;
+    visible.push(line);
+    length += line.length + 1;
+  }
+  const remaining = tracks.length - visible.length;
+  return "📋 **Music Queue — " + tracks.length + " трек(ов)**\n" + visible.join("\n") +
+    "\n… и ещё **" + remaining + "**. Используй export для полной очереди.";
+}
+
 export function isValidMusicSearchSelection(index: number, length: number): boolean {
   return Number.isInteger(index) && index >= 0 && index < length;
 }
@@ -1595,6 +1633,24 @@ export class Music implements PlatformModule {
     }
 
     const action = interaction.options.getString("action") ?? "view";
+    if (action === "export" || action === "share") {
+      const tracks = player.queue.tracks;
+      if (!tracks.length) {
+        await interaction.reply({ content: "Очередь пуста.", ephemeral: true });
+        return;
+      }
+      if (action === "share") {
+        await interaction.reply({ content: buildMusicQueueShare(player.queue.tracks), ephemeral: true });
+      } else {
+        const payload = buildMusicQueueExport(player.queue.tracks);
+        await interaction.reply({
+          content: "📦 Полная очередь экспортирована в JSON.",
+          files: [new AttachmentBuilder(Buffer.from(payload, "utf8"), { name: "vexa-music-queue.json" })],
+          ephemeral: true
+        });
+      }
+      return;
+    }
     if (action !== "view") {
       const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
       if (!await this.canManageMusicMember(interaction.guildId!, member)) {
