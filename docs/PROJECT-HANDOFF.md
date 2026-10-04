@@ -527,3 +527,8 @@ Live validation, требующая пользовательского окру�
 - Analytics visible counters and retention/history configuration are complete and CI-verified (CI #1926).
 - Next single module: **Tickets / linked-related panels**.
 - Continue on `feature/music-v2`; do not reopen completed Analytics configuration work.
+
+### 2026-10-05 — Current checkpoint after Ticket Panels
+- Ticket linked/related panels are complete and CI-verified (#1949).
+- Next single module: **Custom member rewards / milestones**.
+- Do not reopen completed Ticket Panels or Analytics/Integration work.
