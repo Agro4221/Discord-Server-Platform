@@ -419,3 +419,9 @@ Never write credentials, tokens or private user data here.
 ### 2026-10-04 — Welcome/Verification operational preview
 - Welcome now exposes a Dashboard-safe preview action that renders the current configured welcome message/embed without assigning roles or touching a real member.
 - Verification panel copy (title, description and both button labels) is now persisted and configurable from the generic Dashboard settings and `/verify setup`.
+\n\n### 2026-10-04 — Universal Forms
+- Added a first-class `forms` module for server owners: persistent form definitions with up to five short/paragraph fields, required/min/max validation and bounded labels/placeholders.
+- Dashboard now provides form CRUD, channel selection, enable/disable, field editing and panel publishing.
+- Discord exposes `/form publish`; public users launch the saved form through a button and submit answers through a Discord Modal.
+- Answers are persisted separately and can be delivered to a configured response channel; configuration participates in export/import.
+- Generic select-menu tooling remains outside this increment.
