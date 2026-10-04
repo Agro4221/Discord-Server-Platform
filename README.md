@@ -11,7 +11,7 @@ Self-hosted Discord server platform for administration, moderation, community fe
 - Health/readiness endpoint and Gateway connection supervision.
 - Durable audit logging.
 - Protected local Management API.
-- Next.js Control Center with authenticated sessions, functional navigation, module settings, capability/function index, import/export and backup management.
+- Next.js local Control Center without end-user login, with functional navigation, module settings, capability/function index, Bot Fleet management, import/export and backup management.
 - Moderation with case history, warnings, timeout, kick, ban and unban.
 - Temporary Voice with ownership, idempotency and restart reconciliation.
 - AutoMod, Welcome, Verification and Leveling.
@@ -40,7 +40,7 @@ Self-hosted Discord server platform for administration, moderation, community fe
 | Security | ✅ | Persistent incident lifecycle, quarantine recovery and manual clear implemented; live validation remains |
 | Automation | ✅ | Expanded event catalog and bounded execution guard implemented; live validation remains |
 | Music | 🟡 | More providers and multi-node failover validation |
-| Multi-bot fleet | 🟡 | Full orchestration beyond automatic stale-guild failover |
+| Multi-bot fleet | 🟡 | Live Windows/Docker acceptance; launcher orchestration and DB-backed credentials implemented |
 | E2E / chaos / soak | 🟡 | Full live and long-running validation |
 | VPS deployment | 🟡 | Clean-host installer/reverse-proxy acceptance drill |
 | Windows UX | 🟡 | Real launcher/browser behavior validation |

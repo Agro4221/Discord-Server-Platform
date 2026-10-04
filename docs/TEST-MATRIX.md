@@ -182,3 +182,9 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Secondary container lifecycle is driven by registered Bot Identity metadata and stored-credential presence.
 - ✅ Cleanup path removes disabled/unregistered secondary containers.
 - ⚠ Actual Windows/Docker Desktop multi-bot runtime remains a live local acceptance test.
+
+
+## 2026-10-04 — Local Fleet orchestration CI verification
+- ✅ CI run #1592 passed the complete automated pipeline.
+- ✅ Fleet launcher/reconciler contract validation passed.
+- ⚠ Real multi-bot Windows/Docker runtime and Discord Gateway behavior still require live acceptance with user-owned bot credentials.

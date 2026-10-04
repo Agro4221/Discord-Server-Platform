@@ -274,3 +274,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Secondary containers use BOT_IDENTITY_ID only; credential lookup remains PostgreSQL-backed, so plaintext Discord tokens are not passed through the launcher.
 - Disabled or removed identities are cleaned up by the reconciler.
 - This is local process/container orchestration; VPS deployment remains a separate future topology concern.
+
+
+## 2026-10-04 — Local Fleet orchestration CI verified
+- Development head: `03ad5eec1c186b4a76af0cf7c7775457ba3bf4d4`.
+- CI run #1592 passed the full automated pipeline: source/deployment/observability contracts, bot typecheck/tests/build, domain build and Dashboard production build.
+- Local launcher now reconciles enabled secondary identities with stored credentials into separate `dsp-bot-fleet-*` containers.
+- Live Windows/Docker Desktop execution with real Discord identities remains the environment-dependent acceptance gate.
