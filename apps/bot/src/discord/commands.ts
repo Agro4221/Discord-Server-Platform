@@ -166,7 +166,13 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
     new SlashCommandBuilder()
       .setName("play")
       .setDescription("Play a track or playlist")
-      .addStringOption((o) => o.setName("query").setDescription("Song, URL or playlist").setMaxLength(2000).setRequired(true)),
+      .addStringOption((o) => o.setName("query").setDescription("Song, URL or playlist").setMaxLength(2000).setRequired(true))
+      .addStringOption((o) => o.setName("provider").setDescription("Search source").addChoices(
+        { name: "Auto", value: "auto" },
+        { name: "YouTube", value: "youtube" },
+        { name: "YouTube Music", value: "youtube_music" },
+        { name: "SoundCloud", value: "soundcloud" }
+      )),
     new SlashCommandBuilder().setName("pause").setDescription("Pause music"),
     new SlashCommandBuilder().setName("resume").setDescription("Resume music"),
     new SlashCommandBuilder().setName("skip").setDescription("Skip the current track"),
@@ -654,6 +660,12 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .setName("play")
           .setDescription("Play a song or search YouTube")
           .addStringOption((o) => o.setName("query").setDescription("Song, artist, URL or playlist").setMaxLength(2000).setRequired(true))
+          .addStringOption((o) => o.setName("provider").setDescription("Search source").addChoices(
+        { name: "Auto", value: "auto" },
+        { name: "YouTube", value: "youtube" },
+        { name: "YouTube Music", value: "youtube_music" },
+        { name: "SoundCloud", value: "soundcloud" }
+      ))
       )
       .addSubcommand((sub) => sub.setName("pause").setDescription("Pause playback"))
       .addSubcommand((sub) => sub.setName("resume").setDescription("Resume playback"))
