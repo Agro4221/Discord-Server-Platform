@@ -432,3 +432,10 @@ Never write credentials, tokens or private user data here.
 - Select menus preserve toggle-style multi-selection, exclusive one-role selection and bounded max-selection behavior; timed role assignments continue to use the existing expiration worker.
 - Dashboard editor and `/roles panel` expose the component choice, while config export/import preserves it.
 - Legacy role panels default to buttons through migration compatibility.
+
+
+### 2026-10-04 — Forms audit hardening
+- Forms CRUD/publish operations keep one audit record per administrative path; Dashboard actions are logged by Management API, while Discord `/form publish` is actor-aware.
+- Successful form submissions are audited without storing answer contents; processing and staff-channel delivery failures are logged and audited separately.
+- Failed panel publication rolls the Discord message back if persistence fails.
+- Corrected Discord snowflake validation and added regression coverage for form-field bounds, duplicate IDs, required/min/max validation and the five-field limit.
