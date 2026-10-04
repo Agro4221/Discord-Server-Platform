@@ -760,11 +760,15 @@ export function securityAuditLogEventType(type: string): AuditLogEvent {
 }
 
 export function securityAuditLookbackCutoff(now: number, windowSeconds: number): number {
-  return now - Math.min(Math.max(windowSeconds, 5), 300) * 1000;
+  return now - clampSecurityWindowSeconds(windowSeconds) * 1000;
 }
 
+export function clampSecurityWindowSeconds(value: number): number {
+  if (!Number.isFinite(value)) return 20;
+  return Math.min(Math.max(Math.trunc(value), 5), 3600);
+}
 
-export export function clampSecurityWindowSeconds(value: number): number {\n  if (!Number.isFinite(value)) return 20;\n  return Math.min(Math.max(Math.trunc(value), 5), 3600);\n}\n\nfunction clampSecurityIncidentDuration(value: number): number {
+function clampSecurityIncidentDuration(value: number): number {
   if (!Number.isFinite(value)) return 300;
   return Math.min(Math.max(Math.trunc(value), 60), 3600);
 }
