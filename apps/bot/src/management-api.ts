@@ -2544,6 +2544,12 @@ export function validateAutomationPayload(
           throw new RequestInputError("invalid_clear_cooldown_key", 400);
         }
         break;
+      case "set-cooldown":
+        if (typeof item.key !== "string" || !item.key.trim() || item.key.length > 100 ||
+            typeof item.durationSeconds !== "number" || !Number.isInteger(item.durationSeconds) || item.durationSeconds < 1 || item.durationSeconds > 86400) {
+          throw new RequestInputError("invalid_set_cooldown_action", 400);
+        }
+        break;
       default:
         throw new RequestInputError("unsupported_automation_action", 400);
     }

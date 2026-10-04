@@ -23,6 +23,7 @@ type Action =
   | { type: "set-channel-topic"; channelId: string; topic: string }
   | { type: "set-channel-name"; channelId: string; name: string }
   | { type: "clear-cooldown"; key: string }
+  | { type: "set-cooldown"; key: string; durationSeconds: number }
   | { type: "log"; message: string };
 
 type Rule = {
@@ -202,6 +203,7 @@ export function AutomationPanel({
       type === "set-channel-topic" ? { type, channelId: "@event", topic: "" } :
       type === "set-channel-name" ? { type, channelId: "@event", name: "" } :
       type === "clear-cooldown" ? { type, key: "" } :
+      type === "set-cooldown" ? { type, key: "", durationSeconds: 60 } :
       { type: "log", message: "" };
     setActions((current) => current.map((item, i) => i === index ? next : item));
   }
@@ -399,6 +401,7 @@ export function AutomationPanel({
               <option value="set-channel-topic">set-channel-topic</option>
               <option value="set-channel-name">set-channel-name</option>
               <option value="clear-cooldown">clear-cooldown</option>
+              <option value="set-cooldown">set-cooldown</option>
               <option value="log">log</option>
             </select>
 
@@ -498,6 +501,13 @@ export function AutomationPanel({
 
             {action.type === "clear-cooldown" && (
               <input value={action.key} maxLength={100} onChange={(e) => updateAction(index, { key: e.target.value })} placeholder="Cooldown key · {userId}" style={inputStyle} />
+            )}
+
+            {action.type === "set-cooldown" && (
+              <div style={actionGrid}>
+                <input value={action.key} maxLength={100} onChange={(e) => updateAction(index, { key: e.target.value })} placeholder="Cooldown key · {userId}" style={inputStyle} />
+                <input type="number" min={1} max={86400} value={action.durationSeconds} onChange={(e) => updateAction(index, { durationSeconds: Number(e.target.value) })} placeholder="Секунд" style={inputStyle} />
+              </div>
             )}
 
             {action.type === "log" && (

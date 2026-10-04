@@ -44,7 +44,8 @@ test("Automation validation covers channel management actions", () => {
     { type: "set-slowmode", channelId: "@event", seconds: 30 },
     { type: "set-channel-topic", channelId: "@event", topic: "Topic {content}" },
     { type: "set-channel-name", channelId: "@event", name: "ticket-{userId}" },
-    { type: "clear-cooldown", key: "welcome-{userId}" }
+    { type: "clear-cooldown", key: "welcome-{userId}" },
+    { type: "set-cooldown", key: "welcome-{userId}", durationSeconds: 60 }
   ]));
   assert.throws(() => validateAutomationRule("message.create", [], [
     { type: "set-slowmode", channelId: "@event", seconds: 21601 }
@@ -83,4 +84,17 @@ test("Automation clear-cooldown action is accepted and validates its key", () =>
   assert.throws(() => validateAutomationRule("message.create", [], [
     { type: "clear-cooldown", key: "" }
   ]), /invalid_clear_cooldown_key/);
+});
+
+
+test("Automation set-cooldown action validates duration bounds", () => {
+  assert.doesNotThrow(() => validateAutomationRule("message.create", [], [
+    { type: "set-cooldown", key: "welcome-{userId}", durationSeconds: 60 }
+  ]));
+  assert.throws(() => validateAutomationRule("message.create", [], [
+    { type: "set-cooldown", key: "welcome", durationSeconds: 0 }
+  ]), /invalid_set_cooldown_action/);
+  assert.throws(() => validateAutomationRule("message.create", [], [
+    { type: "set-cooldown", key: "welcome", durationSeconds: 86401 }
+  ]), /invalid_set_cooldown_action/);
 });
