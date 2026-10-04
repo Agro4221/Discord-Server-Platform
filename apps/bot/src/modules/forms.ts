@@ -198,7 +198,18 @@ export class Forms implements PlatformModule {
         await interaction.reply({ content: "Forms выключены.", ephemeral: true });
         return;
       }
-      await this.open(interaction, interaction.customId.slice("dsp:form:open:".length));
+      try {
+        await this.open(interaction, interaction.customId.slice("dsp:form:open:".length));
+      } catch (error) {
+        logger.error("Form modal opening failed", {
+          guildId: interaction.guild.id,
+          userId: interaction.user.id,
+          error: String(error)
+        });
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "Не удалось открыть форму.", ephemeral: true });
+        }
+      }
       return;
     }
     if (interaction.isModalSubmit() && interaction.customId.startsWith("dsp:form:submit:")) {
@@ -206,7 +217,27 @@ export class Forms implements PlatformModule {
         await interaction.reply({ content: "Forms выключены.", ephemeral: true });
         return;
       }
-      await this.submit(interaction, interaction.customId.slice("dsp:form:submit:".length));
+      try {
+        await this.submit(interaction, interaction.customId.slice("dsp:form:submit:".length));
+      } catch (error) {
+        logger.error("Form submission processing failed", {
+          guildId: interaction.guild.id,
+          userId: interaction.user.id,
+          error: String(error)
+        });
+        await this.auditLog?.record({
+          guildId: interaction.guild.id,
+          actorUserId: interaction.user.id,
+          source: "discord",
+          action: "forms.submission_failed",
+          targetType: "form",
+          targetId: interaction.customId.slice("dsp:form:submit:".length),
+          metadata: { error: String(error) }
+        }).catch((auditError) => logger.warn("Form failure audit delivery failed", { error: String(auditError) }));
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "Не удалось обработать отправку формы.", ephemeral: true });
+        }
+      }
     }
   }
 
@@ -270,8 +301,17 @@ export class Forms implements PlatformModule {
         for (const field of form.fields) {
           embed.addFields({ name: field.label, value: (answers[field.id] || "—").slice(0, 1024) });
         }
-        await channel.send({ embeds: [embed] }).catch((error) => {
+        await channel.send({ embeds: [embed] }).catch(async (error) => {
           logger.warn("Form response delivery failed", { guildId: interaction.guild!.id, form: form.name, error: String(error) });
+          await this.auditLog?.record({
+            guildId: interaction.guild!.id,
+            actorUserId: interaction.user.id,
+            source: "system",
+            action: "forms.response_delivery_failed",
+            targetType: "form",
+            targetId: form.name,
+            metadata: { responseChannelId: form.responseChannelId, error: String(error) }
+          }).catch((auditError) => logger.warn("Form response failure audit delivery failed", { error: String(auditError) }));
         });
       }
     }
