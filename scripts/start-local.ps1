@@ -196,6 +196,7 @@ if ([string]::IsNullOrWhiteSpace($clientId)) {
 
 $generated = @{
   "MANAGEMENT_API_KEY" = 48
+  "BOT_CREDENTIALS_ENCRYPTION_KEY" = 64
   "POSTGRES_PASSWORD" = 24
   "LAVALINK_PASSWORD" = 24
 }

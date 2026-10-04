@@ -10,6 +10,7 @@ export type AppConfig = {
   managementApiHost: string;
   managementApiPort: number;
   managementApiKey: string;
+  botCredentialsEncryptionKey: string;
   databaseUrl: string;
   lavalinkHost: string;
   lavalinkPort: number;
@@ -169,6 +170,7 @@ export function loadConfig(): AppConfig {
     managementApiHost,
     managementApiPort: port("MANAGEMENT_API_PORT", 3002),
     managementApiKey: required("MANAGEMENT_API_KEY"),
+    botCredentialsEncryptionKey: required("BOT_CREDENTIALS_ENCRYPTION_KEY"),
     databaseUrl: required("DATABASE_URL"),
     lavalinkHost: process.env.LAVALINK_HOST ?? "127.0.0.1",
     lavalinkPort: port("LAVALINK_PORT", 2333),

@@ -26,6 +26,7 @@ function baseEnv(): Record<string, string> {
     DISCORD_TOKEN: "token",
     DISCORD_CLIENT_ID: "123456789012345678",
     MANAGEMENT_API_KEY: "management-key",
+    BOT_CREDENTIALS_ENCRYPTION_KEY: "ab".repeat(32),
     DATABASE_URL: "postgresql://localhost/test",
     LAVALINK_PASSWORD: "lavalink-password"
   };

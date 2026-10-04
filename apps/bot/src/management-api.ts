@@ -25,6 +25,7 @@ import type { TemporaryVoice } from "./modules/temporary-voice.js";
 import { CommandPolicyService, COMMAND_DEFINITIONS } from "./command-policy.js";
 import type { StreamAlertPlatform } from "./modules/stream-alerts.js";
 import { BotIdentityRepository } from "./bot-identity.js";
+import type { BotCredentialsService } from "./bot-credentials.js";
 
 type ApiOptions = {
   host: string;
@@ -37,6 +38,7 @@ type ApiOptions = {
   transfer: ConfigTransferService;
   backups: BackupService;
   identities?: BotIdentityRepository;
+  botCredentials?: BotCredentialsService;
   guildAccess?: (guildId: string) => boolean;
   actions: Record<string, (guildId: string) => Promise<unknown>>;
   giveaways?: {
@@ -189,6 +191,81 @@ export class ManagementApiServer {
           const scopedGuild = path.match(/^\/api\/guilds\/([^/]+)/);
           if (scopedGuild && this.options.guildAccess && !this.options.guildAccess(scopedGuild[1] ?? "")) {
             this.json(res, 404, { error: "guild_not_found" });
+            return;
+          }
+
+          if (method === "POST" && path === "/api/fleet/register") {
+            if (!this.options.botCredentials) {
+              this.json(res, 500, { error: "bot_credentials_unavailable" });
+              return;
+            }
+
+            const body = await readJson(req);
+            if (
+              typeof body.identityId !== "string" ||
+              body.identityId.trim().length < 1 ||
+              body.identityId.trim().length > 64 ||
+              typeof body.token !== "string" ||
+              body.token.trim().length < 20 ||
+              body.token.trim().length > 256
+            ) {
+              throw new RequestInputError("invalid_bot_registration", 400);
+            }
+
+            if (body.clientId !== undefined &&
+                (typeof body.clientId !== "string" || !/^\\d{17,20}$/.test(body.clientId))) {
+              throw new RequestInputError("invalid_discord_client_id", 400);
+            }
+
+            if (body.presenceName !== undefined &&
+                body.presenceName !== null &&
+                (typeof body.presenceName !== "string" || body.presenceName.length > 128)) {
+              throw new RequestInputError("invalid_presence_name", 400);
+            }
+
+            if (body.enabled !== undefined && typeof body.enabled !== "boolean") {
+              throw new RequestInputError("invalid_enabled", 400);
+            }
+
+            if (body.failoverEnabled !== undefined && typeof body.failoverEnabled !== "boolean") {
+              throw new RequestInputError("invalid_failover_enabled", 400);
+            }
+
+            const result = await this.options.botCredentials.register({
+              identityId: body.identityId,
+              clientId: body.clientId,
+              token: body.token,
+              presenceName: body.presenceName ?? null,
+              enabled: body.enabled,
+              failoverEnabled: body.failoverEnabled
+            });
+
+            await this.options.auditLog.record({
+              guildId: null,
+              source: "dashboard",
+              action: result.created ? "fleet.identity.registered" : "fleet.identity.credentials.rotated",
+              targetType: "bot-identity",
+              targetId: result.identityId,
+              metadata: {
+                clientId: result.clientId,
+                username: result.username,
+                globalName: result.globalName,
+                credentialConfigured: true
+              }
+            });
+
+            this.json(res, 200, {
+              ok: true,
+              identity: {
+                identityId: result.identityId,
+                clientId: result.clientId,
+                username: result.username,
+                globalName: result.globalName,
+                credentialConfigured: true,
+                updatedAt: result.updatedAt,
+                created: result.created
+              }
+            });
             return;
           }
 

@@ -31,6 +31,7 @@ import { ModuleSettingsRepository } from "./module-settings.js";
 import { AuditLog } from "./audit.js";
 import { PlatformEventBus } from "./events.js";
 import { BotIdentityRepository } from "./bot-identity.js";
+import { BotCredentialsService } from "./bot-credentials.js";
 import { ConfigTransferService } from "./config-transfer.js";
 import { BackupService } from "./backup.js";
 import { CustomCommandService } from "./custom-commands.js";
@@ -51,6 +52,7 @@ async function main(): Promise<void> {
   const auditLog = new AuditLog(database);
   const dashboardSettings = new DashboardSettingsService(database);
   const identities = new BotIdentityRepository(database, config.botIdentityId);
+  const botCredentials = new BotCredentialsService(database, config.botCredentialsEncryptionKey);
   const transfer = new ConfigTransferService(database);
   const backups = new BackupService(
     database,
@@ -70,6 +72,7 @@ async function main(): Promise<void> {
     await database.ping();
     await migrate(database);
     await identities.ensureIdentity(config.botIdentityId, config.discordClientId);
+    await botCredentials.bootstrapFromEnvironment(config.botIdentityId, config.discordToken);
     await identities.refreshAssignments();
     health.set({ database: "ready" });
     await identities.heartbeat("starting", 0).catch((error) => {
@@ -259,6 +262,7 @@ async function main(): Promise<void> {
         ? client.guilds.cache.has(guildId)
         : identities.ownsGuild(guildId),
     identities,
+    botCredentials,
     moduleSettings,
     auditLog,
     settings: dashboardSettings,

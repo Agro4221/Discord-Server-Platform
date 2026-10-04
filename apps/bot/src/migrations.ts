@@ -787,7 +787,24 @@ const migrations = [
       "ALTER TABLE logging_settings ADD COLUMN IF NOT EXISTS channel_update boolean NOT NULL DEFAULT true;",
       "ALTER TABLE logging_settings ADD COLUMN IF NOT EXISTS role_update boolean NOT NULL DEFAULT true;"
     ])
-  }] as const;
+  }  ,{
+    version: 46,
+    name: "bot_credentials",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS bot_credentials (",
+      "  bot_identity_id text PRIMARY KEY REFERENCES bot_identities(id) ON DELETE CASCADE,",
+      "  token_ciphertext text NOT NULL,",
+      "  token_iv text NOT NULL,",
+      "  token_auth_tag text NOT NULL,",
+      "  token_fingerprint text NOT NULL,",
+      "  username text,",
+      "  global_name text,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");"
+    ])
+  }
+] as const;
 
 export async function migrate(db: Database): Promise<void> {
   await db.query(q([

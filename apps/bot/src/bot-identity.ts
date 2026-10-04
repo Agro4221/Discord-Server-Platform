@@ -14,6 +14,7 @@ export type BotFleetRecord = BotIdentityRecord & {
   status: "starting" | "ready" | "degraded" | "stopped";
   lastSeenAt: string | null;
   guildCount: number;
+  credentialConfigured: boolean;
 };
 
 export class BotIdentityRepository {
@@ -47,10 +48,12 @@ export class BotIdentityRepository {
       status: BotFleetRecord["status"] | null;
       last_seen_at: string | null;
       guild_count: string;
+      credential_configured: boolean;
     }>(
       `SELECT bi.id,bi.client_id,bi.enabled,bi.failover_enabled,bi.presence_name,
               bh.status,bh.last_seen_at,
-              COALESCE(bh.guild_count, 0) AS guild_count
+              COALESCE(bh.guild_count, 0) AS guild_count,
+              EXISTS (SELECT 1 FROM bot_credentials bc WHERE bc.bot_identity_id=bi.id) AS credential_configured
          FROM bot_identities bi
          LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=bi.id
         ORDER BY bi.id`
@@ -64,7 +67,8 @@ export class BotIdentityRepository {
       connected: row.status === "ready",
       status: row.status ?? "stopped",
       lastSeenAt: row.last_seen_at,
-      guildCount: Number(row.guild_count)
+      guildCount: Number(row.guild_count),
+      credentialConfigured: row.credential_configured
     }));
   }
 
