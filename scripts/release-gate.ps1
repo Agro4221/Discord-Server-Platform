@@ -42,6 +42,12 @@ Write-Host ""
 & docker compose ps
 Assert-Ok ($LASTEXITCODE -eq 0) "Docker Compose project is reachable"
 
+$runningServices = @(& docker compose ps --services 2>$null)
+Assert-Ok ($LASTEXITCODE -eq 0) "Docker Compose service inventory is available"
+foreach ($service in @("postgres", "lavalink", "lavalink2", "bot", "dashboard")) {
+  Assert-Ok ($runningServices -contains $service) ("Docker Compose service is running: " + $service)
+}
+
 $health = Get-Json ("http://127.0.0.1:" + $healthPort + "/health")
 Assert-Ok ($health.status -eq "ready") "Bot health status is ready"
 Assert-Ok ($health.discord -eq "ready") "Discord Gateway is ready"
@@ -57,6 +63,25 @@ $fleet = Get-Json ("http://127.0.0.1:" + $managementPort + "/api/fleet") $header
 Assert-Ok ($null -ne $fleet.identities) "Fleet endpoint responds with identity state"
 
 $enabledIdentities = @($fleet.identities | Where-Object { $_.enabled -eq $true })
+
+$expectedFleetContainers = @{}
+foreach ($identity in @($fleet.identities)) {
+  if (
+    $identity.id -and
+    $identity.id -ne "primary" -and
+    $identity.enabled -eq $true -and
+    $identity.credentialConfigured -eq $true
+  ) {
+    $expectedFleetContainers["dsp-bot-fleet-$($identity.id)"] = $true
+  }
+}
+
+$runningFleetContainers = @(& docker ps --format "{{.Names}}" 2>$null | Where-Object { $_ -like "dsp-bot-fleet-*" })
+Assert-Ok ($LASTEXITCODE -eq 0) "Docker Fleet container inventory is available"
+foreach ($container in $runningFleetContainers) {
+  Assert-Ok ($expectedFleetContainers.ContainsKey($container)) ("No orphaned Fleet container is running: " + $container)
+}
+
 foreach ($identity in $enabledIdentities) {
   Assert-Ok ($identity.credentialConfigured -eq $true) ("Identity " + $identity.id + " has stored credentials")
   Assert-Ok ($identity.restartRequired -ne $true) ("Identity " + $identity.id + " has no pending restart")

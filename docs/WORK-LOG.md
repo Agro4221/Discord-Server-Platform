@@ -605,7 +605,14 @@ Never write credentials, tokens or private user data here.
 - Fleet reconciliation no longer reports success when the local Management API is unavailable: the reconciler logs the outage and returns exit code 1.
 - This prevents startup/maintenance automation from silently accepting an unreconciled secondary Bot Fleet.
 - Deployment contract now locks the failure-propagation behavior into CI.
-- Fresh CI verification is pending for this checkpoint.
+- CI #1705 passed the complete automated pipeline on commit `3b5206f50cb344d7092937e6add91d7718b01fb5`.
 ### Next concrete work
 - Complete static release-gate audit and operational acceptance boundaries.
 - Live acceptance on the user's Windows/Docker/Discord/Lavalink environment remains the only blocker to the final runtime gate.
+
+
+## 2026-10-04 — Release-gate Fleet hygiene checkpoint
+- Local release gate now verifies all five core Compose services are actually running before proceeding.
+- It also rejects running orphaned `dsp-bot-fleet-*` containers that do not correspond to an enabled, credentialed secondary identity in the Management API.
+- This closes a local split-brain/stale-secondary visibility gap without mutating the Docker stack.
+- Fresh CI verification is pending for this checkpoint.

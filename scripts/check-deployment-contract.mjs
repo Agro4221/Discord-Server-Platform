@@ -68,6 +68,8 @@ for (const contract of [
   "/api/fleet",
   "restartRequired",
   "credentialConfigured",
+  "dsp-bot-fleet-",
+  "Docker Compose service inventory is available",
   "RELEASE GATE PASSED"
 ]) {
   if (!releaseGate.includes(contract)) {

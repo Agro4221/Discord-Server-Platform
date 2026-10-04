@@ -379,3 +379,11 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Deployment contract explicitly checks the fail-closed API outage path.
 - ⚠ Real Management API outage injection on Windows/Docker remains a live acceptance case.
 - ☐ Fresh CI for this checkpoint is pending.
+
+
+## 2026-10-04 — Release-gate Fleet hygiene verification
+- ✅ Release gate checks running state for postgres/lavalink/lavalink2/bot/dashboard.
+- ✅ Release gate rejects orphaned `dsp-bot-fleet-*` containers absent from the enabled + credentialed Fleet identity set.
+- ✅ Deployment contract covers the new read-only checks.
+- ⚠ Live orphan-container and stale-secondary acceptance remains a Windows/Docker runtime test.
+- ☐ Fresh CI for this checkpoint is pending.
