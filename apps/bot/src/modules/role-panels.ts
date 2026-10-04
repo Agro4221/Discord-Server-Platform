@@ -448,6 +448,7 @@ export class RolePanels implements PlatformModule {
     }
 
     const selectionMode = (interaction.options.getString("mode") as RoleSelectionMode | null) ?? "toggle";
+    const componentType = (interaction.options.getString("component") as RolePanelComponentType | null) ?? "buttons";
     const maxSelections = interaction.options.getInteger("max-selections") ?? 1;
     const durationMinutes = interaction.options.getInteger("duration") ?? 0;
     await this.createPanel(guildId,channel.id,unique,"Выберите роли",selectionMode,maxSelections,durationMinutes,{
@@ -468,7 +469,7 @@ export class RolePanels implements PlatformModule {
         const message = await target.send({ content, components });
         return message.id;
       }
-    });
+    }, componentType);
     await interaction.reply({ content: "Панель ролей создана.", ephemeral: true });
   }
 
