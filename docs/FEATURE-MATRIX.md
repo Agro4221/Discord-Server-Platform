@@ -369,7 +369,7 @@ Music должен стремиться к функциональности си
 | Reminders | ✅ |
 | Channel tools / lock / slowmode / cleanup | ✅ |
 | Forms | ✅ | Универсальный Forms-модуль: Dashboard builder, Discord Modal, persistent answers и staff response channel; generic select-menu toolkit remains a separate backlog item.
-| Interactive buttons/selects/modals toolkit | 🟡 |
+| Interactive buttons/selects/modals toolkit | ✅ | Buttons, select menus and Discord modals are implemented across reusable Forms and Role Panels; broader component orchestration remains backlog.
 | Custom help/menu pages | ✅ |
 | Server info / user info / role/channel utility suite | ✅ |
 | AFK / away system | ✅ |
