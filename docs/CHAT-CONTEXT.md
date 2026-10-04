@@ -259,3 +259,8 @@ Audit-log ingestion расширен для:
 - Automation: `set-nickname` and `ban` green.
 - Fleet failover detail/audit changes present.
 - Next work stays on functional breadth.
+
+### 2026-10-05 — Latest verified checkpoint
+- CI #1839: success on Automation moderation breadth.
+- Added and verified Automation `set-nickname` and `ban` actions.
+- Next implementation target remains functional breadth; documentation-only milestones do not replace feature work.
