@@ -2522,20 +2522,25 @@ export class ManagementApiServer {
             if (method === "PUT" && ticketPanelItemMatch) {
               const body = await readJson(req);
               const input: { channelId?: string; title?: string; description?: string; buttonLabel?: string; enabled?: boolean } = {};
-              if (body.channelId !== undefined) input.channelId = body.channelId;
-              if (body.title !== undefined) input.title = body.title;
-              if (body.description !== undefined) input.description = body.description;
-              if (body.buttonLabel !== undefined) input.buttonLabel = body.buttonLabel;
-              if (body.enabled !== undefined) input.enabled = body.enabled;
-
-              if (
-                input.channelId !== undefined && typeof input.channelId !== "string" ||
-                input.title !== undefined && typeof input.title !== "string" ||
-                input.description !== undefined && typeof input.description !== "string" ||
-                input.buttonLabel !== undefined && typeof input.buttonLabel !== "string" ||
-                input.enabled !== undefined && typeof input.enabled !== "boolean"
-              ) {
-                throw new RequestInputError("invalid_ticket_panel", 400);
+              if (body.channelId !== undefined) {
+                if (typeof body.channelId !== "string") throw new RequestInputError("invalid_ticket_panel", 400);
+                input.channelId = body.channelId;
+              }
+              if (body.title !== undefined) {
+                if (typeof body.title !== "string") throw new RequestInputError("invalid_ticket_panel", 400);
+                input.title = body.title;
+              }
+              if (body.description !== undefined) {
+                if (typeof body.description !== "string") throw new RequestInputError("invalid_ticket_panel", 400);
+                input.description = body.description;
+              }
+              if (body.buttonLabel !== undefined) {
+                if (typeof body.buttonLabel !== "string") throw new RequestInputError("invalid_ticket_panel", 400);
+                input.buttonLabel = body.buttonLabel;
+              }
+              if (body.enabled !== undefined) {
+                if (typeof body.enabled !== "boolean") throw new RequestInputError("invalid_ticket_panel", 400);
+                input.enabled = body.enabled;
               }
 
               const panel = await this.options.tickets!.updatePanel(guildId, panelId!, input);
