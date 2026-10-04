@@ -570,3 +570,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Automation Dashboard now has a fully restored builder with strict numeric conditions `number-eq`, `number-gt`, and `number-lt` rendered in ALL and ANY builders.
 - CI #1811 is green on the feature tree.
 - Current documented HEAD: `ed4b68e96dc35e5c7f1379b6974e9521e8d4d949`.
+
+
+## 2026-10-04 — Verified Security / Automation / Fleet breadth
+- Security response depth now includes optional lockdown, executor timeout and executor ban/fallback.
+- Automation now has strict numeric comparisons and named cooldown set/clear controls.
+- AutoMod rule responses include delete, timeout, warn, log and verified ban.
+- Fleet now fails over both guild ownership and stale Music voice assignments.
+- CI #1824 is green on the current feature tree.

@@ -567,3 +567,11 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ Migration 51 adds the Security lockdown setting and durable channel-lock assignments.
 - ✅ Automation Dashboard builder restored to full pre-regression size and strict numeric operators compile successfully.
 - ✅ CI #1811 passed full typecheck, 137 tests and all builds.
+
+
+## 2026-10-04 — Verification snapshot
+- ✅ CI #1824: dependency/audit/source/deployment checks, bot typecheck, tests and all builds passed.
+- ✅ Fleet stale Music assignment takeover is covered by repository tests.
+- ✅ AutoMod ban runtime behavior is covered by repository tests.
+- ✅ Automation cooldown set/clear runtime behavior is covered by repository tests.
+- ⚠ Live Discord hierarchy/permission behavior and full multi-process failover remain release-gate environment checks.

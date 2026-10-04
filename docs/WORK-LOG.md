@@ -822,3 +822,14 @@ Never write credentials, tokens or private user data here.
 
 ### Next concrete work
 - Continue Automation action breadth with named cooldown controls, then return to remaining Music/Fleet/VPS depth and final live/E2E validation.
+
+
+## 2026-10-04 — AutoMod / Automation / Fleet breadth checkpoint
+- CI #1824 passed completely on the Fleet Music failover tree.
+- Automation: named keyed cooldown actions `set-cooldown` and `clear-cooldown` are implemented across Domain, Core, Management API and Dashboard; runtime set→clear regression is green.
+- AutoMod: rule-level `ban` is implemented and verified. Ban deletes the triggering message, requires Discord bannable state, and creates the durable moderation ban case/event only after successful enforcement.
+- Fleet: stale Music voice assignments can now be durably claimed by primary or a failover-enabled secondary through a transactional `FOR UPDATE SKIP LOCKED` takeover that avoids duplicate guild+identity assignments.
+- Current development HEAD: `2f70a1ead925c9774519431e8fcd53210646d87b`.
+
+### Next concrete work
+- Continue Fleet orchestration depth, then remaining Music node/provider failover and VPS production tooling, followed by live/E2E/chaos/soak acceptance.
