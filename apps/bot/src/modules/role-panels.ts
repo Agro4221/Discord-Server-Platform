@@ -2,9 +2,11 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  StringSelectMenuBuilder,
   type ButtonInteraction,
   type ChatInputCommandInteraction,
-  type Message
+  type Message,
+  type StringSelectMenuInteraction
 } from "discord.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
@@ -13,6 +15,7 @@ import { logger } from "../logger.js";
 
 export type PanelRole = { roleId: string; label: string };
 export type RoleSelectionMode = "toggle" | "exclusive" | "max";
+export type RolePanelComponentType = "buttons" | "select";
 export type RolePanelRecord = {
   id: number;
   guildId: string;
@@ -23,11 +26,13 @@ export type RolePanelRecord = {
   selectionMode: RoleSelectionMode;
   maxSelections: number;
   durationMinutes: number;
+  componentType: RolePanelComponentType;
 };
 
+type PanelComponentRow = ActionRowBuilder<ButtonBuilder> | ActionRowBuilder<StringSelectMenuBuilder>;
 type PanelMessageCallbacks = {
   deleteMessage: (channelId: string, messageId: string) => Promise<void>;
-  sendMessage: (channelId: string, content: string, components: ActionRowBuilder<ButtonBuilder>[]) => Promise<string>;
+  sendMessage: (channelId: string, content: string, components: PanelComponentRow[]) => Promise<string>;
 };
 
 export class RolePanels implements PlatformModule {
@@ -67,7 +72,7 @@ export class RolePanels implements PlatformModule {
   }
 
   async list(guildId: string): Promise<RolePanelRecord[]> {
-    const result = await this.db.query<{ id: string; guild_id: string; channel_id: string; message_id: string | null; title: string; roles: PanelRole[]; selection_mode: RoleSelectionMode; max_selections: number; duration_minutes: number }>(
+    const result = await this.db.query<{ id: string; guild_id: string; channel_id: string; message_id: string | null; title: string; roles: PanelRole[]; selection_mode: RoleSelectionMode; max_selections: number; duration_minutes: number; component_type: RolePanelComponentType | null }>(
       "SELECT id,guild_id,channel_id,message_id,title,roles,selection_mode,max_selections,duration_minutes FROM role_panels WHERE guild_id=$1 ORDER BY id DESC",
       [guildId]
     );
@@ -80,7 +85,8 @@ export class RolePanels implements PlatformModule {
       roles: Array.isArray(row.roles) ? row.roles : [],
       selectionMode: row.selection_mode ?? "toggle",
       maxSelections: Math.min(Math.max(Number(row.max_selections ?? 1), 1), 5),
-      durationMinutes: Math.min(Math.max(Number(row.duration_minutes ?? 0), 0), 43200)
+      durationMinutes: Math.min(Math.max(Number(row.duration_minutes ?? 0), 0), 43200),
+      componentType: row.component_type === "select" ? "select" : "buttons"
     }));
   }
 
@@ -146,7 +152,8 @@ export class RolePanels implements PlatformModule {
     selectionMode: RoleSelectionMode = "toggle",
     maxSelections = 1,
     durationMinutes = 0,
-    callbacks?: Pick<PanelMessageCallbacks, "deleteMessage" | "sendMessage">
+    callbacks?: Pick<PanelMessageCallbacks, "deleteMessage" | "sendMessage">,
+    componentType: RolePanelComponentType = "buttons"
   ): Promise<RolePanelRecord> {
     if (!roles.length || roles.length > 5) throw new Error("panel_requires_1_to_5_roles");
     const cleaned = [...new Map(
@@ -159,9 +166,10 @@ export class RolePanels implements PlatformModule {
 
     const normalizedMax = selectionMode === "max" ? Math.min(Math.max(Math.trunc(maxSelections), 1), cleaned.length) : 1;
     const normalizedDuration = Math.min(Math.max(Math.trunc(durationMinutes), 0), 43200);
+    if (!["buttons","select"].includes(componentType)) throw new Error("invalid_role_panel_component");
     const result = await this.db.query<{ id: string }>(
-      "INSERT INTO role_panels(guild_id,channel_id,title,roles,selection_mode,max_selections,duration_minutes) VALUES($1,$2,$3,$4::jsonb,$5,$6,$7) RETURNING id",
-      [guildId,channelId,title.trim().slice(0,100) || "Выберите роли",JSON.stringify(cleaned),selectionMode,normalizedMax,normalizedDuration]
+      "INSERT INTO role_panels(guild_id,channel_id,title,roles,selection_mode,max_selections,duration_minutes,component_type) VALUES($1,$2,$3,$4::jsonb,$5,$6,$7,$8) RETURNING id",
+      [guildId,channelId,title.trim().slice(0,100) || "Выберите роли",JSON.stringify(cleaned),selectionMode,normalizedMax,normalizedDuration,componentType]
     );
     const id = Number(result.rows[0]?.id);
     if (!Number.isSafeInteger(id) || id < 1) throw new Error("role_panel_id_missing");
@@ -175,7 +183,7 @@ export class RolePanels implements PlatformModule {
         publishedMessageId = await callbacks.sendMessage(
           channelId,
           "🎭 **" + panel.title + "**",
-          [this.row(panel.id, panel.roles)]
+          [this.row(panel.id, panel.roles, panel.selectionMode, panel.maxSelections, panel.componentType)]
         );
         await this.db.query(
           "UPDATE role_panels SET message_id=$1 WHERE id=$2 AND guild_id=$3",
@@ -241,6 +249,7 @@ export class RolePanels implements PlatformModule {
       durationMinutes = 0;
     }
     if (!callbacks) throw new Error("role_panel_callbacks_required");
+    if (!["buttons","select"].includes(componentType)) throw new Error("invalid_role_panel_component");
     if (!roles.length || roles.length > 5) throw new Error("panel_requires_1_to_5_roles");
     const cleaned = [...new Map(
       roles
@@ -255,21 +264,21 @@ export class RolePanels implements PlatformModule {
 
     const nextTitle = title.trim().slice(0,100) || "Выберите роли";
     const content = "🎭 **" + nextTitle + "**";
-    const components = [this.row(panelId, cleaned)];
+    const components = [this.row(panelId, cleaned, selectionMode, selectionMode === "max" ? Math.min(Math.max(Math.trunc(maxSelections),1),cleaned.length) : 1, componentType)];
 
     if (current.messageId && current.channelId === channelId) {
       await callbacks.editMessage(current.channelId, current.messageId, content, components);
       try {
         await this.db.query(
-          "UPDATE role_panels SET title=$1,roles=$2::jsonb,selection_mode=$3,max_selections=$4,duration_minutes=$5 WHERE id=$6 AND guild_id=$7",
-          [nextTitle,JSON.stringify(cleaned),selectionMode,selectionMode === "max" ? Math.min(Math.max(Math.trunc(maxSelections),1),cleaned.length) : 1,Math.min(Math.max(Math.trunc(durationMinutes),0),43200),panelId,guildId]
+          "UPDATE role_panels SET title=$1,roles=$2::jsonb,selection_mode=$3,max_selections=$4,duration_minutes=$5,component_type=$6 WHERE id=$7 AND guild_id=$8",
+          [nextTitle,JSON.stringify(cleaned),selectionMode,selectionMode === "max" ? Math.min(Math.max(Math.trunc(maxSelections),1),cleaned.length) : 1,Math.min(Math.max(Math.trunc(durationMinutes),0),43200),componentType,panelId,guildId]
         );
       } catch (error) {
         await callbacks.editMessage(
           current.channelId,
           current.messageId,
           "🎭 **" + current.title + "**",
-          [this.row(panelId, current.roles)]
+          [this.row(panelId, current.roles, current.selectionMode, current.maxSelections, current.componentType)]
         ).catch((rollbackError) => {
           logger.error("Role panel message rollback failed after database update error", {
             guildId,
@@ -284,8 +293,8 @@ export class RolePanels implements PlatformModule {
       const newMessageId = await callbacks.sendMessage(channelId, content, components);
       try {
         await this.db.query(
-          "UPDATE role_panels SET channel_id=$1,title=$2,roles=$3::jsonb,message_id=$4,selection_mode=$5,max_selections=$6,duration_minutes=$7 WHERE id=$8 AND guild_id=$9",
-          [channelId,nextTitle,JSON.stringify(cleaned),newMessageId,selectionMode,selectionMode === "max" ? Math.min(Math.max(Math.trunc(maxSelections),1),cleaned.length) : 1,Math.min(Math.max(Math.trunc(durationMinutes),0),43200),panelId,guildId]
+          "UPDATE role_panels SET channel_id=$1,title=$2,roles=$3::jsonb,message_id=$4,selection_mode=$5,max_selections=$6,duration_minutes=$7,component_type=$8 WHERE id=$9 AND guild_id=$10",
+          [channelId,nextTitle,JSON.stringify(cleaned),newMessageId,selectionMode,selectionMode === "max" ? Math.min(Math.max(Math.trunc(maxSelections),1),cleaned.length) : 1,Math.min(Math.max(Math.trunc(durationMinutes),0),43200),componentType,panelId,guildId]
         );
       } catch (error) {
         await callbacks.deleteMessage(channelId,newMessageId).catch((deleteError) => {
@@ -587,7 +596,26 @@ export class RolePanels implements PlatformModule {
     }
   }
 
-  private row(panelId: number, roles: PanelRole[]) {
+  private row(
+    panelId: number,
+    roles: PanelRole[],
+    selectionMode: RoleSelectionMode = "toggle",
+    maxSelections = 1,
+    componentType: RolePanelComponentType = "buttons"
+  ): PanelComponentRow {
+    if (componentType === "select") {
+      const maxValues = selectionMode === "max"
+        ? Math.min(Math.max(Math.trunc(maxSelections), 1), roles.length)
+        : 1;
+      return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId("dsp:role-select:" + panelId)
+          .setPlaceholder(selectionMode === "max" ? "Выберите роли" : "Выберите роль")
+          .setMinValues(0)
+          .setMaxValues(maxValues)
+          .addOptions(roles.slice(0,5).map((role) => ({ label: role.label.slice(0,100), value: role.roleId })))
+      );
+    }
     return new ActionRowBuilder<ButtonBuilder>().addComponents(
       roles.slice(0,5).map((role) => new ButtonBuilder()
         .setCustomId("dsp:role:" + panelId + ":" + role.roleId)
@@ -597,12 +625,17 @@ export class RolePanels implements PlatformModule {
   }
 
   private async onInteraction(interaction: import("discord.js").Interaction): Promise<void> {
-    if (!interaction.isButton() || !interaction.customId.startsWith("dsp:role:") || !interaction.guild) return;
+    if (!interaction.guild) return;
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith("dsp:role-select:")) {
+      await this.handleSelect(interaction);
+      return;
+    }
+    if (!interaction.isButton() || !interaction.customId.startsWith("dsp:role:")) return;
     const [, , panelRaw, roleId] = interaction.customId.split(":");
     const panelId = Number(panelRaw);
     if (!Number.isSafeInteger(panelId) || !roleId) return;
-    const result = await this.db.query<{ guild_id: string; roles: PanelRole[] | null; selection_mode: RoleSelectionMode; max_selections: number; duration_minutes: number }>(
-      "SELECT guild_id,roles,selection_mode,max_selections,duration_minutes FROM role_panels WHERE id=$1",[panelId]
+    const result = await this.db.query<{ guild_id: string; roles: PanelRole[] | null; selection_mode: RoleSelectionMode; max_selections: number; duration_minutes: number; component_type: RolePanelComponentType | null }>(
+      "SELECT guild_id,roles,selection_mode,max_selections,duration_minutes,component_type FROM role_panels WHERE id=$1",[panelId]
     );
     const row = result.rows[0];
     if (!row || row.guild_id !== interaction.guild.id) { await interaction.reply({ content: "Панель не найдена.", ephemeral: true }); return; }
@@ -654,6 +687,78 @@ export class RolePanels implements PlatformModule {
     }
     await interaction.reply({
       content: "Роль " + role.name + " выдана." + (durationMinutes > 0 ? " Время действия: " + durationMinutes + " мин." : ""),
+      ephemeral: true
+    });
+  private async handleSelect(interaction: StringSelectMenuInteraction): Promise<void> {
+    const panelId = Number(interaction.customId.slice("dsp:role-select:".length));
+    if (!Number.isSafeInteger(panelId)) return;
+    const result = await this.db.query<{
+      guild_id: string;
+      roles: PanelRole[] | null;
+      selection_mode: RoleSelectionMode;
+      max_selections: number;
+      duration_minutes: number;
+      component_type: RolePanelComponentType | null;
+    }>(
+      "SELECT guild_id,roles,selection_mode,max_selections,duration_minutes,component_type FROM role_panels WHERE id=$1",
+      [panelId]
+    );
+    const row = result.rows[0];
+    if (!row || row.guild_id !== interaction.guild!.id || row.component_type !== "select") {
+      await interaction.reply({ content: "Панель не найдена.", ephemeral: true });
+      return;
+    }
+
+    const allowed = new Set((row.roles ?? []).map((entry) => entry.roleId));
+    const selected = [...new Set(interaction.values)].filter((roleId) => allowed.has(roleId));
+    const maxSelections = row.selection_mode === "max"
+      ? Math.min(Math.max(Number(row.max_selections ?? 1), 1), allowed.size || 1)
+      : 1;
+    if (selected.length > maxSelections) {
+      await interaction.reply({ content: "Превышен максимальный выбор ролей.", ephemeral: true });
+      return;
+    }
+
+    const member = await interaction.guild!.members.fetch(interaction.user.id);
+    const bot = interaction.guild!.members.me;
+    if (!bot) {
+      await interaction.reply({ content: "Не удалось проверить role hierarchy.", ephemeral: true });
+      return;
+    }
+
+    const panelRoles = (row.roles ?? [])
+      .map((entry) => interaction.guild!.roles.cache.get(entry.roleId))
+      .filter((role): role is import("discord.js").Role => Boolean(role) && !role.managed && role.position < bot.roles.highest.position);
+
+    let changed = 0;
+    for (const role of panelRoles) {
+      const shouldHave = selected.includes(role.id);
+      const has = member.roles.cache.has(role.id);
+      try {
+        if (shouldHave && !has) {
+          await member.roles.add(role, "Role panel select menu");
+          changed += 1;
+          if (row.duration_minutes > 0) {
+            await this.db.query(
+              "INSERT INTO role_panel_assignments(guild_id,panel_id,user_id,role_id,expires_at) VALUES($1,$2,$3,$4,now()+make_interval(mins => $5)) ON CONFLICT(panel_id,user_id,role_id) DO UPDATE SET expires_at=EXCLUDED.expires_at",
+              [interaction.guild!.id,panelId,interaction.user.id,role.id,Math.min(Math.max(Number(row.duration_minutes),0),43200)]
+            );
+          }
+        } else if (!shouldHave && has) {
+          await member.roles.remove(role, "Role panel select menu");
+          changed += 1;
+          await this.db.query(
+            "DELETE FROM role_panel_assignments WHERE panel_id=$1 AND user_id=$2 AND role_id=$3",
+            [panelId,interaction.user.id,role.id]
+          );
+        }
+      } catch (error) {
+        logger.warn("Role panel select menu role update failed",{guildId:interaction.guild!.id,panelId,userId:interaction.user.id,roleId:role.id,error:String(error)});
+      }
+    }
+
+    await interaction.reply({
+      content: changed ? "✅ Роли обновлены." : "✅ Выбор ролей уже актуален.",
       ephemeral: true
     });
   }
