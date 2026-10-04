@@ -482,6 +482,8 @@ async function main(): Promise<void> {
     },
     notifications: {
       list: async (guildId) => notifications.listFeeds(guildId),
+      createSocial: async (guildId, provider, target, channelId, intervalSeconds, options) =>
+        notifications.addSocialFeed(guildId, provider, target, channelId, intervalSeconds, options),
       create: async (guildId, channelId, url, intervalSeconds, options) =>
         notifications.addFeed(guildId, channelId, url, intervalSeconds, options),
       update: async (guildId, feedId, input) => notifications.updateFeed(guildId, feedId, input),
