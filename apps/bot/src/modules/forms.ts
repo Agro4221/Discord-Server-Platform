@@ -66,15 +66,12 @@ export class Forms implements PlatformModule {
     this.auditLog = undefined;
   }
 
-  async list(guildId: string): Promise<Array<CustomForm & { fieldCount: number }>> {
+  async list(guildId: string): Promise<CustomForm[]> {
     const result = await this.db.query<Record<string, unknown>>(
       "SELECT name,title,description,panel_channel_id,response_channel_id,button_label,enabled,fields FROM custom_forms WHERE guild_id=$1 ORDER BY name",
       [guildId]
     );
-    return result.rows.map((row) => {
-      const form = rowToForm(row);
-      return { ...form, fieldCount: form.fields.length };
-    });
+    return result.rows.map((row) => rowToForm(row));
   }
 
   async get(guildId: string, name: string): Promise<CustomForm | null> {
@@ -272,7 +269,7 @@ function normalizeText(value: unknown, fallback: string, maxLength: number): str
 
 function normalizeId(value: unknown): string | null {
   if (value == null || value === "") return null;
-  if (typeof value !== "string" || !/^\\d{17,20}$/.test(value)) throw new Error("invalid_form_channel");
+  if (typeof value !== "string" || !/^d{17,20}$/.test(value)) throw new Error("invalid_form_channel");
   return value;
 }
 
