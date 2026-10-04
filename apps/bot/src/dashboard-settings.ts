@@ -235,6 +235,7 @@ export const DASHBOARD_SETTINGS_STORAGE: Partial<Record<ModuleKey, StorageSpec>>
       autoQuarantine: "auto_quarantine",
       removeExecutorRoles: "remove_executor_roles",
       executorTimeoutMinutes: "executor_timeout_minutes",
+      executorBanEnabled: "executor_ban_enabled",
       quarantineRoleId: "quarantine_role_id",
       logChannelId: "log_channel_id"
     }
