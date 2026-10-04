@@ -176,7 +176,7 @@ export function AutomationPanel({
     const next: Condition =
       type === "channel-is" ? { type, channelId: "" } :
       type === "matches" ? { type, left: "content", pattern: "" } :
-      type === "number-gte" || type === "number-lte" || type === "number-eq" ? { type, left: "memberCount", right: 0 } :
+      type === "number-gte" || type === "number-lte" || type === "number-eq" || type === "number-gt" || type === "number-lt" ? { type, left: "memberCount", right: 0 } :
       type === "has-role" ? { type, userId: "@event", roleId: "" } :
       type === "cooldown-clear" ? { type, key: "" } :
       { type, left: "content", right: "" };
