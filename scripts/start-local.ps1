@@ -297,6 +297,7 @@ Write-Host ""
 Write-Host "Discord Server Platform is running locally."
 Write-Host "Control Center: $dashboardUrl"
 Write-Host "Bot health:     $healthUrl"
+Write-Host "Discord bot:    register Application / Client ID and Bot Token in Control Center -> Bot Fleet"
 Write-Host ""
 
 if (-not $NoOpen) {
