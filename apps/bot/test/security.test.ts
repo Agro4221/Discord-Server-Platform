@@ -6,6 +6,7 @@ import {
   securityIncidentCooldownUntil,
   securityResponseThreshold,
   clampSecurityIncidentDuration,
+  clampSecurityWindowSeconds,
   securityAuditLogEventType
 } from "../src/modules/security.js";
 import { AuditLogEvent } from "discord.js";
@@ -38,6 +39,14 @@ test("Security executor audit lookback honors configured destructive window", ()
   assert.equal(securityAuditLookbackCutoff(100_000, 999), -200_000);
 });
 
+
+test("Security detection windows are bounded without truncating valid long windows", () => {
+  assert.equal(clampSecurityWindowSeconds(1), 5);
+  assert.equal(clampSecurityWindowSeconds(20), 20);
+  assert.equal(clampSecurityWindowSeconds(3600), 3600);
+  assert.equal(clampSecurityWindowSeconds(7200), 3600);
+  assert.equal(clampSecurityWindowSeconds(Number.NaN), 20);
+});
 
 test("Security incident duration is bounded to safe operator values", () => {
   assert.equal(clampSecurityIncidentDuration(10), 60);
