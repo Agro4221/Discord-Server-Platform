@@ -107,7 +107,7 @@ async function main(): Promise<void> {
   const security = new Security(database);
   const notifications = new Notifications(database);
   const streamAlerts = new StreamAlerts(database, config.streamAlerts, auditLog);
-  const verification = new Verification(database);
+  const verification = new Verification(database, (guildId) => client.guilds.cache.get(guildId));
   const analytics = new Analytics(database);
   const music = new Music(database, config, identities);
   const moderationPresets = new ModerationPresets(database, autoMod, security, moderation);
@@ -376,6 +376,7 @@ async function main(): Promise<void> {
     actions: {
       "temporary-voice.reconcile": async (guildId) => { await temporaryVoice.reconcileGuild(guildId); return { guildId, ok: true }; },
       "welcome.preview": async (guildId) => welcome.sendPreview(guildId),
+      "verification.publish-panel": async (guildId) => verification.publishPanel(guildId),
       "automation.reload": async (guildId) => { await automation.reload(); return { guildId, ok: true }; },
       "security.check-hierarchy": async (guildId) => security.checkHierarchy(guildId)
     }
