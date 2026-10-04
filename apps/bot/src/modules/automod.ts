@@ -6,7 +6,9 @@ import type { AuditLog } from "../audit.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 
-type RecentMessage = { content: string; timestamp: number };\n\ntype AutoModConfig = {
+type RecentMessage = { content: string; timestamp: number };
+
+type AutoModConfig = {
   enabled: boolean;
   blockedWords: string[];
   maxMentions: number;
@@ -422,12 +424,7 @@ export class AutoMod implements PlatformModule {
         windowSeconds: rule.window_seconds
       };
 
-      if (!detectorMatches(
-        normalizedRule,
-        message,
-        recent.map((item) => item.content),
-        config
-      )) {
+      if (!detectorMatches(normalizedRule, message, recent, config)) {
         continue;
       }
 
@@ -719,10 +716,10 @@ function cleanIds(values?: string[]): string[] {
   return [...new Set((values ?? []).filter((value) => /^\d{15,25}$/.test(value)))].slice(0,100);
 }
 
-function detectorMatches(
+export function detectorMatches(
   rule: { detector: string; threshold: number | null; windowSeconds: number | null },
   message: Message,
-  recentMessages: readonly string[] = [],
+  recentMessages: readonly RecentMessage[] = [],
   config?: AutoModConfig
 ): boolean {
   const content = message.content;
@@ -758,7 +755,13 @@ function detectorMatches(
     case "honeypot":
       return true;
     case "repeated-text": {
-      const normalizedRecent = recentMessages.filter((item) => item === normalized);
+      const configuredWindow = Math.max(1, Number(config?.repeatedWindowSeconds ?? rule.windowSeconds ?? 1));
+      const ruleWindow = Math.max(1, Number(rule.windowSeconds ?? configuredWindow));
+      const effectiveWindowSeconds = Math.min(ruleWindow, configuredWindow);
+      const cutoff = Date.now() - effectiveWindowSeconds * 1000;
+      const normalizedRecent = recentMessages.filter(
+        (item) => item.timestamp >= cutoff && item.content === normalized
+      );
       return normalizedRecent.length >= Number(rule.threshold ?? 5);
     }
     default:
