@@ -233,6 +233,22 @@ test("listFleet marks stale starting and ready heartbeats as degraded", async ()
   }
 });
 
+test("verifyGuildOwnership uses a short-lived durable ownership cache", async () => {
+  const queries: Array<{ text: string; values: readonly unknown[] }> = [];
+  const db = {
+    query: async <T>(text: string, values: readonly unknown[] = []) => {
+      queries.push({ text, values });
+      return { rows: [{ owns: true }] } as { rows: T[] };
+    }
+  } as never;
+
+  const repo = new BotIdentityRepository(db, "secondary");
+  assert.equal(await repo.verifyGuildOwnership("guild-1"), true);
+  assert.equal(await repo.verifyGuildOwnership("guild-1"), true);
+  assert.equal(queries.length, 1);
+  assert.deepEqual(queries[0]?.values, ["guild-1", "secondary"]);
+});
+
 test("fleet heartbeat freshness uses the shared stale threshold", () => {
   const now = Date.parse("2026-10-04T10:00:00.000Z");
   assert.equal(isFleetHeartbeatFresh("2026-10-04T09:59:59.000Z", now), true);

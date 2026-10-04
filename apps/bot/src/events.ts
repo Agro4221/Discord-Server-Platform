@@ -62,7 +62,10 @@ export class PlatformEventBus {
   private readonly listeners = new Map<keyof PlatformEventMap, Set<Listener<any>>>();
   private readonly commandGuards = new Set<CommandGuard>();
 
-  constructor(private readonly guildFilter?: (guildId: string) => boolean) {}
+  constructor(
+    private readonly guildFilter?: (guildId: string) => boolean,
+    private readonly guildVerifier?: (guildId: string) => boolean | Promise<boolean>
+  ) {}
 
   on<K extends keyof PlatformEventMap>(
     event: K,
@@ -89,6 +92,7 @@ export class PlatformEventBus {
   ): Promise<void> {
     const guildId = extractGuildId(event, payload);
     if (guildId && this.guildFilter && !this.guildFilter(guildId)) return;
+    if (guildId && this.guildVerifier && !(await this.guildVerifier(guildId))) return;
 
     if (event === "interaction.command") {
       for (const guard of this.commandGuards) {

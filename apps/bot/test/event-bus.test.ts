@@ -45,6 +45,22 @@ test("event bus extracts guild id from member ban events", async () => {
 });
 
 
+test("async guild verifier blocks stale local ownership without removing the fast filter", async () => {
+  const bus = new PlatformEventBus(
+    () => true,
+    async (guildId) => guildId === "owned-now"
+  );
+  let delivered = 0;
+  bus.on("message.create", () => {
+    delivered += 1;
+  });
+
+  await bus.emit("message.create", { guildId: "owned-now", id: "m1" } as never);
+  await bus.emit("message.create", { guildId: "reassigned", id: "m2" } as never);
+
+  assert.equal(delivered, 1);
+});
+
 test("guild filter scopes passive guild events", async () => {
   const foreignGuild = "111111111111111111";
   const ownedGuild = "222222222222222222";

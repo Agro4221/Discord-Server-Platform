@@ -101,7 +101,10 @@ async function main(): Promise<void> {
 
   const client = createDiscordClient();
   auditLog.setClient(client);
-  const events = new PlatformEventBus((guildId) => identities.ownsGuild(guildId));
+  const events = new PlatformEventBus(
+    (guildId) => identities.ownsGuild(guildId),
+    (guildId) => identities.verifyGuildOwnership(guildId)
+  );
   const temporaryVoice = new TemporaryVoice(database, () => client.guilds.cache.values());
   const moderation = new Moderation(database);
   const autoMod = new AutoMod(database);

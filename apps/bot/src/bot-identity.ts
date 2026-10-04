@@ -22,6 +22,8 @@ export type BotFleetRecord = BotIdentityRecord & {
 
 export class BotIdentityRepository {
   private readonly assignedGuilds = new Set<string>();
+  private readonly ownershipVerificationCache = new Map<string, { owns: boolean; expiresAt: number }>();
+  private static readonly OWNERSHIP_CACHE_MS = 1_000;
 
   constructor(private readonly db: Database, private readonly identityId: string) {}
 
@@ -187,11 +189,53 @@ export class BotIdentityRepository {
         );
 
     this.assignedGuilds.clear();
+    this.ownershipVerificationCache.clear();
     for (const row of result.rows) this.assignedGuilds.add(row.guild_id);
   }
 
   ownsGuild(guildId: string): boolean {
     return this.assignedGuilds.has(guildId);
+  }
+
+  async verifyGuildOwnership(guildId: string): Promise<boolean> {
+    const now = Date.now();
+    const cached = this.ownershipVerificationCache.get(guildId);
+    if (cached && cached.expiresAt > now) return cached.owns;
+
+    let result;
+    if (this.identityId === "primary") {
+      result = await this.db.query<{ owns: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1
+             FROM guild_bot_assignments ga
+             LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id
+            WHERE ga.guild_id=$1
+              AND (
+                ga.bot_identity_id='primary'
+                OR (
+                  ga.bot_identity_id <> 'primary'
+                  AND (
+                    bh.last_seen_at IS NULL
+                    OR bh.last_seen_at < now()-interval '${FLEET_HEARTBEAT_STALE_SECONDS} seconds'
+                  )
+                )
+              )
+         ) AS owns`,
+        [guildId]
+      );
+    } else {
+      result = await this.db.query<{ owns: boolean }>(
+        "SELECT EXISTS (SELECT 1 FROM guild_bot_assignments WHERE guild_id=$1 AND bot_identity_id=$2) AS owns",
+        [guildId, this.identityId]
+      );
+    }
+
+    const owns = result.rows[0]?.owns === true;
+    this.ownershipVerificationCache.set(guildId, {
+      owns,
+      expiresAt: now + BotIdentityRepository.OWNERSHIP_CACHE_MS
+    });
+    return owns;
   }
 
   async heartbeat(
