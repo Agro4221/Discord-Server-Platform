@@ -2798,9 +2798,15 @@ export class ManagementApiServer {
             };
 
             const helpers = {
-              editMessage: async (oldChannelId: string, messageId: string, content: string, components:
-          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[] | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]
-          | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => {
+              editMessage: async (
+                oldChannelId: string,
+                messageId: string,
+                content: string,
+                components: Array<
+                  import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder> |
+                  import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>
+                >
+              ) => {
                 const oldChannel = guild.channels.cache.get(oldChannelId);
                 if (!oldChannel || oldChannel.type !== 0) throw new Error("role_panel_old_channel_missing");
                 const message = await oldChannel.messages.fetch(messageId);
@@ -2811,9 +2817,14 @@ export class ManagementApiServer {
                 if (!oldChannel || oldChannel.type !== 0) return;
                 await oldChannel.messages.delete(messageId).catch(() => undefined);
               },
-              sendMessage: async (newChannelId: string, content: string, components:
-          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[] | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]
-          | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => {
+              sendMessage: async (
+                newChannelId: string,
+                content: string,
+                components: Array<
+                  import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder> |
+                  import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>
+                >
+              ) => {
                 const target = guild.channels.cache.get(newChannelId);
                 if (!target || target.type !== 0) throw new Error("role_panel_channel_missing");
                 const message = await target.send({ content, components });
