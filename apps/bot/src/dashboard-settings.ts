@@ -94,6 +94,7 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "removeExecutorRoles", label: "Снимать роли исполнителя при Anti-Nuke", type: "boolean" },
       { key: "executorTimeoutMinutes", label: "Timeout исполнителя, минут", type: "number", min: 0, max: 40320 },
       { key: "executorBanEnabled", label: "Ban исполнителя при Anti-Nuke", type: "boolean" },
+      { key: "autoLockdown", label: "Автоматический lockdown каналов при инциденте", type: "boolean" },
       { key: "quarantineRoleId", label: "Quarantine role", type: "role" },
       { key: "logChannelId", label: "Security log channel", type: "channel" }
     ],
@@ -236,6 +237,7 @@ export const DASHBOARD_SETTINGS_STORAGE: Partial<Record<ModuleKey, StorageSpec>>
       removeExecutorRoles: "remove_executor_roles",
       executorTimeoutMinutes: "executor_timeout_minutes",
       executorBanEnabled: "executor_ban_enabled",
+      autoLockdown: "auto_lockdown",
       quarantineRoleId: "quarantine_role_id",
       logChannelId: "log_channel_id"
     }
