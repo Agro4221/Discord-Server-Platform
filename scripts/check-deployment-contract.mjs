@@ -71,6 +71,9 @@ for (const contract of [
   "credentialConfigured",
   "dsp-bot-fleet-",
   "Docker Compose service inventory is available",
+  "Assert-ContainerHealthy",
+  "docker inspect --format",
+  "Docker healthcheck is healthy",
   "RELEASE GATE PASSED"
 ]) {
   if (!releaseGate.includes(contract)) {

@@ -44,8 +44,22 @@ Assert-Ok ($LASTEXITCODE -eq 0) "Docker Compose project is reachable"
 
 $runningServices = @(& docker compose ps --services 2>$null)
 Assert-Ok ($LASTEXITCODE -eq 0) "Docker Compose service inventory is available"
+
+function Assert-ContainerHealthy([string]$Service) {
+  $containerId = ((& docker compose ps -q $Service 2>$null) | Select-Object -First 1)
+  Assert-Ok ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($containerId)) ("Docker container exists for service: " + $Service)
+
+  $state = ((& docker inspect --format "{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}" $containerId 2>$null) | Select-Object -First 1)
+  Assert-Ok ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($state)) ("Docker state is inspectable for service: " + $Service)
+
+  $parts = $state.ToString().Trim().Split("|", 2)
+  Assert-Ok ($parts[0] -eq "running") ("Docker container is running: " + $Service)
+  Assert-Ok ($parts[1] -eq "healthy") ("Docker healthcheck is healthy: " + $Service)
+}
+
 foreach ($service in @("postgres", "lavalink", "lavalink2", "bot", "dashboard")) {
   Assert-Ok ($runningServices -contains $service) ("Docker Compose service is running: " + $service)
+  Assert-ContainerHealthy $service
 }
 
 $health = Get-Json ("http://127.0.0.1:" + $healthPort + "/health")
