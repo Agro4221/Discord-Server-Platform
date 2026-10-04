@@ -349,8 +349,8 @@ test("AutoMod base timeout creates a moderation case after successful timeout", 
   assert.equal(timeoutMs, 10 * 60_000);
   const index = queries.findIndex((query) => query.startsWith("INSERT INTO moderation_cases"));
   assert.notEqual(index, -1);
-  assert.equal(values[index]?.[3], "AutoMod: blocked_word");
-  assert.ok(values[index]?.[4] instanceof Date);
+  assert.equal(values[index]?.[2], "AutoMod: blocked_word");
+  assert.ok(values[index]?.[3] instanceof Date);
   assert.equal((auditEvents[0] as { metadata?: { timedOut?: boolean } })?.metadata?.timedOut, true);
 });
 
