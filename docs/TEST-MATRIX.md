@@ -517,6 +517,12 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ restart_required state remains durable until the next process heartbeat explicitly clears it.
 - ⚠ Actual process restart is deployment/supervisor dependent and is not falsely simulated by the Dashboard.
 
+## 2026-10-04 — Automation event field breadth verification
+- ✅ Management API numeric/text field catalogs include attachment/embed/sticker counts and previous voice channel.
+- ✅ Dashboard exposes the new event fields to condition builders.
+- ✅ Automation validation regression covers the new selectors.
+- ⚠ Actual Discord event payloads and cache completeness remain part of live runtime acceptance.
+
 ## 2026-10-04 — Automation channel naming verification
 - ✅ `set-channel-name` is present in the shared Automation action model and Core validator.
 - ✅ Management API accepts the action and validates non-empty names up to the supported bound.
