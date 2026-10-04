@@ -262,3 +262,10 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ AutoMod response template field is present and editable.
 - ✅ CI #1657 passed all automated stages: dependency audit, source/deployment/observability contracts, bot typecheck/tests, domain build, bot build and Dashboard build.
 - ☐ Next: Security executor-role lifecycle; then Music/Fleet failure-path depth and live release-gate validation.
+
+## 2026-10-04 — Security response verification
+- ✅ Successful executor-role removals are counted accurately.
+- ✅ Failed Discord role-removal operations are excluded from `removedRoles`.
+- ✅ `removedRoleIds` is included in response audit/event metadata.
+- ✅ CI #1663 passed typecheck, all bot tests, dependency audit, source/deployment/observability checks, domain/bot builds and Dashboard build.
+- ☐ Next: Security executor-role lifecycle/restart semantics; then Music/Fleet failure paths and live release-gate validation.
