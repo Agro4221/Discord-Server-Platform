@@ -382,6 +382,15 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           )
           .addStringOption((option) =>
             option
+              .setName("component")
+              .setDescription("Panel component")
+              .addChoices(
+                { name: "Buttons", value: "buttons" },
+                { name: "Select menu", value: "select" }
+              )
+          )
+          .addStringOption((option) =>
+            option
               .setName("mode")
               .setDescription("Role selection mode")
               .addChoices(
