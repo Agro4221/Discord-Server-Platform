@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 type Resource = { id: string; name: string };
+type SocialProvider = "reddit" | "youtube" | "mastodon";
 type Feed = {
   id: number;
   channelId: string;
@@ -26,6 +27,8 @@ export function NotificationsPanel({
 }) {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [url, setUrl] = useState("");
+  const [socialProvider, setSocialProvider] = useState<SocialProvider>("reddit");
+  const [socialTarget, setSocialTarget] = useState("");
   const [channelId, setChannelId] = useState("");
   const [interval, setInterval] = useState(300);
   const [messageTemplate, setMessageTemplate] = useState("📡 **Новая запись из feed**\\n**{title}**\\n{url}");
@@ -77,6 +80,39 @@ export function NotificationsPanel({
       await onChanged?.();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Не удалось создать feed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createSocial() {
+    if (!socialTarget.trim() || !channelId) {
+      setError("Для Social Feed укажи источник и канал.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/feeds/social", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          provider: socialProvider,
+          target: socialTarget.trim(),
+          channelId,
+          intervalSeconds: interval,
+          messageTemplate,
+          includeKeywords: includeKeywords.split(",").map((value) => value.trim()).filter(Boolean),
+          excludeKeywords: excludeKeywords.split(",").map((value) => value.trim()).filter(Boolean)
+        })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "social_feed_create_failed");
+      setSocialTarget("");
+      await load();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось создать Social Feed.");
     } finally {
       setBusy(false);
     }
@@ -150,6 +186,33 @@ export function NotificationsPanel({
       </div>
 
       {error && <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d" }}>{error}</div>}
+
+      <section style={{ display: "grid", gap: 8, padding: 12, border: "1px solid #252c38", borderRadius: 12, background: "#0e131a" }}>
+        <div>
+          <strong style={{ fontSize: 12 }}>Social Feeds</strong>
+          <div style={{ marginTop: 3, opacity: 0.42, fontSize: 10 }}>Готовые источники без API-ключей: Reddit, YouTube RSS и Mastodon RSS.</div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "150px minmax(0,1fr) minmax(180px,1fr) 140px auto", gap: 8 }}>
+          <select value={socialProvider} onChange={(e) => setSocialProvider(e.target.value as SocialProvider)} style={inputStyle} disabled={busy}>
+            <option value="reddit">Reddit</option>
+            <option value="youtube">YouTube</option>
+            <option value="mastodon">Mastodon</option>
+          </select>
+          <input
+            value={socialTarget}
+            onChange={(e) => setSocialTarget(e.target.value)}
+            placeholder={socialProvider === "reddit" ? "r/discordapp" : socialProvider === "youtube" ? "UCxxxxxxxxxxxxxxxxxxxxxx" : "https://mastodon.social/@user"}
+            style={inputStyle}
+            disabled={busy}
+          />
+          <select value={channelId} onChange={(e) => setChannelId(e.target.value)} style={inputStyle} disabled={busy}>
+            <option value="">Канал назначения</option>
+            {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+          </select>
+          <input type="number" min={60} max={86400} value={interval} onChange={(e) => setInterval(Number(e.target.value))} style={inputStyle} disabled={busy} />
+          <button type="button" disabled={busy} onClick={() => void createSocial()} style={buttonStyle("primary")}>Добавить</button>
+        </div>
+      </section>
 
       <div style={{ display: "grid", gap: 8 }}>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(180px,1fr) 140px auto", gap: 8 }}>
