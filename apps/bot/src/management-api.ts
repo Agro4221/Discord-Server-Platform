@@ -1297,6 +1297,21 @@ export class ManagementApiServer {
             if (!detector || !["delete","timeout","warn","log"].includes(action)) {
               throw new RequestInputError("invalid_automod_rule", 400);
             }
+            const logChannelId =
+              body.logChannelId === undefined || body.logChannelId === null
+                ? null
+                : typeof body.logChannelId === "string"
+                  ? body.logChannelId
+                  : null;
+            if (body.logChannelId !== undefined && body.logChannelId !== null && logChannelId === null) {
+              throw new RequestInputError("invalid_automod_log_channel", 400);
+            }
+            if (logChannelId) {
+              const logChannel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(logChannelId);
+              if (!logChannel?.isTextBased() || !("send" in logChannel)) {
+                throw new RequestInputError("invalid_automod_log_channel", 400);
+              }
+            }
             await this.options.autoMod!.upsertRule(guildId, {
               detector,
               enabled: body.enabled !== false,
@@ -1309,6 +1324,7 @@ export class ManagementApiServer {
               affectedChannelIds: Array.isArray(body.affectedChannelIds) ? body.affectedChannelIds.filter((v: unknown): v is string => typeof v === "string") : [],
               ignoredChannelIds: Array.isArray(body.ignoredChannelIds) ? body.ignoredChannelIds.filter((v: unknown): v is string => typeof v === "string") : [],
               ignoreModerators: body.ignoreModerators !== false,
+              logChannelId,
               messageTemplate: typeof body.messageTemplate === "string" ? body.messageTemplate : ""
             });
             await this.options.auditLog.record({

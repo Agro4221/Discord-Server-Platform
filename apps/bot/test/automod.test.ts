@@ -210,11 +210,12 @@ test("AutoMod rule upsert rejects unsupported detectors before database writes",
 
 test("AutoMod log rule can deliver a template to its configured log channel", async () => {
   const sent: unknown[] = [];
+  const auditEvents: unknown[] = [];
   const db = {
     async query<T>(text: string) {
       if (text.startsWith("SELECT enabled FROM guild_modules")) return { rows: [{ enabled: true }] } as { rows: T[] };
       if (text.startsWith("SELECT enabled,blocked_words")) {
-        return { rows: [{ enabled: true, blocked_words: [], max_mentions: 6, max_caps_ratio: 0.85, max_repeated_messages: 5, repeated_window_seconds: 10, block_links: false, block_invites: false, max_links: 3, max_emojis: 20, max_line_length: 1000, exempt_channel_ids: "", exempt_role_ids: "", delete_message: false, timeout_minutes: 0 }] } as { rows: T[] };
+        return { rows: [{ enabled: true, blocked_words: ["trigger"], max_mentions: 6, max_caps_ratio: 0.85, max_repeated_messages: 5, repeated_window_seconds: 10, block_links: false, block_invites: false, max_links: 3, max_emojis: 20, max_line_length: 1000, exempt_channel_ids: "", exempt_role_ids: "", delete_message: false, timeout_minutes: 0 }] } as { rows: T[] };
       }
       if (text.includes("FROM automod_rules WHERE guild_id=")) {
         return { rows: [{ detector: "bad-words", threshold: null, window_seconds: null, action: "log", timeout_minutes: 0, affected_role_ids: [], ignored_role_ids: [], affected_channel_ids: [], ignored_channel_ids: [], ignore_moderators: true, log_channel_id: "999999999999999999", message_template: "{mention} нарушил правило в {channel}" }] } as { rows: T[] };
@@ -229,7 +230,7 @@ test("AutoMod log rule can deliver a template to its configured log channel", as
     client: {} as never,
     db,
     events,
-    auditLog: { record: async () => undefined } as never,
+    auditLog: { record: async (event: unknown) => { auditEvents.push(event); } } as never,
     identityId: "primary"
   });
   const logChannel = {
@@ -247,13 +248,13 @@ test("AutoMod log rule can deliver a template to its configured log channel", as
     channel: { isTextBased: () => true, send: async () => undefined },
     author: { id: "456789012345678901", username: "tester", bot: false },
     member: null,
-    content: "normal",
+    content: "trigger",
     mentions: { users: { size: 0 }, roles: { size: 0 } },
     delete: async () => undefined
   };
   await events.emit("message.create", message as never);
   await automod.shutdown();
-  assert.equal(sent.length, 0);
-
-  // The bad-words detector needs a matching blocked word, so this assertion is kept deterministic by the dedicated detector helper.
+  assert.equal(sent.length, 1);
+  assert.match(JSON.stringify(sent[0]), /нарушил правило/);
+  assert.equal((auditEvents[0] as { metadata?: { logDelivered?: boolean } })?.metadata?.logDelivered, true);
 });
