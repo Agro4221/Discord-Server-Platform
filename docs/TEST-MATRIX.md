@@ -240,3 +240,9 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Security partial incident-resolution count regression coverage.
 - ⚠ Latest development HEAD `7121d7557063772d712c47006bdbb9845c99d1b9` has no attached CI status yet.
 - ☐ Remaining: AutoMod warn semantics/response edge cases; Security executor-role lifecycle/restart semantics; Music/Fleet failure-path coverage; live Discord/Lavalink/Windows/VPS release gates.
+
+## 2026-10-04 — Security window verification
+- ✅ Regression coverage confirms Security window bounds: 5 seconds minimum, 3600 seconds maximum, deterministic fallback for invalid values.
+- ✅ Cache retention no longer truncates events at the old five-minute ceiling.
+- ⚠ Latest development HEAD `a915418cab191a58100849aff95264b49311fb74` still awaits an attached CI check.
+- ☐ Next: Security executor-role lifecycle, AutoMod response edge cases, then Music/Fleet failure-path and live acceptance work.
