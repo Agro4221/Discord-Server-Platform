@@ -527,6 +527,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Fleet now exposes an operator-facing durable restart request for secondary identities.
 - Dashboard reflects the pending restart state already tracked by bot heartbeats.
 
+## 2026-10-04 — Automation event field breadth
+- Automation message events now expose attachment/embed/sticker counts and voice transitions expose the previous channel ID.
+- Runtime, Management API and Dashboard field catalogs remain synchronized; no migration was required.
+
 ## 2026-10-04 — Automation channel naming
 - Automation can now rename the triggering or explicitly selected channel with `set-channel-name` and template rendering.
 - The action is wired through Domain, Core, Management API and Dashboard with validation and regression coverage.
