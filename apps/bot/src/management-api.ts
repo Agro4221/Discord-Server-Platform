@@ -3572,14 +3572,14 @@ function validateAutomationPayload(
   }
 }
 
-async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function readJson(req: IncomingMessage, maxBytes = 64 * 1024): Promise<Record<string, unknown>> {
   let size = 0;
   const chunks: Buffer[] = [];
 
   for await (const chunk of req) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += buffer.length;
-    if (size > 64 * 1024) {
+    if (size > maxBytes) {
       throw new RequestInputError("request_too_large", 413);
     }
     chunks.push(buffer);
