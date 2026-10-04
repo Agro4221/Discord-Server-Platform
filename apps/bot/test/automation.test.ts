@@ -245,7 +245,7 @@ test("Automation kick action kicks a kickable member with a rendered reason", as
   const engine = new AutomationEngine({} as never);
   const state = engine as unknown as {
     perform: (actions: unknown[], event: { type: "member.join"; guildId: string; userId: string }) => Promise<void>;
-    client: { guilds: { cache: Map<string, { members: { fetch: (userId: string) => Promise<unknown> } } } };
+    client: { guilds: { cache: Map<string, { members: { fetch: (userId: string) => Promise<unknown> } }> } };
   };
   state.client = {
     guilds: {
