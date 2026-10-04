@@ -23,6 +23,7 @@ import type { AutoMod } from "./modules/automod.js";
 import { CommandPolicyService, COMMAND_DEFINITIONS } from "./command-policy.js";
 import type { StreamAlertPlatform } from "./modules/stream-alerts.js";
 import { BotIdentityRepository } from "./bot-identity.js";
+import type { ServerConfigPresetService } from "./config-presets.js";
 
 type ApiOptions = {
   host: string;
@@ -33,6 +34,7 @@ type ApiOptions = {
   auditLog: AuditLog;
   settings: DashboardSettingsService;
   transfer: ConfigTransferService;
+  presets?: ServerConfigPresetService;
   backups: BackupService;
   identities?: BotIdentityRepository;
   botSetup?: {
@@ -573,6 +575,95 @@ export class ManagementApiServer {
               action: "config.imported",
               targetType: "guild",
               targetId: guildId
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const presetsMatch = path.match(/^\/api\/guilds\/([^/]+)\/presets$/);
+          const presetItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/presets\/(\d+)$/);
+          const presetApplyMatch = path.match(/^\/api\/guilds\/([^/]+)\/presets\/(\d+)\/apply$/);
+
+          if ((presetsMatch || presetItemMatch || presetApplyMatch) && !this.options.presets) {
+            this.json(res, 500, { error: "presets_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && presetsMatch) {
+            const guildId = presetsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, {
+              guildId,
+              presets: await this.options.presets!.list(guildId)
+            });
+            return;
+          }
+
+          if (method === "POST" && presetsMatch) {
+            const guildId = presetsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const name = body.name;
+            if (typeof name !== "string") {
+              throw new RequestInputError("invalid_preset_name", 400);
+            }
+            const preset = await this.options.presets!.save(guildId, name);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "config.preset.saved",
+              targetType: "preset",
+              targetId: String(preset.id),
+              metadata: { name: preset.name, moduleCount: preset.moduleCount }
+            });
+            this.json(res, 200, { ok: true, guildId, preset });
+            return;
+          }
+
+          if (method === "POST" && presetApplyMatch) {
+            const guildId = presetApplyMatch[1] ?? "";
+            const presetId = Number(presetApplyMatch[2]);
+            if (!guildId || !Number.isSafeInteger(presetId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_preset_not_found" });
+              return;
+            }
+            const preset = await this.options.presets!.apply(guildId, presetId);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "config.preset.applied",
+              targetType: "preset",
+              targetId: String(preset.id),
+              metadata: { name: preset.name, moduleCount: preset.moduleCount }
+            });
+            this.json(res, 200, { ok: true, guildId, preset });
+            return;
+          }
+
+          if (method === "DELETE" && presetItemMatch) {
+            const guildId = presetItemMatch[1] ?? "";
+            const presetId = Number(presetItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(presetId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_preset_not_found" });
+              return;
+            }
+            const deleted = await this.options.presets!.delete(guildId, presetId);
+            if (!deleted) {
+              this.json(res, 404, { error: "preset_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "config.preset.deleted",
+              targetType: "preset",
+              targetId: String(presetId)
             });
             this.json(res, 200, { ok: true });
             return;
