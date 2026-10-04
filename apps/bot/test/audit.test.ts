@@ -45,3 +45,32 @@ test("audit recent keeps the legacy bounded limit contract", async () => {
   await new AuditLog(db).recent("123456789012345678", 999);
   assert.equal(captured[captured.length - 1], 200);
 });
+
+
+test("audit module activity uses bounded action prefixes", async () => {
+  let captured = { text: "", values: [] as readonly unknown[] };
+  const db = {
+    async query<T>(text: string, values: readonly unknown[] = []) {
+      captured = { text, values };
+      return { rows: [] as T[], rowCount: 0 };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  await new AuditLog(db).moduleActivity(
+    "123456789012345678",
+    "roles",
+    40,
+    "2026-10-05T00:00:00.000Z"
+  );
+
+  assert.match(captured.text, /WHERE guild_id=$1 AND (action ILIKE $2 ESCAPE '\\' OR action ILIKE $3 ESCAPE '\\' OR action ILIKE $4 ESCAPE '\\') AND created_at < $5/);
+  assert.match(captured.text, /LIMIT $6/);
+  assert.deepEqual(captured.values, [
+    "123456789012345678",
+    "role-panel.%",
+    "role.%",
+    "role_automation.%",
+    "2026-10-05T00:00:00.000Z",
+    40
+  ]);
+});
