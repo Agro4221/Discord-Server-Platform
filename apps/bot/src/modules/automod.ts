@@ -216,7 +216,7 @@ export class AutoMod implements PlatformModule {
     const action = input.action ?? "delete";
     if (action === "log" && !input.logChannelId) throw new Error("automod_log_channel_required");
     const threshold = input.threshold === undefined || input.threshold === null ? null : Number(input.threshold);
-    const windowSeconds = input.windowSeconds === undefined || input.windowSeconds === null ? null : Math.floor(input.windowSeconds);
+    const windowSeconds = input.windowSeconds === undefined || input.windowSeconds === null ? null : clampAutoModWindowSeconds(input.windowSeconds);
     const timeoutMinutes = Math.min(Math.max(Math.floor(input.timeoutMinutes ?? 0),0),40320);
 
     await this.db.query(
@@ -252,7 +252,11 @@ export class AutoMod implements PlatformModule {
 
   async configure(guildId: string, patch: Partial<AutoModConfig>): Promise<void> {
     const current = await this.getConfig(guildId);
-    const next = { ...current, ...patch };
+    const next = {
+      ...current,
+      ...patch,
+      repeatedWindowSeconds: clampAutoModWindowSeconds(patch.repeatedWindowSeconds ?? current.repeatedWindowSeconds)
+    };
     await this.db.query(
       `INSERT INTO automod_settings
        (guild_id,enabled,blocked_words,max_mentions,max_caps_ratio,max_repeated_messages,
@@ -333,7 +337,7 @@ export class AutoMod implements PlatformModule {
       maxMentions: row.max_mentions,
       maxCapsRatio: row.max_caps_ratio,
       maxRepeatedMessages: row.max_repeated_messages,
-      repeatedWindowSeconds: row.repeated_window_seconds,
+      repeatedWindowSeconds: clampAutoModWindowSeconds(row.repeated_window_seconds),
       blockLinks: row.block_links,
       blockInvites: row.block_invites,
       maxLinks: row.max_links,
@@ -364,13 +368,16 @@ export class AutoMod implements PlatformModule {
     const key = `${message.guild.id}:${message.author.id}`;
     const now = Date.now();
     const bucket = this.recent.get(key) ?? [];
-    const cutoff = now - config.repeatedWindowSeconds * 1000;
-    const recent = bucket
-      .filter((item) => item.timestamp >= cutoff)
-      .slice(-19);
+    const historyCutoff = now - 3_600_000;
+    const history = bucket
+      .filter((item) => item.timestamp >= historyCutoff)
+      .slice(-99);
 
-    recent.push({ content: content.toLocaleLowerCase(), timestamp: now });
-    this.recent.set(key, recent);
+    history.push({ content: content.toLocaleLowerCase(), timestamp: now });
+    this.recent.set(key, history);
+
+    const baseCutoff = now - config.repeatedWindowSeconds * 1000;
+    const recent = history.filter((item) => item.timestamp >= baseCutoff);
     this.inspectedMessages += 1;
     if (this.inspectedMessages % 100 === 0) this.pruneRecent(now);
 
@@ -425,7 +432,7 @@ export class AutoMod implements PlatformModule {
         windowSeconds: rule.window_seconds
       };
 
-      if (!detectorMatches(normalizedRule, message, recent, config)) {
+      if (!detectorMatches(normalizedRule, message, history, config)) {
         continue;
       }
 
@@ -690,7 +697,7 @@ export class AutoMod implements PlatformModule {
   }
 
   private pruneRecent(now: number): void {
-    const cutoff = now - 120_000;
+    const cutoff = now - 3_600_000;
     for (const [key, entries] of this.recent) {
       const latest = entries.at(-1)?.timestamp ?? 0;
       if (latest < cutoff) this.recent.delete(key);
@@ -756,9 +763,8 @@ export function detectorMatches(
     case "honeypot":
       return true;
     case "repeated-text": {
-      const configuredWindow = Math.max(1, Number(config?.repeatedWindowSeconds ?? rule.windowSeconds ?? 1));
-      const ruleWindow = Math.max(1, Number(rule.windowSeconds ?? configuredWindow));
-      const effectiveWindowSeconds = Math.min(ruleWindow, configuredWindow);
+      const configuredWindow = clampAutoModWindowSeconds(config?.repeatedWindowSeconds ?? 10);
+      const effectiveWindowSeconds = clampAutoModWindowSeconds(rule.windowSeconds ?? configuredWindow);
       const cutoff = Date.now() - effectiveWindowSeconds * 1000;
       const normalizedRecent = recentMessages.filter(
         (item) => item.timestamp >= cutoff && item.content === normalized
@@ -768,6 +774,11 @@ export function detectorMatches(
     default:
       return normalized.length > 0 && rule.detector === "content";
   }
+}
+
+export function clampAutoModWindowSeconds(value: number): number {
+  if (!Number.isFinite(value)) return 10;
+  return Math.min(Math.max(Math.trunc(value), 1), 3600);
 }
 
 export function parseAutoModIdList(value: string): Set<string> {
