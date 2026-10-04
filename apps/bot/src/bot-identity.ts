@@ -142,7 +142,7 @@ export class BotIdentityRepository {
     return result.rows[0]?.bot_identity_id ?? null;
   }
 
-  async claimStaleMusicAssignments(guildIds: string[], limit = 20): Promise<string[]> {
+  async claimStaleMusicAssignments(guildIds: string[], limit = 20): Promise<Array<{ guildId: string; voiceChannelId: string; previousIdentityId: string }>> {
     if (this.identityId !== "primary") {
       const identity = await this.db.query<{ failover_enabled: boolean; enabled: boolean }>(
         "SELECT failover_enabled,enabled FROM bot_identities WHERE id=$1",
@@ -154,7 +154,7 @@ export class BotIdentityRepository {
 
     const safeLimit = clampFailoverBatchLimit(limit);
     return this.db.transaction(async (client) => {
-      const result = await client.query<{ guild_id: string }>(
+      const result = await client.query<{ guild_id: string; voice_channel_id: string; previous_identity_id: string }>(
         `WITH candidates AS (
            SELECT a.guild_id,a.bot_identity_id,a.voice_channel_id
              FROM guild_music_bot_assignments a
@@ -178,10 +178,10 @@ export class BotIdentityRepository {
           WHERE a.guild_id=candidates.guild_id
             AND a.bot_identity_id=candidates.bot_identity_id
             AND a.voice_channel_id=candidates.voice_channel_id
-          RETURNING a.guild_id`,
+          RETURNING a.guild_id,a.voice_channel_id,candidates.bot_identity_id AS previous_identity_id`,
         [guildIds, this.identityId, safeLimit]
       );
-      return result.rows.map((row) => row.guild_id);
+      return result.rows.map((row) => ({ guildId: row.guild_id, voiceChannelId: row.voice_channel_id, previousIdentityId: row.previous_identity_id }));
     });
   }
 
@@ -318,12 +318,12 @@ async setFailover(id: string, enabled: boolean): Promise<void> {
     if (result.rowCount !== 1) throw new Error("bot_identity_not_available");
   }
 
-  async claimStaleGuildsAsPrimary(guildIds: string[], limit = 100): Promise<string[]> {
+  async claimStaleGuildsAsPrimary(guildIds: string[], limit = 100): Promise<Array<{ guildId: string; previousIdentityId: string }>> {
     if (this.identityId !== "primary" || guildIds.length === 0) return [];
 
     const safeLimit = clampFailoverBatchLimit(limit);
     return this.db.transaction(async (client) => {
-      const result = await client.query<{ guild_id: string }>(
+      const result = await client.query<{ guild_id: string; previous_identity_id: string }>(
         `WITH candidates AS (
            SELECT ga.guild_id
              FROM guild_bot_assignments ga
@@ -339,13 +339,13 @@ async setFailover(id: string, enabled: boolean): Promise<void> {
             SET bot_identity_id='primary',updated_at=now()
            FROM candidates
           WHERE ga.guild_id=candidates.guild_id
-          RETURNING ga.guild_id`,
+          RETURNING ga.guild_id,candidates.bot_identity_id AS previous_identity_id`,
         [guildIds, safeLimit]
       );
-      return result.rows.map((row) => row.guild_id);
+      return result.rows.map((row) => ({ guildId: row.guild_id, previousIdentityId: row.previous_identity_id }));
     });
   }
-  async claimStaleGuilds(guildIds: string[], limit = 20): Promise<string[]> {
+  async claimStaleGuilds(guildIds: string[], limit = 20): Promise<Array<{ guildId: string; previousIdentityId: string }>> {
     if (this.identityId === "primary" || guildIds.length === 0) return [];
     const identity = await this.db.query<{ failover_enabled: boolean; enabled: boolean }>(
       "SELECT failover_enabled,enabled FROM bot_identities WHERE id=$1",
@@ -355,7 +355,7 @@ async setFailover(id: string, enabled: boolean): Promise<void> {
 
     const safeLimit = clampFailoverBatchLimit(limit);
     return this.db.transaction(async (client) => {
-      const result = await client.query<{ guild_id: string }>(
+      const result = await client.query<{ guild_id: string; previous_identity_id: string }>(
         `WITH candidates AS (
            SELECT ga.guild_id
              FROM guild_bot_assignments ga
@@ -371,10 +371,10 @@ async setFailover(id: string, enabled: boolean): Promise<void> {
             SET bot_identity_id=$2,updated_at=now()
            FROM candidates
           WHERE ga.guild_id=candidates.guild_id
-          RETURNING ga.guild_id`,
+          RETURNING ga.guild_id,candidates.bot_identity_id AS previous_identity_id`,
         [guildIds, this.identityId, safeLimit]
       );
-      return result.rows.map((row) => row.guild_id);
+      return result.rows.map((row) => ({ guildId: row.guild_id, previousIdentityId: row.previous_identity_id }));
     });
   }
 
