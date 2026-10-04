@@ -365,9 +365,9 @@ async function main(): Promise<void> {
     rolePanels: {
       list: async (guildId) => rolePanels.list(guildId),
       create: async (guildId, input, callbacks) =>
-        rolePanels.createPanel(guildId, input.channelId, input.roles, input.title, input.selectionMode, input.maxSelections, 0, callbacks),
+        rolePanels.createPanel(guildId, input.channelId, input.roles, input.title, input.selectionMode, input.maxSelections, input.durationMinutes ?? 0, callbacks, input.componentType ?? "buttons"),
       update: async (guildId, panelId, input, callbacks) =>
-        rolePanels.updatePanel(guildId, panelId, input.channelId, input.roles, input.title ?? "Выберите роли", input.selectionMode, input.maxSelections, input.durationMinutes, callbacks),
+        rolePanels.updatePanel(guildId, panelId, input.channelId, input.roles, input.title ?? "Выберите роли", input.selectionMode, input.maxSelections, input.durationMinutes ?? 0, callbacks, input.componentType ?? "buttons"),
       delete: async (guildId, panelId, deleteMessage) => rolePanels.deletePanel(guildId, panelId, deleteMessage),
       listAutomationRules: async (guildId) => rolePanels.listAutomationRules(guildId),
       saveAutomationRule: async (guildId, input) => rolePanels.saveAutomationRule(guildId, input),
