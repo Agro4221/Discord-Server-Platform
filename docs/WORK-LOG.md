@@ -567,3 +567,15 @@ Never write credentials, tokens or private user data here.
 - Final source checkpoint: `efd8eeef4505e5cf2d21d50c79e792ba83eb4637`.
 - Analytics counters and retention/history settings are now considered implemented; live browser/Discord rendering remains a release-gate check.
 - Next single backlog area: **Tickets / linked-related panels**.
+
+
+## 2026-10-05 — Ticket Panels / linked entry points
+- Completed the `Linked/related panels` ticket slice as persistent multi-panel Ticket entry points.
+- Added migration 88 with durable `ticket_panels` and nullable `tickets.panel_id`.
+- Panels support create/update/delete, enable/disable, channel move and Discord message refresh through Management API and Control Center.
+- Panel buttons open the existing Ticket form/lifecycle; the source panel is persisted on created tickets.
+- Config Export/Import preserves panel IDs and ticket-to-panel links.
+- Added schema, normalization and config round-trip regression coverage.
+- CI #1949 passed completely.
+- Final source checkpoint: `879b684c418fda2d2e2ceaebd38852e9341feaa0`.
+- Next single backlog slice: **Custom member rewards / milestones**.
