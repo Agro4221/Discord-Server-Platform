@@ -68,7 +68,7 @@ export class AuditLog {
           { name: "Актор", value: event.actorUserId ? "<@" + event.actorUserId + ">" : "system", inline: true },
           { name: "Цель", value: event.targetId ?? "—", inline: true }
         )
-        .setDescription(metadata === "{}" ? " " : "\`\`\`json\\n" + metadata.slice(0, 3500) + "\\n\`\`\`")
+        .setDescription(metadata === "{}" ? " " : "\`\`\`json\n" + metadata.slice(0, 3500) + "\n\`\`\`")
         .setTimestamp();
 
       await channel.send({ embeds: [embed] });
