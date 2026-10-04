@@ -67,30 +67,37 @@ async function main(): Promise<void> {
   let fleetTimer: NodeJS.Timeout | undefined;
   let cleanupStarted = false;
   let modulesHealthy = true;
+  let storedCredentials: Awaited<ReturnType<BotIdentityRepository["credentials"]>> = null;
+  let runtimeConfig = config;
+  let botEnabled = true;
   await health.start(config.healthHost, config.healthPort);
 
   try {
     await database.ping();
     await migrate(database);
-    const storedCredentials = await identities.credentials();
+    storedCredentials = await identities.credentials();
     const discordClientId = storedCredentials?.clientId || config.discordClientId;
     const discordToken = storedCredentials?.token || config.discordToken;
-    const botEnabled = storedCredentials?.enabled ?? true;
+    botEnabled = storedCredentials?.enabled ?? true;
     if (discordClientId) {
       await identities.ensureIdentity(config.botIdentityId, discordClientId, storedCredentials?.token ? undefined : discordToken || undefined);
     }
     await identities.refreshAssignments();
 
-    const runtimeConfig = {
+    runtimeConfig = {
       ...config,
       discordClientId,
       discordToken
     };
 
     health.set({ database: "ready" });
-    await identities.heartbeat("starting", 0).catch((error) => {
+    if (discordClientId) {
+      await identities.heartbeat("starting", 0).catch((error) => {
       logger.warn("Initial fleet heartbeat failed", { identityId: config.botIdentityId, error: String(error) });
-    });
+          });
+    }
+    }
+    }
   } catch (error) {
     health.set({ database: "down", status: "degraded", lastError: "database startup failed" });
     logger.error("Database startup failed", { error: String(error) });
@@ -163,7 +170,8 @@ async function main(): Promise<void> {
     supervisor?.stop();
     if (fleetTimer) clearInterval(fleetTimer);
 
-    await identities.heartbeat("stopped", client.guilds.cache.size).catch((error) => {
+    if (runtimeConfig.discordClientId) {
+      await identities.heartbeat("stopped", client.guilds.cache.size).catch((error) => {
       logger.warn("Stopped fleet heartbeat failed", {
         identityId: config.botIdentityId,
         error: String(error)
@@ -256,7 +264,8 @@ async function main(): Promise<void> {
       discord: status,
       status: status === "ready" && modulesHealthy ? "ready" : "degraded"
     });
-    void identities.heartbeat(status === "ready" ? "ready" : "degraded", client.guilds.cache.size).catch((error) => {
+    if (runtimeConfig.discordClientId) {
+      void identities.heartbeat(status === "ready" ? "ready" : "degraded", client.guilds.cache.size).catch((error) => {
       logger.warn("Fleet heartbeat update failed", {
         identityId: config.botIdentityId,
         status,
@@ -464,7 +473,9 @@ async function main(): Promise<void> {
 
   fleetTimer = setInterval(() => {
     void identities.refreshAssignments()
-      .then(() => identities.heartbeat(modulesHealthy ? "ready" : "degraded", client.guilds.cache.size))
+      .then(() => runtimeConfig.discordClientId
+        ? identities.heartbeat(modulesHealthy ? "ready" : "degraded", client.guilds.cache.size)
+        : undefined)
       .catch((error) => logger.warn("Fleet heartbeat failed", {
         identityId: config.botIdentityId,
         error: String(error)
