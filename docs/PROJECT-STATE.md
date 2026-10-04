@@ -381,3 +381,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Active playback position advances from the persisted snapshot timestamp and is bounded before resume; queued-only sessions can restart without requiring a current track.
 - Fleet exposes stale starting/ready heartbeats as degraded, allowing the Windows reconciler to restart a running unhealthy secondary container.
 - CI #1682 passed the complete automated pipeline; latest verified code: `e8c8467d5d4c890199227a1634299606666fe0e0`.
+
+
+## 2026-10-04 — Music recovery + AutoMod response finalization
+- Music durable player recovery now covers failed Lavalink session resume and cold reconstruction from PostgreSQL, including current track, queue, filters, repeat and approximate playback position.
+- Recoverable player state is retained during player destruction while current/queued tracks remain; queue-only sessions can be restarted.
+- AutoMod `warn` is now distinct from destructive actions: no delete/timeout is performed, a moderation case is created, and warning-response delivery is tracked explicitly.
+- Fleet stale `starting`/ `ready` heartbeats are exposed as degraded and trigger local reconciler restart of running secondary containers.
+- CI #1687 passed the complete automated pipeline; latest verified code: `38f35992d2553b779d51dadb01882517933aa3f3`.

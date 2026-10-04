@@ -523,3 +523,16 @@ Never write credentials, tokens or private user data here.
 - AutoMod: final warn/response delivery edge cases.
 - Fleet: multi-bot runtime/Discord acceptance and reconciliation failure injection.
 - Final live release gate: real Discord permissions/hierarchy, Lavalink/providers, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Music recovery finalization + AutoMod response edge verification
+- Music cold recovery now survives an unsuccessful Lavalink session resume without deleting a recoverable durable player snapshot; PostgreSQL state is reconciled onto a connected node when no resumed player exists.
+- Resume position is reconstructed from the persisted position/timestamp while active playback advances and paused playback remains fixed; position is bounded before seek.
+- Queue-only durable sessions are recoverable after restart, and player destruction preserves durable state while current/queued tracks remain.
+- AutoMod `warn` is now non-destructive: it creates a `warn` moderation case, attempts a warning response, and records `responseDelivered`; response delivery failure does not roll back the moderation case.
+- Fleet stale `starting`/ `ready` heartbeats are classified as degraded, and the local reconciler restarts unhealthy secondary containers.
+- CI run #1687 passed the complete automated pipeline on commit `38f35992d2553b779d51dadb01882517933aa3f3` after correcting the Music recovery regression test import.
+### Next concrete work
+- Fleet: reconciliation failure injection and multi-bot process restart/credential-state edge cases.
+- Music: multi-session/node-loss de-duplication and position/queue continuity under simultaneous failures.
+- Final live release gate: real Discord permissions/hierarchy, Lavalink/providers, Windows/Docker multi-bot runtime, soak/chaos/recovery and clean-host deployment.

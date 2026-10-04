@@ -304,3 +304,15 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ CI #1682 passed typecheck, bot tests, domain/bot/Dashboard builds and all static contracts.
 - ⚠ Real Lavalink node loss/session expiry and Windows/Docker secondary-process restart remain live acceptance tests.
 - ☐ Next: Music multi-session/node-loss reconciliation, AutoMod final response edges, then live release gates.
+
+
+## 2026-10-04 — Music recovery + AutoMod response verification
+- ✅ Failed Lavalink resume no longer deletes recoverable durable Music state.
+- ✅ Cold Music recovery reconstructs current/queued playback and bounded resume position.
+- ✅ Queue-only Music sessions are considered recoverable after restart.
+- ✅ AutoMod `warn` does not delete or timeout, creates a moderation case, and reports warning-response delivery success/failure.
+- ✅ Response delivery failure is regression-tested without losing the moderation case.
+- ✅ Fleet stale heartbeat classification and reconciler restart path are covered by regression checks.
+- ✅ CI #1687 passed typecheck, bot tests, dependency/source/deployment/observability checks, and all domain/bot/Dashboard builds.
+- ⚠ Real Lavalink session expiry, simultaneous node loss, Windows/Docker multi-bot restart and Discord permission behavior remain live release-gate cases.
+- ☐ Next: Fleet failure injection and Music multi-session/node-loss reconciliation.
