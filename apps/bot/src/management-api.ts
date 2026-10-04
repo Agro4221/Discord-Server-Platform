@@ -2090,6 +2090,31 @@ export class ManagementApiServer {
               return;
             }
 
+            if (method === "POST" && formsMatch) {
+              const body = await readJson(req);
+              if (typeof body.name !== "string") throw new RequestInputError("invalid_form_name", 400);
+              const form = await this.options.forms!.save(guildId, {
+                name: body.name,
+                title: body.title,
+                description: body.description,
+                panelChannelId: body.panelChannelId,
+                responseChannelId: body.responseChannelId,
+                buttonLabel: body.buttonLabel,
+                enabled: body.enabled,
+                fields: body.fields
+              } satisfies Partial<CustomForm> & { name: string });
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "forms.created",
+                targetType: "form",
+                targetId: form.name,
+                metadata: { fieldCount: form.fields.length }
+              });
+              this.json(res, 200, { ok: true, guildId, form });
+              return;
+            }
+
             if (method === "PUT" && formItemMatch) {
               const name = decodeURIComponent(formItemMatch[2] ?? "");
               const body = await readJson(req);
