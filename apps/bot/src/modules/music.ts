@@ -24,8 +24,9 @@ import { logger } from "../logger.js";
 
 type MusicRepeatMode = "off" | "track" | "queue";
 export type MusicSearchProvider = "auto" | "youtube" | "youtube_music" | "soundcloud";
+type MusicSearchSource = "ytsearch" | "ytmsearch" | "scsearch";
 
-const MUSIC_PROVIDER_SOURCES: Record<Exclude<MusicSearchProvider, "auto">, string> = {
+const MUSIC_PROVIDER_SOURCES: Record<Exclude<MusicSearchProvider, "auto">, MusicSearchSource> = {
   youtube: "ytsearch",
   youtube_music: "ytmsearch",
   soundcloud: "scsearch"
@@ -1412,7 +1413,7 @@ export function normalizeMusicSearchProvider(value: string): MusicSearchProvider
 export function buildMusicSearch(
   provider: MusicSearchProvider,
   rawQuery: string
-): { query: string; source?: string } | null {
+): { query: string; source?: MusicSearchSource } | null {
   const query = rawQuery.trim();
   if (!query) return null;
   if (/^https?:\/\//i.test(query)) return { query };
