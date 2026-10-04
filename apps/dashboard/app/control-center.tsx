@@ -467,6 +467,15 @@ const MODULE_META: Record<string, ModuleMeta> = {
 
 const PANEL_KEYS = new Set(["moderation", "custom-commands", "autoresponder", "automod", "tickets", "embed", "roles", "forms", "giveaways", "analytics", "automation", "notifications", "stream-alerts"]);
 
+const secondaryButtonStyle = {
+  border: "1px solid #303846",
+  background: "#0f131a",
+  color: "#b6c0ce",
+  borderRadius: 10,
+  padding: "10px 12px",
+  cursor: "pointer"
+} as const;
+
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
   border: "1px solid #252c38",
@@ -672,14 +681,22 @@ export function ControlCenter() {
     setSearch("");
   }
 
-  async function reloadAudit(options: { append?: boolean } = {}) {
+  async function reloadAudit(options: {
+    append?: boolean;
+    source?: string;
+    action?: string;
+    actor?: string;
+  } = {}) {
     if (!guildId) return;
     setAuditLoading(true);
     try {
       const params = new URLSearchParams({ limit: "80" });
-      if (auditSource) params.set("source", auditSource);
-      if (auditAction.trim()) params.set("action", auditAction.trim());
-      if (auditActor.trim()) params.set("actorUserId", auditActor.trim());
+      const source = options.source ?? auditSource;
+      const action = options.action ?? auditAction;
+      const actor = options.actor ?? auditActor;
+      if (source) params.set("source", source);
+      if (action.trim()) params.set("action", action.trim());
+      if (actor.trim()) params.set("actorUserId", actor.trim());
       if (options.append && auditNextBefore) params.set("before", auditNextBefore);
 
       const response = await fetch(
@@ -702,7 +719,7 @@ export function ControlCenter() {
     setAuditAction("");
     setAuditActor("");
     setAuditNextBefore(null);
-    void reloadAudit();
+    void reloadAudit({ source: "", action: "", actor: "" });
   }
 
   async function toggle(moduleKey: string, enabled: boolean) {
