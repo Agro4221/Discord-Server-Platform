@@ -12,6 +12,7 @@ import { BackupService } from "./backup.js";
 import type { CustomCommandService } from "./custom-commands.js";
 import type { AutoResponder, AutoResponderInput } from "./modules/autoresponder.js";
 import type { Forms, CustomForm } from "./modules/forms.js";
+import type { OnboardingStep, OnboardingTrigger } from "./modules/onboarding.js";
 import type { TicketCustomization, TicketFormField } from "./modules/tickets.js";
 import type { HelpPage } from "./help-pages.js";
 import type { Moderation } from "./modules/moderation.js";
@@ -152,6 +153,10 @@ type ApiOptions = {
   customCommands?: CustomCommandService;
   autoResponder?: AutoResponder;
   forms?: Forms;
+  onboarding?: {
+    get: (guildId: string) => Promise<unknown>;
+    set: (guildId: string, input: { enabled?: boolean; trigger?: OnboardingTrigger; steps?: OnboardingStep[] }) => Promise<unknown>;
+  };
   tickets?: {
     getFormFields: (guildId: string) => Promise<TicketFormField[]>;
     setFormFields: (guildId: string, fields: TicketFormField[]) => Promise<TicketFormField[]>;
@@ -2644,6 +2649,48 @@ export class ManagementApiServer {
             return;
           }
 
+          const onboardingMatch = path.match(/^\/api\/guilds\/([^/]+)\/onboarding$/);
+          if (onboardingMatch) {
+            if (!this.options.onboarding) {
+              this.json(res, 500, { error: "onboarding_unavailable" });
+              return;
+            }
+            const guildId = onboardingMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (method === "GET") {
+              this.json(res, 200, { guildId, flow: await this.options.onboarding.get(guildId) });
+              return;
+            }
+            if (method === "PUT") {
+              const body = await readJson(req);
+              const input: { enabled?: boolean; trigger?: OnboardingTrigger; steps?: OnboardingStep[] } = {};
+              if (body.enabled !== undefined) {
+                if (typeof body.enabled !== "boolean") throw new RequestInputError("invalid_onboarding_enabled", 400);
+                input.enabled = body.enabled;
+              }
+              if (body.trigger !== undefined) {
+                if (body.trigger !== "member.join" && body.trigger !== "verification.passed") throw new RequestInputError("invalid_onboarding_trigger", 400);
+                input.trigger = body.trigger;
+              }
+              if (body.steps !== undefined) {
+                if (!Array.isArray(body.steps) || body.steps.length > 10) throw new RequestInputError("invalid_onboarding_steps", 400);
+                input.steps = body.steps as OnboardingStep[];
+              }
+              const flow = await this.options.onboarding.set(guildId, input);
+              await this.options.auditLog.record({
+                guildId, source: "dashboard", action: "onboarding.updated",
+                targetType: "onboarding-flow", targetId: guildId,
+                metadata: { enabled: input.enabled, trigger: input.trigger, stepCount: input.steps?.length }
+              });
+              this.json(res, 200, { ok: true, guildId, flow });
+              return;
+            }
+            this.json(res, 405, { error: "method_not_allowed" });
+            return;
+          }
           const settingsMatch = path.match(/^\/api\/guilds\/([^/]+)\/settings\/([^/]+)$/);
           if (settingsMatch) {
             const guildId = settingsMatch[1];

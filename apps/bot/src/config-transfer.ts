@@ -2,6 +2,7 @@ import type { Database } from "./database.js";
 import { MODULE_CATALOG } from "./modules/catalog.js";
 import { validateAutomationRule } from "./modules/automation-engine.js";
 import { normalizeFormFields } from "./modules/forms.js";
+import { normalizeOnboardingSteps, normalizeOnboardingTrigger } from "./modules/onboarding.js";
 import type { AutomationAction, AutomationCondition, AutomationEvent } from "@dsp/domain";
 import type { ServerConfigExport, ServerModuleConfig } from "@dsp/domain";
 
@@ -36,6 +37,7 @@ const CONFIG_TABLES: ExportTable[] = [
   { table: "music_settings", fields: ["enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven","queue_access"] },
   { table: "birthday_settings", fields: ["channel_id","announcement_template"] },
   { table: "analytics_settings", fields: ["retention_days","visible_counters"] },
+  { table: "onboarding_flows", fields: ["enabled","trigger","steps"] },
 ];
 
 const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
@@ -389,6 +391,12 @@ export class ConfigTransferService {
 
       const values = fields.map((field) => {
         const value = settings[field] ?? defaults[field];
+        if (table === "onboarding_flows" && field === "trigger") {
+          return normalizeOnboardingTrigger(value);
+        }
+        if (table === "onboarding_flows" && field === "steps") {
+          return JSON.stringify(normalizeOnboardingSteps(value));
+        }
         if ((table === "analytics_settings" && field === "visible_counters") ||
             (table === "starboard_settings" && (field === "ignored_channel_ids" || field === "ignored_role_ids"))) {
           return JSON.stringify(value ?? []);
@@ -544,6 +552,14 @@ export class ConfigTransferService {
       retention_days: 30,
       visible_counters: ["message","member_join","member_leave","voice_join","voice_leave","voice_move"]
     });
+
+    await execute("onboarding_flows", "onboarding", [
+      "enabled","trigger","steps"
+    ], {
+      enabled: false,
+      trigger: "member.join",
+      steps: []
+    });
   }
 }
 
@@ -555,6 +571,7 @@ function tableToModule(table: string): ServerModuleConfig["key"] | null {
     case "ticket_settings": return "tickets";
     case "ticket_sla_settings": return "tickets";
     case "analytics_settings": return "analytics";
+    case "onboarding_flows": return "onboarding";
     case "security_settings": return "security";
     case "verification_settings": return "verification";
     case "leveling_settings": return "leveling";

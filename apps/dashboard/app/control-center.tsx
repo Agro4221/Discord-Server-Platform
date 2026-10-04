@@ -19,6 +19,7 @@ import { StreamAlertsPanel } from "./stream-alerts-panel";
 import { TicketFormPanel } from "./ticket-form-panel";
 import { RolePanelsEditor } from "./role-panels-editor";
 import { FormsPanel } from "./forms-panel";
+import { OnboardingPanel } from "./onboarding-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -205,6 +206,22 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Логи", description: "Отдельный канал для событий verification." }
     ],
     kind: "settings"
+  },
+  onboarding: {
+    icon: "◎",
+    accent: "#82d4b3",
+    title: "Onboarding",
+    summary: "Сценарий действий при входе или после успешной Verification.",
+    category: "server",
+    commands: ["Dashboard"],
+    functions: [
+      { title: "Flow trigger", description: "Запуск при входе участника или после успешной Verification." },
+      { title: "Role steps", description: "Последовательная выдача стартовых ролей с проверкой hierarchy." },
+      { title: "Channel messages", description: "Публикация персонализированных сообщений в выбранные каналы." },
+      { title: "Direct messages", description: "Отправка персонализированных сообщений участнику в ЛС." },
+      { title: "Step ordering", description: "До 10 шагов с явным порядком выполнения." }
+    ],
+    kind: "full"
   },
   forms: {
     icon: "▱",
@@ -465,7 +482,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["moderation", "custom-commands", "autoresponder", "automod", "tickets", "embed", "roles", "forms", "giveaways", "analytics", "automation", "notifications", "stream-alerts"]);
+const PANEL_KEYS = new Set(["moderation", "custom-commands", "autoresponder", "automod", "tickets", "embed", "roles", "forms", "onboarding", "giveaways", "analytics", "automation", "notifications", "stream-alerts"]);
 
 const secondaryButtonStyle = {
   border: "1px solid #303846",
@@ -1593,6 +1610,18 @@ function ModulePage(props: {
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Embed Builder" eyebrow="OPERATIONS" />
           <EmbedBuilderPanel guildId={props.guildId} channels={props.resources.channels.filter((item) => item.type === 0)} onChanged={props.onAudit} />
+        </section>
+      )}
+
+      {props.module?.key === "onboarding" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Onboarding Flow Builder" eyebrow="ONBOARDING FLOW" />
+          <OnboardingPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            roles={props.resources.roles.filter((item) => item.manageable !== false)}
+            onChanged={props.onAudit}
+          />
         </section>
       )}
 
