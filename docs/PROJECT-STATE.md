@@ -438,3 +438,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Release gate verifies required local Compose services are running and rejects orphaned secondary Fleet containers.
 - This is read-only diagnostic logic; it does not start, stop or modify services.
 - Fresh CI verification is pending for this checkpoint.
+
+
+## 2026-10-04 — Release documentation contract cleanup
+- Architecture/test documentation now reflects the implemented local Dashboard model: no user login sessions or CSRF flow; sensitive operations are protected at the Management API bearer boundary.
+- No runtime behavior changed in this checkpoint.

@@ -40,7 +40,7 @@ Verify real component boundaries:
 - Lavalink
 - worker jobs
 - filesystem/persistent volumes
-- OAuth login
+- protected Management API bearer flow
 - provider adapters
 
 ### 4. End-to-end verification
@@ -119,10 +119,10 @@ We intentionally try to break the system.
 
 ### Security abuse
 - privilege escalation through role hierarchy
-- dashboard session fixation/hijacking attempts
-- CSRF attempts
-- replay of stale actions
+- Management API bearer-key leakage/replay attempts
+- replay of stale dashboard actions
 - unauthorized guild access
+- cross-guild data leakage
 - cross-guild data leakage
 - secret leakage in logs/errors
 - automation chains that amplify into spam or destructive actions

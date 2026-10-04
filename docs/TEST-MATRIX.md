@@ -387,3 +387,9 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Deployment contract covers the new read-only checks.
 - ⚠ Live orphan-container and stale-secondary acceptance remains a Windows/Docker runtime test.
 - ☐ Fresh CI for this checkpoint is pending.
+
+
+## 2026-10-04 — Release documentation contract verification
+- ✅ Master Plan and test strategy no longer require removed Dashboard login/RBAC/CSRF flows.
+- ✅ Release verification targets the implemented Management API bearer boundary instead.
+- ☐ Documentation-only cleanup awaits fresh CI.

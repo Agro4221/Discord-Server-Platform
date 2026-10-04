@@ -616,3 +616,10 @@ Never write credentials, tokens or private user data here.
 - It also rejects running orphaned `dsp-bot-fleet-*` containers that do not correspond to an enabled, credentialed secondary identity in the Management API.
 - This closes a local split-brain/stale-secondary visibility gap without mutating the Docker stack.
 - Fresh CI verification is pending for this checkpoint.
+
+
+## 2026-10-04 — Release documentation contract cleanup
+- Updated Master Plan, implementation order and test strategy to match the implemented local Control Center security model: no end-user login/session/CSRF layer; Management API uses internal bearer authentication and rate limiting.
+- Removed stale OAuth/dashboard-session test expectations so future release work targets the real architecture.
+- CI #1706 passed the preceding release-gate hardening checkpoint.
+- Documentation-only verification is pending for this cleanup commit.

@@ -71,9 +71,9 @@ Monorepo:
 ## Security
 - No Administrator requirement by default.
 - Secrets never committed.
-- Server-side validation for dashboard.
-- RBAC for dashboard sessions.
-- CSRF protection and secure local sessions.
+- Server-side validation for Dashboard requests.
+- Local Control Center is loopback/local-first and has no end-user login/session layer.
+- Management API is protected by an internal bearer key and rate-limited.
 - Rate-limit sensitive endpoints.
 - Audit configuration changes.
 - Never log credentials or OAuth secrets.

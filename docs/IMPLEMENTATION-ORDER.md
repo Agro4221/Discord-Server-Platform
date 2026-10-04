@@ -64,10 +64,9 @@ Intentionally:
 - simulate stale/orphaned state
 
 ### Security testing
-- permission boundaries
-- dashboard authentication/RBAC
-- session handling
-- CSRF
+- Discord permission boundaries and role hierarchy
+- Management API bearer authentication and guild-access boundaries
+- stale/replayed dashboard action rejection
 - rate limits
 - secret leakage checks
 - log redaction
