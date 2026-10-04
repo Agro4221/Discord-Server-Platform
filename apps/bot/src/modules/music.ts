@@ -60,9 +60,6 @@ export function trimMusicQueueToPosition<T>(queue: T[], position: number): T | n
 
 
 class PostgresQueueStore implements QueueStoreManager {
-  private readonly searchSessions = new Map<string, { guildId: string; userId: string; tracks: Track[]; expiresAt: number }>();
-  private searchSequence = 0;
-
   constructor(
     private readonly db: Database,
     private readonly botIdentityId: string
@@ -127,6 +124,8 @@ export class Music implements PlatformModule {
   private readonly autoLeaveTimers = new Map<string, NodeJS.Timeout>();
   private readonly requestInFlight = new Set<string>();
   private readonly failoverInFlight = new Set<string>();
+  private readonly searchSessions = new Map<string, { guildId: string; userId: string; tracks: Track[]; expiresAt: number }>();
+  private searchSequence = 0;
 
   constructor(
     private readonly db: Database,
