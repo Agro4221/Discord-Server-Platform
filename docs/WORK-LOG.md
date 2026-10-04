@@ -794,3 +794,16 @@ Never write credentials, tokens or private user data here.
 
 ### Next concrete work
 - After the current CI gate, continue Security/AutoMod response-policy depth, then broader Automation actions/fields and remaining Music/Fleet/VPS breadth.
+
+
+## 2026-10-04 — Security confirmed-executor ban response checkpoint
+- Added optional `executorBanEnabled` Security response policy, disabled by default.
+- When enabled and an executor reaches the existing Anti-Nuke response threshold, Security only bans members passing the existing owner/Administrator/manageability guards and requiring Discord `member.bannable`.
+- Successful ban creates the standard durable moderation `ban` case and emits `moderation.case`.
+- If ban enforcement fails, the response fails soft and the already-configured timeout remains available as fallback.
+- Control Center storage, config transfer and migration 50 were synchronized for the new policy; migration ordering remains monotonic (49 timeout, then 50 ban).
+- Regression coverage now proves successful ban produces a moderation case/event and prevents an unnecessary timeout after a successful ban.
+- Current development tree contains both Security response-depth work and Automation numeric breadth work; CI #1795 is the active verification run.
+
+### Next concrete work
+- Re-check CI #1795 after completion, then continue the remaining Security/AutoMod policy depth and broader Automation actions/fields.
