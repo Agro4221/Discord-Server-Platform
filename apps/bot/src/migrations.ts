@@ -1251,6 +1251,38 @@ const migrations = [
     ])
   },
   {
+    version: 82,
+    name: "custom_forms",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS custom_forms (",
+      "  guild_id text NOT NULL,",
+      "  name text NOT NULL,",
+      "  title text NOT NULL,",
+      "  description text NOT NULL,",
+      "  panel_channel_id text,",
+      "  panel_message_id text,",
+      "  response_channel_id text,",
+      "  button_label text NOT NULL DEFAULT 'Заполнить форму',",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  fields jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,name)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_custom_forms_guild_updated ON custom_forms(guild_id,updated_at DESC);",
+      "CREATE TABLE IF NOT EXISTS custom_form_submissions (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  form_name text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  answers jsonb NOT NULL DEFAULT '{}'::jsonb,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  FOREIGN KEY(guild_id,form_name) REFERENCES custom_forms(guild_id,name) ON DELETE CASCADE",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_custom_form_submissions_form_created ON custom_form_submissions(guild_id,form_name,created_at DESC);"
+    ])
+  },
+  {
     version: 81,
     name: "verification_panel_customization",
     sql: q([
