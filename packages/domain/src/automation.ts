@@ -26,9 +26,12 @@ export type AutomationEvent =
 export type AutomationCondition =
   | { type: "equals"; left: string; right: string }
   | { type: "contains"; left: string; right: string }
+  | { type: "starts-with"; left: string; right: string }
+  | { type: "ends-with"; left: string; right: string }
   | { type: "matches"; left: string; pattern: string }
   | { type: "number-gte"; left: string; right: number }
   | { type: "number-lte"; left: string; right: number }
+  | { type: "number-eq"; left: string; right: number }
   | { type: "has-role"; userId: string; roleId: string }
   | { type: "channel-is"; channelId: string }
   | { type: "cooldown-clear"; key: string };
@@ -40,6 +43,7 @@ export type AutomationAction =
   | { type: "remove-role"; userId: string; roleId: string }
   | { type: "timeout"; userId: string; durationSeconds: number; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
+  | { type: "add-reaction"; channelId: string; messageId: string; emoji: string }
   | { type: "log"; message: string };
 
 export type AutomationRule = {

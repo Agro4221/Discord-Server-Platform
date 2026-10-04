@@ -495,3 +495,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Major platform functionality exists and is integrated.
 - Full 100% feature completeness is not yet established.
 - Live runtime acceptance remains environment-dependent and is tracked independently of feature completeness.
+
+
+## 2026-10-04 — Automation breadth checkpoint
+- Automation now includes richer string-prefix/suffix and exact-numeric conditions plus a message reaction action.
+- Event-relative role checks and event-channel message delivery are aligned between the Dashboard UI and Core validation/runtime.
+- The Automation Discord ID validators now use the intended snowflake regex form.
+- The remaining Automation status is still broader than this slice: additional condition/action catalog depth and live validation remain outstanding.

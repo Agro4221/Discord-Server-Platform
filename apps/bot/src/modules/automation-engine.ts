@@ -611,6 +611,16 @@ export class AutomationEngine implements PlatformModule {
           if (value === undefined || !value.toLocaleLowerCase().includes(condition.right.toLocaleLowerCase())) return false;
           break;
         }
+        case "starts-with": {
+          const value = resolveTextField(event, condition.left);
+          if (value === undefined || !value.toLocaleLowerCase().startsWith(condition.right.toLocaleLowerCase())) return false;
+          break;
+        }
+        case "ends-with": {
+          const value = resolveTextField(event, condition.left);
+          if (value === undefined || !value.toLocaleLowerCase().endsWith(condition.right.toLocaleLowerCase())) return false;
+          break;
+        }
         case "equals":
           if (resolveTextField(event, condition.left) !== condition.right) return false;
           break;
@@ -634,9 +644,15 @@ export class AutomationEngine implements PlatformModule {
           if (value === undefined || value > condition.right) return false;
           break;
         }
+        case "number-eq": {
+          const value = event.numeric?.[String(condition.left)];
+          if (value === undefined || value !== condition.right) return false;
+          break;
+        }
         case "has-role": {
           const guild = this.client?.guilds.cache.get(event.guildId);
-          const member = event.userId ? await guild?.members.fetch(event.userId).catch(() => null) : null;
+          const userId = resolveUserReference(condition.userId, event.userId);
+          const member = userId ? await guild?.members.fetch(userId).catch(() => null) : null;
           if (!member?.roles.cache.has(condition.roleId)) return false;
           break;
         }
@@ -718,6 +734,17 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
+        if (action.type === "add-reaction") {
+          const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
+          const messageId = action.messageId === "@event" ? event.messageId : action.messageId;
+          const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
+          if (channel?.isTextBased() && "messages" in channel && messageId) {
+            const message = await channel.messages.fetch(messageId).catch(() => null);
+            if (message) await message.react(action.emoji);
+          }
+          continue;
+        }
+
       } catch (error) {
         logger.warn("Automation action failed", {
           guildId: event.guildId,
@@ -741,6 +768,8 @@ export function validateAutomationRule(
   for (const condition of conditions) {
     switch (condition.type) {
       case "contains":
+      case "starts-with":
+      case "ends-with":
       case "equals":
         if (condition.left.length > 64 || condition.right.length > 200) throw new Error("automation_condition_too_long");
         break;
@@ -750,13 +779,16 @@ export function validateAutomationRule(
         break;
       case "number-gte":
       case "number-lte":
+      case "number-eq":
         if (String(condition.left).length > 64 || !Number.isFinite(condition.right)) throw new Error("invalid_numeric_condition");
         break;
       case "has-role":
-        if (!/^\\d{17,20}$/.test(condition.userId) || !/^\\d{17,20}$/.test(condition.roleId)) throw new Error("invalid_role_condition");
+        if ((!/^\d{17,20}$/.test(condition.userId) && condition.userId !== "@event") || !/^\d{17,20}$/.test(condition.roleId)) {
+          throw new Error("invalid_role_condition");
+        }
         break;
       case "channel-is":
-        if (!/^\\d{17,20}$/.test(condition.channelId)) throw new Error("invalid_condition_channel");
+        if (!/^\d{17,20}$/.test(condition.channelId)) throw new Error("invalid_condition_channel");
         break;
       case "cooldown-clear":
         if (!condition.key || condition.key.length > 100) throw new Error("invalid_cooldown_key");
@@ -767,24 +799,31 @@ export function validateAutomationRule(
   for (const action of actions) {
     switch (action.type) {
       case "send-message":
-        if (!/^\\d{17,20}$/.test(action.channelId) || !action.content || action.content.length > 2000) throw new Error("invalid_send_message_action");
+        if ((!/^\d{17,20}$/.test(action.channelId) && action.channelId !== "@event") || !action.content || action.content.length > 2000) {
+          throw new Error("invalid_send_message_action");
+        }
         break;
       case "dm-user":
-        if (!/^\\d{17,20}$/.test(action.userId) && action.userId !== "@event") throw new Error("invalid_dm_user");
+        if (!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") throw new Error("invalid_dm_user");
         if (!action.content || action.content.length > 2000) throw new Error("invalid_dm_content");
         break;
       case "add-role":
       case "remove-role":
-        if ((!/^\\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !/^\\d{17,20}$/.test(action.roleId)) throw new Error("invalid_role_action");
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !/^\d{17,20}$/.test(action.roleId)) throw new Error("invalid_role_action");
         break;
       case "timeout":
-        if ((!/^\\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !Number.isInteger(action.durationSeconds) || action.durationSeconds < 1 || action.durationSeconds > 2419200 || !action.reason || action.reason.length > 500) {
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !Number.isInteger(action.durationSeconds) || action.durationSeconds < 1 || action.durationSeconds > 2419200 || !action.reason || action.reason.length > 500) {
           throw new Error("invalid_timeout_action");
         }
         break;
       case "delete-message":
-        if (action.channelId !== "@event" && !/^\\d{17,20}$/.test(action.channelId)) throw new Error("invalid_delete_channel");
-        if (action.messageId !== "@event" && !/^\\d{17,20}$/.test(action.messageId)) throw new Error("invalid_delete_message");
+        if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_delete_channel");
+        if (action.messageId !== "@event" && !/^\d{17,20}$/.test(action.messageId)) throw new Error("invalid_delete_message");
+        break;
+      case "add-reaction":
+        if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_reaction_channel");
+        if (action.messageId !== "@event" && !/^\d{17,20}$/.test(action.messageId)) throw new Error("invalid_reaction_message");
+        if (!action.emoji.trim() || action.emoji.length > 100) throw new Error("invalid_reaction_emoji");
         break;
       case "log":
         if (!action.message || action.message.length > 1000) throw new Error("invalid_log_action");

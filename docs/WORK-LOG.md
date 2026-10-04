@@ -680,3 +680,16 @@ Never write credentials, tokens or private user data here.
 ### Next concrete work
 - Continue feature completion by closing the remaining functional breadth gaps rather than generating more paperwork-only release checkpoints.
 - Keep live Discord/Windows/Lavalink/VPS acceptance separate from feature implementation status.
+
+
+## 2026-10-04 — Automation response breadth checkpoint
+- Expanded the Automation domain and builder with starts-with, ends-with and number-eq conditions.
+- Fixed event-relative has-role validation so the existing @event builder mode is accepted and resolved against the triggering user.
+- Fixed send-message validation so the existing @event channel mode is accepted by the Core validator.
+- Corrected the Automation ID validators from an over-escaped regex form to the intended Discord snowflake pattern.
+- Added the add-reaction action for reacting to the triggering or selected message from an automation rule.
+- Automation Dashboard now exposes the new condition/action primitives.
+- Added regression coverage for the new validation paths and event-relative automation configuration.
+- This is a targeted feature-breadth increment; live Discord permissions and reaction behavior remain part of the release-gate environment.
+### Next concrete work
+- Continue Automation breadth with additional safe event fields/actions, then close remaining Music/Fleet functional breadth gaps before the live release-gate cycle.

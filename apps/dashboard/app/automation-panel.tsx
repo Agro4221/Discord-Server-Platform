@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 
 type Resource = { id: string; name: string };
 type Condition =
-  | { type: "contains" | "equals"; left: string; right: string }
+  | { type: "contains" | "equals" | "starts-with" | "ends-with"; left: string; right: string }
   | { type: "matches"; left: string; pattern: string }
-  | { type: "number-gte" | "number-lte"; left: string; right: number }
+  | { type: "number-gte" | "number-lte" | "number-eq"; left: string; right: number }
   | { type: "has-role"; userId: string; roleId: string }
   | { type: "channel-is"; channelId: string }
   | { type: "cooldown-clear"; key: string };
@@ -17,6 +17,7 @@ type Action =
   | { type: "add-role" | "remove-role"; userId: string; roleId: string }
   | { type: "timeout"; userId: string; durationSeconds: number; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
+  | { type: "add-reaction"; channelId: string; messageId: string; emoji: string }
   | { type: "log"; message: string };
 
 type Rule = {
@@ -170,7 +171,7 @@ export function AutomationPanel({
     const next: Condition =
       type === "channel-is" ? { type, channelId: "" } :
       type === "matches" ? { type, left: "content", pattern: "" } :
-      type === "number-gte" || type === "number-lte" ? { type, left: "memberCount", right: 0 } :
+      type === "number-gte" || type === "number-lte" || type === "number-eq" ? { type, left: "memberCount", right: 0 } :
       type === "has-role" ? { type, userId: "@event", roleId: "" } :
       type === "cooldown-clear" ? { type, key: "" } :
       { type, left: "content", right: "" };
@@ -189,6 +190,7 @@ export function AutomationPanel({
       type === "add-role" || type === "remove-role" ? { type, userId: "@event", roleId: "" } :
       type === "timeout" ? { type, userId: "@event", durationSeconds: 60, reason: "" } :
       type === "delete-message" ? { type, channelId: "@event", messageId: "@event" } :
+      type === "add-reaction" ? { type, channelId: "@event", messageId: "@event", emoji: "👍" } :
       { type: "log", message: "" };
     setActions((current) => current.map((item, i) => i === index ? next : item));
   }
@@ -221,16 +223,19 @@ export function AutomationPanel({
           <div key={index} style={rowStyle}>
             <select value={condition.type} onChange={(e) => replaceCondition(index, e.target.value as Condition["type"])} style={inputStyle}>
               <option value="contains">contains</option>
+              <option value="starts-with">starts-with</option>
+              <option value="ends-with">ends-with</option>
               <option value="equals">equals</option>
               <option value="matches">matches</option>
               <option value="number-gte">number-gte</option>
               <option value="number-lte">number-lte</option>
+              <option value="number-eq">number-eq</option>
               <option value="has-role">has-role</option>
               <option value="channel-is">channel-is</option>
               <option value="cooldown-clear">cooldown-clear</option>
             </select>
 
-            {(condition.type === "contains" || condition.type === "equals" || condition.type === "matches") && (
+            {(condition.type === "contains" || condition.type === "equals" || condition.type === "starts-with" || condition.type === "ends-with" || condition.type === "matches") && (
               <>
                 <select value={condition.left} onChange={(e) => updateCondition(index, { left: e.target.value })} style={inputStyle}>
                   {TEXT_FIELDS.map((field) => <option key={field}>{field}</option>)}
@@ -288,16 +293,19 @@ export function AutomationPanel({
           <div key={"any-" + index} style={rowStyle}>
             <select value={condition.type} onChange={(e) => replaceCondition(index, e.target.value as Condition["type"], true)} style={inputStyle}>
               <option value="contains">contains</option>
+              <option value="starts-with">starts-with</option>
+              <option value="ends-with">ends-with</option>
               <option value="equals">equals</option>
               <option value="matches">matches</option>
               <option value="number-gte">number-gte</option>
               <option value="number-lte">number-lte</option>
+              <option value="number-eq">number-eq</option>
               <option value="has-role">has-role</option>
               <option value="channel-is">channel-is</option>
               <option value="cooldown-clear">cooldown-clear</option>
             </select>
 
-            {(condition.type === "contains" || condition.type === "equals" || condition.type === "matches") && (
+            {(condition.type === "contains" || condition.type === "equals" || condition.type === "starts-with" || condition.type === "ends-with" || condition.type === "matches") && (
               <>
                 <select value={condition.left} onChange={(e) => updateCondition(index, { left: e.target.value }, true)} style={inputStyle}>
                   {TEXT_FIELDS.map((field) => <option key={field}>{field}</option>)}
@@ -366,6 +374,7 @@ export function AutomationPanel({
               <option value="remove-role">remove-role</option>
               <option value="timeout">timeout</option>
               <option value="delete-message">delete-message</option>
+              <option value="add-reaction">add-reaction</option>
               <option value="log">log</option>
             </select>
 
@@ -409,6 +418,17 @@ export function AutomationPanel({
               <div style={actionGrid}>
                 <input value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} placeholder="@event или channel ID" style={inputStyle} />
                 <input value={action.messageId} onChange={(e) => updateAction(index, { messageId: e.target.value })} placeholder="@event или message ID" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "add-reaction" && (
+              <div style={actionGrid}>
+                <select value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} style={inputStyle}>
+                  <option value="@event">Канал события</option>
+                  {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                </select>
+                <input value={action.messageId} onChange={(e) => updateAction(index, { messageId: e.target.value })} placeholder="@event или message ID" style={inputStyle} />
+                <input value={action.emoji} maxLength={100} onChange={(e) => updateAction(index, { emoji: e.target.value })} placeholder="Emoji, например 👍" style={inputStyle} />
               </div>
             )}
 

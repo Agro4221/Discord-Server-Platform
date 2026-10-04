@@ -471,3 +471,12 @@ This section records **feature scope status**, not live-test results. The main t
 - 🟡 in **Planned breadth complete** means the subsystem works but the original specification called for additional breadth/depth.
 - ⚠ in **Live acceptance** means repository/CI evidence is not a substitute for running against real Discord, Lavalink, Windows processes or a clean VPS.
 - This audit therefore does **not** mark the project 100% complete; it records exactly why.
+
+
+## 2026-10-04 — Automation response breadth verification
+- ✅ Validation coverage for starts-with, ends-with and number-eq.
+- ✅ Event-relative has-role validation and send-message @event channel validation.
+- ✅ add-reaction action validation and Dashboard builder coverage.
+- ✅ Automation Discord ID validator regex form corrected.
+- ⚠ Live Discord reaction permissions, missing-message behavior and actual automation execution remain environment-dependent.
+- ☐ Next: additional safe Automation breadth, then remaining Music/Fleet feature-depth and live release gates.
