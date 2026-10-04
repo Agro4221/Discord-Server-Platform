@@ -331,8 +331,8 @@ Music должен стремиться к функциональности си
 | Function-level permission editor | ✅ | Full command-level allow/deny scopes for roles/channels, Prefix/Slash, cooldown and help visibility in Dashboard |
 | Dashboard previews и test actions | 🟡 |
 | Permission / hierarchy diagnostics | ✅ |
-| Audit trail всех административных действий | 🟡 |
-| Per-module activity/error history | 🟡 |
+| Audit trail / activity viewer | ✅ | Durable audit storage with Dashboard filtering and cursor pagination; remaining gap is auditing any future mutation paths before release.
+| Per-module activity/error history | 🟡 | Central audit viewer is ready; module-specific operational histories remain deeper follow-up.
 | Mass configuration / reusable server presets | 🟡 |
 | Import/export с корректным resource remapping | ✅ / расширять |
 | Multi-server / fleet administration | ✅ / расширять |
