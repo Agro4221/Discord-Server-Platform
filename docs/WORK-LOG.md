@@ -737,6 +737,12 @@ Never write credentials, tokens or private user data here.
 - Dashboard now lets an administrator request a restart for a secondary identity.
 - The operation only sets restart_required; an external/supervisor process remains responsible for performing the actual process restart.
 
+## 2026-10-04 — Automation channel naming checkpoint
+- Added `set-channel-name` as a native Automation action.
+- Core validates channel references and a bounded non-empty channel name, then applies rendered names through the Discord channel API.
+- Management API and Dashboard expose the same action, keeping the builder/runtime/API catalogs aligned.
+- Regression coverage covers accepted channel-name actions and rejects blank/overlong names.
+
 ## 2026-10-04 — Automation event/action breadth checkpoint
 - Added Automation handling for reaction.remove, channel.update and role.update events already emitted by Discord Core.
 - Added channel actions set-slowmode and set-channel-topic with event-relative or explicit channel targets.
