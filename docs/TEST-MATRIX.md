@@ -581,3 +581,9 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ Automation ban validation + runtime.
 - ✅ Fleet failover previous-owner detail tests.
 - ✅ CI #1837 full pipeline.
+
+
+## 2026-10-05 — Latest verification
+- ✅ CI #1839 full pipeline.
+- ✅ Automation `set-nickname`: validation + runtime + nickname clear.
+- ✅ Automation `ban`: validation + runtime, rendered reason and bannable guard.
