@@ -29,8 +29,11 @@ export class Verification implements PlatformModule {
   readonly name = "verification";
   private unsubscribe?: () => void;
   private readonly codes = new Map<string, { hash: string; expiresAt: number; attempts: number }>();
+  private guildResolver?: (guildId: string) => import("discord.js").Guild | undefined;
 
-  constructor(private readonly db: Database) {}
+  constructor(private readonly db: Database, guildResolver?: (guildId: string) => import("discord.js").Guild | undefined) {
+    this.guildResolver = guildResolver;
+  }
 
   async init(context: ModuleContext): Promise<void> {
     const a = context.events.on("member.add", (member) => this.onJoin(member));
@@ -108,6 +111,38 @@ export class Verification implements PlatformModule {
     );
   }
 
+  async publishPanel(guildId: string, channelId?: string): Promise<{ channelId: string; messageId: string }> {
+    const config = await this.config(guildId);
+    if (!config.enabled) throw new Error("verification_disabled");
+    const guild = this.clientGuild(guildId);
+    const targetChannelId = channelId ?? config.channelId;
+    if (!targetChannelId) throw new Error("verification_panel_channel_required");
+    const channel = guild.channels.cache.get(targetChannelId);
+    if (!channel || channel.type !== 0) throw new Error("verification_panel_channel_required");
+    const message = await channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(config.panelTitle)
+          .setDescription(config.panelDescription)
+      ],
+      components: [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId("dsp:verify:issue")
+            .setLabel(config.issueButtonLabel)
+            .setStyle(ButtonStyle.Primary)
+        )
+      ]
+    });
+    return { channelId: channel.id, messageId: message.id };
+  }
+
+  private clientGuild(guildId: string): import("discord.js").Guild {
+    const guild = this.guildResolver?.(guildId);
+    if (!guild) throw new Error("guild_not_available");
+    return guild;
+  }
+
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!interaction.inGuild() || interaction.commandName !== "verify") return;
     const sub = interaction.options.getSubcommand();
@@ -153,26 +188,13 @@ export class Verification implements PlatformModule {
       return;
     }
     if (sub === "panel") {
-      const config = await this.config(interaction.guild!.id);
-      const channelOption = interaction.options.getChannel("channel", true);
-      const channel = interaction.guild!.channels.cache.get(channelOption.id);
-      if (!channel || channel.type !== 0) {
-        await interaction.reply({ content: "Panel channel должен быть текстовым.", ephemeral: true });
-        return;
+      const channelId = interaction.options.getChannel("channel", true).id;
+      try {
+        await this.publishPanel(interaction.guild!.id, channelId);
+        await interaction.reply({ content: "Панель Verification опубликована.", ephemeral: true });
+      } catch (error) {
+        await interaction.reply({ content: "Не удалось опубликовать панель: " + String(error instanceof Error ? error.message : error), ephemeral: true });
       }
-      await channel.send({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle(config.panelTitle)
-            .setDescription(config.panelDescription)
-        ],
-        components: [
-          new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder().setCustomId("dsp:verify:issue").setLabel(config.issueButtonLabel).setStyle(ButtonStyle.Primary)
-          )
-        ]
-      });
-      await interaction.reply({ content: "Панель Verification опубликована.", ephemeral: true });
     }
   }
 
