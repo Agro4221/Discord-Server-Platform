@@ -129,3 +129,32 @@ test("fleet heartbeat freshness uses the shared stale threshold", () => {
   assert.equal(isFleetHeartbeatFresh(null, now), false);
   assert.equal(isFleetHeartbeatFresh("not-a-date", now), false);
 });
+
+
+test("primary takeover durably reassigns stale guilds", async () => {
+  let transactionCalls = 0;
+  const queries: string[] = [];
+  const db = {
+    transaction: async (fn: (client: never) => Promise<unknown>) => {
+      transactionCalls += 1;
+      const client = {
+        query: async (sql: string) => {
+          queries.push(sql);
+          return { rows: [{ guild_id: "111111111111111111" }] };
+        }
+      };
+      return fn(client as never);
+    }
+  } as never;
+
+  const primary = new BotIdentityRepository(db, "primary");
+  assert.deepEqual(await primary.claimStaleGuildsAsPrimary(["111111111111111111"], 10), ["111111111111111111"]);
+  assert.equal(transactionCalls, 1);
+  assert.match(queries[0] ?? "", /SET bot_identity_id='primary'/);
+});
+
+test("secondary cannot perform primary takeover", async () => {
+  const db = { transaction: async () => { throw new Error("transaction_should_not_run"); } } as never;
+  const secondary = new BotIdentityRepository(db, "secondary");
+  assert.deepEqual(await secondary.claimStaleGuildsAsPrimary(["111111111111111111"], 10), []);
+});

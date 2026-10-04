@@ -203,6 +203,33 @@ async setFailover(id: string, enabled: boolean): Promise<void> {
     if (result.rowCount !== 1) throw new Error("bot_identity_not_available");
   }
 
+  async claimStaleGuildsAsPrimary(guildIds: string[], limit = 100): Promise<string[]> {
+    if (this.identityId !== "primary" || guildIds.length === 0) return [];
+
+    const safeLimit = clampFailoverBatchLimit(limit);
+    return this.db.transaction(async (client) => {
+      const result = await client.query<{ guild_id: string }>(
+        `WITH candidates AS (
+           SELECT ga.guild_id
+             FROM guild_bot_assignments ga
+             LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id
+            WHERE ga.guild_id = ANY($1::text[])
+              AND ga.bot_identity_id <> 'primary'
+              AND (bh.last_seen_at IS NULL OR bh.last_seen_at < now()-interval '${FLEET_HEARTBEAT_STALE_SECONDS} seconds')
+            ORDER BY ga.updated_at ASC
+            LIMIT $2
+            FOR UPDATE OF ga SKIP LOCKED
+         )
+         UPDATE guild_bot_assignments ga
+            SET bot_identity_id='primary',updated_at=now()
+           FROM candidates
+          WHERE ga.guild_id=candidates.guild_id
+          RETURNING ga.guild_id`,
+        [guildIds, safeLimit]
+      );
+      return result.rows.map((row) => row.guild_id);
+    });
+  }
   async claimStaleGuilds(guildIds: string[], limit = 20): Promise<string[]> {
     if (this.identityId === "primary" || guildIds.length === 0) return [];
     const identity = await this.db.query<{ failover_enabled: boolean; enabled: boolean }>(
