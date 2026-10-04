@@ -46,6 +46,10 @@ export function nextMusicQueueRepeatMode(mode: MusicRepeatMode): MusicRepeatMode
 export function clampMusicVolume(value: number): number {
   return Math.min(200, Math.max(0, Math.round(value)));
 }
+export function isValidMusicSearchSelection(index: number, length: number): boolean {
+  return Number.isInteger(index) && index >= 0 && index < length;
+}
+
 export function trimMusicQueueToPosition<T>(queue: T[], position: number): T | null {
   if (!Number.isInteger(position) || position < 1 || position > queue.length) return null;
   const target = queue[position - 1] ?? null;
@@ -1958,7 +1962,7 @@ export class Music implements PlatformModule {
       const token = parts[3];
       const index = Number(parts[4]);
       const session = token ? this.searchSessions.get(token) : undefined;
-      if (!session || session.guildId !== interaction.guild.id || session.userId !== interaction.user.id || session.expiresAt < Date.now() || !Number.isInteger(index) || index < 0 || index >= session.tracks.length) {
+      if (!session || session.guildId !== interaction.guild.id || session.userId !== interaction.user.id || session.expiresAt < Date.now() || !isValidMusicSearchSelection(index, session.tracks.length)) {
         await interaction.reply({ content: "Результаты поиска устарели или недоступны.", ephemeral: true });
         if (token) this.searchSessions.delete(token);
         return;
