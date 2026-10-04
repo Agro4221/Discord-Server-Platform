@@ -805,6 +805,13 @@ const migrations = [
     ])
   },
   {
+    version: 47,
+    name: "automod_log_channel",
+    sql: q([
+      "ALTER TABLE automod_rules ADD COLUMN IF NOT EXISTS log_channel_id text;"
+    ])
+  },
+  {
     version: 48,
     name: "fleet_restart_requests",
     sql: q([
@@ -824,15 +831,7 @@ const migrations = [
     sql: q([
       "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS executor_ban_enabled boolean NOT NULL DEFAULT false;"
     ])
-  },
-  {
-    version: 47,
-    name: "automod_log_channel",
-    sql: q([
-      "ALTER TABLE automod_rules ADD COLUMN IF NOT EXISTS log_channel_id text;"
-    ])
-  }
-] as const;
+  }] as const;
 
 export async function migrate(db: Database): Promise<void> {
   await db.query(q([
