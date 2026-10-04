@@ -371,7 +371,7 @@ export class StreamAlerts implements PlatformModule {
     if(!r.ok)throw new Error("twitch_token_http_"+r.status);
     const body=await r.json() as {access_token?:string;expires_in?:number};
     if(!body.access_token)throw new Error("twitch_token_missing");
-    this.twitchToken={value:body.access_token,expiresAt:Date.now()+Math.max(60,Number(body.expires_in??3600))*1000};
+    this.twitchTokens.set(cacheKey,{value:body.access_token,expiresAt:Date.now()+Math.max(60,Number(body.expires_in??3600))*1000});
     return body.access_token;
   }
 
