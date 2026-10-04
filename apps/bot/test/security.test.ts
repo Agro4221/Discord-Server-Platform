@@ -99,7 +99,7 @@ test("Security persists successful executor-role removals as durable non-reversi
   const call = calls.find((entry) => entry.text.startsWith("INSERT INTO security_events(guild_id,event_type,metadata)"));
   assert.ok(call);
   assert.equal(call?.values[0], "guild-1");
-  assert.match(String(call?.values[1]), /security\.executor-role-removed/);
+  assert.match(String(call?.text), /'security\.executor-role-removed'/);
   assert.match(String(call?.values[1]), /"reversible":false/);
   assert.match(String(call?.values[1]), /"roleId":"role-1"/);
 });
