@@ -34,6 +34,15 @@ type ApiOptions = {
   transfer: ConfigTransferService;
   backups: BackupService;
   identities?: BotIdentityRepository;
+  botSetup?: {
+    get: () => Promise<unknown>;
+    update: (input: {
+      clientId: string;
+      token?: string;
+      enabled?: boolean;
+      presenceName?: string | null;
+    }) => Promise<unknown>;
+  };
   guildAccess?: (guildId: string) => boolean;
   actions: Record<string, (guildId: string) => Promise<unknown>>;
   giveaways?: {
@@ -278,6 +287,49 @@ export class ManagementApiServer {
           const scopedGuild = path.match(/^\/api\/guilds\/([^/]+)/);
           if (scopedGuild && this.options.guildAccess && !this.options.guildAccess(scopedGuild[1] ?? "")) {
             this.json(res, 404, { error: "guild_not_found" });
+            return;
+          }
+
+          if ((method === "GET" || method === "PUT") && path === "/api/bot") {
+            if (!this.options.botSetup) {
+              this.json(res, 500, { error: "bot_setup_unavailable" });
+              return;
+            }
+            if (method === "GET") {
+              this.json(res, 200, { bot: await this.options.botSetup.get() });
+              return;
+            }
+
+            const body = await readJson(req);
+            if (
+              typeof body.clientId !== "string" ||
+              !/^\d{17,20}$/.test(body.clientId) ||
+              (body.token !== undefined && (typeof body.token !== "string" || body.token.length < 1 || body.token.length > 512)) ||
+              (body.enabled !== undefined && typeof body.enabled !== "boolean") ||
+              (body.presenceName !== undefined && body.presenceName !== null && (typeof body.presenceName !== "string" || body.presenceName.length > 128))
+            ) {
+              throw new RequestInputError("invalid_bot_registration", 400);
+            }
+
+            const result = await this.options.botSetup.update({
+              clientId: body.clientId,
+              ...(body.token !== undefined ? { token: body.token } : {}),
+              ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
+              ...(body.presenceName !== undefined ? { presenceName: body.presenceName === null ? null : body.presenceName.trim() } : {})
+            });
+            await this.options.auditLog.record({
+              source: "dashboard",
+              action: "bot.credentials.updated",
+              targetType: "bot-identity",
+              targetId: String((result as { id?: string })?.id ?? "primary"),
+              metadata: {
+                clientId: body.clientId,
+                tokenChanged: body.token !== undefined,
+                enabled: body.enabled,
+                presenceNameChanged: body.presenceName !== undefined
+              }
+            });
+            this.json(res, 200, { ok: true, bot: result });
             return;
           }
 
