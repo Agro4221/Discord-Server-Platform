@@ -46,6 +46,34 @@ import { InviteTracking } from "./modules/invite-tracking.js";
 import { HelpPages } from "./help-pages.js";
 import { Forms } from "./modules/forms.js";
 
+async function applyBotProfile(client: import("discord.js").Client, input: {
+  username?: string;
+  avatarData?: string | null;
+  bannerData?: string | null;
+}): Promise<void> {
+  if (!client.user) return;
+
+  const edit: {
+    username?: string;
+    avatar?: string | null;
+    banner?: string | null;
+  } = {};
+
+  if (input.username !== undefined && input.username !== client.user.username) {
+    edit.username = input.username;
+  }
+  if (input.avatarData !== undefined) {
+    edit.avatar = input.avatarData;
+  }
+  if (input.bannerData !== undefined) {
+    edit.banner = input.bannerData;
+  }
+
+  if (Object.keys(edit).length > 0) {
+    await client.user.edit(edit);
+  }
+}
+
 let fatalCleanup: (() => Promise<void>) | undefined;
 
 async function main(): Promise<void> {
@@ -316,8 +344,21 @@ async function main(): Promise<void> {
         : identities.ownsGuild(guildId),
     identities,
     botSetup: {
-      get: async () => identities.settings(),
-      update: async (input) => {
+      get: async () => ({
+        ...(await identities.settings()),
+        username: client.user?.username ?? null,
+        avatarUrl: client.user?.displayAvatarURL({ size: 256 }) ?? null,
+        bannerUrl: client.user?.bannerURL({ size: 512 }) ?? null
+      }),
+      update: async (input: {
+        clientId: string;
+        token?: string;
+        enabled?: boolean;
+        presenceName?: string | null;
+        username?: string;
+        avatarData?: string | null;
+        bannerData?: string | null;
+      }) => {
         const saved = await identities.saveSettings(input);
         const credentials = await identities.credentials();
         try {
@@ -329,6 +370,7 @@ async function main(): Promise<void> {
               enabled: saved.enabled,
               presenceName: saved.presenceName
             });
+            await applyBotProfile(client, input);
           } else {
             await connectDiscord({
               clientId: saved.clientId,
