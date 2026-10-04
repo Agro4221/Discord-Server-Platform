@@ -485,3 +485,9 @@ Live validation, требующая пользовательского окру�
 - Completed and CI-verified the next Administration slice.
 - Current implementation checkpoint: `35660b0f5291104c4d66bc80463dfa768f2f2174`.
 - Next unfinished high-priority item in Administration is **per-module activity/error history**; then reusable server configuration presets.
+
+
+### 2026-10-05 — Per-module activity/error history closed
+- Implemented and CI-verified module-scoped operational history on top of the existing Audit Log.
+- Final code checkpoint: `2bdd9e7f092da349b8caed846459dc95fb9ffdd7`.
+- Next single module: **Mass configuration / reusable server presets**.

@@ -332,7 +332,7 @@ Music должен стремиться к функциональности си
 | Dashboard previews и test actions | ✅ | Welcome preview, Automation dry-run, Onboarding flow dry-run и operational hierarchy test actions; дополнительные module-specific previews могут расширяться дальше |
 | Permission / hierarchy diagnostics | ✅ |
 | Audit trail / activity viewer | ✅ | Durable audit storage with Dashboard filtering and cursor pagination; remaining gap is auditing any future mutation paths before release.
-| Per-module activity/error history | 🟡 | Central audit viewer is ready; module-specific operational histories remain deeper follow-up.
+| Per-module activity/error history | ✅ / расширять | Module pages now query module-scoped Audit Log activity with bounded pagination and error-like event highlighting; future mutation paths can add richer module-specific diagnostics |
 | Mass configuration / reusable server presets | 🟡 |
 | Import/export с корректным resource remapping | ✅ / расширять |
 | Multi-server / fleet administration | ✅ / расширять |

@@ -491,3 +491,13 @@ Never write credentials, tokens or private user data here.
 - Dashboard displays structured issues and a rendered step preview.
 - CI `#1862` passed: 123 tests, bot typecheck, domain build, bot build and Dashboard production build.
 - Dashboard preview/test-actions backlog item is now considered implemented; future modules may add their own test surfaces using the same Management API/action conventions.
+
+
+## 2026-10-05 — Per-module activity/error history
+- Extended the existing AuditLog query contract with action-prefix and target filters.
+- Added a whitelisted module-to-action-prefix mapping so module pages can retrieve their operational history without accepting arbitrary prefix queries from the browser.
+- Added Management API module activity endpoint with bounded cursor pagination.
+- Added a reusable Dashboard Module Activity panel to every module page.
+- Error-like actions are highlighted when audit actions contain fail/error/denied/blocked; this is an audit-derived operational signal, not a replacement for internal structured error telemetry.
+- Added regression coverage for prefix query construction and wildcard escaping.
+- CI `#1873` passed.

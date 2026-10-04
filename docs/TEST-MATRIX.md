@@ -220,3 +220,11 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - The current platform now has multiple read-only/testable Dashboard operations: Automation dry-run, Onboarding flow validation/dry-run, plus existing Welcome preview and Security hierarchy diagnostics.
 - The Onboarding dry-run checks live guild resources, role hierarchy, channel send permissions and Verification dependency without performing member changes or message delivery.
 - Remaining module-specific preview UX can be extended later without changing the shared action/API contract.
+
+
+## 2026-10-05 — Per-module activity/error history verified
+- CI `#1873` passed: bot typecheck and tests, domain/bot/dashboard builds all green.
+- Audit Log now supports bounded action-prefix queries plus target filters and a module activity helper.
+- Management API exposes `GET /api/guilds/:guildId/modules/:moduleKey/activity`.
+- Control Center shows module-scoped activity with pagination and error-like action highlighting.
+- This intentionally reuses the durable Audit Log rather than introducing another event store.
