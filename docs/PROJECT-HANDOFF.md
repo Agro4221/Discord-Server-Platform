@@ -538,3 +538,8 @@ Live validation, требующая пользовательского окру�
 - Custom member rewards / milestones are complete and CI-verified (#1955).
 - Next single module: **Community social widgets / engagement depth**.
 - Do not reopen completed rewards, Ticket Panels, Analytics or Integration work.
+
+
+### 2026-10-05 — Current checkpoint after Community Hub
+- Social/community engagement widgets are complete and CI-verified (#1964).
+- Next single module: **Additional social feeds**.
