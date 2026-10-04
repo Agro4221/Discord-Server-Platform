@@ -290,3 +290,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Added a Dashboard action for sending a clearly labeled Welcome preview to the configured channel; it exercises the same message/embed rendering path while using a fake preview identity.
 - Verification panel presentation is now persistent/configurable: title, description, issue-code button and confirmation button labels.
 - Both additions reuse the existing generic settings/action/audit architecture; no second configuration model was introduced.
+\n\n### 2026-10-04 — Universal Forms module
+- The bot now has a reusable Forms module separate from Tickets.
+- Form definitions and submissions are durable in PostgreSQL; Dashboard and Discord share the same runtime contract.
+- Form panels use a Discord button to open a Modal; answers are validated server-side, persisted and optionally forwarded to a response channel.
+- The module is included in the catalog, shared config domain, command-policy definitions, Management API and Dashboard routes.
