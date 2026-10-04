@@ -9,7 +9,9 @@ import {
   clampSecurityWindowSeconds,
   removeSecurityExecutorRoles,
   securityAuditLogEventType,
-  securityAuditDestructiveType
+  securityAuditDestructiveType,
+  clampSecurityExecutorTimeoutMinutes,
+  Security
 } from "../src/modules/security.js";
 import { AuditLogEvent } from "discord.js";
 
@@ -222,4 +224,49 @@ test("Security audit type resolver covers extended destructive event names", () 
   assert.equal(securityAuditLogEventType("channel.overwrite.delete"), AuditLogEvent.ChannelOverwriteDelete);
   assert.equal(securityAuditLogEventType("member.prune"), AuditLogEvent.MemberPrune);
   assert.equal(securityAuditLogEventType("integration.delete"), AuditLogEvent.IntegrationDelete);
+});
+
+
+test("Security executor timeout is bounded and disabled by zero", () => {
+  assert.equal(clampSecurityExecutorTimeoutMinutes(-1), 0);
+  assert.equal(clampSecurityExecutorTimeoutMinutes(0), 0);
+  assert.equal(clampSecurityExecutorTimeoutMinutes(15.9), 15);
+  assert.equal(clampSecurityExecutorTimeoutMinutes(40320), 40320);
+  assert.equal(clampSecurityExecutorTimeoutMinutes(50000), 40320);
+  assert.equal(clampSecurityExecutorTimeoutMinutes(Number.NaN), 0);
+});
+
+test("Security configure persists executor timeout policy", async () => {
+  const calls: Array<{ text: string; values: readonly unknown[] }> = [];
+  const db = {
+    async query<T>(text: string, values: readonly unknown[] = []) {
+      calls.push({ text, values });
+      if (text.startsWith("SELECT enabled,max_joins")) {
+        return {
+          rows: [{
+            enabled: true,
+            max_joins: 10,
+            window_seconds: 20,
+            max_destructive_actions: 5,
+            destructive_window_seconds: 20,
+            quarantine_role_id: null,
+            log_channel_id: null,
+            incident_duration_seconds: 300,
+            auto_quarantine: true,
+            remove_executor_roles: true,
+            executor_timeout_minutes: 0
+          }]
+        } as { rows: T[] };
+      }
+      return { rows: [], rowCount: 1 } as { rows: T[]; rowCount: number };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const security = new Security(db);
+  await security.configure("guild-1", { executorTimeoutMinutes: 30 });
+
+  const insert = calls.find((entry) => entry.text.startsWith("INSERT INTO security_settings"));
+  assert.ok(insert);
+  assert.equal(insert?.values.at(-1), 30);
+  assert.match(insert?.text ?? "", /executor_timeout_minutes/);
 });
