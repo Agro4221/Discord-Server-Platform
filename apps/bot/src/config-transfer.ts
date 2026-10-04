@@ -901,7 +901,6 @@ function normalizeImportedTicket(value: unknown): NormalizedTicket {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_ticket");
   const object = value as Record<string, unknown>;
   if (
-    typeof object.id !== "number" || !Number.isSafeInteger(object.id) || object.id < 1 ||
     typeof object.channel_id !== "string" || !/^\d{17,20}$/.test(object.channel_id) ||
     typeof object.creator_id !== "string" || !/^\d{17,20}$/.test(object.creator_id) ||
     (object.claimed_by !== null && object.claimed_by !== undefined && (typeof object.claimed_by !== "string" || !/^\d{17,20}$/.test(object.claimed_by))) ||
@@ -931,7 +930,9 @@ function normalizeImportedTicket(value: unknown): NormalizedTicket {
     lastActivityAt: typeof object.last_activity_at === "string" ? object.last_activity_at : null,
     panelId: typeof object.panel_id === "number" && Number.isSafeInteger(object.panel_id) && object.panel_id > 0
       ? object.panel_id
-      : null
+      : typeof object.panel_id === "string" && /^\d+$/.test(object.panel_id) && Number(object.panel_id) > 0
+        ? Number(object.panel_id)
+        : null
   };
 }
 
@@ -949,7 +950,10 @@ function normalizeImportedTicketPanel(value: unknown): ImportedTicketPanel {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_ticket_panel");
   const object = value as Record<string, unknown>;
   if (
-    typeof object.id !== "number" || !Number.isSafeInteger(object.id) || object.id < 1 ||
+    !(
+      (typeof object.id === "number" && Number.isSafeInteger(object.id) && object.id > 0) ||
+      (typeof object.id === "string" && /^\d+$/.test(object.id) && Number(object.id) > 0)
+    ) ||
     typeof object.channel_id !== "string" || !/^\d{17,20}$/.test(object.channel_id) ||
     (object.message_id !== null && object.message_id !== undefined &&
       (typeof object.message_id !== "string" || !/^\d{17,20}$/.test(object.message_id))) ||
@@ -961,7 +965,7 @@ function normalizeImportedTicketPanel(value: unknown): ImportedTicketPanel {
     throw new Error("invalid_ticket_panel");
   }
   return {
-    id: object.id,
+    id: typeof object.id === "number" ? object.id : Number(object.id),
     channelId: object.channel_id,
     messageId: typeof object.message_id === "string" ? object.message_id : null,
     title: object.title.trim(),
