@@ -21,6 +21,7 @@ import { RolePanelsEditor } from "./role-panels-editor";
 import { FormsPanel } from "./forms-panel";
 import { OnboardingPanel } from "./onboarding-panel";
 import { LevelingRewardsPanel } from "./leveling-rewards-panel";
+import { CommunityHubPanel } from "./community-hub-panel";
 import { ModuleActivityPanel } from "./module-activity-panel";
 import { ConfigPresetsPanel } from "./config-presets-panel";
 
@@ -979,6 +980,11 @@ export function ControlCenter() {
                 onToggle={(key, value) => void toggle(key, value)}
                 saving={saving}
               />
+              {guildId && (
+                <div style={{ marginTop: 14 }}>
+                  <CommunityHubPanel guildId={guildId} />
+                </div>
+              )}
             )}
 
             {view === "category" && (
