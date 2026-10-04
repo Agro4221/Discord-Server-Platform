@@ -662,3 +662,14 @@ Never write credentials, tokens or private user data here.
 ### Current boundary
 - Repository-side native/runtime hardening is green.
 - Remaining acceptance is genuinely machine/environment dependent: live Discord permissions/hierarchy, real secondary-bot process lifetime, Lavalink/node-loss audio recovery, chaos/soak and clean-host deployment.
+
+## 2026-10-04 — Feature completeness audit checkpoint
+- Performed an explicit inventory of the originally planned platform functionality instead of treating "Release Candidate" or green CI as proof that every planned feature is fully complete.
+- Confirmed that the major functional areas are already present in the repository: Discord Core/Event Bus/module lifecycle; PostgreSQL and migrations; Control Center; moderation/cases; Temporary Voice; tickets/transcripts; role panels; giveaways; starboard; economy/shop/ledger; reminders/AFK/utility; leveling; welcome/verification; notifications; analytics; backup/restore; import/export; Automation; AutoMod; Security/Anti-Raid/Anti-Nuke; Music/Lavalink; multi-bot Music routing/Fleet; Bot credential registration; and native Windows runtime tooling.
+- Confirmed that several areas are functionally implemented but still need breadth/depth or final acceptance before they can be called 100% complete: AutoMod/Security response-policy depth; broader Automation condition/action coverage; additional Music providers and full multi-node failover; full Fleet orchestration/failover hardening; complete VPS install/upgrade/production workflow; and E2E/chaos/soak/live runtime validation.
+- Important distinction recorded: a module being implemented is not the same as the entire planned feature set being exhausted, and automated CI is not the same as live Discord/Windows/Lavalink acceptance.
+- Do not declare the project "100% feature-complete" until the remaining functional extensions are either implemented or explicitly accepted as out-of-scope/known limitations and the corresponding release-gate tests are complete.
+- Current verified repository baseline remains commit `807af06529ff0a95313db2d5454475e8574dcf53` with CI #1720 green; this checkpoint adds documentation only.
+### Next concrete work
+- Continue feature completion by closing the remaining functional breadth gaps rather than generating more paperwork-only release checkpoints.
+- Keep live Discord/Windows/Lavalink/VPS acceptance separate from feature implementation status.
