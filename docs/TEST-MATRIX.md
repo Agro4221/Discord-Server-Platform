@@ -541,3 +541,12 @@ This section records **feature scope status**, not live-test results. The main t
 - Added runtime regression coverage proving successful timeout enforcement creates the standard moderation timeout case/event.
 - Added negative coverage proving a failed Discord timeout does not create a false moderation case.
 - Live Discord hierarchy/permission/timeout behavior remains an environment-dependent release-gate case.
+
+## 2026-10-04 — Security / Automation verification snapshot
+- ✅ Security executor timeout bounds and persisted configuration are regression-covered.
+- ✅ Successful Security executor timeout creates the standard moderation timeout case/event.
+- ✅ Failed Security executor timeout does not create a false moderation case.
+- ✅ Automation `number-eq` Dashboard rendering gap fixed in both ALL and ANY condition paths.
+- ✅ Automation `number-gt` and `number-lt` validation coverage added.
+- ⚠ Live Discord timeout/hierarchy behavior and live Automation execution remain release-gate environment checks.
+- CI #1783 on the current tree is pending.
