@@ -965,7 +965,8 @@ export function ControlCenter() {
 
           <section style={{ flex: 1, minWidth: 0 }}>
             {view === "overview" && (
-              <Overview
+              <>
+                <Overview
                 guild={selectedGuild}
                 health={health}
                 catalog={catalog}
@@ -984,7 +985,7 @@ export function ControlCenter() {
                 <div style={{ marginTop: 14 }}>
                   <CommunityHubPanel guildId={guildId} />
                 </div>
-              )}
+              </>
             )}
 
             {view === "category" && (
