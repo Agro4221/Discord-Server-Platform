@@ -698,12 +698,12 @@ export class Security implements PlatformModule {
         )
       : member.roles.cache.filter(() => false);
 
-    const removedRoleIds: string[] = [];
-    for (const role of removable.values()) {
-      try {
+    const removedRoleIds = await removeSecurityExecutorRoles(
+      [...removable.values()],
+      async (role) => {
         await member.roles.remove(role, "Security destructive burst response");
-        removedRoleIds.push(role.id);
-      } catch (error) {
+      },
+      (role, error) => {
         logger.warn("Security role removal failed", {
           guildId,
           userId,
@@ -711,7 +711,7 @@ export class Security implements PlatformModule {
           error: String(error)
         });
       }
-    }
+    );
 
     await this.trackQuarantine(incidentId, member, config);
 
@@ -735,6 +735,23 @@ export class Security implements PlatformModule {
       userId
     );
   }
+}
+
+export async function removeSecurityExecutorRoles<T extends { id: string }>(
+  roles: readonly T[],
+  removeRole: (role: T) => Promise<void>,
+  onFailure?: (role: T, error: unknown) => void
+): Promise<string[]> {
+  const removedRoleIds: string[] = [];
+  for (const role of roles) {
+    try {
+      await removeRole(role);
+      removedRoleIds.push(role.id);
+    } catch (error) {
+      onFailure?.(role, error);
+    }
+  }
+  return removedRoleIds;
 }
 
 export function shouldTriggerSecurityIncident(
