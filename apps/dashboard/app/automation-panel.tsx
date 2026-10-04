@@ -19,6 +19,8 @@ type Action =
   | { type: "delete-message"; channelId: string; messageId: string }
   | { type: "add-reaction" | "remove-reaction"; channelId: string; messageId: string; emoji: string }
   | { type: "pin-message" | "unpin-message"; channelId: string; messageId: string }
+  | { type: "set-slowmode"; channelId: string; seconds: number }
+  | { type: "set-channel-topic"; channelId: string; topic: string }
   | { type: "log"; message: string };
 
 type Rule = {
@@ -194,6 +196,8 @@ export function AutomationPanel({
       type === "delete-message" ? { type, channelId: "@event", messageId: "@event" } :
       type === "add-reaction" || type === "remove-reaction" ? { type, channelId: "@event", messageId: "@event", emoji: "👍" } :
       type === "pin-message" || type === "unpin-message" ? { type, channelId: "@event", messageId: "@event" } :
+      type === "set-slowmode" ? { type, channelId: "@event", seconds: 0 } :
+      type === "set-channel-topic" ? { type, channelId: "@event", topic: "" } :
       { type: "log", message: "" };
     setActions((current) => current.map((item, i) => i === index ? next : item));
   }
@@ -381,6 +385,8 @@ export function AutomationPanel({
               <option value="remove-reaction">remove-reaction</option>
               <option value="pin-message">pin-message</option>
               <option value="unpin-message">unpin-message</option>
+              <option value="set-slowmode">set-slowmode</option>
+              <option value="set-channel-topic">set-channel-topic</option>
               <option value="log">log</option>
             </select>
 
@@ -445,6 +451,26 @@ export function AutomationPanel({
                   {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
                 </select>
                 <input value={action.messageId} onChange={(e) => updateAction(index, { messageId: e.target.value })} placeholder="@event или message ID" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "set-slowmode" && (
+              <div style={actionGrid}>
+                <select value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} style={inputStyle}>
+                  <option value="@event">Канал события</option>
+                  {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                </select>
+                <input type="number" min={0} max={21600} value={action.seconds} onChange={(e) => updateAction(index, { seconds: Number(e.target.value) })} style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "set-channel-topic" && (
+              <div style={actionGrid}>
+                <select value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} style={inputStyle}>
+                  <option value="@event">Канал события</option>
+                  {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                </select>
+                <input value={action.topic} maxLength={1024} onChange={(e) => updateAction(index, { topic: e.target.value })} placeholder="Новый topic" style={inputStyle} />
               </div>
             )}
 

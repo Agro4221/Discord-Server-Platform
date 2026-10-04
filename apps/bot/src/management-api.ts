@@ -2519,6 +2519,18 @@ export function validateAutomationPayload(
         }
         break;
       }
+      case "set-slowmode":
+        if (typeof item.channelId !== "string" || (item.channelId !== "@event" && !/^\d{17,20}$/.test(item.channelId)) ||
+            typeof item.seconds !== "number" || !Number.isInteger(item.seconds) || item.seconds < 0 || item.seconds > 21600) {
+          throw new RequestInputError("invalid_slowmode_action", 400);
+        }
+        break;
+      case "set-channel-topic":
+        if (typeof item.channelId !== "string" || (item.channelId !== "@event" && !/^\d{17,20}$/.test(item.channelId)) ||
+            typeof item.topic !== "string" || item.topic.length > 1024) {
+          throw new RequestInputError("invalid_topic_action", 400);
+        }
+        break;
       default:
         throw new RequestInputError("unsupported_automation_action", 400);
     }

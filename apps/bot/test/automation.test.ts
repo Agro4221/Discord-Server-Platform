@@ -34,3 +34,16 @@ test("Automation validation rejects malformed message action references", () => 
     { type: "pin-message", channelId: "bad", messageId: "@event" }
   ]), /invalid_message_action_channel/);
 });
+
+test("Automation validation covers channel management actions", () => {
+  assert.doesNotThrow(() => validateAutomationRule("message.create", [], [
+    { type: "set-slowmode", channelId: "@event", seconds: 30 },
+    { type: "set-channel-topic", channelId: "@event", topic: "Topic {content}" }
+  ]));
+  assert.throws(() => validateAutomationRule("message.create", [], [
+    { type: "set-slowmode", channelId: "@event", seconds: 21601 }
+  ]), /invalid_slowmode_seconds/);
+  assert.throws(() => validateAutomationRule("message.create", [], [
+    { type: "set-channel-topic", channelId: "@event", topic: "x".repeat(1025) }
+  ]), /automation_topic_too_long/);
+});

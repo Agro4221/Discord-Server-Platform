@@ -776,6 +776,24 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
+        if (action.type === "set-slowmode") {
+          const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
+          const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
+          if (channel && "setRateLimitPerUser" in channel) {
+            await channel.setRateLimitPerUser(action.seconds, "Automation rule");
+          }
+          continue;
+        }
+
+        if (action.type === "set-channel-topic") {
+          const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
+          const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
+          if (channel && "setTopic" in channel) {
+            await channel.setTopic(renderTemplate(action.topic, event), "Automation rule");
+          }
+          continue;
+        }
+
       } catch (error) {
         logger.warn("Automation action failed", {
           guildId: event.guildId,
@@ -861,6 +879,14 @@ export function validateAutomationRule(
       case "unpin-message":
         if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_message_action_channel");
         if (action.messageId !== "@event" && !/^\d{17,20}$/.test(action.messageId)) throw new Error("invalid_message_action_message");
+        break;
+      case "set-slowmode":
+        if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_slowmode_channel");
+        if (!Number.isInteger(action.seconds) || action.seconds < 0 || action.seconds > 21600) throw new Error("invalid_slowmode_seconds");
+        break;
+      case "set-channel-topic":
+        if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_topic_channel");
+        if (action.topic.length > 1024) throw new Error("automation_topic_too_long");
         break;
       case "log":
         if (!action.message || action.message.length > 1000) throw new Error("invalid_log_action");

@@ -50,6 +50,8 @@ export type AutomationAction =
   | { type: "remove-reaction"; channelId: string; messageId: string; emoji: string }
   | { type: "pin-message"; channelId: string; messageId: string }
   | { type: "unpin-message"; channelId: string; messageId: string }
+  | { type: "set-slowmode"; channelId: string; seconds: number }
+  | { type: "set-channel-topic"; channelId: string; topic: string }
   | { type: "log"; message: string };
 
 export type AutomationRule = {
