@@ -547,3 +547,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Migration 49 and regression tests cover the new policy.
 - Development feature commit: 0722ed241e3a677b27c73dac8bd41edc20e93c29.
 - Fresh CI verification is pending for this development tree.
+
+## 2026-10-04 — Security + Automation breadth checkpoint
+- Security response policy now supports an optional executor timeout in addition to the existing role stripping/quarantine response.
+- Automation now supports strict numeric comparisons `number-gt` and `number-lt`; the Dashboard builder renders `number-eq` correctly and exposes the new operators.
+- Core, Management API and Dashboard catalogs remain aligned for the supported Automation condition set.
+- Latest development HEAD: `4c69d5644b5e35fd5497619c008642c74ece02dd`.
+- CI #1783 is the active verification gate and is currently pending.
