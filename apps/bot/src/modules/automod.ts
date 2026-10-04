@@ -195,7 +195,7 @@ export class AutoMod implements PlatformModule {
       enabled?: boolean;
       threshold?: number | null;
       windowSeconds?: number | null;
-      action?: "delete" | "timeout" | "warn" | "log";
+      action?: "delete" | "timeout" | "warn" | "log" | "ban";
       timeoutMinutes?: number;
       affectedRoleIds?: string[];
       ignoredRoleIds?: string[];
