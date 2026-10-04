@@ -1,9 +1,14 @@
-# Public Dashboard reverse proxy.
-# Keep bot health (3001) and Management API (3002) private.
+# Public VPS Dashboard reverse proxy.
+# The application itself stays loopback-only on the host.
+# Caddy terminates HTTPS and protects the Dashboard at the public edge.
+# DASHBOARD_BASIC_AUTH_HASH must be a Caddy-supported password hash.
 
 {$DOMAIN} {
   encode gzip
-  reverse_proxy 127.0.0.1:3000
+
+  basic_auth {
+    {$DASHBOARD_BASIC_AUTH_USER} {$DASHBOARD_BASIC_AUTH_HASH}
+  }
 
   header {
     X-Content-Type-Options nosniff
@@ -11,4 +16,6 @@
     Referrer-Policy strict-origin-when-cross-origin
     Permissions-Policy "camera=(), microphone=(), geolocation=()"
   }
+
+  reverse_proxy dashboard:3000
 }
