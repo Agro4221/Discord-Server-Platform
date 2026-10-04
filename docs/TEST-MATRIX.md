@@ -175,3 +175,10 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ CI run #1590: **84/84 bot tests passed**, domain/bot/dashboard builds passed, deployment/observability contracts passed.
 - ⚠ Live Discord credential registration still requires a real user-owned Discord application/token.
 - ⚠ Additional Bot Identity registration does not yet spawn another process; Fleet orchestration remains the next module.
+
+
+## 2026-10-04 — Local Bot Fleet orchestration snapshot
+- ✅ Static deployment contract validates the Fleet reconciler and local launcher wiring.
+- ✅ Secondary container lifecycle is driven by registered Bot Identity metadata and stored-credential presence.
+- ✅ Cleanup path removes disabled/unregistered secondary containers.
+- ⚠ Actual Windows/Docker Desktop multi-bot runtime remains a live local acceptance test.

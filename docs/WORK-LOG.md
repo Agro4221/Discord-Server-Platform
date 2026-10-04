@@ -326,3 +326,10 @@ Never write credentials, tokens or private user data here.
 - PostgreSQL is now authoritative for runtime credentials; stale .env values cannot overwrite an existing stored credential.
 - CI run #1590 passed with 84/84 bot tests and all build/contract stages.
 - Next module: local Bot Fleet process orchestration so additional registered identities can actually run concurrently.
+
+
+## 2026-10-04 — Local Bot Fleet orchestration
+- Added `scripts/reconcile-fleet.ps1` for local Windows Fleet lifecycle.
+- Startup reconciles enabled secondary identities with stored credentials into `dsp-bot-fleet-<identity>` containers.
+- Down cleanup removes secondary fleet containers before Docker Compose shutdown.
+- Fleet reconciler logs lifecycle events to `data/logs/fleet-reconciler.log` without logging credentials.

@@ -171,6 +171,7 @@ function Ensure-Docker {
 Ensure-Docker
 
 if ($Down) {
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\reconcile-fleet.ps1 -Down
   docker compose down
   exit 0
 }
@@ -305,6 +306,17 @@ for ($attempt = 1; $attempt -le 30; $attempt++) {
 if (-not $dashboardReady) {
   docker compose ps
   throw "Dashboard did not become available: $dashboardUrl"
+}
+
+Write-Host ""
+Write-Host "Reconciling registered secondary Bot Identities..."
+try {
+  & powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\reconcile-fleet.ps1
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Secondary Bot Fleet reconciliation returned exit code $LASTEXITCODE. Primary bot and Dashboard remain available."
+  }
+} catch {
+  Write-Warning "Secondary Bot Fleet reconciliation failed: $($_.Exception.Message)"
 }
 
 Write-Host ""

@@ -40,3 +40,20 @@ for (const contract of [
 }
 
 console.log("Deployment contract passed.");
+
+const fleetSupervisor = await readFile("scripts/reconcile-fleet.ps1", "utf8");
+for (const contract of [
+  "api/fleet",
+  "docker compose run",
+  "--no-deps",
+  "BOT_IDENTITY_ID",
+  "dsp-bot-fleet-",
+  "fleet-reconciler.log"
+]) {
+  if (!fleetSupervisor.includes(contract)) {
+    throw new Error("Local fleet reconciler contract missing: " + contract);
+  }
+}
+if (!localLauncher.includes("reconcile-fleet.ps1")) {
+  throw new Error("Local launcher must reconcile the registered Bot Fleet");
+}

@@ -266,3 +266,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Runtime resolution is database-first with environment bootstrap only when the selected identity has no stored credential.
 - Credential corruption fails closed rather than silently falling back to environment values.
 - Remaining Fleet gap: one process per BOT_IDENTITY_ID; multi-process/multi-client local orchestration is the next module.
+
+
+## 2026-10-04 — Local Bot Fleet orchestration
+- Registered enabled secondary Bot Identities are now reconciled by the Windows local launcher.
+- Each secondary identity runs in its own one-off Docker container on the local PC and shares the existing PostgreSQL/Lavalink Compose network.
+- Secondary containers use BOT_IDENTITY_ID only; credential lookup remains PostgreSQL-backed, so plaintext Discord tokens are not passed through the launcher.
+- Disabled or removed identities are cleaned up by the reconciler.
+- This is local process/container orchestration; VPS deployment remains a separate future topology concern.
