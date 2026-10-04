@@ -130,10 +130,10 @@ export class Security implements PlatformModule {
     const row = result.rows[0];
     return {
       enabled: row?.enabled ?? false,
-      maxJoins: row?.max_joins ?? 10,
-      windowSeconds: row?.window_seconds ?? 20,
-      maxDestructiveActions: row?.max_destructive_actions ?? 5,
-      destructiveWindowSeconds: row?.destructive_window_seconds ?? 20,
+      maxJoins: Math.max(1, Math.trunc(row?.max_joins ?? 10)),
+      windowSeconds: clampSecurityWindowSeconds(row?.window_seconds ?? 20),
+      maxDestructiveActions: Math.max(1, Math.trunc(row?.max_destructive_actions ?? 5)),
+      destructiveWindowSeconds: clampSecurityWindowSeconds(row?.destructive_window_seconds ?? 20),
       quarantineRoleId: row?.quarantine_role_id ?? null,
       logChannelId: row?.log_channel_id ?? null,
       incidentDurationSeconds: row?.incident_duration_seconds ?? 300,
@@ -579,7 +579,7 @@ export class Security implements PlatformModule {
   }
 
   private pruneBuckets(now: number): void {
-    const cutoff = now - 300_000;
+    const cutoff = now - 3_600_000;
     for (const [guildId, entries] of this.joins) {
       const latest = entries.at(-1)?.timestamp ?? 0;
       if (latest < cutoff) this.joins.delete(guildId);
@@ -764,7 +764,7 @@ export function securityAuditLookbackCutoff(now: number, windowSeconds: number):
 }
 
 
-export function clampSecurityIncidentDuration(value: number): number {
+export export function clampSecurityWindowSeconds(value: number): number {\n  if (!Number.isFinite(value)) return 20;\n  return Math.min(Math.max(Math.trunc(value), 5), 3600);\n}\n\nfunction clampSecurityIncidentDuration(value: number): number {
   if (!Number.isFinite(value)) return 300;
   return Math.min(Math.max(Math.trunc(value), 60), 3600);
 }
