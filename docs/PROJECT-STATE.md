@@ -321,3 +321,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Both changes have regression coverage.
 - Latest development HEAD: `83755f29b9ac747b278bce919d97397441a96d00`.
 - Automated verification is pending because the latest direct development HEAD currently has no attached CI checks.
+
+## 2026-10-04 — AutoMod response contract hardening
+- AutoMod repeated-text rule windows are time-aware and rule-specific within the configured global history window.
+- AutoMod log actions now require a valid configured log channel before persistence.
+- Security manual incident clearing reports only incidents successfully marked resolved.
+- Regression coverage exists for all three consistency fixes.
+- Current development HEAD: `7121d7557063772d712c47006bdbb9845c99d1b9`.
+- CI status for the direct development HEAD is currently pending/no attached check.
