@@ -218,3 +218,12 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Rule log delivery is regression-tested with deterministic channel routing and final `logDelivered` audit metadata.
 - ⚠ Live Discord channel permissions, deleted/missing log-channel handling and real message delivery remain environment-dependent acceptance cases.
 - ☐ Next: continue richer AutoMod/Security response workflows, then broader Fleet/release-gate validation.
+
+
+## 2026-10-04 — AutoMod timeout moderation verification
+- ✅ CI run **#1623** passed the complete automated matrix.
+- ✅ Rule-based `timeout` actions are regression-tested for successful Discord timeout, persisted moderation case, reason and expiration.
+- ✅ Base AutoMod timeout enforcement is regression-tested for durable `timeout` case creation.
+- ✅ Existing warn-case behavior remains covered and uses the same moderation event bus path.
+- ⚠ Real Discord moderation hierarchy, timeout permission and enforcement behavior remain live acceptance cases.
+- ☐ Next: continue richer AutoMod/Security response workflows, then broader Fleet/release-gate validation.

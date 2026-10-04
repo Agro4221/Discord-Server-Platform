@@ -308,3 +308,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Log messages support `{mention}`, `{user}` and `{channel}` placeholders with explicit allowed-mentions restrictions.
 - The rule-trigger audit event includes the final delivery result without duplicate records.
 - CI run #1617 is green; live Discord delivery remains a release-gate acceptance item.
+
+
+## 2026-10-04 — AutoMod timeout audit checkpoint
+- Rule-based and base AutoMod timeouts now create durable moderation history only after successful Discord enforcement.
+- Timeout cases retain the effective AutoMod reason and expiration timestamp and emit the standard moderation event.
+- CI run #1623 is green; live Discord hierarchy/permission and timeout acceptance remains environment-dependent.

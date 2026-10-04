@@ -389,3 +389,13 @@ Never write credentials, tokens or private user data here.
 - Live Discord permission/channel-delivery behavior remains an environment-dependent acceptance test.
 ### Next concrete work
 - Continue the remaining AutoMod/Security response workflow depth, then return to the broader Fleet/release-gate matrix.
+
+
+## 2026-10-04 — AutoMod timeout moderation-case checkpoint verified
+- Development HEAD: `73af83405195e2c94c44f1f1740fe74ac2c66f76`.
+- CI run **#1623** passed the full automated pipeline.
+- AutoMod rule `action=timeout` now records a `moderation_cases` timeout case only after the Discord timeout succeeds, including an `expires_at` timestamp.
+- Base AutoMod detections configured with a timeout now use the same durable moderation-case path.
+- Both paths emit the existing `moderation.case` event after successful persistence; failed Discord timeouts do not create false cases.
+### Next concrete work
+- Continue the remaining AutoMod/Security response workflow depth, then return to broader Fleet/release-gate validation.
