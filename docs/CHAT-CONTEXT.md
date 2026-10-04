@@ -7,7 +7,7 @@
 
 Репозиторий: `Agro4221/Discord-Server-Platform`
 Ветка: `development`
-Последний известный HEAD на момент обновления этого файла: `0722ed241e3a677b27c73dac8bd41edc20e93c29`
+Последний известный HEAD на момент обновления этого файла: `4c69d5644b5e35fd5497619c008642c74ece02dd`
 Тип: self-hosted Discord Server Platform / единый Discord-бот.
 Основной локальный runtime: Native Windows.
 Docker: дополнительный путь для локального/VPS-развёртывания.
@@ -96,6 +96,8 @@ Carl-bot, Juniper, MEE6, ProBot, Jockie Music и похожие боты.
 ## 5. ПОСЛЕДНИЕ ВАЖНЫЕ FEATURE-SLICE
 
 ### Automation
+Последний срез добавил строгие числовые условия `number-gt` и `number-lt`, а также исправил Dashboard-рендеринг `number-eq` в ALL/ANY builder. Management API, Core и Dashboard остаются синхронизированы.
+
 Добавлены:
 - conditions: `starts-with`, `ends-with`, `number-eq`;
 - event-relative `@event` для `has-role` и `send-message`;
@@ -180,7 +182,7 @@ Audit-log ingestion расширен для:
 На момент создания контекста:
 - HEAD: `79dfbb13e33fe9b63c26fbf7bc84b744e6867f2b`
 - CI #1764 для предыдущего HEAD завершён успешно.
-- Для текущего feature-коммита нужен новый CI run; его нельзя считать green до завершения.
+- Для текущего дерева активен CI #1783; его нельзя считать green до завершения.
 
 Последний предыдущий подтверждённо зелёный baseline: CI #1757.
 
