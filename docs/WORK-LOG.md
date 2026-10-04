@@ -693,3 +693,10 @@ Never write credentials, tokens or private user data here.
 - This is a targeted feature-breadth increment; live Discord permissions and reaction behavior remain part of the release-gate environment.
 ### Next concrete work
 - Continue Automation breadth with additional safe event fields/actions, then close remaining Music/Fleet functional breadth gaps before the live release-gate cycle.
+
+
+## 2026-10-04 — Automation message controls checkpoint
+- Added remove-reaction, pin-message and unpin-message to the Automation action catalog.
+- Core supports event-relative or explicit message targets and keeps failures isolated per action.
+- Dashboard now exposes all three actions.
+- Regression coverage extends the validator with the new message-control references.

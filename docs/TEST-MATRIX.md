@@ -480,3 +480,9 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ Automation Discord ID validator regex form corrected.
 - ⚠ Live Discord reaction permissions, missing-message behavior and actual automation execution remain environment-dependent.
 - ☐ Next: additional safe Automation breadth, then remaining Music/Fleet feature-depth and live release gates.
+
+
+## 2026-10-04 — Automation message controls verification
+- ✅ New action types compile through the shared domain model and validation path.
+- ✅ Dashboard exposes event-relative message targets.
+- ⚠ Actual Discord permissions and message-state behavior remain live-runtime gates.

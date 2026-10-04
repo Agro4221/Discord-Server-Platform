@@ -502,3 +502,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Event-relative role checks and event-channel message delivery are aligned between the Dashboard UI and Core validation/runtime.
 - The Automation Discord ID validators now use the intended snowflake regex form.
 - The remaining Automation status is still broader than this slice: additional condition/action catalog depth and live validation remain outstanding.
+
+
+## 2026-10-04 — Automation message controls
+- Automation now supports remove-reaction plus pin/unpin message actions in the persisted rule model and Dashboard builder.
