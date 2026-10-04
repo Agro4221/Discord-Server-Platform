@@ -249,6 +249,8 @@ async function main(): Promise<void> {
     };
     await registerCommands(nextConfig, client);
     await client.login(credentials.token);
+    runtimeConfig = nextConfig;
+    botEnabled = true;
     if (credentials.presenceName && client.user) {
       client.user.setPresence({
         status: "online",
