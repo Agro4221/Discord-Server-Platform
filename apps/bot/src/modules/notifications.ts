@@ -104,6 +104,18 @@ export class Notifications implements PlatformModule {
     return feed;
   }
 
+  async addSocialFeed(
+    guildId: string,
+    provider: "reddit" | "youtube" | "mastodon",
+    target: string,
+    channelId: string,
+    intervalSeconds: number,
+    options: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[] } = {}
+  ): Promise<NotificationFeedRecord> {
+    const url = buildSocialFeedUrl(provider, target);
+    return this.addFeed(guildId, channelId, url, intervalSeconds, options);
+  }
+
   async updateFeed(guildId: string, id: number, patch: {
     channelId?: string;
     url?: string;
@@ -360,6 +372,35 @@ export class Notifications implements PlatformModule {
 function normalizeFeedTemplate(value?: string): string {
   const template = String(value ?? "📡 **Новая запись из feed**\n**{title}**\n{url}").trim().slice(0, 1800);
   return template || "📡 **Новая запись из feed**\n**{title}**\n{url}";
+}
+
+export function buildSocialFeedUrl(
+  provider: "reddit" | "youtube" | "mastodon",
+  target: string
+): string {
+  const value = target.trim();
+  if (provider === "reddit") {
+    const subreddit = value.replace(/^r\//i, "").replace(/^https?:\/\/www\.reddit\.com\/r\//i, "").replace(/\/$/, "");
+    if (!/^[A-Za-z0-9_]{2,21}$/.test(subreddit)) throw new Error("invalid_reddit_target");
+    return "https://www.reddit.com/r/" + subreddit + "/new/.rss";
+  }
+
+  if (provider === "youtube") {
+    const match = value.match(/(?:youtube\.com\/channel\/|^)(UC[\w-]{20,40})$/i);
+    if (!match) throw new Error("invalid_youtube_channel");
+    return "https://www.youtube.com/feeds/videos.xml?channel_id=" + match[1];
+  }
+
+  let url: URL;
+  try {
+    url = new URL(/^https?:\/\//i.test(value) ? value : "https://" + value);
+  } catch {
+    throw new Error("invalid_mastodon_target");
+  }
+  if (url.protocol !== "https:" || !/^\/\@[A-Za-z0-9_\-\.]+$/.test(url.pathname.replace(/\.rss$/, ""))) {
+    throw new Error("invalid_mastodon_target");
+  }
+  return url.origin + url.pathname.replace(/\.rss$/, "") + ".rss";
 }
 
 export function normalizeKeywords(values?: string[]): string[] {
