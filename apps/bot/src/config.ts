@@ -162,8 +162,8 @@ export function loadConfig(): AppConfig {
   }
 
   return {
-    discordToken: discordCredentials.token,
-    discordClientId: discordCredentials.clientId,
+    discordToken: discordCredentials.token ?? "",
+    discordClientId: discordCredentials.clientId ?? "",
     botIdentityId,
     ...(process.env.DISCORD_TEST_GUILD_ID ? { discordTestGuildId: process.env.DISCORD_TEST_GUILD_ID } : {}),
     healthHost: process.env.HEALTH_HOST ?? "127.0.0.1",
