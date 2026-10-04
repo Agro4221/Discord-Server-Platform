@@ -35,6 +35,7 @@ export type PlatformEventMap = {
   "channel.delete": import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel;
   "role.delete": import("discord.js").Role;
   "member.ban": { guildId: string; userId: string };
+  "verification.passed": { guildId: string; userId: string };
 };
 
 type Listener<K extends keyof PlatformEventMap> = (
@@ -128,7 +129,7 @@ function extractGuildId<K extends keyof PlatformEventMap>(
   }
   if (event === "member.role.add" || event === "member.role.remove" ||
       event === "moderation.case" || event === "ticket.create" || event === "ticket.close" ||
-      event === "giveaway.end" || event === "schedule") {
+      event === "giveaway.end" || event === "schedule" || event === "verification.passed") {
     return (payload as { guildId: string }).guildId;
   }
   if (event === "channel.delete") {

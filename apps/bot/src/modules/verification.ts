@@ -28,6 +28,7 @@ export const DEFAULT_VERIFICATION_CONFIG: Pick<VerificationConfig, "panelTitle" 
 export class Verification implements PlatformModule {
   readonly name = "verification";
   private unsubscribe?: () => void;
+  private events?: ModuleContext["events"];
   private readonly codes = new Map<string, { hash: string; expiresAt: number; attempts: number }>();
   private guildResolver?: (guildId: string) => import("discord.js").Guild | undefined;
 
@@ -36,6 +37,7 @@ export class Verification implements PlatformModule {
   }
 
   async init(context: ModuleContext): Promise<void> {
+    this.events = context.events;
     const a = context.events.on("member.add", (member) => this.onJoin(member));
     const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const c = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
@@ -45,6 +47,7 @@ export class Verification implements PlatformModule {
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    this.events = undefined;
     this.codes.clear();
   }
 
@@ -347,6 +350,10 @@ export class Verification implements PlatformModule {
       }
     }
     this.codes.delete(key);
+    await this.events?.emit("verification.passed", {
+      guildId: interaction.guild!.id,
+      userId: interaction.user.id
+    });
     await interaction.reply({ content: "✅ Проверка пройдена.", ephemeral: true });
     if (config.logChannelId) {
       const channel = interaction.guild!.channels.cache.get(config.logChannelId);
