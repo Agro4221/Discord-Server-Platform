@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AutoMod, detectAutoModViolation, parseAutoModIdList } from "../src/modules/automod.js";
+import { AutoMod, detectAutoModViolation, detectorMatches, parseAutoModIdList } from "../src/modules/automod.js";
 
 test("AutoMod configure sends every extended setting to PostgreSQL", async () => {
   const queries: Array<{ text: string; values: readonly unknown[] }> = [];
@@ -101,6 +101,46 @@ test("AutoMod detector covers content, link, emoji, caps and repeat rules", () =
     "repeated_message"
   );
   assert.equal(detectAutoModViolation("normal message", 0, config), null);
+});
+
+test("AutoMod repeated-text rule honors its own window", () => {
+  const now = Date.now();
+  const message = { content: "same" } as never;
+  const rule = { detector: "repeated-text", threshold: 3, windowSeconds: 5 };
+  const config = {
+    enabled: true,
+    blockedWords: [],
+    maxMentions: 6,
+    maxCapsRatio: 0.85,
+    maxRepeatedMessages: 5,
+    repeatedWindowSeconds: 10,
+    blockLinks: false,
+    blockInvites: false,
+    maxLinks: 3,
+    maxEmojis: 20,
+    maxLineLength: 1000,
+    exemptChannelIds: "",
+    exemptRoleIds: "",
+    deleteMessage: true,
+    timeoutMinutes: 0
+  };
+
+  assert.equal(
+    detectorMatches(rule, message, [
+      { content: "same", timestamp: now - 4_000 },
+      { content: "same", timestamp: now - 2_000 },
+      { content: "same", timestamp: now }
+    ], config),
+    true
+  );
+  assert.equal(
+    detectorMatches(rule, message, [
+      { content: "same", timestamp: now - 6_000 },
+      { content: "same", timestamp: now - 4_000 },
+      { content: "same", timestamp: now }
+    ], config),
+    false
+  );
 });
 
 test("AutoMod records a durable audit event for a handled violation", async () => {
