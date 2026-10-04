@@ -18,7 +18,7 @@ Install Docker Desktop, clone the repository, and from the repository directory 
 
     powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1
 
-On the first launch the script creates `.env`, asks for the Discord bot token, Discord client ID and Dashboard admin password, then generates the local management/database/Lavalink/session secrets.
+On the first launch the script creates `.env` and generates the local management/database/Lavalink secrets. Discord credentials and user login are not requested by the launcher; register the bot in Control Center → Bot Fleet.
 
 After the services become healthy it opens the local Control Center automatically:
 
@@ -48,7 +48,7 @@ The bot exposes health and Management API ports only on `127.0.0.1`. The Dashboa
 
 ## First Discord setup
 
-Create a Discord application and bot in the Discord Developer Portal and put its token/client ID into the first-run prompts. Enable the Gateway intents required by the bot, then invite the bot to the test server with the permissions needed by the modules you plan to use.
+Create a Discord application and bot in the Discord Developer Portal. Open Control Center → Bot Fleet and enter the bot Application / Client ID and Bot Token; the token is stored encrypted locally and is never returned to the Dashboard. Enable the Gateway intents required by the bot, then invite the bot to the test server with the permissions needed by the modules you plan to use.
 
 For command development, set `DISCORD_TEST_GUILD_ID` in `.env` so slash commands register to the test guild instead of waiting for global propagation.
 
