@@ -210,3 +210,11 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ CI run #1608 verifies active-node visibility in the Control Center plus the complete automated matrix.
 - ⚠ Live Lavalink node-loss/recovery, player migration, queue continuity and audio continuity remain environment-dependent release-gate tests.
 - ☐ Next: live Music failover acceptance, then broader fleet/release-gate validation.
+
+
+## 2026-10-04 — AutoMod log response verification
+- ✅ CI run **#1617** passed the full automated matrix after fixing AutoMod rule-log typing and response-flow regression coverage.
+- ✅ Persisted `automod_rules.log_channel_id` is covered by migration, CRUD, Management API validation and Dashboard contract paths.
+- ✅ Rule log delivery is regression-tested with deterministic channel routing and final `logDelivered` audit metadata.
+- ⚠ Live Discord channel permissions, deleted/missing log-channel handling and real message delivery remain environment-dependent acceptance cases.
+- ☐ Next: continue richer AutoMod/Security response workflows, then broader Fleet/release-gate validation.

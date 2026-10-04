@@ -377,3 +377,15 @@ Never write credentials, tokens or private user data here.
 ### Next concrete work
 - Release-gate validation of Music multi-node failover: live node loss/recovery with queue, current track position and player state continuity.
 - Then continue the remaining broader fleet/release-gate validation without reopening already verified Music slices.
+
+
+## 2026-10-04 — AutoMod rule log-channel checkpoint verified
+- Development HEAD: `3a61ed05f3042a80eb60d5005eccc1ee7c5e1ff4`.
+- CI run **#1617** passed the full automated pipeline.
+- AutoMod rules now support an optional persisted log channel for `action=log`, with Management API validation that the target is text-based and sendable.
+- Control Center exposes the log-channel selector only for log actions.
+- Rule log delivery renders `{mention}`, `{user}` and `{channel}` with allowed mentions restricted to the triggering user.
+- Audit telemetry records the final `logDelivered` result once, after the delivery attempt; delivery failure is logged without breaking rule handling.
+- Live Discord permission/channel-delivery behavior remains an environment-dependent acceptance test.
+### Next concrete work
+- Continue the remaining AutoMod/Security response workflow depth, then return to the broader Fleet/release-gate matrix.

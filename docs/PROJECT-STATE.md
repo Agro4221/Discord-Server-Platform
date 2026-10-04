@@ -300,3 +300,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Failover observability, disconnect-time player persistence and active-node visibility are implemented.
 - Current remaining Music limitation is live Lavalink node-loss/recovery acceptance with real Discord audio playback.
 - Next bounded scope: release-gate/live validation of failover continuity, followed by broader fleet/release-gate coverage.
+
+
+## 2026-10-04 — AutoMod log response checkpoint
+- AutoMod rule actions now include a durable, configurable log-channel response path.
+- Management API validates configured log channels; Control Center exposes the setting for `action=log` rules.
+- Log messages support `{mention}`, `{user}` and `{channel}` placeholders with explicit allowed-mentions restrictions.
+- The rule-trigger audit event includes the final delivery result without duplicate records.
+- CI run #1617 is green; live Discord delivery remains a release-gate acceptance item.
