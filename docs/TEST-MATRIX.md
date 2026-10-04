@@ -496,3 +496,8 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ User-facing 1-based queue position validation is covered.
 - ✅ Management API and Dashboard expose remove/move/clear.
 - ⚠ Actual Lavalink queue mutation still requires live Discord/Lavalink acceptance.
+
+## 2026-10-04 — Music audio filter verification
+- ✅ Built-in filter preset validation is covered.
+- ✅ Discord, Management API and Dashboard filter controls are wired.
+- ⚠ Actual filter availability depends on the connected Lavalink node exposing the corresponding native filters; live playback verification remains required.

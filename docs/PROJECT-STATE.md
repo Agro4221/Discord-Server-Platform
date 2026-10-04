@@ -513,3 +513,6 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 
 ## 2026-10-04 — Music queue management
 - Music now has explicit upcoming-queue remove, move and clear controls across Core, Dashboard, Management API and Discord commands.
+
+## 2026-10-04 — Music audio filters
+- Music now includes native built-in audio filter presets exposed consistently across Discord, API and Dashboard.

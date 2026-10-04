@@ -713,3 +713,10 @@ Never write credentials, tokens or private user data here.
 - Management API validates and forwards the new queue operations.
 - Dashboard exposes queue clear, per-item remove and queue reordering.
 - Added regression coverage for user-facing queue position normalization.
+
+## 2026-10-04 — Music audio filters checkpoint
+- Added native Music filter presets: Off, Nightcore, Vaporwave, Karaoke, 8D/Rotation, Tremolo, Vibrato and Low Pass.
+- Filter changes are available through Discord /music filter, prefix !music filter, Management API and Dashboard.
+- Each preset resets previous built-in filters first so presets do not stack unexpectedly.
+- Dashboard now reflects the active filter state from Core.
+- Added regression coverage for filter preset normalization.

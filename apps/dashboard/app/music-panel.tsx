@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 type VoiceChannel = { id: string; name: string; type?: number };
 type Track = { title: string; author: string; durationMs: number };
 type MusicProvider = "auto" | "youtube" | "youtube_music" | "soundcloud";
+type MusicFilter = "off" | "nightcore" | "vaporwave" | "karaoke" | "rotation" | "tremolo" | "vibrato" | "lowpass";
 type MusicState = {
   enabled: boolean;
   initialized: boolean;
@@ -14,6 +15,7 @@ type MusicState = {
   volume: number;
   repeatMode: "off" | "track" | "queue";
   autoplay: boolean;
+  filters: string[];
   current: Track & { positionMs: number } | null;
   queue: Track[];
   nodeCount: number;
@@ -29,6 +31,7 @@ const EMPTY: MusicState = {
   volume: 100,
   repeatMode: "off",
   autoplay: false,
+  filters: [],
   current: null,
   queue: [],
   nodeCount: 0,
@@ -47,6 +50,7 @@ export function MusicPanel({
   const [state, setState] = useState<MusicState>(EMPTY);
   const [query, setQuery] = useState("");
   const [provider, setProvider] = useState<MusicProvider>("auto");
+  const [filter, setFilter] = useState<MusicFilter>("off");
   const [voiceChannelId, setVoiceChannelId] = useState("");
   const [seek, setSeek] = useState("");
   const [moveFrom, setMoveFrom] = useState("");
@@ -64,6 +68,11 @@ export function MusicPanel({
     const next = (body.state ?? EMPTY) as MusicState;
     setState(next);
     if (!voiceChannelId && next.voiceChannelId) setVoiceChannelId(next.voiceChannelId);
+    if (next.filters?.length) {
+      setFilter(next.filters[0] as MusicFilter);
+    } else {
+      setFilter("off");
+    }
   }
 
   useEffect(() => {
@@ -112,6 +121,11 @@ export function MusicPanel({
     }
     await control("play", { query: query.trim(), voiceChannelId, provider });
     setQuery("");
+  }
+
+  async function applyFilter(next: MusicFilter) {
+    setFilter(next);
+    await control("filter", { filter: next });
   }
 
   async function doSeek() {
@@ -188,6 +202,21 @@ export function MusicPanel({
           <ActionButton disabled={busy || !state.current} onClick={() => void control("stop")}>Стоп</ActionButton>
           <ActionButton disabled={busy || state.queue.length < 2} onClick={() => void control("shuffle")}>Перемешать</ActionButton>
           <ActionButton disabled={busy || state.queue.length === 0} onClick={() => void control("clear")}>Очистить очередь</ActionButton>
+          <select
+            value={filter}
+            disabled={busy}
+            onChange={(event) => void applyFilter(event.target.value as MusicFilter)}
+            style={{ ...inputStyle, width: 155 }}
+          >
+            <option value="off">Filter: Off</option>
+            <option value="nightcore">Nightcore</option>
+            <option value="vaporwave">Vaporwave</option>
+            <option value="karaoke">Karaoke</option>
+            <option value="rotation">8D / Rotation</option>
+            <option value="tremolo">Tremolo</option>
+            <option value="vibrato">Vibrato</option>
+            <option value="lowpass">Low Pass</option>
+          </select>
           <select
             value={state.repeatMode}
             disabled={busy}
@@ -294,7 +323,8 @@ function formatMusicError(error: unknown): string {
     music_queue_too_short: "В очереди недостаточно треков.",
     invalid_repeat_mode: "Некорректный repeat mode.",
     invalid_seek: "Некорректная позиция seek.",
-    invalid_volume: "Некорректная громкость."
+    invalid_volume: "Некорректная громкость.",
+    invalid_music_filter: "Некорректный аудиофильтр."
   };
   return messages[code] ?? code;
 }

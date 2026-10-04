@@ -8,6 +8,7 @@ import {
   musicPlayerNodeId,
   musicNodeHealth,
   normalizeMusicRepeatMode,
+  normalizeMusicFilterPreset,
   shouldRetainMusicPlayerState,
   musicResumePosition,
   hasPersistedMusicPlayback,
@@ -203,4 +204,12 @@ test("Music queue position helpers validate 1-based user positions", () => {
   assert.deepEqual(normalizeMusicQueueMove(1, 3, 3), { from: 0, to: 2 });
   assert.equal(normalizeMusicQueueMove(2, 2, 3), null);
   assert.equal(normalizeMusicQueueMove(1, 4, 3), null);
+});
+
+test("Music filter preset validator accepts supported built-in filters", () => {
+  for (const preset of ["off","nightcore","vaporwave","karaoke","rotation","tremolo","vibrato","lowpass"]) {
+    assert.equal(normalizeMusicFilterPreset(preset), preset);
+  }
+  assert.equal(normalizeMusicFilterPreset("bassboost"), null);
+  assert.equal(normalizeMusicFilterPreset(""), null);
 });
