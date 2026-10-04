@@ -199,10 +199,10 @@ test("Automation ban action validates target and reason", () => {
   ]), /invalid_ban_action/);
   assert.throws(() => validateAutomationRule("member.join", [], [
     { type: "ban", userId: "@event", reason: "" }
-  ]), /invalid_ban_reason/);
+  ]), /invalid_ban_action/);
   assert.throws(() => validateAutomationRule("member.join", [], [
     { type: "ban", userId: "@event", reason: "x".repeat(501) }
-  ]), /invalid_ban_reason/);
+  ]), /invalid_ban_action/);
 });
 
 test("Automation ban action bans a bannable member with a rendered reason", async () => {
