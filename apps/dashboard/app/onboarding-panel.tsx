@@ -63,7 +63,7 @@ export function OnboardingPanel({
   }
 
   function addRoleStep() {
-    const roleId = manageableRoles[0]?.id;
+    const roleId = manageableRoles.find((role) => !flow.steps.some((step) => step.type === "role" && step.roleId === role.id))?.id;
     if (!roleId || flow.steps.length >= 10) return;
     setFlow((current) => ({ ...current, steps: [...current.steps, { type: "role", roleId }] }));
   }

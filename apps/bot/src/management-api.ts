@@ -12,7 +12,7 @@ import { BackupService } from "./backup.js";
 import type { CustomCommandService } from "./custom-commands.js";
 import type { AutoResponder, AutoResponderInput } from "./modules/autoresponder.js";
 import type { Forms, CustomForm } from "./modules/forms.js";
-import type { OnboardingStep, OnboardingTrigger } from "./modules/onboarding.js";
+import { normalizeOnboardingSteps, normalizeOnboardingTrigger, type OnboardingStep, type OnboardingTrigger } from "./modules/onboarding.js";
 import type { TicketCustomization, TicketFormField } from "./modules/tickets.js";
 import type { HelpPage } from "./help-pages.js";
 import type { Moderation } from "./modules/moderation.js";
@@ -2672,12 +2672,18 @@ export class ManagementApiServer {
                 input.enabled = body.enabled;
               }
               if (body.trigger !== undefined) {
-                if (body.trigger !== "member.join" && body.trigger !== "verification.passed") throw new RequestInputError("invalid_onboarding_trigger", 400);
-                input.trigger = body.trigger;
+                try {
+                  input.trigger = normalizeOnboardingTrigger(body.trigger);
+                } catch {
+                  throw new RequestInputError("invalid_onboarding_trigger", 400);
+                }
               }
               if (body.steps !== undefined) {
-                if (!Array.isArray(body.steps) || body.steps.length > 10) throw new RequestInputError("invalid_onboarding_steps", 400);
-                input.steps = body.steps as OnboardingStep[];
+                try {
+                  input.steps = normalizeOnboardingSteps(body.steps);
+                } catch (error) {
+                  throw new RequestInputError(error instanceof Error ? error.message : "invalid_onboarding_steps", 400);
+                }
               }
               const flow = await this.options.onboarding.set(guildId, input);
               await this.options.auditLog.record({
