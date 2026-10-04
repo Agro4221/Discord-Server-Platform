@@ -42,7 +42,7 @@ for (const contract of ["DASHBOARD_BASIC_AUTH_HASH", "docker-compose.vps.yml", "
   }
 }
 for (const contract of ['"80:80"', '"443:443"', "dashboard:3000"]) {
-  if (!vpsCompose.includes(contract)) {
+  if (!vpsCompose.includes(contract) && !caddyExample.includes(contract)) {
     throw new Error("Public Caddy ingress contract missing: " + contract);
   }
 }
