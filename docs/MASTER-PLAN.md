@@ -83,6 +83,6 @@ Monorepo:
 PostgreSQL is the source of truth for configuration and durable state; in-memory caches are disposable.
 
 ## Deployment
-Local: Docker Compose on the user's PC.
-VPS: same topology with persistent volumes, reverse proxy, backups and monitoring.
-No hard-coded host paths or OS-specific assumptions.
+Local: native Windows processes on the user's PC (PostgreSQL + Lavalink + Bot + optional Control Center + native Fleet supervisor), with no Docker Desktop/WSL requirement.
+VPS: Docker-based topology with persistent volumes, reverse proxy, backups and monitoring.
+The application architecture stays shared between native local and Docker/VPS deployment paths; runtime launch tooling may be OS-specific where required.

@@ -473,3 +473,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - The report covers primary Bot/Fleet/Lavalink/Dashboard PID state, Bot health, Management API 401/authenticated access, Fleet identity readiness and Lavalink versions.
 - Plaintext and JSON modes both avoid printing credentials.
 - CI verification for this checkpoint is pending.
+
+
+## 2026-10-04 — Native runtime verification checkpoint
+- CI #1720 passed the complete automated pipeline for the native Windows acceptance tooling checkpoint.
+- Verified statically: native Fleet supervisor lifecycle, native release-gate PID checks, native diagnostics, no-login Control Center cleanup, endpoint-scoped bot-registration throttling and native-first documentation.
+- The repository-side local runtime path is now consistently documented as native Windows first; Docker remains optional for VPS/reproducible deployment.
+- Live target-machine acceptance remains the next boundary: real Discord Gateway/permissions, secondary-bot process behavior, Lavalink audio continuity, restart/chaos/soak and clean-host validation.

@@ -2,7 +2,7 @@
 
 Self-hosted Discord server platform for administration, moderation, community features, automation, temporary voice rooms, notifications and music.
 
-> Current state: release candidate for live validation. CI/typecheck/tests/builds cover the implemented feature set, but live Discord/VPS/Windows validation is still environment-dependent.
+> Current state: release candidate for live validation. CI/typecheck/tests/builds cover the implemented feature set, including the native Windows runtime path; live Discord/Windows acceptance and optional VPS validation remain environment-dependent.
 
 ## Implemented
 
@@ -91,13 +91,13 @@ Automated verification is not a substitute for a live Discord server, real provi
 
 ## Local deployment
 
-The primary local workflow is the Windows launcher:
+The primary local workflow is the native Windows launcher, designed to avoid Docker Desktop/WSL overhead on a gaming or streaming PC:
 
 ~~~powershell
-scripts/start-local.ps1
+.\start-native.bat
 ~~~
 
-Docker Compose is the main service topology. See docs/LOCAL-SETUP.md and docs/ADMIN-GUIDE.md.
+Add `-Dashboard` for the local Control Center or `-Lavalink2` for a second Lavalink node. Docker Compose remains an optional deployment topology for reproducible environments and VPS use. See docs/LOCAL-SETUP.md and docs/NATIVE-SETUP.md.
 
 ## Public snapshot
 

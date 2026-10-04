@@ -653,3 +653,12 @@ Never write credentials, tokens or private user data here.
 - Added `scripts/native-diagnostics.ps1` as a read-only operator diagnostic for the native Windows runtime.
 - Supports optional Dashboard/Lavalink2 checks and machine-readable JSON output.
 - It reports process/PID state, Bot health, Management API authentication, Fleet readiness and Lavalink versions without printing secrets.
+
+
+## 2026-10-04 — Native runtime verification checkpoint
+- CI #1720 completed successfully on `ada6fa61abd7f267c79c8d5c86dc6dea05615bb9`.
+- Native Windows runtime/diagnostic tooling and the local no-login Control Center model are now CI-verified together.
+- README and Master Plan were synchronized so native Windows is the documented primary local path and Docker is explicitly optional.
+### Current boundary
+- Repository-side native/runtime hardening is green.
+- Remaining acceptance is genuinely machine/environment dependent: live Discord permissions/hierarchy, real secondary-bot process lifetime, Lavalink/node-loss audio recovery, chaos/soak and clean-host deployment.

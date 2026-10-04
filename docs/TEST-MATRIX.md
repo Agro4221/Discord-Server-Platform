@@ -427,3 +427,13 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Credential values are not printed by the report.
 - ☐ Real execution on the target Windows machine remains environment-dependent.
 - ☐ Full CI verification for this checkpoint is pending.
+
+
+## 2026-10-04 — Native runtime verification checkpoint
+- ✅ CI #1720 passed the full automated pipeline.
+- ✅ Native build ordering avoids overlapping first-run compiler load with Lavalink startup.
+- ✅ Native Fleet supervisor and native release-gate lifecycle checks are contract-verified.
+- ✅ Native diagnostics are contract-verified and do not print credential values.
+- ✅ Dashboard legacy logout/login remnants are guarded against reintroduction.
+- ✅ Bot registration has an endpoint-specific throttling window.
+- ⚠ Actual target Windows/Discord/Lavalink runtime behavior remains environment-dependent.
