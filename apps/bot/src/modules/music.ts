@@ -1150,7 +1150,7 @@ export class Music implements PlatformModule {
     this.restoreTimer.unref();
   }
 
-  private async reconcilePersistedPlayers(preferredNodeId?: string): Promise<void> {
+  private async reconcilePersistedPlayers(): Promise<void> {
     if (!this.manager || !this.initialized) return;
 
     const result = await this.db.query<{
@@ -1226,20 +1226,19 @@ export class Music implements PlatformModule {
           Number(current?.info.duration ?? 0)
         );
 
-        if (current && !state.paused) {
-          await player.play({
-            track: state.track as Parameters<Player["play"]>[0] extends infer _ ? never : never,
-            clientTrack: current
-          } as never);
+        const playFromSnapshot = player.play as unknown as (options: {
+          track: unknown;
+          clientTrack?: Track;
+        }) => Promise<unknown>;
+
+        if (current && state.track && !state.paused) {
+          await playFromSnapshot({ track: state.track, clientTrack: current });
           if (position > 0) await player.seek(position);
-        } else if (current && state.paused) {
-          await player.play({
-            track: state.track as never,
-            clientTrack: current
-          } as never);
+        } else if (current && state.track && state.paused) {
+          await playFromSnapshot({ track: state.track, clientTrack: current });
           await player.pause();
-          player.lastPosition = position;
-          player.lastPositionChange = Date.now();
+        } else if (!current && player.queue.tracks.length > 0 && !state.paused) {
+          await player.play();
         }
 
         player.paused = state.paused;
