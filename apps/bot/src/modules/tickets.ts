@@ -11,6 +11,7 @@ export type TicketFormField = {
   type: TicketFormFieldType;
   required: boolean;
   placeholder: string;
+  minLength: number;
   maxLength: number;
 };
 export type TicketCustomization = {
@@ -49,8 +50,8 @@ export type TicketConfig = {
   sla: TicketSlaConfig;
 };
 export const DEFAULT_TICKET_FORM_FIELDS: readonly TicketFormField[] = [
-  { id: "subject", label: "Тема", type: "short", required: true, placeholder: "Кратко опиши вопрос", maxLength: 100 },
-  { id: "details", label: "Описание", type: "paragraph", required: true, placeholder: "Что произошло?", maxLength: 2000 }
+  { id: "subject", label: "Тема", type: "short", required: true, placeholder: "Кратко опиши вопрос", minLength: 3, maxLength: 100 },
+  { id: "details", label: "Описание", type: "paragraph", required: true, placeholder: "Что произошло?", minLength: 10, maxLength: 2000 }
 ];
 
 export class Tickets implements PlatformModule {
@@ -562,6 +563,7 @@ export class Tickets implements PlatformModule {
         .setLabel(field.label.slice(0, 45))
         .setStyle(field.type === "paragraph" ? TextInputStyle.Paragraph : TextInputStyle.Short)
         .setRequired(field.required)
+        .setMinLength(field.minLength)
         .setMaxLength(field.maxLength);
       if (field.placeholder) input.setPlaceholder(field.placeholder.slice(0, 100));
       modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
@@ -581,6 +583,11 @@ export class Tickets implements PlatformModule {
     const formData: Record<string, string> = {};
     for (const field of fields) {
       formData[field.id] = interaction.fields.getTextInputValue("ticket:" + field.id);
+    }
+    const validationError = validateTicketFormSubmission(fields, formData);
+    if (validationError) {
+      await interaction.reply({ content: validationError, ephemeral: true });
+      return;
     }
     const subject = formData.subject?.trim() || formData[fields[0]?.id ?? ""]?.trim() || "Тикет";
     const details = formData.details?.trim() || Object.entries(formData)
@@ -1037,15 +1044,30 @@ function normalizeFormFields(value: unknown): TicketFormField[] {
     const placeholder = typeof source.placeholder === "string" ? source.placeholder.trim().slice(0, 100) : "";
     const rawMax = typeof source.maxLength === "number" ? Math.trunc(source.maxLength) : type === "paragraph" ? 2000 : 100;
     const maxLength = Math.min(Math.max(rawMax, 1), type === "paragraph" ? 4000 : 400);
+    const rawMin = typeof source.minLength === "number" ? Math.trunc(source.minLength) : 0;
+    const minLength = Math.min(Math.max(rawMin, 0), maxLength);
     if (!/^[a-z0-9_-]{1,30}$/.test(id) || !label || seen.has(id)) continue;
     seen.add(id);
-    normalized.push({ id,label,type,required:source.required !== false,placeholder,maxLength });
+    normalized.push({ id,label,type,required:source.required !== false,placeholder,minLength,maxLength });
     if (normalized.length >= 5) break;
   }
   return normalized.length ? normalized : [...DEFAULT_TICKET_FORM_FIELDS];
 }
 
  
+export function validateTicketFormSubmission(
+  fields: TicketFormField[],
+  values: Record<string, string>
+): string | null {
+  for (const field of fields) {
+    const value = typeof values[field.id] === "string" ? values[field.id].trim() : "";
+    if (field.required && !value) return "Заполни обязательное поле: " + field.label + ".";
+    if (value.length < field.minLength) return "Поле «" + field.label + "» слишком короткое: минимум " + field.minLength + " символа.";
+    if (value.length > field.maxLength) return "Поле «" + field.label + "» слишком длинное: максимум " + field.maxLength + " символов.";
+  }
+  return null;
+}
+
 export function normalizeTicketCustomization(input?: Partial<TicketCustomization> | null): TicketCustomization {
   const source = input ?? {};
   const clean = (value: unknown, fallback: string, max: number) => {
