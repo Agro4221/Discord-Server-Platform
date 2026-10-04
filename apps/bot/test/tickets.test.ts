@@ -173,3 +173,16 @@ test("Tickets normalize persisted customization with safe Discord-facing limits"
     }
   );
 });
+
+test("ticket form validation enforces required, minimum and maximum lengths", () => {
+  const fields: TicketFormField[] = [
+    { id: "subject", label: "Тема", type: "short", required: true, placeholder: "", minLength: 3, maxLength: 20 },
+    { id: "details", label: "Описание", type: "paragraph", required: true, placeholder: "", minLength: 10, maxLength: 100 }
+  ];
+
+  assert.match(validateTicketFormSubmission(fields, { subject: "", details: "0123456789" }) ?? "", /обязательное/);
+  assert.match(validateTicketFormSubmission(fields, { subject: "a", details: "0123456789" }) ?? "", /слишком короткое/);
+  assert.match(validateTicketFormSubmission(fields, { subject: "ok!", details: "short" }) ?? "", /слишком короткое/);
+  assert.match(validateTicketFormSubmission(fields, { subject: "ok!", details: "0123456789" }) ?? "", /max/i);
+  assert.equal(validateTicketFormSubmission(fields, { subject: "Тема", details: "1234567890" }), null);
+});
