@@ -8,6 +8,8 @@ import {
   musicNodeHealth,
   normalizeMusicRepeatMode,
   shouldRetainMusicPlayerState,
+  musicResumePosition,
+  hasPersistedMusicPlayback,
   normalizeMusicSearchProvider,
   shouldAutoplayAfterQueueEnd
 } from "../src/modules/music.js";
@@ -83,6 +85,21 @@ test("Music failover debug filtering covers migration success and failure events
   assert.equal(isMusicFailoverDebugEvent(DebugEvents.QueueEnded), false);
 });
 
+
+test("Music resume position advances only while playing and stays inside track duration", () => {
+  assert.equal(musicResumePosition(30_000, 10_000, true, 120_000, 50_000), 30_000);
+  assert.equal(musicResumePosition(30_000, 10_000, false, 120_000, 50_000), 70_000);
+  assert.equal(musicResumePosition(119_500, 10_000, false, 120_000, 50_000), 119_000);
+  assert.equal(musicResumePosition(-100, Number.NaN, false, 0, 1_000), 0);
+});
+
+test("Music persisted playback detection distinguishes active queue state from an empty snapshot", () => {
+  assert.equal(hasPersistedMusicPlayback({ track: { encoded: "track" } }, null), true);
+  assert.equal(hasPersistedMusicPlayback({ track: null }, { tracks: [{ info: { title: "Queued" } }] }), true);
+  assert.equal(hasPersistedMusicPlayback({ track: null }, { queue: [{ info: { title: "Queued" } }] }), true);
+  assert.equal(hasPersistedMusicPlayback({ track: null }, { tracks: [] }), false);
+  assert.equal(hasPersistedMusicPlayback({ track: null }, null), false);
+});
 
 test("Music durable player state is retained when a destroyed player still has current or queued tracks", () => {
   assert.equal(

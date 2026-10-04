@@ -96,6 +96,7 @@ export class Music implements PlatformModule {
   private readonly lastPlayedTracks = new Map<string, Track>();
   private readonly autoplayInFlight = new Set<string>();
   private readonly autoLeaveTimers = new Map<string, NodeJS.Timeout>();
+  private restoreTimer?: NodeJS.Timeout;
 
   constructor(
     private readonly db: Database,
@@ -182,6 +183,7 @@ export class Music implements PlatformModule {
       if (!this.manager || !this.client?.user) return;
       this.manager.init({ ...this.client.user });
       this.initialized = true;
+      this.schedulePersistedPlayerReconciliation();
       logger.info("Lavalink manager initialized", {
         identity: this.config.botIdentityId,
         node: this.config.lavalinkHost
@@ -282,14 +284,20 @@ export class Music implements PlatformModule {
           error: String(error)
         });
       });
+      this.schedulePersistedPlayerReconciliation();
       logger.info("Lavalink node connected", { node: node.id });
     });
 
     this.manager.nodeManager.on("resumed", (node, _payload, fetchedPlayers) => {
       this.connectedNodes.add(node.id);
       this.publishNodeHealth();
-      if (!Array.isArray(fetchedPlayers)) return;
-      void this.restoreResumedPlayers(node.id, fetchedPlayers as unknown[]);
+      if (!Array.isArray(fetchedPlayers)) {
+        this.schedulePersistedPlayerReconciliation();
+        return;
+      }
+      void this.restoreResumedPlayers(node.id, fetchedPlayers as unknown[]).finally(() => {
+        this.schedulePersistedPlayerReconciliation();
+      });
     });
 
     this.manager.nodeManager.on("reconnecting", (node) => {
@@ -366,6 +374,8 @@ export class Music implements PlatformModule {
 
     if (this.healthTimer) clearTimeout(this.healthTimer);
     this.healthTimer = undefined;
+    if (this.restoreTimer) clearTimeout(this.restoreTimer);
+    this.restoreTimer = undefined;
     this.connectedNodes.clear();
     this.lastPlayedTracks.clear();
     this.autoplayInFlight.clear();
@@ -1130,6 +1140,131 @@ export class Music implements PlatformModule {
     });
   }
 
+  private schedulePersistedPlayerReconciliation(delayMs = 1500): void {
+    if (!this.manager || !this.initialized) return;
+    if (this.restoreTimer) clearTimeout(this.restoreTimer);
+    this.restoreTimer = setTimeout(() => {
+      this.restoreTimer = undefined;
+      void this.reconcilePersistedPlayers();
+    }, delayMs);
+    this.restoreTimer.unref();
+  }
+
+  private async reconcilePersistedPlayers(preferredNodeId?: string): Promise<void> {
+    if (!this.manager || !this.initialized) return;
+
+    const result = await this.db.query<{
+      guild_id: string;
+      voice_channel_id: string | null;
+      text_channel_id: string | null;
+      state: unknown;
+      queue_data: unknown;
+      updated_at: Date | string;
+    }>(
+      `SELECT p.guild_id,p.voice_channel_id,p.text_channel_id,p.state,q.data AS queue_data,p.updated_at
+       FROM music_players p
+       LEFT JOIN music_queue_store q
+         ON q.guild_id=p.guild_id AND q.bot_identity_id=p.bot_identity_id
+       WHERE p.bot_identity_id=$1
+       ORDER BY p.updated_at ASC`,
+      [this.config.botIdentityId]
+    );
+
+    const connectedNodeId = preferredNodeId && this.connectedNodes.has(preferredNodeId)
+      ? preferredNodeId
+      : [...this.connectedNodes][0] ?? null;
+    if (!connectedNodeId) return;
+
+    for (const row of result.rows) {
+      if (!row.voice_channel_id || this.manager.players.get(row.guild_id)) continue;
+
+      const state = normalizePersistedMusicPlayerState(row.state);
+      if (!hasPersistedMusicPlayback(state, row.queue_data)) continue;
+
+      const player = this.manager.createPlayer({
+        guildId: row.guild_id,
+        voiceChannelId: row.voice_channel_id,
+        textChannelId: row.text_channel_id ?? undefined,
+        node: connectedNodeId,
+        volume: typeof state.volume === "number" ? state.volume : 100,
+        selfDeaf: true
+      });
+
+      try {
+        if (!player.connected) await player.connect();
+        if (typeof state.filters === "object" && state.filters !== null) {
+          player.filterManager.data = state.filters as typeof player.filterManager.data;
+        }
+
+        await player.queue.utils.sync(true, false);
+
+        const repeatValue = typeof state.repeatMode === "string" ? normalizeMusicRepeatMode(state.repeatMode) : null;
+        if (repeatValue) await player.setRepeatMode(repeatValue);
+
+        let current = player.queue.current;
+        if (state.track && typeof state.track === "object") {
+          current = this.manager.utils.buildTrack(
+            state.track as Parameters<LavalinkManager["utils"]["buildTrack"]>[0],
+            current?.requester ?? this.client?.user
+          );
+          player.queue.current = current;
+          if (current) this.lastPlayedTracks.set(row.guild_id, current);
+        }
+
+        if (!current && player.queue.tracks.length === 0) {
+          await this.db.query(
+            "DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
+            [row.guild_id, this.config.botIdentityId]
+          );
+          continue;
+        }
+
+        const position = musicResumePosition(
+          state.positionMs,
+          new Date(row.updated_at).getTime(),
+          state.paused,
+          Number(current?.info.duration ?? 0)
+        );
+
+        if (current && !state.paused) {
+          await player.play({
+            track: state.track as Parameters<Player["play"]>[0] extends infer _ ? never : never,
+            clientTrack: current
+          } as never);
+          if (position > 0) await player.seek(position);
+        } else if (current && state.paused) {
+          await player.play({
+            track: state.track as never,
+            clientTrack: current
+          } as never);
+          await player.pause();
+          player.lastPosition = position;
+          player.lastPositionChange = Date.now();
+        }
+
+        player.paused = state.paused;
+        player.lastPosition = position;
+        player.lastPositionChange = Date.now();
+        await this.persistPlayer(player);
+        logger.info("Reconciled persisted Music player", {
+          guildId: row.guild_id,
+          identity: this.config.botIdentityId,
+          node: connectedNodeId,
+          resumed: Boolean(current && !state.paused),
+          positionMs: position,
+          queuedTracks: player.queue.tracks.length
+        });
+      } catch (error) {
+        logger.warn("Failed to reconcile persisted Music player", {
+          guildId: row.guild_id,
+          identity: this.config.botIdentityId,
+          node: connectedNodeId,
+          error: String(error)
+        });
+      }
+    }
+  }
+
   private async restoreResumedPlayers(nodeId: string, fetchedPlayers: unknown[]): Promise<void> {
     for (const item of fetchedPlayers) {
       if (!item || typeof item !== "object") continue;
@@ -1464,6 +1599,54 @@ export class Music implements PlatformModule {
   }
 }
 
+
+export function musicResumePosition(
+  positionMs: number,
+  snapshotAtMs: number,
+  paused: boolean,
+  durationMs = 0,
+  nowMs = Date.now()
+): number {
+  const base = Number.isFinite(positionMs) && positionMs >= 0 ? positionMs : 0;
+  const snapshot = Number.isFinite(snapshotAtMs) && snapshotAtMs >= 0 ? snapshotAtMs : nowMs;
+  const advanced = paused ? base : base + Math.max(0, nowMs - snapshot);
+  if (durationMs > 0) return Math.min(advanced, Math.max(0, durationMs - 1000));
+  return advanced;
+}
+
+type PersistedMusicPlayerState = {
+  track: unknown | null;
+  filters: unknown;
+  repeatMode: string | null;
+  paused: boolean;
+  positionMs: number;
+  volume: number | null;
+};
+
+function normalizePersistedMusicPlayerState(input: unknown): PersistedMusicPlayerState {
+  const source = input && typeof input === "object" ? input as Record<string, unknown> : {};
+  const nestedState = source.state && typeof source.state === "object"
+    ? source.state as Record<string, unknown>
+    : {};
+  const position = nestedState.position ?? source.position;
+  return {
+    track: source.track ?? null,
+    filters: source.filters ?? null,
+    repeatMode: typeof source.repeatMode === "string" ? source.repeatMode : null,
+    paused: source.paused === true,
+    positionMs: typeof position === "number" ? position : 0,
+    volume: typeof source.volume === "number" ? source.volume : null
+  };
+}
+
+export function hasPersistedMusicPlayback(state: Pick<PersistedMusicPlayerState, "track">, queueData: unknown): boolean {
+  if (state.track && typeof state.track === "object") return true;
+  if (!queueData || typeof queueData !== "object") return false;
+  const source = queueData as Record<string, unknown>;
+  if (Array.isArray(source.tracks) && source.tracks.length > 0) return true;
+  if (Array.isArray(source.queue) && source.queue.length > 0) return true;
+  return false;
+}
 
 export function shouldRetainMusicPlayerState(player: {
   queue: {
