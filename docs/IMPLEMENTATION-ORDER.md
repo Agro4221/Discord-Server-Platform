@@ -1,5 +1,11 @@
 # Implementation Strategy
 
+## Product north star
+The development target is not merely "a Discord bot with many commands". We are building a **self-contained replacement for the usual multi-bot stack**: combine the best useful functionality from bots such as **Carl-bot, Juniper, MEE6, ProBot, Jockie Music and similar products** into one platform so server owners do not need to depend on numerous third-party bots or pay multiple premium subscriptions.
+
+Feature prioritization therefore follows this rule: **replace a dependency first, then improve the integration.** A feature counts as complete only when its core behavior is implemented in our platform and fits the shared permission, persistence, audit, dashboard and recovery model. We can be inspired by public product behavior, but implementation and architecture remain our own.
+
+
 The product is intentionally developed as one large coherent private build. We do not optimize for many public mini-releases.
 
 ## Development phase — build the whole product
