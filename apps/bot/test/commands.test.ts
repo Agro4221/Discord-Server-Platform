@@ -175,3 +175,16 @@ test("prefix command allowlist covers all policy-defined prefix commands", () =>
     assert.ok(definition?.prefix, "Prefix allowlist contains non-prefix command " + name);
   }
 });
+
+
+test("music play commands expose the supported search providers", () => {
+  const commands = buildCommands().map((command) => command.toJSON());
+  const top = commands.find((command) => command.name === "play");
+  const grouped = commands.find((command) => command.name === "music");
+  const topProvider = top?.options?.find((option) => option.name === "provider");
+  const groupedPlay = grouped?.options?.find((option) => option.name === "play");
+  const groupedProvider = groupedPlay?.options?.find((option) => option.name === "provider");
+  const expected = ["auto", "youtube", "youtube_music", "soundcloud"];
+  assert.deepEqual(topProvider?.choices?.map((choice) => String(choice.value)), expected);
+  assert.deepEqual(groupedProvider?.choices?.map((choice) => String(choice.value)), expected);
+});
