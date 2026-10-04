@@ -183,7 +183,9 @@ type ApiOptions = {
       input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number; componentType?: "buttons" | "select" },
       callbacks: {
         deleteMessage: (channelId: string, messageId: string) => Promise<void>;
-        sendMessage: (channelId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => Promise<string>;
+        sendMessage: (channelId: string, content: string, components:
+          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]
+          | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => Promise<string>;
       }
     ) => Promise<unknown>;
     update: (
@@ -191,9 +193,13 @@ type ApiOptions = {
       panelId: number,
       input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number },
       callbacks: {
-        editMessage: (channelId: string, messageId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => Promise<void>;
+        editMessage: (channelId: string, messageId: string, content: string, components:
+          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]
+          | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => Promise<void>;
         deleteMessage: (channelId: string, messageId: string) => Promise<void>;
-        sendMessage: (channelId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => Promise<string>;
+        sendMessage: (channelId: string, content: string, components:
+          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]
+          | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => Promise<string>;
       }
     ) => Promise<unknown>;
     delete: (guildId: string, panelId: number, deleteMessage: (channelId: string, messageId: string) => Promise<void>) => Promise<boolean>;
@@ -2776,7 +2782,9 @@ export class ManagementApiServer {
             };
 
             const helpers = {
-              editMessage: async (oldChannelId: string, messageId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => {
+              editMessage: async (oldChannelId: string, messageId: string, content: string, components:
+          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]
+          | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => {
                 const oldChannel = guild.channels.cache.get(oldChannelId);
                 if (!oldChannel || oldChannel.type !== 0) throw new Error("role_panel_old_channel_missing");
                 const message = await oldChannel.messages.fetch(messageId);
@@ -2787,7 +2795,9 @@ export class ManagementApiServer {
                 if (!oldChannel || oldChannel.type !== 0) return;
                 await oldChannel.messages.delete(messageId).catch(() => undefined);
               },
-              sendMessage: async (newChannelId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => {
+              sendMessage: async (newChannelId: string, content: string, components:
+          | import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]
+          | import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>[]) => {
                 const target = guild.channels.cache.get(newChannelId);
                 if (!target || target.type !== 0) throw new Error("role_panel_channel_missing");
                 const message = await target.send({ content, components });
