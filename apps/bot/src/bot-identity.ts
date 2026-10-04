@@ -17,6 +17,7 @@ export type BotFleetRecord = BotIdentityRecord & {
   lastSeenAt: string | null;
   guildCount: number;
   credentialConfigured: boolean;
+  restartRequired: boolean;
 };
 
 export class BotIdentityRepository {
@@ -51,10 +52,12 @@ export class BotIdentityRepository {
       last_seen_at: string | null;
       guild_count: string;
       credential_configured: boolean;
+      restart_required: boolean;
     }>(
       `SELECT bi.id,bi.client_id,bi.enabled,bi.failover_enabled,bi.presence_name,
               bh.status,bh.last_seen_at,
               COALESCE(bh.guild_count, 0) AS guild_count,
+              COALESCE(bh.restart_required, false) AS restart_required,
               EXISTS (SELECT 1 FROM bot_credentials bc WHERE bc.bot_identity_id=bi.id) AS credential_configured
          FROM bot_identities bi
          LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=bi.id
@@ -63,8 +66,10 @@ export class BotIdentityRepository {
     return result.rows.map((row) => {
       const rawStatus = row.status ?? "stopped";
       const heartbeatFresh = isFleetHeartbeatFresh(row.last_seen_at);
-      const status =
-        !heartbeatFresh && (rawStatus === "ready" || rawStatus === "starting")
+      const restartRequired = row.restart_required === true;
+      const status = restartRequired
+        ? "degraded"
+        : !heartbeatFresh && (rawStatus === "ready" || rawStatus === "starting")
           ? "degraded"
           : rawStatus;
       return {
@@ -77,7 +82,8 @@ export class BotIdentityRepository {
         status,
         lastSeenAt: row.last_seen_at,
         guildCount: Number(row.guild_count),
-        credentialConfigured: row.credential_configured
+        credentialConfigured: row.credential_configured,
+        restartRequired
       };
     });
   }
@@ -188,14 +194,33 @@ export class BotIdentityRepository {
     return this.assignedGuilds.has(guildId);
   }
 
-  async heartbeat(status: BotFleetRecord["status"], guildCount: number): Promise<void> {
+  async heartbeat(
+    status: BotFleetRecord["status"],
+    guildCount: number,
+    clearRestartRequired = false
+  ): Promise<void> {
     await this.db.query(
-      `INSERT INTO bot_heartbeats(bot_identity_id,status,last_seen_at,guild_count)
-       VALUES($1,$2,now(),$3)
+      `INSERT INTO bot_heartbeats(bot_identity_id,status,last_seen_at,guild_count,restart_required)
+       VALUES($1,$2,now(),$3,$4)
        ON CONFLICT(bot_identity_id)
-       DO UPDATE SET status=EXCLUDED.status,last_seen_at=EXCLUDED.last_seen_at,guild_count=EXCLUDED.guild_count`,
-      [this.identityId, status, guildCount]
+       DO UPDATE SET
+         status=EXCLUDED.status,
+         last_seen_at=EXCLUDED.last_seen_at,
+         guild_count=EXCLUDED.guild_count,
+         restart_required=CASE
+           WHEN $4 THEN false
+           ELSE bot_heartbeats.restart_required
+         END`,
+      [this.identityId, status, guildCount, clearRestartRequired]
     );
+  }
+
+  async requestRestart(id: string): Promise<boolean> {
+    const result = await this.db.query(
+      "UPDATE bot_heartbeats SET restart_required=true WHERE bot_identity_id=$1",
+      [id]
+    );
+    return result.rowCount === 1;
   }
 
 async setFailover(id: string, enabled: boolean): Promise<void> {

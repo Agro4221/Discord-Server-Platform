@@ -84,7 +84,7 @@ async function main(): Promise<void> {
     await identities.ensureIdentity(config.botIdentityId, config.discordClientId);
     await identities.refreshAssignments();
     health.set({ database: "ready" });
-    await identities.heartbeat("starting", 0).catch((error) => {
+    await identities.heartbeat("starting", 0, true).catch((error) => {
       logger.warn("Initial fleet heartbeat failed", { identityId: config.botIdentityId, error: String(error) });
     });
   } catch (error) {

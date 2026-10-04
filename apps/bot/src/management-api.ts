@@ -239,6 +239,11 @@ export class ManagementApiServer {
               enabled: body.enabled,
               failoverEnabled: body.failoverEnabled
             });
+            const restartRequired = !result.created &&
+              result.identityId !== "primary" &&
+              Boolean(this.options.identities?.requestRestart)
+              ? await this.options.identities!.requestRestart(result.identityId)
+              : false;
 
             await this.options.auditLog.record({
               guildId: null,
@@ -250,7 +255,8 @@ export class ManagementApiServer {
                 clientId: result.clientId,
                 username: result.username,
                 globalName: result.globalName,
-                credentialConfigured: true
+                credentialConfigured: true,
+                restartRequired
               }
             });
 
@@ -263,7 +269,8 @@ export class ManagementApiServer {
                 globalName: result.globalName,
                 credentialConfigured: true,
                 updatedAt: result.updatedAt,
-                created: result.created
+                created: result.created,
+                restartRequired
               }
             });
             return;

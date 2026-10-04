@@ -805,6 +805,13 @@ const migrations = [
     ])
   },
   {
+    version: 48,
+    name: "fleet_restart_requests",
+    sql: q([
+      "ALTER TABLE bot_heartbeats ADD COLUMN IF NOT EXISTS restart_required boolean NOT NULL DEFAULT false;"
+    ])
+  },
+  {
     version: 47,
     name: "automod_log_channel",
     sql: q([

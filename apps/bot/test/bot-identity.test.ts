@@ -122,6 +122,72 @@ test("claimStaleGuilds atomically returns guilds claimed by an enabled failover 
 });
 
 
+test("listFleet marks a requested restart as degraded even with a fresh heartbeat", async () => {
+  const now = Date.parse("2026-10-04T10:00:00.000Z");
+  const db = {
+    query: async () => ({
+      rows: [{
+        id: "secondary",
+        client_id: "client-2",
+        enabled: true,
+        failover_enabled: true,
+        presence_name: "secondary",
+        status: "ready",
+        last_seen_at: new Date(now - 10_000).toISOString(),
+        guild_count: "3",
+        credential_configured: true,
+        restart_required: true
+      }]
+    })
+  } as never;
+
+  const repo = new BotIdentityRepository(db, "primary");
+  const originalNow = Date.now;
+  Date.now = () => now;
+  try {
+    const fleet = await repo.listFleet();
+    assert.equal(fleet[0]?.restartRequired, true);
+    assert.equal(fleet[0]?.status, "degraded");
+    assert.equal(fleet[0]?.connected, false);
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
+test("heartbeat preserves a restart request until a new process explicitly clears it", async () => {
+  const updates: readonly unknown[][] = [];
+  const queries: string[] = [];
+  const db = {
+    query: async (text: string, values: readonly unknown[] = []) => {
+      queries.push(text);
+      updates.push(values);
+      return { rows: [], rowCount: 1 };
+    }
+  } as never;
+
+  const repo = new BotIdentityRepository(db, "secondary");
+  await repo.heartbeat("ready", 4);
+  await repo.heartbeat("starting", 0, true);
+
+  assert.match(queries[0] ?? "", /restart_required/);
+  assert.equal(updates[0]?.[3], false);
+  assert.equal(updates[1]?.[3], true);
+});
+
+test("requestRestart marks an existing fleet heartbeat for controlled restart", async () => {
+  let updateValues: readonly unknown[] = [];
+  const db = {
+    query: async (text: string, values: readonly unknown[] = []) => {
+      if (text.startsWith("UPDATE bot_heartbeats")) updateValues = values;
+      return { rows: [], rowCount: 1 };
+    }
+  } as never;
+
+  const repo = new BotIdentityRepository(db, "primary");
+  assert.equal(await repo.requestRestart("secondary"), true);
+  assert.deepEqual(updateValues, ["secondary"]);
+});
+
 test("listFleet marks stale starting and ready heartbeats as degraded", async () => {
   const now = Date.parse("2026-10-04T10:00:00.000Z");
   const db = {
