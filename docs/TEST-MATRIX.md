@@ -533,3 +533,11 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ reaction.remove, channel.update and role.update are routed into Automation.
 - ✅ set-slowmode and set-channel-topic are validated and exposed in the Dashboard/API catalog.
 - ⚠ Real Discord permission/hierarchy behavior remains part of live acceptance.
+
+
+## 2026-10-04 — Security executor timeout coverage
+- Added bounded-policy coverage for executorTimeoutMinutes.
+- Added configuration persistence coverage for the Security timeout setting.
+- Added runtime regression coverage proving successful timeout enforcement creates the standard moderation timeout case/event.
+- Added negative coverage proving a failed Discord timeout does not create a false moderation case.
+- Live Discord hierarchy/permission/timeout behavior remains an environment-dependent release-gate case.
