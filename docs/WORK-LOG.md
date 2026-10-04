@@ -433,3 +433,18 @@ Never write credentials, tokens or private user data here.
 - In-memory Security event buckets now retain up to the full supported one-hour detection horizon instead of a hard-coded five minutes.
 - Added regression coverage for window lower/upper bounds and invalid values.
 - CI verification is still pending for the latest direct development HEAD.
+
+## 2026-10-04 — AutoMod independent rule windows + Security window hardening
+- AutoMod rule-based `repeated-text` now has timestamp-aware history independent from the base detector window, up to the supported one-hour history horizon; added regression coverage for a rule window larger than the global base window.
+- AutoMod `action=log` requires a configured log channel before persistence, with Management API rejection and zero-write regression coverage when missing.
+- Security incident clearing now returns only successfully resolved incident count.
+- Security raid/destructive detection windows are normalized to 5–3600 seconds; event-cache retention and audit-log lookback now cover the full supported hour instead of a hard five-minute ceiling.
+- CI run #1647 exposed a genuine TypeScript syntax corruption in the Security helper area; it was repaired before the current checkpoint. CI run #1651 then reached 93/94 tests and exposed the missing export of `clampSecurityIncidentDuration`; the helper export was restored in commit `f079a866aa2294ad211d7234fa6396c8c052e643`.
+- Latest code before this documentation checkpoint: `f079a866aa2294ad211d7234fa6396c8c052e643`.
+- Current verification state: a fresh CI run is active on the latest documentation checkpoint; no green claim is made until it completes.
+### Remaining after this pass
+- AutoMod: response-workflow edge cases / final warn semantics review.
+- Security: executor-role lifecycle semantics and durable destructive-history policy.
+- Music: deeper multi-node queue/current-position continuity and provider/runtime failure paths.
+- Fleet: reconciliation/failover failure paths and multi-bot Windows/Docker acceptance.
+- Release gate: live Discord permissions/hierarchy, Lavalink/provider behavior, soak/chaos/recovery and clean-host deployment.
