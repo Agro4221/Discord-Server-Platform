@@ -53,4 +53,5 @@ test("Security anti-nuke tracks channel/role create and delete audit actions", (
   assert.equal(securityAuditLogEventType("role.create"), AuditLogEvent.RoleCreate);
   assert.equal(securityAuditLogEventType("role.delete"), AuditLogEvent.RoleDelete);
   assert.equal(securityAuditLogEventType("member.ban"), AuditLogEvent.MemberBanAdd);
+  assert.throws(() => securityAuditLogEventType("unsupported"), /Unsupported security audit event type/);
 });
