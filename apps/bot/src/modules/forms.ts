@@ -377,7 +377,8 @@ export function normalizeFormFields(value: unknown): FormField[] {
 
 export function validateSubmission(fields: FormField[], answers: Record<string, string>): string | null {
   for (const field of fields) {
-    const value = typeof answers[field.id] === "string" ? answers[field.id].trim() : "";
+    const rawValue = answers[field.id];
+    const value = typeof rawValue === "string" ? rawValue.trim() : "";
     if (field.required && !value) return "Заполни обязательное поле: " + field.label + ".";
     if (value.length < field.minLength) return "Поле «" + field.label + "» слишком короткое.";
     if (value.length > field.maxLength) return "Поле «" + field.label + "» слишком длинное.";
