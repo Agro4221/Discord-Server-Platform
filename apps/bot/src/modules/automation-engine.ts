@@ -20,6 +20,7 @@ type RuntimeEvent = {
   guildId: string;
   userId?: string;
   channelId?: string;
+  previousChannelId?: string;
   content?: string;
   messageId?: string;
   numeric?: Record<string, number>;
@@ -83,7 +84,12 @@ export class AutomationEngine implements PlatformModule {
         return this.execute({
           type: "message.delete", guildId: message.guildId, userId: message.author.id,
           channelId: message.channelId, content: message.content, messageId: message.id,
-          numeric: { messageLength: message.content.length }
+          numeric: {
+            messageLength: message.content.length,
+            attachmentCount: message.attachments.size,
+            embedCount: message.embeds.length,
+            stickerCount: message.stickers.size
+          }
         });
       }),
       context.events.on("message.update", ({ oldMessage, newMessage }) => {
@@ -91,7 +97,13 @@ export class AutomationEngine implements PlatformModule {
         return this.execute({
           type: "message.edit", guildId: newMessage.guildId, userId: newMessage.author.id,
           channelId: newMessage.channelId, content: newMessage.content, messageId: newMessage.id,
-          numeric: { messageLength: newMessage.content.length, previousLength: oldMessage.content.length }
+          numeric: {
+            messageLength: newMessage.content.length,
+            previousLength: oldMessage.content.length,
+            attachmentCount: newMessage.attachments.size,
+            embedCount: newMessage.embeds.length,
+            stickerCount: newMessage.stickers.size
+          }
         });
       }),
       context.events.on("reaction.add", ({ reaction, user }) => {
@@ -521,21 +533,24 @@ export class AutomationEngine implements PlatformModule {
         type: "voice.join",
         guildId: newState.guild.id,
         userId: newState.id,
-        channelId: newState.channelId
+        channelId: newState.channelId,
+        previousChannelId: undefined
       });
     } else if (!newState.channelId && oldState.channelId) {
       await this.execute({
         type: "voice.leave",
         guildId: newState.guild.id,
         userId: newState.id,
-        channelId: oldState.channelId
+        channelId: oldState.channelId,
+        previousChannelId: oldState.channelId
       });
     } else if (newState.channelId !== oldState.channelId) {
       await this.execute({
         type: "voice.move",
         guildId: newState.guild.id,
         userId: newState.id,
-        channelId: newState.channelId ?? undefined
+        channelId: newState.channelId ?? undefined,
+        previousChannelId: oldState.channelId ?? undefined
       });
     }
   }
@@ -914,6 +929,7 @@ function resolveTextField(event: RuntimeEvent, field: string): string | undefine
   if (field === "content") return event.content;
   if (field === "userId") return event.userId;
   if (field === "channelId") return event.channelId;
+  if (field === "previousChannelId") return event.previousChannelId;
   if (field === "messageId") return event.messageId;
   if (field === "guildId") return event.guildId;
   return undefined;
