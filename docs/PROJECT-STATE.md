@@ -374,3 +374,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - CI #1926 passed completely.
 - Configurable visible counters and retention are now implemented across Dashboard and Discord analytics reporting.
 - Next single backlog slice: **Tickets / linked-related panels**.
+
+## 2026-10-05 — Ticket Panels verified
+- Source checkpoint: `879b684c418fda2d2e2ceaebd38852e9341feaa0`.
+- CI #1949 is green.
+- Tickets now supports multiple persistent entry panels with per-panel channel/appearance and ticket source tracking.
+- Next high-value slice: **Custom member rewards / milestones**.
