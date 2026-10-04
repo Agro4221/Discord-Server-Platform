@@ -771,7 +771,7 @@ export class Tickets implements PlatformModule {
   }
 
   private async createTicket(interaction: ModalSubmitInteraction): Promise<void> {
-    const rawPanelId = interaction.customId.split(":")[3];
+    const rawPanelId = interaction.customId?.split(":")[3];
     const panelId = rawPanelId ? Number(rawPanelId) : null;
     if (panelId !== null) {
       const panel = await this.db.query<{ enabled: boolean }>(
