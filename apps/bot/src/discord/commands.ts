@@ -402,6 +402,9 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addIntegerOption((option) =>
             option.setName("max-selections").setDescription("Maximum selections for max mode").setMinValue(1).setMaxValue(5)
           )
+          .addIntegerOption((option) =>
+            option.setName("duration").setDescription("Role duration in minutes; 0 = permanent").setMinValue(0).setMaxValue(43200)
+          )
       ),
 
     new SlashCommandBuilder()
