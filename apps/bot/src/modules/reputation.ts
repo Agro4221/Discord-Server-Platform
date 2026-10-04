@@ -150,6 +150,15 @@ export class Reputation implements PlatformModule {
     });
   }
 
+  async dashboardLeaderboard(guildId: string, limit = 8): Promise<Array<{ userId: string; points: number }>> {
+    const safe = Math.min(Math.max(Math.floor(limit), 1), 25);
+    const result = await this.db.query<{ user_id: string; points: number }>(
+      "SELECT user_id,points FROM reputation_points WHERE guild_id=$1 ORDER BY points DESC,user_id LIMIT $2",
+      [guildId, safe]
+    );
+    return result.rows.map((row) => ({ userId: row.user_id, points: Number(row.points) }));
+  }
+
   private async getPoints(guildId: string,userId: string): Promise<number> {
     const result = await this.db.query<{ points:number }>(
       "SELECT points FROM reputation_points WHERE guild_id=$1 AND user_id=$2",[guildId,userId]
