@@ -1257,7 +1257,7 @@ export function isOpenTicketConflict(error: unknown): boolean {
   return value.code === "23505" && value.constraint === "uq_open_ticket_per_creator";
 }
 
-function normalizeTicketPanelInput(input: {
+export function normalizeTicketPanelInput(input: {
   channelId: string;
   title: string;
   description: string;
