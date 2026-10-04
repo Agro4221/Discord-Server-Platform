@@ -554,3 +554,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Core, Management API and Dashboard catalogs remain aligned for the supported Automation condition set.
 - Latest development HEAD: `4c69d5644b5e35fd5497619c008642c74ece02dd`.
 - CI #1783 is the active verification gate and is currently pending.
+
+
+## 2026-10-04 — Security response policy depth checkpoint
+- Security response policy now supports three independent escalation tools for confirmed destructive executors: manageable-role stripping, optional timeout and optional ban.
+- Ban is conservative by default (`false`) and is guarded by the same owner/Administrator/manageability/hierarchy model used by the existing response path.
+- Successful ban and timeout actions create durable moderation cases only after Discord enforcement succeeds.
+- Latest development HEAD before documentation update: `afeb5c184cbb1d19b1033c9600593f0274326453`.
+- CI #1795 is the active verification gate.
