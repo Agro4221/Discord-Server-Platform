@@ -3,6 +3,13 @@
 This file is the persistent continuity record for development across chats.
 
 ## 2026-09-19 — Repository bootstrap
+## 2026-10-04 — Product north-star clarification
+- Reaffirmed the project's central purpose: build our own self-hosted Discord bot/platform to replace the typical collection of third-party bots and paid premium subscriptions.
+- Reference feature pool explicitly includes the best useful functionality from **Carl-bot, Juniper, MEE6, ProBot, Jockie Music and similar Discord bots**, with equivalent or improved behavior implemented independently in our own codebase.
+- The goal is not to clone proprietary implementations. The goal is to select the strongest practical features from the ecosystem and unify them behind one bot, one configuration model, shared persistence, consistent permissions/audit, integrated Control Center and recovery model.
+- "Module exists" is therefore not the final product criterion. We must continue closing useful feature gaps until the platform can genuinely replace the external-bot stack for its intended scope.
+- The project should avoid artificial premium walls for its intended self-hosted feature set; users should not need third-party subscriptions to unlock the platform's core capabilities.
+
 - Confirmed private repository: Agro4221/Discord-Server-Platform.
 - Development branch created from main.
 - Product scope fixed as one coherent full build followed by continuous verification and later full stabilization.
