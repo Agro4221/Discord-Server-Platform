@@ -437,3 +437,37 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Dashboard legacy logout/login remnants are guarded against reintroduction.
 - ✅ Bot registration has an endpoint-specific throttling window.
 - ⚠ Actual target Windows/Discord/Lavalink runtime behavior remains environment-dependent.
+
+## 2026-10-04 — Feature completeness audit snapshot
+This section records **feature scope status**, not live-test results. The main test matrix remains intentionally separate because a feature can be implemented while its real Discord/runtime behavior is still unvalidated.
+
+| Area | Feature family present | Planned breadth complete | Live acceptance |
+|---|---:|---:|---:|
+| Core / Discord lifecycle | ✅ | ✅ | ⚠ |
+| PostgreSQL / persistence / migrations | ✅ | ✅ | ⚠ |
+| Control Center | ✅ | ✅ for implemented UI/contracts | ⚠ |
+| Moderation / cases | ✅ | ✅ | ⚠ |
+| Temporary Voice | ✅ | ✅ | ⚠ |
+| Tickets / transcripts | ✅ | ✅ | ⚠ |
+| Role Panels | ✅ | ✅ | ⚠ |
+| Giveaways | ✅ | ✅ | ⚠ |
+| Economy / shop / ledger | ✅ | ✅ | ⚠ |
+| Reminders / AFK / Utility | ✅ | ✅ | ⚠ |
+| Leveling / Welcome / Verification | ✅ | ✅ | ⚠ |
+| Notifications | ✅ | 🟡 provider breadth varies | ⚠ |
+| Analytics | ✅ | ✅ for current planned scope | ⚠ |
+| Backup / restore / import / export | ✅ | ✅ for current planned scope | ⚠ |
+| Automation | ✅ | 🟡 broader conditions/actions remain | ⚠ |
+| AutoMod | ✅ | 🟡 response/policy depth remains | ⚠ |
+| Security / Anti-Raid / Anti-Nuke | ✅ | 🟡 deeper response workflow remains | ⚠ |
+| Music / Lavalink | ✅ | 🟡 provider breadth + complete failover acceptance remain | ⚠ |
+| Multi-bot Fleet / routing | ✅ | 🟡 deeper orchestration/failover remains | ⚠ |
+| Native Windows runtime | ✅ | ✅ for current repository-side tooling | ⚠ |
+| VPS deployment | ✅ | 🟡 production install/upgrade acceptance remains | ⚠ |
+| E2E / chaos / soak | ✅ tooling/contracts exist | ❌ final cycle not complete | ☐ |
+
+### Interpretation
+- ✅ in **Feature family present** means the subsystem is actually represented and functional code exists.
+- 🟡 in **Planned breadth complete** means the subsystem works but the original specification called for additional breadth/depth.
+- ⚠ in **Live acceptance** means repository/CI evidence is not a substitute for running against real Discord, Lavalink, Windows processes or a clean VPS.
+- This audit therefore does **not** mark the project 100% complete; it records exactly why.
