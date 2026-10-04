@@ -379,6 +379,7 @@ export class Tickets implements PlatformModule {
     createdAt: string;
     closedAt: string | null;
     lastActivityAt: string | null;
+    panelId: number | null;
   }>> {
     const result = await this.db.query<{
       id: string;
@@ -391,8 +392,9 @@ export class Tickets implements PlatformModule {
       created_at: string;
       closed_at: string | null;
       last_activity_at: string | null;
+      panel_id: string | null;
     }>(
-      "SELECT id,channel_id,creator_id,claimed_by,status,priority,tags,created_at,closed_at,last_activity_at FROM tickets WHERE guild_id=$1" +
+      "SELECT id,channel_id,creator_id,claimed_by,status,priority,tags,created_at,closed_at,last_activity_at,panel_id FROM tickets WHERE guild_id=$1" +
       (status ? " AND status=$2" : "") +
       " ORDER BY CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,created_at DESC LIMIT 200",
       status ? [guildId,status] : [guildId]
@@ -407,7 +409,8 @@ export class Tickets implements PlatformModule {
       tags: Array.isArray(row.tags) ? row.tags : [],
       createdAt: row.created_at,
       closedAt: row.closed_at,
-      lastActivityAt: row.last_activity_at
+      lastActivityAt: row.last_activity_at,
+      panelId: row.panel_id === null ? null : Number(row.panel_id)
     }));
   }
 
