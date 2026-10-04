@@ -999,7 +999,7 @@ export class ManagementApiServer {
               this.json(res, 404, { error: "guild_not_found" });
               return;
             }
-            this.json(res, 200, { guildId, providers: this.options.streamAlerts!.providers(guildId), alerts: await this.options.streamAlerts!.list(guildId) });
+            this.json(res, 200, { guildId, providers: await this.options.streamAlerts!.providers(guildId), alerts: await this.options.streamAlerts!.list(guildId) });
             return;
           }
 

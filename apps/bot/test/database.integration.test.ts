@@ -25,7 +25,7 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
         "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs","moderation_presets","ticket_sla_settings","help_pages","analytics_settings","music_history","custom_forms","custom_form_submissions","onboarding_flows","server_config_presets"
       ]]
     );
-    assert.equal(tables.rows.length, 27);
+    assert.equal(tables.rows.length, 28);
     const version = (await db.query("SELECT max(version) AS version FROM schema_migrations")).rows[0]?.version;
     const retryColumn = await db.query(
       "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='automation_delayed_jobs' AND column_name='dead_lettered_at'"
@@ -117,6 +117,70 @@ test("onboarding flow settings persist with normalized steps", { skip: !enabled 
     await db.query("DELETE FROM guild_modules WHERE guild_id=$1 AND module_key='onboarding'", [guildId]).catch(() => undefined);
     await db.query("DELETE FROM onboarding_flows WHERE guild_id=$1", [guildId]).catch(() => undefined);
     await db.close();
+  }
+});
+
+
+test("integration credential encryption round-trips secrets without plaintext listing", { skip: !enabled }, async () => {
+  const rows: Array<{ id: number; guild_id: string; provider: "twitch" | "youtube" | "kick"; label: string; secret_ciphertext: string; created_at: string; updated_at: string }> = [];
+  const fakeDb = {
+    query: async (sql: string, params: unknown[] = []) => {
+      if (sql.startsWith("INSERT INTO integration_credentials")) {
+        const [guildId, provider, label, ciphertext] = params as [string,string,string,string];
+        const existing = rows.find((row) => row.guild_id === guildId && row.provider === provider && row.label === label);
+        if (existing) {
+          existing.secret_ciphertext = ciphertext;
+          existing.updated_at = new Date().toISOString();
+          return { rows: [{ id: String(existing.id) }] };
+        }
+        const id = rows.length + 1;
+        rows.push({ id, guild_id: guildId, provider: provider as "twitch", label, secret_ciphertext: ciphertext, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+        return { rows: [{ id: String(id) }] };
+      }
+      if (sql.startsWith("SELECT id,guild_id,provider,label,created_at,updated_at FROM integration_credentials")) {
+        const guildId = params[0] as string;
+        return { rows: rows.filter((row) => row.guild_id === guildId).map((row) => ({ ...row, id: String(row.id) })) };
+      }
+      if (sql.startsWith("SELECT secret_ciphertext FROM integration_credentials")) {
+        const [id, guildId, provider] = params;
+        const row = rows.find((item) => item.id === Number(id) && item.guild_id === guildId && item.provider === provider);
+        return { rows: row ? [{ secret_ciphertext: row.secret_ciphertext }] : [] };
+      }
+      if (sql.startsWith("DELETE FROM integration_credentials")) {
+        const [id, guildId] = params;
+        const before = rows.length;
+        for (let i = rows.length - 1; i >= 0; i -= 1) {
+          if (rows[i]?.id === Number(id) && rows[i]?.guild_id === guildId) rows.splice(i, 1);
+        }
+        return { rows: [], rowCount: rows.length === before ? 0 : 1 };
+      }
+      throw new Error("unexpected SQL: " + sql);
+    }
+  } as unknown as Database;
+  const { IntegrationCredentialRepository } = await import("../src/integration-credentials.js");
+  const credentials = new IntegrationCredentialRepository(fakeDb, "integration-test-secret");
+  try {
+    const saved = await credentials.save("123456789012345678", {
+      provider: "twitch",
+      label: " Main Twitch ",
+      clientId: "client-id",
+      clientSecret: "client-secret"
+    });
+    assert.equal(saved.label, "Main Twitch");
+    assert.equal(rows.length, 1);
+    assert.notEqual(rows[0]?.secret_ciphertext.includes("client-secret"), true);
+
+    assert.deepEqual(
+      await credentials.getSecret("123456789012345678", saved.id, "twitch"),
+      { clientId: "client-id", clientSecret: "client-secret" }
+    );
+    assert.deepEqual(
+      await credentials.list("123456789012345678"),
+      [saved]
+    );
+    assert.equal(await credentials.delete("123456789012345678", saved.id), true);
+  } finally {
+    rows.splice(0, rows.length);
   }
 });
 
