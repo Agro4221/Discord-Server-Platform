@@ -588,7 +588,7 @@ export class AutoMod implements PlatformModule {
     }
   ): Promise<boolean> {
     let deleted = false;
-    if (rule.action === "delete" || rule.action === "timeout" || rule.action === "warn") {
+    if (rule.action === "delete" || rule.action === "timeout") {
       try {
         await message.delete();
         deleted = true;
@@ -604,12 +604,17 @@ export class AutoMod implements PlatformModule {
     }
 
     let timedOut = false;
-    if ((rule.action === "timeout" || rule.action === "warn") && rule.timeoutMinutes > 0 && message.member?.moderatable) {
+    if (rule.action === "timeout" && rule.timeoutMinutes > 0 && message.member?.moderatable) {
       await message.member
         .timeout(rule.timeoutMinutes * 60_000, "AutoMod: " + rule.detector)
         .then(() => { timedOut = true; })
         .catch((error) =>
-          logger.warn("AutoMod rule timeout failed", { guildId:message.guild!.id,userId:message.author.id,detector:rule.detector,error:String(error) })
+          logger.warn("AutoMod rule timeout failed", {
+            guildId: message.guild!.id,
+            userId: message.author.id,
+            detector: rule.detector,
+            error: String(error)
+          })
         );
     }
 
@@ -637,6 +642,7 @@ export class AutoMod implements PlatformModule {
       }
     }
 
+    let responseDelivered = false;
     let logDelivered = false;
     if (rule.action === "log" && rule.logChannelId) {
       const logChannel = message.guild!.channels.cache.get(rule.logChannelId);
@@ -663,25 +669,30 @@ export class AutoMod implements PlatformModule {
       }
     }
 
-    if (rule.messageTemplate && rule.action !== "log") {
-      const rendered = rule.messageTemplate
+    const shouldSendResponse = rule.action === "warn" || Boolean(rule.messageTemplate);
+    if (shouldSendResponse && rule.action !== "log" && "send" in message.channel) {
+      const template = rule.messageTemplate || (
+        "⚠️ <@" + message.author.id + ">, AutoMod обнаружил нарушение **" + rule.detector + "**."
+      );
+      const rendered = template
         .replaceAll("{mention}", "<@" + message.author.id + ">")
         .replaceAll("{user}", message.author.username)
         .replaceAll("{channel}", "<#" + message.channelId + ">");
-      if ("send" in message.channel) {
-        await message.channel.send({
-          content: rendered,
-          allowedMentions: { users: [message.author.id], roles: [], repliedUser: false }
-        }).catch((error) => {
-          logger.warn("AutoMod response delivery failed", {
-            guildId: message.guild!.id,
-            userId: message.author.id,
-            messageId: message.id,
-            detector: rule.detector,
-            error: String(error)
-          });
+      await message.channel.send({
+        content: rendered,
+        allowedMentions: { users: [message.author.id], roles: [], repliedUser: false }
+      }).then(() => {
+        responseDelivered = true;
+      }).catch((error) => {
+        logger.warn("AutoMod response delivery failed", {
+          guildId: message.guild!.id,
+          userId: message.author.id,
+          messageId: message.id,
+          detector: rule.detector,
+          action: rule.action,
+          error: String(error)
         });
-      }
+      });
     }
 
     await this.auditLog?.record({
@@ -690,7 +701,7 @@ export class AutoMod implements PlatformModule {
       action: "automod.rule.triggered",
       targetType: "user",
       targetId: message.author.id,
-      metadata: { detector: rule.detector, action: rule.action, deleted, logDelivered }
+      metadata: { detector: rule.detector, action: rule.action, deleted, timedOut, responseDelivered, logDelivered }
     }).catch(() => undefined);
 
     return true;

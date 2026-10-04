@@ -461,6 +461,98 @@ test("AutoMod rule upsert rejects unsupported detectors before database writes",
 });
 
 
+test("AutoMod warn does not delete or timeout and always attempts a warning response", async () => {
+  const deletes: string[] = [];
+  const sent: string[] = [];
+  let timeoutCalls = 0;
+  const queries: Array<{ text: string; values: readonly unknown[] }> = [];
+  const auditEvents: unknown[] = [];
+  const moderationEvents: unknown[] = [];
+
+  const db = {
+    async query<T>(text: string, values: readonly unknown[] = []) {
+      queries.push({ text, values });
+      if (text.startsWith("INSERT INTO automod_events")) return { rows: [], rowCount: 1 } as { rows: T[] };
+      if (text.startsWith("INSERT INTO moderation_cases")) return { rows: [{ id: "77" }], rowCount: 1 } as { rows: T[] };
+      throw new Error("unexpected query: " + text);
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const events = new (await import("../src/events.js")).PlatformEventBus();
+  events.on("moderation.case", (event) => {
+    moderationEvents.push(event);
+  });
+
+  const automod = new AutoMod(db);
+  await automod.init({
+    client: {} as never,
+    db,
+    events,
+    auditLog: {
+      record: async (event: unknown) => { auditEvents.push(event); }
+    } as never,
+    identityId: "primary"
+  });
+
+  const message = {
+    id: "123456789012345678",
+    guild: { id: "234567890123456789" },
+    channelId: "345678901234567890",
+    author: { id: "456789012345678901", username: "tester", bot: false },
+    member: {
+      moderatable: true,
+      timeout: async () => { timeoutCalls += 1; }
+    },
+    channel: {
+      send: async (payload: { content: string }) => {
+        sent.push(payload.content);
+      }
+    },
+    delete: async () => { deletes.push("deleted"); }
+  };
+
+  await (automod as unknown as {
+    applyRule: (
+      message: unknown,
+      rule: {
+        detector: string;
+        action: "delete" | "timeout" | "warn" | "log";
+        timeoutMinutes: number;
+        logChannelId: string | null;
+        messageTemplate: string;
+      }
+    ) => Promise<boolean>;
+  }).applyRule(message, {
+    detector: "blocked_word",
+    action: "warn",
+    timeoutMinutes: 30,
+    logChannelId: null,
+    messageTemplate: ""
+  });
+
+  await automod.shutdown();
+
+  assert.deepEqual(deletes, []);
+  assert.equal(timeoutCalls, 0);
+  assert.deepEqual(sent, ["⚠️ <@456789012345678901>, AutoMod обнаружил нарушение **blocked_word**."]);
+  assert.equal(queries.filter((item) => item.text.startsWith("INSERT INTO moderation_cases")).length, 1);
+  assert.deepEqual(moderationEvents[0], {
+    guildId: "234567890123456789",
+    userId: "456789012345678901",
+    action: "warn",
+    caseId: 77
+  });
+  assert.equal(
+    (auditEvents[0] as { metadata?: { action?: string; deleted?: boolean; timedOut?: boolean; responseDelivered?: boolean } })
+      ?.metadata?.action,
+    "warn"
+  );
+  assert.equal(
+    (auditEvents[0] as { metadata?: { responseDelivered?: boolean } })?.metadata?.responseDelivered,
+    true
+  );
+});
+
 test("AutoMod log rules require a configured log channel", async () => {
   let writes = 0;
   const db = {
