@@ -87,9 +87,9 @@ export class Forms implements PlatformModule {
   async save(guildId: string, input: Partial<CustomForm> & { name: string }): Promise<CustomForm> {
     const name = normalizeFormName(input.name);
     if (!name) throw new Error("invalid_form_name");
-    const existing = await this.get(guildId, name);
     if (input.enabled !== undefined && typeof input.enabled !== "boolean") throw new Error("invalid_form_enabled");
     if (input.fields !== undefined && !Array.isArray(input.fields)) throw new Error("invalid_form_fields");
+    const existing = await this.get(guildId, name);
     const form: CustomForm = {
       name,
       title: normalizeText(input.title ?? existing?.title, "Форма", 256),
@@ -109,14 +109,6 @@ export class Forms implements PlatformModule {
       "INSERT INTO guild_modules(guild_id,module_key,enabled) VALUES($1,$2,true) ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()",
       [guildId, "forms"]
     );
-    await this.auditLog?.record({
-      guildId,
-      source: "system",
-      action: existing ? "forms.updated" : "forms.created",
-      targetType: "form",
-      targetId: form.name,
-      metadata: { fieldCount: form.fields.length, enabled: form.enabled }
-    });
     return form;
   }
 
@@ -124,15 +116,6 @@ export class Forms implements PlatformModule {
     const normalized = normalizeFormName(name);
     if (!normalized) throw new Error("invalid_form_name");
     const result = await this.db.query("DELETE FROM custom_forms WHERE guild_id=$1 AND name=$2", [guildId, normalized]);
-    if (result.rowCount === 1) {
-      await this.auditLog?.record({
-        guildId,
-        source: "system",
-        action: "forms.deleted",
-        targetType: "form",
-        targetId: normalized
-      });
-    }
     return result.rowCount === 1;
   }
 
@@ -154,18 +137,28 @@ export class Forms implements PlatformModule {
       ]
     });
 
-    await this.db.query(
-      "UPDATE custom_forms SET panel_channel_id=$1,panel_message_id=$2,updated_at=now() WHERE guild_id=$3 AND name=$4",
-      [channel.id, message.id, guildId, form.name]
-    );
-    await this.auditLog?.record({
-      guildId,
-      source: "system",
-      action: "forms.published",
-      targetType: "form",
-      targetId: form.name,
-      metadata: { channelId: channel.id, messageId: message.id }
-    });
+    try {
+      await this.db.query(
+        "UPDATE custom_forms SET panel_channel_id=$1,panel_message_id=$2,updated_at=now() WHERE guild_id=$3 AND name=$4",
+        [channel.id, message.id, guildId, form.name]
+      );
+    } catch (error) {
+      await channel.messages.delete(message.id).catch((cleanupError) => {
+        logger.warn("Form publication rollback message delete failed", {
+          guildId,
+          form: form.name,
+          messageId: message.id,
+          error: String(cleanupError)
+        });
+      });
+      logger.error("Form publication persistence failed and was rolled back", {
+        guildId,
+        form: form.name,
+        messageId: message.id,
+        error: String(error)
+      });
+      throw error;
+    }
     return { channelId: channel.id, messageId: message.id };
   }
 
@@ -182,6 +175,15 @@ export class Forms implements PlatformModule {
         interaction.options.getString("name", true),
         interaction.options.getChannel("channel")?.id
       );
+      await this.auditLog?.record({
+        guildId: interaction.guild!.id,
+        actorUserId: interaction.user.id,
+        source: "discord",
+        action: "forms.published",
+        targetType: "form",
+        targetId: interaction.options.getString("name", true).trim().toLowerCase(),
+        metadata: result
+      });
       await interaction.reply({ content: "Форма опубликована в <#" + result.channelId + ">.", ephemeral: true });
     } catch (error) {
       logger.warn("Form publish failed", { guildId: interaction.guild!.id, error: String(error) });
