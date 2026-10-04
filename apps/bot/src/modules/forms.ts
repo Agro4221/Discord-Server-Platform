@@ -109,6 +109,14 @@ export class Forms implements PlatformModule {
       "INSERT INTO guild_modules(guild_id,module_key,enabled) VALUES($1,$2,true) ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()",
       [guildId, "forms"]
     );
+    await this.auditLog?.record({
+      guildId,
+      source: "system",
+      action: existing ? "forms.updated" : "forms.created",
+      targetType: "form",
+      targetId: form.name,
+      metadata: { fieldCount: form.fields.length, enabled: form.enabled }
+    });
     return form;
   }
 
@@ -116,6 +124,15 @@ export class Forms implements PlatformModule {
     const normalized = normalizeFormName(name);
     if (!normalized) throw new Error("invalid_form_name");
     const result = await this.db.query("DELETE FROM custom_forms WHERE guild_id=$1 AND name=$2", [guildId, normalized]);
+    if (result.rowCount === 1) {
+      await this.auditLog?.record({
+        guildId,
+        source: "system",
+        action: "forms.deleted",
+        targetType: "form",
+        targetId: normalized
+      });
+    }
     return result.rowCount === 1;
   }
 
@@ -141,6 +158,14 @@ export class Forms implements PlatformModule {
       "UPDATE custom_forms SET panel_channel_id=$1,panel_message_id=$2,updated_at=now() WHERE guild_id=$3 AND name=$4",
       [channel.id, message.id, guildId, form.name]
     );
+    await this.auditLog?.record({
+      guildId,
+      source: "system",
+      action: "forms.published",
+      targetType: "form",
+      targetId: form.name,
+      metadata: { channelId: channel.id, messageId: message.id }
+    });
     return { channelId: channel.id, messageId: message.id };
   }
 
@@ -223,6 +248,15 @@ export class Forms implements PlatformModule {
       "INSERT INTO custom_form_submissions(guild_id,form_name,user_id,answers) VALUES($1,$2,$3,$4)",
       [interaction.guild!.id, form.name, interaction.user.id, JSON.stringify(answers)]
     );
+    await this.auditLog?.record({
+      guildId: interaction.guild!.id,
+      actorUserId: interaction.user.id,
+      source: "discord",
+      action: "forms.submitted",
+      targetType: "form",
+      targetId: form.name,
+      metadata: { fieldCount: form.fields.length, responseChannelId: form.responseChannelId }
+    });
 
     if (form.responseChannelId) {
       const channel = interaction.guild!.channels.cache.get(form.responseChannelId);
@@ -269,7 +303,7 @@ function normalizeText(value: unknown, fallback: string, maxLength: number): str
 
 function normalizeId(value: unknown): string | null {
   if (value == null || value === "") return null;
-  if (typeof value !== "string" || !/^d{17,20}$/.test(value)) throw new Error("invalid_form_channel");
+  if (typeof value !== "string" || !/^\d{17,20}$/.test(value)) throw new Error("invalid_form_channel");
   return value;
 }
 
