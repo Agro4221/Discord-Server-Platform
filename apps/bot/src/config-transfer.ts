@@ -201,6 +201,8 @@ export class ConfigTransferService {
         }
       }
 
+      const ticketsModule = data.modules.find((module) => module.key === "tickets");
+
       const ticketPanels = ticketsModule?.settings.ticket_panels;
       if (ticketPanels !== undefined && !Array.isArray(ticketPanels)) {
         throw new Error("invalid_ticket_panels");
@@ -223,9 +225,12 @@ export class ConfigTransferService {
             ]
           );
         }
+        await client.query(
+          "SELECT setval(pg_get_serial_sequence('ticket_panels','id'), COALESCE((SELECT max(id) FROM ticket_panels WHERE guild_id=$1), 1), true)",
+          [targetGuildId]
+        );
       }
 
-      const ticketsModule = data.modules.find((module) => module.key === "tickets");
       const exportedTickets = ticketsModule?.settings.tickets;
       if (exportedTickets !== undefined && !Array.isArray(exportedTickets)) {
         throw new Error("invalid_tickets");
@@ -235,7 +240,7 @@ export class ConfigTransferService {
         await client.query("DELETE FROM tickets WHERE guild_id=$1", [targetGuildId]);
         for (const ticket of normalizedTickets) {
           await client.query(
-            "INSERT INTO tickets(guild_id,channel_id,creator_id,claimed_by,status,priority,tags,created_at,closed_at,last_activity_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+            "INSERT INTO tickets(guild_id,channel_id,creator_id,claimed_by,status,priority,tags,created_at,closed_at,last_activity_at,panel_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
             [
               targetGuildId,
               ticket.channelId,
