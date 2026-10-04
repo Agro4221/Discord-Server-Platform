@@ -251,3 +251,10 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - bash -n validation covers VPS install/upgrade scripts and deployment contract validates the VPS Compose overlay.
 - Local Windows Docker flow remains unchanged.
 - Live VPS DNS, TLS issuance, firewall policy and full clean-host deployment remain environment-dependent release-gate checks.
+
+
+## 2026-10-05 — RU/EN localization foundation verified
+- CI #1904 passed: source/deployment/observability contracts, bot typecheck/tests and all builds.
+- Added shared LocalizationService-style dictionary with ru/en normalization and guild locale lookup from existing guild_settings.locale.
+- Core Help/Embed responses and the global command error boundary now honor the configured guild locale.
+- The locale architecture is intentionally incremental: module-specific responses can migrate to the same keys without another translation framework.

@@ -503,3 +503,9 @@ Live validation, требующая пользовательского окру�
 - Docker/VPS foundation is implemented and CI-verified.
 - Final source checkpoint: f466eddb5749c0044c7f1b9fce68b7dd4f9b412c.
 - Next single backlog slice: RU / EN localization.
+
+
+### 2026-10-05 — RU/EN localization foundation closed
+- Completed and CI-verified the shared localization foundation and first core command migrations.
+- Source checkpoint: d871b56f36a91d15c07038ebf3122956d8d4e66a.
+- Next single backlog selection should come from the next unfinished feature, not from broad UI translation cleanup.

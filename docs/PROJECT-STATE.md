@@ -349,3 +349,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Final deployment source checkpoint: f466eddb5749c0044c7f1b9fce68b7dd4f9b412c.
 - CI #1899 passed.
 - Administration foundation is now followed by localization work; live VPS clean-host deployment is still a release-gate task.
+
+
+## 2026-10-05 — RU/EN localization verified
+- Source checkpoint: d871b56f36a91d15c07038ebf3122956d8d4e66a.
+- CI #1904 passed.
+- Localization foundation is complete; remaining work is incremental migration of module-specific Discord copy.

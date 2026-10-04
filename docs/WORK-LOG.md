@@ -528,3 +528,10 @@ Never write credentials, tokens or private user data here.
 - Generated Caddyfile is ignored by git.
 - Strengthened scripts/check-deployment-contract.mjs with shell syntax and Docker Compose overlay validation.
 - CI #1899 passed completely.
+
+
+## 2026-10-05 — RU/EN localization foundation
+- Added apps/bot/src/localization.ts with Locale, normalized locale selection and typed message keys.
+- Migrated core /help and /embed responses plus the Discord command error boundary to the configured guild locale.
+- Added deterministic localization tests covering RU/EN values and Russian fallback.
+- CI #1904 passed completely.
