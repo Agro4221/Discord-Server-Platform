@@ -1,0 +1,23 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+      DASHBOARD_BASIC_AUTH_USER: ${DASHBOARD_BASIC_AUTH_USER}
+      DASHBOARD_BASIC_AUTH_HASH: ${DASHBOARD_BASIC_AUTH_HASH}
+    volumes:
+      - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      dashboard:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    networks: [dsp]
+
+volumes:
+  caddy-data:
+  caddy-config:
