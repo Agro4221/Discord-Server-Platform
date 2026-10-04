@@ -146,7 +146,10 @@ function Reconcile-Once {
     $identityId = $entry.Key
     $identity = $entry.Value
     $process = Get-FleetPid $identityId
-    $healthyState = [string]$identity.status -in @("starting", "ready") -and $identity.restartRequired -ne $true -and $identity.connected -eq $true
+    $healthyState = (
+      [string]$identity.status -eq "starting" -or
+      ([string]$identity.status -eq "ready" -and $identity.connected -eq $true)
+    ) -and $identity.restartRequired -ne $true
 
     if ($null -ne $process -and $healthyState) {
       Write-FleetLog "healthy identity=$identityId pid=$($process.Id) status=$($identity.status)"
