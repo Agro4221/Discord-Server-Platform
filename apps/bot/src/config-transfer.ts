@@ -41,7 +41,7 @@ const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
   { table: "automation_rules", fields: ["name","enabled","event","conditions","any_conditions","actions","cooldown_seconds"] },
   { table: "automation_workflow_presets", fields: ["name","event","conditions","any_conditions","actions","cooldown_seconds"] },
   { table: "help_pages", fields: ["slug","title","content","enabled"] },
-  { table: "role_panels", fields: ["channel_id","message_id","title","roles","selection_mode","max_selections","duration_minutes"] },
+  { table: "role_panels", fields: ["channel_id","message_id","title","roles","selection_mode","max_selections","duration_minutes","component_type"] },
   { table: "stream_alerts", fields: ["platform","target","channel_id","mention_role_id","enabled","interval_seconds","message_template"] },
   { table: "tickets", fields: ["channel_id","creator_id","claimed_by","status","priority","tags","created_at","closed_at","last_activity_at"] },
   { table: "notification_feeds", fields: ["channel_id","url","enabled","interval_seconds","last_item_key","last_polled_at","message_template","include_keywords","exclude_keywords"] },
@@ -352,7 +352,7 @@ export class ConfigTransferService {
         await client.query("DELETE FROM role_panels WHERE guild_id=$1", [targetGuildId]);
         for (const panel of normalizedPanels) {
           await client.query(
-            "INSERT INTO role_panels(guild_id,channel_id,message_id,title,roles,selection_mode,max_selections,duration_minutes) VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8)",
+            "INSERT INTO role_panels(guild_id,channel_id,message_id,title,roles,selection_mode,max_selections,duration_minutes,component_type) VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9)",
             [
               targetGuildId,
               panel.channelId,
@@ -361,7 +361,8 @@ export class ConfigTransferService {
               JSON.stringify(panel.roles),
               panel.selectionMode,
               panel.maxSelections,
-              panel.durationMinutes
+              panel.durationMinutes,
+              panel.componentType
             ]
           );
         }
@@ -754,6 +755,7 @@ type ImportedRolePanel = {
   selectionMode: "toggle" | "exclusive" | "max";
   maxSelections: number;
   durationMinutes: number;
+  componentType: "buttons" | "select";
 };
 
 function normalizeImportedRolePanel(value: unknown): ImportedRolePanel {
@@ -774,7 +776,8 @@ function normalizeImportedRolePanel(value: unknown): ImportedRolePanel {
     object.roles.length > 5 ||
     (object.selection_mode !== undefined && !["toggle","exclusive","max"].includes(String(object.selection_mode))) ||
     (object.max_selections !== undefined && (typeof object.max_selections !== "number" || !Number.isInteger(object.max_selections) || object.max_selections < 1 || object.max_selections > 5)) ||
-    (object.duration_minutes !== undefined && (typeof object.duration_minutes !== "number" || !Number.isInteger(object.duration_minutes) || object.duration_minutes < 0 || object.duration_minutes > 43200))
+    (object.duration_minutes !== undefined && (typeof object.duration_minutes !== "number" || !Number.isInteger(object.duration_minutes) || object.duration_minutes < 0 || object.duration_minutes > 43200)) ||
+    (object.component_type !== undefined && !["buttons","select"].includes(String(object.component_type)))
   ) {
     throw new Error("invalid_role_panel");
   }
@@ -805,7 +808,8 @@ function normalizeImportedRolePanel(value: unknown): ImportedRolePanel {
       ? object.selection_mode
       : "toggle") as "toggle" | "exclusive" | "max",
     maxSelections: typeof object.max_selections === "number" ? Math.min(Math.max(Math.trunc(object.max_selections),1),5) : 1,
-    durationMinutes: typeof object.duration_minutes === "number" ? Math.min(Math.max(Math.trunc(object.duration_minutes),0),43200) : 0
+    durationMinutes: typeof object.duration_minutes === "number" ? Math.min(Math.max(Math.trunc(object.duration_minutes),0),43200) : 0,
+    componentType: object.component_type === "select" ? "select" : "buttons"
   };
 }
 
