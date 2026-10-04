@@ -403,3 +403,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Local Fleet cleanup/start failures are now surfaced through the reconciler exit code while other identities continue processing.
 - Failed container removal blocks the corresponding restart attempt for that cycle.
 - CI #1691 verified the change; latest code: `7f7dae95a43028cde27f083c7b397c3a2a2a9da8`.
+
+
+## 2026-10-04 — Distributed Fleet ownership revalidation checkpoint
+- Guild event routing now uses durable DB ownership revalidation with a 1-second cache after the existing in-memory fast filter, reducing the stale-owner split-brain window from the Fleet refresh interval to the ownership-cache interval.
+- Primary failover and secondary ownership rules remain consistent with stale-heartbeat semantics.
+- CI #1693 passed the complete automated pipeline; latest verified code: `6bf8e4423ef4f8fccd1bae497b5c66368bc9b5f0`.

@@ -336,3 +336,12 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ CI #1691 passed all static checks, typecheck, bot tests and builds.
 - ⚠ Real Docker Desktop failure injection remains a live acceptance test.
 - ☐ Next: concurrent Fleet failover ownership / split-brain coverage.
+
+
+## 2026-10-04 — Distributed Fleet ownership verification
+- ✅ Async durable guild ownership verification is applied after the fast local filter.
+- ✅ Ownership verification is cached for 1 second per guild to limit database load.
+- ✅ Regression coverage proves stale local ownership can be rejected without removing the existing fast filter.
+- ✅ CI #1693 passed typecheck, bot tests, static contracts, and all domain/bot/Dashboard builds.
+- ⚠ Exact simultaneous assignment changes across multiple live processes remain an environment-dependent acceptance case.
+- ☐ Next: Music simultaneous node/session failure recovery and de-duplication.

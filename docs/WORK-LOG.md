@@ -560,3 +560,14 @@ Never write credentials, tokens or private user data here.
 - Fleet: concurrent failover/assignment ownership and split-brain prevention across primary/secondary identities.
 - Music: simultaneous node-loss/session-recovery de-duplication.
 - Final live release gate: Discord permissions/hierarchy, Lavalink/providers, Windows/Docker multi-bot runtime, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Distributed Fleet ownership revalidation checkpoint
+- Event Bus now performs a short-lived durable ownership recheck after the fast local guild filter, using a 1-second cache to avoid a PostgreSQL query for every message/event.
+- Primary and secondary ownership semantics mirror the existing stale-heartbeat failover rules; after an atomic assignment change the old process stops receiving guild events on the next ownership-cache refresh instead of waiting for the 15-second Fleet refresh cycle.
+- Added regression coverage for async guild verification and its cache behavior.
+- CI run #1693 passed the complete automated pipeline on commit `6bf8e4423ef4f8fccd1bae497b5c66368bc9b5f0`.
+### Next concrete work
+- Music: simultaneous Lavalink node/session failures, duplicate recovery suppression and queue/current-state continuity across multi-node events.
+- Fleet: real Windows/Docker multi-bot acceptance plus remaining operational failure injection.
+- Final live release gate: Discord permissions/hierarchy, Lavalink/providers, soak/chaos/recovery and clean-host deployment.
