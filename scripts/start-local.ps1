@@ -171,8 +171,16 @@ function Ensure-Docker {
 Ensure-Docker
 
 if ($Down) {
-  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\reconcile-fleet.ps1 -Down
+  & powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\reconcile-fleet.ps1 -Down
+  $fleetExitCode = $LASTEXITCODE
   docker compose down
+  $composeExitCode = $LASTEXITCODE
+  if ($fleetExitCode -ne 0) {
+    exit $fleetExitCode
+  }
+  if ($composeExitCode -ne 0) {
+    exit $composeExitCode
+  }
   exit 0
 }
 
