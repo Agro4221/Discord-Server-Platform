@@ -194,3 +194,10 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Regression coverage added for channel/role create/delete audit-log mapping.
 - ✅ Existing destructive-burst executor response pipeline remains reused.
 - ⚠ Live Discord audit-log timing and real admin-action correlation require acceptance testing.
+
+
+## 2026-10-04 — Security / Music release-gate checkpoints
+- ✅ CI run #1596 verifies the Security anti-nuke event-mapping increment.
+- ✅ CI run #1603 verifies Music provider-aware search routing, provider command registration and Control Center provider selection.
+- ⚠ Live Security audit-log correlation, real Lavalink provider availability and real multi-node failover remain environment-dependent acceptance tests.
+- ☐ Next: Music multi-node failover hardening with deterministic node-loss/recovery regression coverage.

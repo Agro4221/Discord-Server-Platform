@@ -15,7 +15,7 @@ Release candidate — code/CI verified, ready for live Discord validation.
 - Health/readiness endpoint and Discord connection supervision.
 - Durable audit log.
 - Local protected Management API.
-- Schema-driven Next.js Control Center with session auth, functional-area navigation, capability/function index, module toggles, Discord channel/role selectors, grouped settings forms, import/export, backup management, module actions and specialized admin panels.
+- Schema-driven Next.js Control Center with local-first access, functional-area navigation, capability/function index, module toggles, Discord channel/role selectors, grouped settings forms, import/export, backup management, module actions and specialized admin panels.
 - Moderation with case history.
 - Temporary Voice with idempotency, ownership and reconciliation.
 - AutoMod, Welcome, Verification, Leveling.
@@ -287,3 +287,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Security destructive-burst monitoring now also observes channel creation and role creation bursts, in addition to channel/role deletion and member bans.
 - Executor correlation maps the expanded event types to Discord audit-log categories before response actions are applied.
 - Existing quarantine/removal response and incident lifecycle are unchanged; live Discord validation remains required.
+
+
+## 2026-10-04 — Development checkpoints
+- Security anti-nuke expansion is CI-verified by run #1596.
+- Music provider-aware search routing is CI-verified by run #1603 on `035e23cc163871172cba9e0298d824876a74387c`.
+- Current next bounded development task: Music multi-node failover hardening and regression coverage.

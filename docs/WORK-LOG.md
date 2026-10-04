@@ -345,3 +345,22 @@ Never write credentials, tokens or private user data here.
 - Security module pass: extended anti-nuke event coverage to `channel.create` and `role.create`.
 - Kept the existing `destructive-burst` incident model to avoid unnecessary schema churn; event type is retained in incident/security-event metadata.
 - Added regression coverage for audit-log event mapping.
+
+
+## 2026-10-04 — Security anti-nuke checkpoint verified
+- Development HEAD at checkpoint: `9069f68ec96bd4e6d0a2efc96da9625d719b3399`.
+- CI run **#1596** passed the complete automated verification pipeline.
+- Security anti-nuke event coverage now includes channel/role creation as well as deletion and member bans; regression coverage verifies the audit-log event mapping.
+- Known limitation remains live Discord audit-log timing/permission/hierarchy validation.
+
+## 2026-10-04 — Music provider-aware search checkpoint
+- Development HEAD at current feature checkpoint: `035e23cc163871172cba9e0298d824876a74387c`.
+- Added a shared provider-aware search path for Dashboard and Discord Music play flows.
+- Supported search providers are `auto`, `youtube`, `youtube_music` and `soundcloud`; direct URLs remain passed through unchanged.
+- Added provider choices to `/play`, `/music play` and the local Music Control Center.
+- Added regression coverage for provider normalization, query construction and command registration.
+- CI run **#1603** passed typecheck, bot tests, domain/bot builds and Dashboard build.
+- Known limitation remains actual provider/plugin availability and live Lavalink behavior in the user's local runtime.
+
+### Next concrete work
+- Music — multi-node failover hardening: verify and strengthen automatic player migration/recovery when an active Lavalink node disconnects, including persistent player state and regression coverage.
