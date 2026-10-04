@@ -13,7 +13,7 @@ import {
   clampSecurityExecutorTimeoutMinutes,
   Security
 } from "../src/modules/security.js";
-import { AuditLogEvent } from "discord.js";
+import { AuditLogEvent, PermissionFlagsBits } from "discord.js";
 
 test("Security burst incident is opened only at threshold and outside active window", () => {
   assert.equal(shouldTriggerSecurityIncident(100, 0, 5, 5), true);
