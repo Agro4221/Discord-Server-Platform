@@ -184,6 +184,74 @@ test("integration credential encryption round-trips secrets without plaintext li
   }
 });
 
+test("integration credential diagnostics validate provider access without exposing secrets", { skip: !enabled }, async () => {
+  const rows: Array<{ id: number; guild_id: string; provider: "twitch" | "youtube" | "kick"; label: string; secret_ciphertext: string; created_at: string; updated_at: string }> = [];
+  const fakeDb = {
+    query: async (sql: string, params: unknown[] = []) => {
+      if (sql.startsWith("INSERT INTO integration_credentials")) {
+        const [guildId, provider, label, ciphertext] = params as [string,string,string,string];
+        const id = rows.length + 1;
+        rows.push({
+          id,
+          guild_id: guildId,
+          provider: provider as "twitch",
+          label,
+          secret_ciphertext: ciphertext,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        return { rows: [{ id: String(id) }] };
+      }
+      if (sql.startsWith("SELECT id,guild_id,provider,label,created_at,updated_at FROM integration_credentials")) {
+        const guildId = params[0] as string;
+        return { rows: rows.filter((row) => row.guild_id === guildId).map((row) => ({ ...row, id: String(row.id) })) };
+      }
+      if (sql.startsWith("SELECT secret_ciphertext FROM integration_credentials")) {
+        const [id, guildId, provider] = params;
+        const row = rows.find((item) => item.id === Number(id) && item.guild_id === guildId && item.provider === provider);
+        return { rows: row ? [{ secret_ciphertext: row.secret_ciphertext }] : [] };
+      }
+      if (sql.startsWith("SELECT provider,secret_ciphertext FROM integration_credentials")) {
+        const [id, guildId] = params;
+        const row = rows.find((item) => item.id === Number(id) && item.guild_id === guildId);
+        return { rows: row ? [{ provider: row.provider, secret_ciphertext: row.secret_ciphertext }] : [] };
+      }
+      throw new Error("unexpected SQL: " + sql);
+    }
+  } as unknown as Database;
+
+  const requests: Array<{ url: string; method: string; body: string }> = [];
+  const fakeFetch: typeof fetch = async (url, init) => {
+    requests.push({
+      url: String(url),
+      method: String(init?.method ?? "GET"),
+      body: typeof init?.body === "string" ? init.body : ""
+    });
+    return new Response(JSON.stringify({ access_token: "test-access-token" }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+
+  const { IntegrationCredentialRepository } = await import("../src/integration-credentials.js");
+  const credentials = new IntegrationCredentialRepository(fakeDb, "diagnostic-secret", fakeFetch);
+  const saved = await credentials.save("123456789012345678", {
+    provider: "twitch",
+    label: "Diagnostic",
+    clientId: "client-id",
+    clientSecret: "super-secret"
+  });
+
+  const result = await credentials.test("123456789012345678", saved.id);
+  assert.equal(result.provider, "twitch");
+  assert.equal(typeof result.latencyMs, "number");
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0]?.url, "https://id.twitch.tv/oauth2/token");
+  assert.equal(requests[0]?.method, "POST");
+  assert.match(requests[0]?.body ?? "", /client_id=client-id/);
+  assert.match(requests[0]?.body ?? "", /client_secret=super-secret/);
+});
+
 test("custom help pages persist with normalized slugs", { skip: !enabled }, async () => {
   const db = new Database(process.env.DATABASE_URL!);
   const guildId = "123456789012345757";
