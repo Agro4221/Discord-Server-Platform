@@ -246,3 +246,13 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - ✅ Cache retention no longer truncates events at the old five-minute ceiling.
 - ⚠ Latest development HEAD `a915418cab191a58100849aff95264b49311fb74` still awaits an attached CI check.
 - ☐ Next: Security executor-role lifecycle, AutoMod response edge cases, then Music/Fleet failure-path and live acceptance work.
+
+## 2026-10-04 — AutoMod/Security CI incident log
+- ✅ AutoMod repeated-text per-rule window regression coverage added.
+- ✅ AutoMod log-action missing-channel contract regression coverage added.
+- ✅ Security partial-resolution count regression coverage added.
+- ✅ Security detection-window bound/lookback coverage added.
+- ✅ CI #1647: static checks passed through deployment/observability, then failed at bot typecheck on `security.ts:767` due malformed helper text; fixed before continuing.
+- ✅ CI #1651: typecheck passed; test suite ran **94 tests / 93 pass / 1 fail** because `clampSecurityIncidentDuration` was imported by `security.test.ts` but not exported by `security.ts`; fixed in `f079a866aa2294ad211d7234fa6396c8c052e643`.
+- ⚠ Fresh CI for the fixed code is currently in progress; full green verification remains pending.
+- ☐ Next: AutoMod warn/response semantics, Security executor-role lifecycle, then Music/Fleet failure paths and live release gates.
