@@ -123,6 +123,10 @@ export function AutoModRulesPanel(props: {
       setError("Timeout: 0–40320 минут.");
       return;
     }
+    if (action === "log" && !logChannelId) {
+      setError("Для action=log нужно выбрать log channel.");
+      return;
+    }
 
     setBusy(true);
     setError("");
@@ -231,7 +235,7 @@ export function AutoModRulesPanel(props: {
       <label style={boxStyle}>
         <span>Log channel (для action=log)</span>
         <select value={logChannelId} onChange={(e) => setLogChannelId(e.target.value)} style={inputStyle} disabled={action !== "log"}>
-          <option value="">В текущий канал / только audit</option>
+          <option value="">Выберите канал</option>
           {props.channels.filter((channel) => channel.type !== 4).map((channel) => (
             <option key={channel.id} value={channel.id}>{channel.name}</option>
           ))}
