@@ -53,7 +53,7 @@ async function main(): Promise<void> {
   const moduleSettings = new ModuleSettingsRepository(database);
   const auditLog = new AuditLog(database);
   const dashboardSettings = new DashboardSettingsService(database);
-  const identities = new BotIdentityRepository(database, config.botIdentityId);
+  const identities = new BotIdentityRepository(database, config.botIdentityId, config.managementApiKey);
   const transfer = new ConfigTransferService(database);
   const backups = new BackupService(
     database,
@@ -72,8 +72,21 @@ async function main(): Promise<void> {
   try {
     await database.ping();
     await migrate(database);
-    await identities.ensureIdentity(config.botIdentityId, config.discordClientId);
+    const storedCredentials = await identities.credentials();
+    const discordClientId = storedCredentials?.clientId || config.discordClientId;
+    const discordToken = storedCredentials?.token || config.discordToken;
+    const botEnabled = storedCredentials?.enabled ?? true;
+    if (discordClientId) {
+      await identities.ensureIdentity(config.botIdentityId, discordClientId, storedCredentials?.token ? undefined : discordToken || undefined);
+    }
     await identities.refreshAssignments();
+
+    const runtimeConfig = {
+      ...config,
+      discordClientId,
+      discordToken
+    };
+
     health.set({ database: "ready" });
     await identities.heartbeat("starting", 0).catch((error) => {
       logger.warn("Initial fleet heartbeat failed", { identityId: config.botIdentityId, error: String(error) });
@@ -109,7 +122,7 @@ async function main(): Promise<void> {
   const streamAlerts = new StreamAlerts(database, config.streamAlerts, auditLog);
   const verification = new Verification(database, (guildId) => client.guilds.cache.get(guildId));
   const analytics = new Analytics(database);
-  const music = new Music(database, config, identities);
+  const music = new Music(database, runtimeConfig, identities);
   const moderationPresets = new ModerationPresets(database, autoMod, security, moderation);
   const automation = new AutomationEngine(database, moderation, {
     tickets,
@@ -117,7 +130,7 @@ async function main(): Promise<void> {
     notifications,
     music
   });
-  const customCommands = new CustomCommandService(database, config);
+  const customCommands = new CustomCommandService(database, runtimeConfig);
   const autoResponder = new AutoResponder(database);
   const commandPolicy = new CommandPolicyService(database);
   const polls = new Polls(database);
@@ -202,6 +215,42 @@ async function main(): Promise<void> {
 
   for (const name of modules.list()) health.setModule(name, "starting");
 
+  const connectDiscord = async (credentials: {
+    clientId: string;
+    token: string;
+    enabled: boolean;
+    presenceName?: string | null;
+  }): Promise<void> => {
+    if (!credentials.enabled) {
+      client.destroy();
+      health.set({ discord: "stopped", status: "degraded" });
+      await identities.heartbeat("stopped", client.guilds.cache.size);
+      logger.info("Discord bot disabled from Control Center", { identityId: config.botIdentityId });
+      return;
+    }
+    if (!credentials.clientId || !credentials.token) throw new Error("bot_credentials_incomplete");
+
+    if (client.isReady()) client.destroy();
+
+    const nextConfig = {
+      ...runtimeConfig,
+      discordClientId: credentials.clientId,
+      discordToken: credentials.token
+    };
+    await registerCommands(nextConfig, client);
+    await client.login(credentials.token);
+    if (credentials.presenceName && client.user) {
+      client.user.setPresence({
+        status: "online",
+        activities: [{ name: credentials.presenceName }]
+      });
+    }
+    logger.info("Discord bot connected from Control Center", {
+      identityId: config.botIdentityId,
+      clientId: credentials.clientId
+    });
+  };
+
   supervisor = new ConnectionSupervisor(client, (status) => {
     health.set({
       discord: status,
@@ -246,6 +295,30 @@ async function main(): Promise<void> {
         ? client.guilds.cache.has(guildId)
         : identities.ownsGuild(guildId),
     identities,
+    botSetup: {
+      get: async () => identities.settings(),
+      update: async (input) => {
+        const saved = await identities.saveSettings(input);
+        const credentials = await identities.credentials();
+        if (saved.enabled) {
+          if (!credentials?.token || !credentials.clientId) throw new Error("bot_credentials_incomplete");
+          await connectDiscord({
+            clientId: credentials.clientId,
+            token: credentials.token,
+            enabled: saved.enabled,
+            presenceName: saved.presenceName
+          });
+        } else {
+          await connectDiscord({
+            clientId: saved.clientId,
+            token: credentials?.token ?? "",
+            enabled: false,
+            presenceName: saved.presenceName
+          });
+        }
+        return saved;
+      },
+    },
     moduleSettings,
     auditLog,
     settings: dashboardSettings,
@@ -383,7 +456,6 @@ async function main(): Promise<void> {
   });
   await management.start();
 
-  await registerCommands(config, client);
   wireDiscordEvents(client, events);
   client.once("ready", () => temporaryVoice.markReady());
 
@@ -423,7 +495,19 @@ async function main(): Promise<void> {
     void prefixCommands.handleMessage(message);
   });
 
-  await client.login(config.discordToken);
+  if (botEnabled && runtimeConfig.discordClientId && runtimeConfig.discordToken) {
+    await connectDiscord({
+      clientId: runtimeConfig.discordClientId,
+      token: runtimeConfig.discordToken,
+      enabled: true,
+      presenceName: storedCredentials?.presenceName
+    });
+  } else {
+    health.set({ discord: "stopped", status: "degraded", lastError: "Discord bot credentials are not configured" });
+    logger.warn("Discord bot is not configured; Control Center remains available for registration", {
+      identityId: config.botIdentityId
+    });
+  }
 
   let shuttingDown = false;
   const shutdown = async (signal: string) => {
