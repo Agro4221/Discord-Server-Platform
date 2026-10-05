@@ -257,7 +257,7 @@
 |---|---|
 | YouTube / YouTube Music | ✅ |
 | SoundCloud | ✅ |
-| Spotify | 🟡 |
+| Spotify | ✅ | LavaSrc source + Spotify credentials + explicit spsearch / provider selection in Music play/search; playback is mirror-based and live provider validation remains a release-gate check |
 | Apple Music | 🟡 |
 | Deezer | 🟡 |
 | **Yandex Music** | ✅ | LavaSrc source + access-token wiring + explicit ymsearch / provider selection in Music play/search; live provider playback still belongs to release-gate validation |
