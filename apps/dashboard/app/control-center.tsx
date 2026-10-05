@@ -1624,7 +1624,7 @@ function ModulePage(props: {
           <SectionHeader title="Automation builder" eyebrow="OPERATIONS" />
           <AutomationPanel
             guildId={props.guildId}
-            channels={props.resources.channels.filter((item) => item.type === 0)}
+            channels={props.resources.channels}
             roles={props.resources.roles.filter((item) => item.manageable !== false)}
             onChanged={props.onAudit}
           />
