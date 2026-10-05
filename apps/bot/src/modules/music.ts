@@ -44,6 +44,17 @@ const MUSIC_FILTER_ACTIONS = [
 
 type MusicFilterAction = (typeof MUSIC_FILTER_ACTIONS)[number];
 
+export function shuffleMusicItems<T>(items: readonly T[]): T[] {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const target = Math.floor(Math.random() * (index + 1));
+    const current = result[index]!;
+    result[index] = result[target]!;
+    result[target] = current;
+  }
+  return result;
+}
+
 export function normalizeMusicPlaylistName(value: string): string | null {
   const name = value.trim().replace(/\s+/g, " ").slice(0, 80);
   return name.length >= 1 ? name : null;
@@ -1088,6 +1099,7 @@ export class Music implements PlatformModule {
 
     const stored = Array.isArray(row.tracks) ? [...row.tracks] : [];
     const current = this.manager?.players.get(guildId);
+    const shouldShuffle = action === "load" && interaction.options.getBoolean("shuffle") === true;
 
     if (action === "add") {
       const track = current?.queue.current;
@@ -1135,7 +1147,8 @@ export class Music implements PlatformModule {
       if (!player.connected) await player.connect();
 
       let added = 0;
-      for (const item of stored.slice(0, MAX_PLAYLIST_TRACKS)) {
+      const itemsToLoad = (shouldShuffle ? shuffleMusicItems(stored) : stored).slice(0, MAX_PLAYLIST_TRACKS);
+      for (const item of itemsToLoad) {
         try {
           const built = this.manager?.utils.buildTrack(
             item as Parameters<LavalinkManager["utils"]["buildTrack"]>[0],
@@ -1158,7 +1171,7 @@ export class Music implements PlatformModule {
       await this.persistPlayer(player);
       await this.syncController(player);
       await interaction.reply({
-        content: "▶️ В очередь загружено **" + added + "** треков из **" + name + "**.",
+        content: "▶️ В очередь загружено **" + added + "** треков из **" + name + "**" + (shouldShuffle ? " в случайном порядке" : "") + ".",
         ephemeral: true
       });
       return;
