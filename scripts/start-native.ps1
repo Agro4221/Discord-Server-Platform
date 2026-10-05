@@ -277,10 +277,12 @@ function Ensure-Postgres {
   }
 
   $dbUrl = Get-EnvValue "DATABASE_URL"
+  $autoConfiguredDatabase = $false
   if ([string]::IsNullOrWhiteSpace($dbUrl) -or $dbUrl -match "://USER:PASSWORD@") {
     $dbUrl = "postgresql://postgres:$postgresPassword@127.0.0.1:5432/discord_platform"
     Set-EnvValue "DATABASE_URL" $dbUrl
     $env:DATABASE_URL = $dbUrl
+    $autoConfiguredDatabase = $true
   }
 
   & pg_isready.exe -d $dbUrl *> $null
@@ -301,6 +303,17 @@ function Ensure-Postgres {
   }
 
   & psql.exe $env:DATABASE_URL -c "SELECT 1;" *> $null
+  if ($LASTEXITCODE -ne 0 -and $autoConfiguredDatabase) {
+    $adminUrl = "postgresql://postgres:$postgresPassword@127.0.0.1:5432/postgres"
+    & psql.exe $adminUrl -c "SELECT 1;" *> $null
+    if ($LASTEXITCODE -eq 0) {
+      $exists = (& psql.exe $adminUrl -tAc "SELECT 1 FROM pg_database WHERE datname='discord_platform';" 2>$null).Trim()
+      if ($exists -ne "1") {
+        & psql.exe $adminUrl -c "CREATE DATABASE discord_platform;" *> $null
+      }
+      & psql.exe $env:DATABASE_URL -c "SELECT 1;" *> $null
+    }
+  }
   if ($LASTEXITCODE -ne 0) { throw "PostgreSQL accepted no connection for DATABASE_URL." }
 
   Write-Host "PostgreSQL: ready"
