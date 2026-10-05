@@ -63,6 +63,49 @@ export function isMusicAppleMusicConfigured(
   return enabledValue === "true" && Boolean(apiTokenValue?.trim());
 }
 
+export function isMusicDeezerConfigured(
+  enabledValue = process.env.LAVASRC_DEEZER_ENABLED,
+  arlValue = process.env.DEEZER_ARL,
+  keyValue = process.env.DEEZER_MASTER_DECRYPTION_KEY
+): boolean {
+  return enabledValue === "true" && Boolean(arlValue?.trim()) && Boolean(keyValue?.trim());
+}
+
+export function isMusicYandexConfigured(
+  enabledValue = process.env.LAVASRC_YANDEXMUSIC_ENABLED,
+  tokenValue = process.env.YANDEX_MUSIC_ACCESS_TOKEN
+): boolean {
+  return enabledValue === "true" && Boolean(tokenValue?.trim());
+}
+
+export function isMusicVkMusicConfigured(
+  enabledValue = process.env.LAVASRC_VKMUSIC_ENABLED,
+  tokenValue = process.env.VK_MUSIC_USER_TOKEN
+): boolean {
+  return enabledValue === "true" && Boolean(tokenValue?.trim());
+}
+
+export function isMusicTidalConfigured(
+  enabledValue = process.env.LAVASRC_TIDAL_ENABLED,
+  tokenValue = process.env.TIDAL_TOKEN
+): boolean {
+  return enabledValue === "true" && Boolean(tokenValue?.trim());
+}
+
+export function isMusicQobuzConfigured(
+  enabledValue = process.env.LAVASRC_QOBUZ_ENABLED,
+  tokenValue = process.env.QOBUZ_USER_OAUTH_TOKEN
+): boolean {
+  return enabledValue === "true" && Boolean(tokenValue?.trim());
+}
+
+export function isMusicJioSaavnConfigured(
+  enabledValue = process.env.LAVASRC_JIOSAAVN_ENABLED,
+  secretValue = process.env.JIOSAAVN_SECRET_KEY
+): boolean {
+  return enabledValue === "true" && Boolean(secretValue?.trim());
+}
+
 export function resolveMusicSearchRequest(
   query: string,
   provider?: MusicSearchProvider | null
@@ -1044,13 +1087,13 @@ export class Music implements PlatformModule {
         { name: "SoundCloud", enabled: true, mode: "direct" },
         { name: "Spotify", enabled: process.env.LAVASRC_SPOTIFY_ENABLED === "true" && Boolean(process.env.SPOTIFY_CLIENT_ID?.trim()) && Boolean(process.env.SPOTIFY_CLIENT_SECRET?.trim()), mode: "mirror" },
         { name: "Apple Music", enabled: isMusicAppleMusicConfigured(), mode: "mirror" },
-        { name: "Deezer", enabled: process.env.LAVASRC_DEEZER_ENABLED === "true" && Boolean(process.env.DEEZER_ARL?.trim()) && Boolean(process.env.DEEZER_MASTER_DECRYPTION_KEY?.trim()), mode: "direct" },
-        { name: "Yandex Music", enabled: process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true", mode: "direct" },
-        { name: "VK Music", enabled: process.env.LAVASRC_VKMUSIC_ENABLED === "true" && Boolean(process.env.VK_MUSIC_USER_TOKEN?.trim()), mode: "direct" },
-        { name: "Tidal", enabled: process.env.LAVASRC_TIDAL_ENABLED === "true" && Boolean(process.env.TIDAL_TOKEN?.trim()), mode: "mirror" },
-        { name: "Qobuz", enabled: process.env.LAVASRC_QOBUZ_ENABLED === "true" && Boolean(process.env.QOBUZ_USER_OAUTH_TOKEN?.trim()), mode: "direct" },
+        { name: "Deezer", enabled: isMusicDeezerConfigured(), mode: "direct" },
+        { name: "Yandex Music", enabled: isMusicYandexConfigured(), mode: "direct" },
+        { name: "VK Music", enabled: isMusicVkMusicConfigured(), mode: "direct" },
+        { name: "Tidal", enabled: isMusicTidalConfigured(), mode: "mirror" },
+        { name: "Qobuz", enabled: isMusicQobuzConfigured(), mode: "direct" },
         { name: "yt-dlp", enabled: process.env.LAVASRC_YTDLP_ENABLED === "true", mode: "direct" },
-        { name: "JioSaavn", enabled: process.env.LAVASRC_JIOSAAVN_ENABLED === "true", mode: "direct" }
+        { name: "JioSaavn", enabled: isMusicJioSaavnConfigured(), mode: "direct" }
       ]
     };
   }
@@ -3222,13 +3265,13 @@ export class Music implements PlatformModule {
       ["SoundCloud","Lavalink",true],
       ["Spotify","LavaSrc",process.env.LAVASRC_SPOTIFY_ENABLED === "true" && Boolean(process.env.SPOTIFY_CLIENT_ID?.trim()) && Boolean(process.env.SPOTIFY_CLIENT_SECRET?.trim())],
       ["Apple Music","LavaSrc",isMusicAppleMusicConfigured()],
-      ["Deezer","LavaSrc",process.env.LAVASRC_DEEZER_ENABLED === "true"],
-      ["Yandex Music","LavaSrc",process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true" && Boolean(process.env.YANDEX_MUSIC_ACCESS_TOKEN?.trim())],
-      ["VK Music","LavaSrc",process.env.LAVASRC_VKMUSIC_ENABLED === "true"],
-      ["Tidal","LavaSrc",process.env.LAVASRC_TIDAL_ENABLED === "true"],
-      ["Qobuz","LavaSrc",process.env.LAVASRC_QOBUZ_ENABLED === "true"],
+      ["Deezer","LavaSrc",isMusicDeezerConfigured()],
+      ["Yandex Music","LavaSrc",isMusicYandexConfigured()],
+      ["VK Music","LavaSrc",isMusicVkMusicConfigured()],
+      ["Tidal","LavaSrc",isMusicTidalConfigured()],
+      ["Qobuz","LavaSrc",isMusicQobuzConfigured()],
       ["yt-dlp","LavaSrc",process.env.LAVASRC_YTDLP_ENABLED === "true"],
-      ["JioSaavn","LavaSrc",process.env.LAVASRC_JIOSAAVN_ENABLED === "true"]
+      ["JioSaavn","LavaSrc",isMusicJioSaavnConfigured()]
     ];
     const lines = providers.map(([name, source, enabled]) =>
       (enabled ? "🟢" : "⚪") + " **" + name + "** · " + source
