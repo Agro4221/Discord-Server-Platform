@@ -1206,18 +1206,21 @@ export class Music implements PlatformModule {
       }
       if (!player.connected) await player.connect();
 
-      const maxQueuedPerUser = (await this.musicSettings(guildId)).maxQueuedPerUser;
+      const settings = await this.musicSettings(guildId);
       const queuedByUser = countMusicQueuedByUser(player.queue.tracks, interaction.user.id);
-      const remainingSlots = remainingMusicQueueSlots(queuedByUser, maxQueuedPerUser);
-      if (remainingSlots === 0) {
-        await interaction.reply({ content: "⛔ Твой лимит ожидающих треков уже достигнут.", ephemeral: true });
+      const remainingUserSlots = remainingMusicQueueSlots(queuedByUser, settings.maxQueuedPerUser);
+      const remainingGuildSlots = remainingMusicGuildQueueSlots(player.queue.tracks.length, settings.maxQueueSize);
+      if (remainingUserSlots === 0 || remainingGuildSlots === 0) {
+        await interaction.reply({ content: "⛔ Доступный лимит очереди для тебя или сервера уже достигнут.", ephemeral: true });
         return;
       }
 
-      const itemsToLoad = (shouldShuffle ? shuffleMusicItems(stored) : stored).slice(
-        0,
-        remainingSlots === null ? MAX_PLAYLIST_TRACKS : remainingSlots
+      const loadLimit = Math.min(
+        MAX_PLAYLIST_TRACKS,
+        ...(remainingUserSlots === null ? [] : [remainingUserSlots]),
+        ...(remainingGuildSlots === null ? [] : [remainingGuildSlots])
       );
+      const itemsToLoad = (shouldShuffle ? shuffleMusicItems(stored) : stored).slice(0, loadLimit);
       const builtTracks: Track[] = [];
       for (const item of itemsToLoad) {
         try {
@@ -1244,7 +1247,10 @@ export class Music implements PlatformModule {
       if (!player.playing && added > 0) await player.play();
       await this.persistPlayer(player);
       await this.syncController(player);
-      const limitedSuffix = remainingSlots !== null && stored.length > added ? " — в пределах лимита пользователя" : "";
+      const limitedSuffix =
+        ((remainingUserSlots !== null || remainingGuildSlots !== null) && stored.length > added)
+          ? " — в пределах лимита очереди"
+          : "";
       await interaction.reply({
         content: "▶️ В очередь загружено **" + added + "** треков из **" + name + "**" + (shouldShuffle ? " в случайном порядке" : "") + limitedSuffix + ".",
         ephemeral: true
@@ -2352,10 +2358,11 @@ export class Music implements PlatformModule {
         await interaction.reply({ content: "Результат больше недоступен.", ephemeral: true });
         return;
       }
-      const maxQueuedPerUser = (await this.musicSettings(interaction.guild.id)).maxQueuedPerUser;
+      const settings = await this.musicSettings(interaction.guild.id);
       const queuedByUser = countMusicQueuedByUser(player.queue.tracks, interaction.user.id);
-      const remainingSlots = remainingMusicQueueSlots(queuedByUser, maxQueuedPerUser);
-      if (remainingSlots === 0) {
+      const remainingUserSlots = remainingMusicQueueSlots(queuedByUser, settings.maxQueuedPerUser);
+      const remainingGuildSlots = remainingMusicGuildQueueSlots(player.queue.tracks.length, settings.maxQueueSize);
+      if (remainingUserSlots === 0 || remainingGuildSlots === 0) {
         this.searchSessions.delete(token);
         await interaction.update({ content: "⛔ Твой лимит ожидающих треков уже достигнут.", embeds: [], components: [] });
         return;
