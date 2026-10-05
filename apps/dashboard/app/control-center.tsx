@@ -3,12 +3,27 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { AnalyticsPanel } from "./analytics-panel";
+import { HelpPagesPanel } from "./help-pages-panel";
+import { AutoModRulesPanel } from "./automod-rules-panel";
 import { AutomationPanel } from "./automation-panel";
 import { BackupPanel } from "./backup-panel";
+import { CommandPolicyPanel } from "./command-policy-panel";
+import { CustomCommandsPanel } from "./custom-commands-panel";
+import { AutoResponderPanel } from "./autoresponder-panel";
 import { FleetPanel } from "./fleet-panel";
+import { EmbedBuilderPanel } from "./embed-builder-panel";
 import { GiveawaysPanel } from "./giveaways-panel";
+import { ModerationPanel } from "./moderation-panel";
 import { NotificationsPanel } from "./notifications-panel";
+import { StreamAlertsPanel } from "./stream-alerts-panel";
+import { TicketFormPanel } from "./ticket-form-panel";
 import { RolePanelsEditor } from "./role-panels-editor";
+import { FormsPanel } from "./forms-panel";
+import { OnboardingPanel } from "./onboarding-panel";
+import { LevelingRewardsPanel } from "./leveling-rewards-panel";
+import { CommunityHubPanel } from "./community-hub-panel";
+import { ModuleActivityPanel } from "./module-activity-panel";
+import { ConfigPresetsPanel } from "./config-presets-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -22,11 +37,21 @@ type Field = {
   min?: number;
   max?: number;
   step?: number;
+  maxLength?: number;
 };
 type ModuleAction = { id: string; label: string; kind?: "safe" | "danger"; confirmation?: string };
 type Schema = { key: string; title: string; fields: Field[]; actions?: ModuleAction[] };
 type Resource = { id: string; name: string; type?: number; position?: number; manageable?: boolean };
-type AuditEvent = { action: string; target_id: string | null; created_at: string };
+type AuditEvent = {
+  id?: string;
+  action: string;
+  source?: "discord" | "dashboard" | "system";
+  actor_user_id?: string | null;
+  target_type?: string | null;
+  target_id: string | null;
+  created_at: string;
+  metadata?: Record<string, unknown>;
+};
 type CatalogItem = { key: string; title: string; description: string };
 type Health = { status: string; discord: string; database: string } | null;
 
@@ -186,6 +211,37 @@ const MODULE_META: Record<string, ModuleMeta> = {
     ],
     kind: "settings"
   },
+  onboarding: {
+    icon: "◎",
+    accent: "#82d4b3",
+    title: "Onboarding",
+    summary: "Сценарий действий при входе или после успешной Verification.",
+    category: "server",
+    commands: ["Dashboard"],
+    functions: [
+      { title: "Flow trigger", description: "Запуск при входе участника или после успешной Verification." },
+      { title: "Role steps", description: "Последовательная выдача стартовых ролей с проверкой hierarchy." },
+      { title: "Channel messages", description: "Публикация персонализированных сообщений в выбранные каналы." },
+      { title: "Direct messages", description: "Отправка персонализированных сообщений участнику в ЛС." },
+      { title: "Step ordering", description: "До 10 шагов с явным порядком выполнения." }
+    ],
+    kind: "full"
+  },
+  forms: {
+    icon: "▱",
+    accent: "#82c7f1",
+    title: "Forms",
+    summary: "Универсальные серверные формы на Discord Modal с публикацией и сбором ответов.",
+    category: "server",
+    commands: ["/form publish"],
+    functions: [
+      { title: "Form builder", description: "До 5 настраиваемых полей short/paragraph с required и min/max length." },
+      { title: "Publishing", description: "Публикация кнопки запуска формы в выбранный текстовый канал." },
+      { title: "Response delivery", description: "Сохранение ответов и отправка staff-уведомления в выбранный канал." },
+      { title: "Persistent config", description: "Определения форм хранятся в PostgreSQL и входят в конфигурационный export/import." }
+    ],
+    kind: "full"
+  },
   roles: {
     icon: "♢",
     accent: "#b294f6",
@@ -204,16 +260,17 @@ const MODULE_META: Record<string, ModuleMeta> = {
     icon: "▤",
     accent: "#d3a4f0",
     title: "Тикеты",
-    summary: "Поддержка, staff claim, закрытие и transcript.",
+    summary: "Поддержка, staff workflow и настраиваемая intake-форма.",
     category: "server",
     commands: ["/ticket create", "/ticket setup"],
     functions: [
-      { title: "Intake", description: "Создание пользовательского тикета." },
-      { title: "Staff workflow", description: "Категория, staff role и управление обслуживанием." },
-      { title: "Close / archive", description: "Закрытие тикета с обработкой stale-состояний." },
-      { title: "Transcripts", description: "Публикация transcript в выделенный канал." }
+      { title: "Intake form", description: "До 5 полей Discord Modal: short/paragraph, required, placeholder и лимит длины." },
+      { title: "Persistent answers", description: "Ответы формы сохраняются вместе с тикетом и попадают в transcript." },
+      { title: "Staff workflow", description: "Claim, close/reopen, category routing и ограничения на открытые тикеты." },
+      { title: "Ticket Panels", description: "Несколько независимых точек входа в одну Ticket-систему с отдельным каналом и оформлением." },
+      { title: "Transcripts", description: "HTML transcript сохраняется и может быть опубликован в transcript channel." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   leveling: {
     icon: "↗",
@@ -226,9 +283,10 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "XP", description: "Начисление опыта за сообщения." },
       { title: "Cooldown", description: "Ограничение частоты начисления XP." },
       { title: "Rank", description: "Просмотр собственного или чужого ранга." },
-      { title: "Leaderboard", description: "Таблица лидеров сервера." }
+      { title: "Leaderboard", description: "Таблица лидеров сервера." },
+      { title: "Custom rewards", description: "Награды за уровни: роли, снятие предыдущих наград, DM и milestone-сообщение." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   giveaways: {
     icon: "🎁",
@@ -280,10 +338,12 @@ const MODULE_META: Record<string, ModuleMeta> = {
     title: "Напоминания",
     summary: "Напоминания и utility-функции.",
     category: "community",
-    commands: ["/remind"],
+    commands: ["/remind", "/schedule", "/sticky setup", "/sticky remove", "/sticky list"],
     functions: [
       { title: "Reminders", description: "Отложенное напоминание с повторяемой обработкой фонового worker." },
-      { title: "Retry / lease", description: "Фоновая доставка использует lease/retry semantics." }
+      { title: "Retry / lease", description: "Фоновая доставка использует lease/retry semantics." },
+      { title: "Scheduled messages", description: "Одноразовая публикация в выбранный текстовый канал по таймеру через тот же worker." },
+      { title: "Sticky messages", description: "Постоянное сообщение в канале, которое автоматически возвращается вниз после новых сообщений." }
     ],
     kind: "discord"
   },
@@ -309,11 +369,26 @@ const MODULE_META: Record<string, ModuleMeta> = {
     title: "Уведомления",
     summary: "RSS/Atom feeds с безопасной сетевой проверкой.",
     category: "integrations",
-    commands: ["/feed add"],
+    commands: ["/feed add", "/feed github"],
     functions: [
       { title: "RSS / Atom", description: "Периодический polling внешнего HTTPS feed." },
-      { title: "SSRF protection", description: "Блокировка private, mapped и loopback адресов." },
-      { title: "Cursor safety", description: "Курсор обновляется только после успешной доставки." }
+      { title: "SSRF protection", description: "Блокировка private, mapped и loopback адресов для внешних feed URL." },
+      { title: "Cursor safety", description: "Курсор обновляется только после успешной доставки feed-сообщения." }
+    ],
+    kind: "full"
+  },
+  "stream-alerts": {
+    icon: "◉",
+    accent: "#ef7272",
+    title: "Stream Alerts",
+    summary: "Уведомления о начале прямых эфиров.",
+    category: "integrations",
+    commands: ["/streamalert create"],
+    functions: [
+      { title: "Platforms", description: "Twitch, YouTube, VK Видео Live и Kick." },
+      { title: "Templates", description: "Шаблоны сообщения с mention, названием эфира, автором и URL." },
+      { title: "Persistent state", description: "Состояние подписок и последний обнаруженный эфир хранятся в PostgreSQL." },
+      { title: "Provider status", description: "Dashboard показывает, какие API credentials настроены." }
     ],
     kind: "full"
   },
@@ -326,13 +401,77 @@ const MODULE_META: Record<string, ModuleMeta> = {
     commands: ["/music play", "/music pause", "/music resume", "/music skip", "/music stop", "/music shuffle", "/music repeat", "/music autoplay", "/music seek", "/music queue", "/music nowplaying", "/music volume"],
     functions: [
       { title: "Playback", description: "Play, pause, resume, skip, stop и seek." },
-      { title: "Queue", description: "Очередь, shuffle и повтор трека/очереди." },
+      { title: "Queue", description: "Очередь, shuffle и повтор трека/очереди, теперь с постраничным просмотром." },
+      { title: "Saved state", description: "Личные favorites и сохранённые playlists до 500 треков." },
+      { title: "Filters", description: "Bassboost, Rock, Pop, Electronic, Gaming, Nightcore и 8D." },
       { title: "Autoplay", description: "Автоматическое продолжение после окончания очереди." },
+      { title: "Request channel", description: "Можно писать песню, исполнителя, URL или плейлист прямо в выделенный текстовый канал." },
+      { title: "Controller", description: "Постоянный panel с pause, skip, shuffle, repeat, stop, volume и queue." },
       { title: "Voice access", description: "Управление привязано к voice-каналу или Manage Server." },
       { title: "Lavalink health", description: "Статус модуля зависит от доступности узлов." },
       { title: "Multi-bot routing", description: "Отдельные bot identities могут обслуживать разные voice-каналы." }
     ],
     kind: "settings"
+  },
+  reputation: {
+    icon: "★",
+    accent: "#d7ba73",
+    title: "Репутация",
+    summary: "Rep и социальные профили участников.",
+    category: "community",
+    commands: ["/rep give", "/rep check", "/rep leaderboard", "/profile"],
+    functions: [
+      { title: "Rep", description: "Участники выдают друг другу +1 rep с защитой от повторной выдачи в течение дня." },
+      { title: "Leaderboard", description: "Топ участников по репутации сервера." },
+      { title: "Profiles", description: "Публичное био и текущая репутация участника." }
+    ],
+    kind: "discord"
+  },
+  polls: {
+    icon: "◉",
+    accent: "#79c7dd",
+    title: "Опросы и предложения",
+    summary: "Интерактивные голосования и community suggestions прямо в Discord.",
+    category: "community",
+    commands: ["/poll create", "/poll close", "/suggestion create", "/suggestion review"],
+    functions: [
+      { title: "Live voting", description: "Голоса пересчитываются прямо на опубликованном сообщении." },
+      { title: "Multiple choice", description: "Один вариант или несколько вариантов на участника." },
+      { title: "Auto-close", description: "Опрос закрывается автоматически по заданному дедлайну." },
+      { title: "Persistent state", description: "Вопросы, голоса и предложения сохраняются в PostgreSQL." },
+      { title: "Suggestions", description: "Предложения собирают голоса За/Против и могут быть приняты или отклонены staff." }
+    ],
+    kind: "discord"
+  },
+  "custom-commands": {
+    icon: "⌘",
+    accent: "#82b8f2",
+    title: "Custom Commands",
+    summary: "Пользовательские Prefix/Slash-команды, aliases и role actions.",
+    category: "automation",
+    commands: ["Prefix + Slash"],
+    functions: [
+      { title: "Response", description: "Текстовые ответы с переменными user, mention, server, channel и args." },
+      { title: "Aliases", description: "Короткие имена для существующих команд." },
+      { title: "Role actions", description: "Выдача, снятие и toggle ролей с учётом hierarchy." },
+      { title: "Cooldown", description: "Ограничение частоты выполнения пользовательской команды." }
+    ],
+    kind: "full"
+  },
+  autoresponder: {
+    icon: "↻",
+    accent: "#79c7dd",
+    title: "AutoResponder",
+    summary: "Автоматические ответы на ключевые слова и фразы.",
+    category: "automation",
+    commands: ["Dashboard"],
+    functions: [
+      { title: "Triggers", description: "Точные, частичные, prefix и regex-сопоставления." },
+      { title: "Scopes", description: "Ограничения по ролям и каналам." },
+      { title: "Cooldown", description: "Per-user cooldown для защиты от зацикливания и спама." },
+      { title: "Templates", description: "Переменные user, mention, server и channel." }
+    ],
+    kind: "full"
   },
   analytics: {
     icon: "▥",
@@ -349,7 +488,16 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["roles", "giveaways", "analytics", "automation", "notifications"]);
+const PANEL_KEYS = new Set(["moderation", "custom-commands", "autoresponder", "automod", "tickets", "embed", "roles", "forms", "onboarding", "giveaways", "analytics", "automation", "notifications", "stream-alerts"]);
+
+const secondaryButtonStyle = {
+  border: "1px solid #303846",
+  background: "#0f131a",
+  color: "#b6c0ce",
+  borderRadius: 10,
+  padding: "10px 12px",
+  cursor: "pointer"
+} as const;
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -386,6 +534,11 @@ export function ControlCenter() {
   const [originalValues, setOriginalValues] = useState<Record<string, unknown>>({});
   const [health, setHealth] = useState<Health>(null);
   const [audit, setAudit] = useState<AuditEvent[]>([]);
+  const [auditSource, setAuditSource] = useState("");
+  const [auditAction, setAuditAction] = useState("");
+  const [auditActor, setAuditActor] = useState("");
+  const [auditNextBefore, setAuditNextBefore] = useState<string | null>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
@@ -551,13 +704,45 @@ export function ControlCenter() {
     setSearch("");
   }
 
-  async function reloadAudit() {
+  async function reloadAudit(options: {
+    append?: boolean;
+    source?: string;
+    action?: string;
+    actor?: string;
+  } = {}) {
     if (!guildId) return;
-    const response = await fetch(
-      "/api/guilds/" + encodeURIComponent(guildId) + "/audit?limit=60",
-      { cache: "no-store" }
-    );
-    if (response.ok) setAudit((await response.json()).events ?? []);
+    setAuditLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: "80" });
+      const source = options.source ?? auditSource;
+      const action = options.action ?? auditAction;
+      const actor = options.actor ?? auditActor;
+      if (source) params.set("source", source);
+      if (action.trim()) params.set("action", action.trim());
+      if (actor.trim()) params.set("actorUserId", actor.trim());
+      if (options.append && auditNextBefore) params.set("before", auditNextBefore);
+
+      const response = await fetch(
+        "/api/guilds/" + encodeURIComponent(guildId) + "/audit?" + params.toString(),
+        { cache: "no-store" }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(String(body.error ?? "audit_failed"));
+
+      const nextEvents = (body.events ?? []) as AuditEvent[];
+      setAudit((current) => options.append ? [...current, ...nextEvents] : nextEvents);
+      setAuditNextBefore(typeof body.nextBefore === "string" && body.nextBefore ? body.nextBefore : null);
+    } finally {
+      setAuditLoading(false);
+    }
+  }
+
+  function clearAuditFilters() {
+    setAuditSource("");
+    setAuditAction("");
+    setAuditActor("");
+    setAuditNextBefore(null);
+    void reloadAudit({ source: "", action: "", actor: "" });
   }
 
   async function toggle(moduleKey: string, enabled: boolean) {
@@ -780,7 +965,8 @@ export function ControlCenter() {
 
           <section style={{ flex: 1, minWidth: 0 }}>
             {view === "overview" && (
-              <Overview
+              <>
+                <Overview
                 guild={selectedGuild}
                 health={health}
                 catalog={catalog}
@@ -795,6 +981,12 @@ export function ControlCenter() {
                 onToggle={(key, value) => void toggle(key, value)}
                 saving={saving}
               />
+              {guildId && (
+                <div style={{ marginTop: 14 }}>
+                  <CommunityHubPanel guildId={guildId} />
+                </div>
+              )}
+              </>
             )}
 
             {view === "category" && (
@@ -847,7 +1039,25 @@ export function ControlCenter() {
               <SystemPage guildId={guildId} health={health} audit={audit} onAudit={() => setView("audit")} />
             )}
 
-            {view === "audit" && <AuditPage audit={audit} />}
+            {view === "audit" && (
+              <AuditPage
+                audit={audit}
+                source={auditSource}
+                action={auditAction}
+                actor={auditActor}
+                loading={auditLoading}
+                hasMore={Boolean(auditNextBefore)}
+                onSource={setAuditSource}
+                onAction={setAuditAction}
+                onActor={setAuditActor}
+                onApply={() => {
+                  setAuditNextBefore(null);
+                  void reloadAudit();
+                }}
+                onClear={clearAuditFilters}
+                onLoadMore={() => void reloadAudit({ append: true })}
+              />
+            )}
           </section>
         </div>
       </div>
@@ -1363,12 +1573,110 @@ function ModulePage(props: {
         </section>
       )}
 
+      {props.module?.key && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="История модуля" eyebrow="MODULE ACTIVITY" />
+          <ModuleActivityPanel guildId={props.guildId} moduleKey={props.module.key} />
+        </section>
+      )}
+
+      {props.module?.key === "moderation" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Escalation rules" eyebrow="OPERATIONS" />
+          <ModerationPanel guildId={props.guildId} channels={props.resources.channels.filter((item) => item.type === 0)} onChanged={props.onAudit} />
+        </section>
+      )}
+
+      {props.module?.key === "tickets" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Ticket Intake Form" eyebrow="SUPPORT FORM" />
+          <TicketFormPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "autoresponder" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="AutoResponder" eyebrow="KEYWORD TRIGGERS" />
+          <AutoResponderPanel guildId={props.guildId} channels={props.resources.channels.filter((item) => item.type === 0)} roles={props.resources.roles} onChanged={props.onAudit} />
+        </section>
+      )}
+
+      {props.module?.key === "custom-commands" && (
+        <>
+          <section style={{ ...panel, padding: 20 }}>
+            <SectionHeader title="Custom Commands" eyebrow="COMMAND BUILDER" />
+            <CustomCommandsPanel guildId={props.guildId} roles={props.resources.roles} onChanged={props.onAudit} />
+          </section>
+          <section style={{ ...panel, padding: 20 }}>
+            <SectionHeader title="Custom Help / Menu pages" eyebrow="SERVER UX" />
+            <HelpPagesPanel guildId={props.guildId} onChanged={props.onAudit} />
+          </section>
+        </>
+      )}
+
+      {props.module?.key === "automod" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Правила AutoMod" eyebrow="RULE EDITOR" />
+          <AutoModRulesPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            roles={props.resources.roles.filter((item) => item.manageable !== false)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "embed" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Embed Builder" eyebrow="OPERATIONS" />
+          <EmbedBuilderPanel guildId={props.guildId} channels={props.resources.channels.filter((item) => item.type === 0)} onChanged={props.onAudit} />
+        </section>
+      )}
+
+      {props.module?.key === "onboarding" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Onboarding Flow Builder" eyebrow="ONBOARDING FLOW" />
+          <OnboardingPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            roles={props.resources.roles.filter((item) => item.manageable !== false)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "forms" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Universal Forms" eyebrow="INTERACTIVE FORMS" />
+          <FormsPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
       {props.module?.key === "roles" && (
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Role Panels" eyebrow="OPERATIONS" />
           <RolePanelsEditor
             guildId={props.guildId}
             channels={props.resources.channels.filter((item) => item.type === 0)}
+            roles={props.resources.roles}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "leveling" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Level Rewards & Milestones" eyebrow="LEVELING REWARDS" />
+          <LevelingRewardsPanel
+            guildId={props.guildId}
             roles={props.resources.roles}
             onChanged={props.onAudit}
           />
@@ -1386,6 +1694,13 @@ function ModulePage(props: {
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Analytics" eyebrow="OPERATIONS" />
           <AnalyticsPanel guildId={props.guildId} />
+        </section>
+      )}
+
+      {props.module?.key === "security" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Security incidents" eyebrow="INCIDENTS" />
+          <SecurityIncidentPanel audit={props.audit} />
         </section>
       )}
 
@@ -1407,6 +1722,18 @@ function ModulePage(props: {
           <NotificationsPanel
             guildId={props.guildId}
             channels={props.resources.channels.filter((item) => item.type === 0)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "stream-alerts" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Stream alerts" eyebrow="LIVE INTEGRATIONS" />
+          <StreamAlertsPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            roles={props.resources.roles.filter((item) => item.manageable !== false)}
             onChanged={props.onAudit}
           />
         </section>
@@ -1483,13 +1810,63 @@ function ModulePage(props: {
   );
 }
 
+function SecurityIncidentPanel({ audit }: { audit: AuditEvent[] }) {
+  const incidents = audit.filter((event) => event.action.startsWith("security."));
+  const raid = incidents.filter((event) => event.action === "security.raid-detected");
+  const destructive = incidents.filter((event) => event.action === "security.destructive-burst");
+  const responses = incidents.filter((event) => event.action === "security.response-applied");
+  const latest = incidents.slice(0, 8);
+
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
+        <MiniMetric label="Anti-Raid" value={String(raid.length)} />
+        <MiniMetric label="Destructive bursts" value={String(destructive.length)} />
+        <MiniMetric label="Responses" value={String(responses.length)} />
+      </div>
+      {latest.length ? latest.map((event, index) => (
+        <div key={String(index) + event.created_at} style={{ padding: "9px 10px", border: "1px solid #242b36", borderRadius: 10, background: "#0d1219" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+            <strong style={{ fontSize: 11 }}>{event.action}</strong>
+            <span style={{ color: "#697486", fontSize: 9 }}>{new Date(event.created_at).toLocaleString("ru-RU")}</span>
+          </div>
+          <div style={{ marginTop: 4, color: "#737e8f", fontSize: 9 }}>
+            target: {event.target_id ?? "—"}
+            {event.metadata && Object.keys(event.metadata).length ? " · " + JSON.stringify(event.metadata).slice(0, 280) : ""}
+          </div>
+        </div>
+      )) : (
+        <div style={{ color: "#697486", fontSize: 11 }}>Security-событий в последнем окне аудита нет.</div>
+      )}
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ padding: 10, borderRadius: 10, border: "1px solid #232a35", background: "#0e131a" }}>
+      <div style={{ color: "#667184", fontSize: 9 }}>{label}</div>
+      <div style={{ marginTop: 4, fontSize: 17, fontWeight: 750 }}>{value}</div>
+    </div>
+  );
+}
+
 function SystemPage(props: { guildId: string; health: Health; audit: AuditEvent[]; onAudit: () => void }) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <PageHeader eyebrow="SYSTEM" title="Система" description="Операционные инструменты экземпляра: fleet, здоровье Core, backups и аудит." />
       <section style={{ ...panel, padding: 20 }}>
+        <SectionHeader title="Command Policies" eyebrow="PERMISSIONS · COOLDOWNS" />
+        <CommandPolicyPanel guildId={props.guildId} />
+      </section>
+
+      <section style={{ ...panel, padding: 20 }}>
         <SectionHeader title="Bot Fleet" eyebrow="IDENTITIES" />
         <FleetPanel guildId={props.guildId} onChanged={props.onAudit} />
+      </section>
+      <section style={{ ...panel, padding: 20 }}>
+        <SectionHeader title="Server Presets" eyebrow="CONFIGURATION SNAPSHOTS" />
+        <ConfigPresetsPanel guildId={props.guildId} onChanged={props.onAudit} />
       </section>
       <section style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 14 }}>
         <div style={{ ...panel, padding: 20 }}>
@@ -1512,14 +1889,74 @@ function SystemPage(props: { guildId: string; health: Health; audit: AuditEvent[
   );
 }
 
-function AuditPage(props: { audit: AuditEvent[] }) {
+function AuditPage(props: {
+  audit: AuditEvent[];
+  source: string;
+  action: string;
+  actor: string;
+  loading: boolean;
+  hasMore: boolean;
+  onSource: (value: string) => void;
+  onAction: (value: string) => void;
+  onActor: (value: string) => void;
+  onApply: () => void;
+  onClear: () => void;
+  onLoadMore: () => void;
+}) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <PageHeader eyebrow="AUDIT LOG" title="Журнал действий" description="Изменения настроек, модульные операции и служебные действия Dashboard/Core." />
+      <PageHeader
+        eyebrow="AUDIT LOG"
+        title="Журнал действий"
+        description="Административные изменения, действия Discord-пользователей и системные события с серверным хранением."
+      />
+      <section style={{ ...panel, padding: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "160px minmax(180px,1fr) 190px auto auto", gap: 8, alignItems: "center" }}>
+          <select value={props.source} onChange={(event) => props.onSource(event.target.value)} style={selectStyle}>
+            <option value="">Все источники</option>
+            <option value="dashboard">Dashboard</option>
+            <option value="discord">Discord</option>
+            <option value="system">System</option>
+          </select>
+          <input
+            value={props.action}
+            onChange={(event) => props.onAction(event.target.value)}
+            placeholder="Поиск по action…"
+            maxLength={120}
+            style={inputStyle}
+          />
+          <input
+            value={props.actor}
+            onChange={(event) => props.onActor(event.target.value)}
+            placeholder="Actor user ID"
+            maxLength={20}
+            inputMode="numeric"
+            style={inputStyle}
+          />
+          <button type="button" onClick={props.onApply} disabled={props.loading} style={buttonStyle("primary")}>
+            {props.loading ? "Загрузка…" : "Применить"}
+          </button>
+          <button type="button" onClick={props.onClear} disabled={props.loading} style={secondaryButtonStyle}>
+            Сбросить
+          </button>
+        </div>
+      </section>
+
       <section style={{ ...panel, padding: 20 }}>
         {props.audit.length
-          ? props.audit.map((event, index) => <AuditCompact key={index} event={event} last={index === props.audit.length - 1} />)
-          : <Empty text="Журнал пуст." />}
+          ? (
+            <>
+              {props.audit.map((event, index) => (
+                <AuditCompact key={event.id ?? event.created_at + ":" + index} event={event} last={index === props.audit.length - 1} />
+              ))}
+              {props.hasMore && (
+                <button type="button" onClick={props.onLoadMore} disabled={props.loading} style={{ ...secondaryButtonStyle, width: "100%", marginTop: 12 }}>
+                  {props.loading ? "Загрузка…" : "Загрузить ещё"}
+                </button>
+              )}
+            </>
+          )
+          : <Empty text={props.loading ? "Загрузка журнала…" : "По заданным фильтрам записей нет."} />}
       </section>
     </div>
   );
@@ -1582,7 +2019,10 @@ function settingGroup(field: Field, moduleKey: string): string {
       maxDestructiveActions: "Destructive burst",
       destructiveWindowSeconds: "Destructive burst",
       quarantineRoleId: "Quarantine",
-      logChannelId: "Логи"
+      logChannelId: "Логи",
+      raidQuarantineEnabled: "Anti-Raid",
+      destructiveRoleRemoval: "Destructive burst",
+      destructiveQuarantineEnabled: "Destructive burst"
     },
     leveling: {
       xpPerMessage: "XP",
@@ -1646,6 +2086,7 @@ function SettingControl(props: {
       {props.field.type === "text" && (
         <input
           value={typeof props.value === "string" ? props.value : ""}
+          maxLength={props.field.maxLength}
           onChange={(event) => props.onChange(event.target.value)}
           style={common}
         />
@@ -1751,14 +2192,20 @@ function HealthRow(props: { label: string; value: string }) {
 }
 
 function AuditCompact(props: { event: AuditEvent; last: boolean }) {
+  const actor = props.event.actor_user_id ?? "system";
+  const source = props.event.source ?? "system";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: props.last ? "none" : "1px solid #1f2631" }}>
-      <div style={{ width: 28, height: 28, borderRadius: 8, display: "grid", placeItems: "center", background: "#171c25", color: "#8b98aa", fontSize: 10 }}>↗</div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontSize: 10, fontWeight: 620, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{props.event.action}</div>
-        <div style={{ marginTop: 2, color: "#626d7d", fontSize: 8 }}>{props.event.target_id ?? "system"}</div>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: props.last ? "none" : "1px solid #1f2631" }}>
+      <div style={{ width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", background: "#171c25", color: "#8b98aa", fontSize: 9 }}>
+        {source === "discord" ? "DC" : source === "dashboard" ? "UI" : "SYS"}
       </div>
-      <time style={{ color: "#5f6978", fontSize: 8 }}>{new Date(props.event.created_at).toLocaleString("ru-RU")}</time>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 10, fontWeight: 650, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{props.event.action}</div>
+        <div style={{ marginTop: 3, color: "#626d7d", fontSize: 8 }}>
+          {source} · {actor} · {props.event.target_type ?? "system"}:{props.event.target_id ?? "—"}
+        </div>
+      </div>
+      <time style={{ color: "#5f6978", fontSize: 8, whiteSpace: "nowrap" }}>{new Date(props.event.created_at).toLocaleString("ru-RU")}</time>
     </div>
   );
 }

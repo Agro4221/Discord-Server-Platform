@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { timingSafeEqual } from "node:crypto";
-import type { Client } from "discord.js";
+import { randomBytes, timingSafeEqual } from "node:crypto";
+import { EmbedBuilder, type Client } from "discord.js";
 import { logger } from "./logger.js";
 import { ModuleSettingsRepository } from "./module-settings.js";
 import { MODULE_CATALOG, type ModuleKey } from "./modules/catalog.js";
@@ -10,6 +10,12 @@ import { guildResources } from "./discord/resources.js";
 import { ConfigTransferService } from "./config-transfer.js";
 import { BackupService } from "./backup.js";
 import type { CustomCommandService } from "./custom-commands.js";
+import type { AutoResponder, AutoResponderInput } from "./modules/autoresponder.js";
+import { normalizeNotificationEmbedConfig } from "./modules/notifications.js";
+import type { Forms, CustomForm } from "./modules/forms.js";
+import { normalizeOnboardingSteps, normalizeOnboardingTrigger, type OnboardingStep, type OnboardingTrigger } from "./modules/onboarding.js";
+import type { TicketCustomization, TicketFormField } from "./modules/tickets.js";
+import type { HelpPage } from "./help-pages.js";
 import type { Moderation } from "./modules/moderation.js";
 import type { Music } from "./modules/music.js";
 import type { Leveling } from "./modules/leveling.js";
@@ -18,6 +24,8 @@ import type { AutoMod } from "./modules/automod.js";
 import { CommandPolicyService, COMMAND_DEFINITIONS } from "./command-policy.js";
 import type { StreamAlertPlatform } from "./modules/stream-alerts.js";
 import { BotIdentityRepository } from "./bot-identity.js";
+import type { ServerConfigPresetService } from "./config-presets.js";
+import type { IntegrationCredentialProvider, IntegrationCredentialRepository } from "./integration-credentials.js";
 
 type ApiOptions = {
   host: string;
@@ -28,8 +36,23 @@ type ApiOptions = {
   auditLog: AuditLog;
   settings: DashboardSettingsService;
   transfer: ConfigTransferService;
+  presets?: ServerConfigPresetService;
+  integrationCredentials?: IntegrationCredentialRepository;
   backups: BackupService;
   identities?: BotIdentityRepository;
+  botSetup?: {
+    test: (input: { clientId: string; token: string }) => Promise<unknown>;
+    get: () => Promise<unknown>;
+    update: (input: {
+      clientId: string;
+      token?: string;
+      enabled?: boolean;
+      presenceName?: string | null;
+      username?: string;
+      avatarData?: string | null;
+      bannerData?: string | null;
+    }) => Promise<unknown>;
+  };
   guildAccess?: (guildId: string) => boolean;
   actions: Record<string, (guildId: string) => Promise<unknown>>;
   giveaways?: {
@@ -37,18 +60,61 @@ type ApiOptions = {
     end: (guildId: string, giveawayId: number) => Promise<unknown>;
     reroll: (guildId: string, giveawayId: number) => Promise<unknown>;
   };
+  community?: {
+    overview: (guildId: string) => Promise<unknown>;
+  };
   analytics?: {
     report: (guildId: string, hours?: number) => Promise<unknown>;
+    getSettings: (guildId: string) => Promise<unknown>;
+    setSettings: (guildId: string, input: Record<string, unknown>) => Promise<unknown>;
   };
   notifications?: {
     list: (guildId: string) => Promise<unknown[]>;
-    create: (guildId: string, channelId: string, url: string, intervalSeconds: number) => Promise<unknown>;
-    update: (guildId: string, feedId: number, input: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean }) => Promise<boolean>;
+    create: (
+      guildId: string,
+      channelId: string,
+      url: string,
+      intervalSeconds: number,
+      options?: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[]; embedConfig?: Record<string, unknown> | null }
+    ) => Promise<unknown>;
+    createSocial: (
+      guildId: string,
+      provider: "reddit" | "youtube" | "mastodon",
+      target: string,
+      channelId: string,
+      intervalSeconds: number,
+      options?: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[]; embedConfig?: Record<string, unknown> | null }
+    ) => Promise<unknown>;
+    update: (
+      guildId: string,
+      feedId: number,
+      input: {
+        channelId?: string;
+        url?: string;
+        intervalSeconds?: number;
+        enabled?: boolean;
+        messageTemplate?: string;
+        includeKeywords?: string[];
+        excludeKeywords?: string[];
+      }
+    ) => Promise<boolean>;
     delete: (guildId: string, feedId: number) => Promise<boolean>;
+    testFeed: (guildId: string, feedId: number) => Promise<{ title: string; url: string }>;
+    listTikTokFeeds: (guildId: string) => Promise<unknown[]>;
+    createTikTokFeed: (
+      guildId: string,
+      channelId: string,
+      credentialId: number,
+      intervalSeconds: number,
+      options?: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[]; embedConfig?: Record<string, unknown> | null }
+    ) => Promise<unknown>;
+    setTikTokFeedEnabled: (guildId: string, feedId: number, enabled: boolean) => Promise<boolean>;
+    deleteTikTokFeed: (guildId: string, feedId: number) => Promise<boolean>;
+    testTikTokFeed: (guildId: string, feedId: number) => Promise<{ id: string; title: string; url: string }>;
   };
   streamAlerts?: {
     list: (guildId: string) => Promise<unknown[]>;
-    providers: () => unknown;
+    providers: (guildId?: string) => Promise<unknown>;
     create: (guildId: string, input: {
       platform: StreamAlertPlatform;
       target: string;
@@ -56,18 +122,38 @@ type ApiOptions = {
       mentionRoleId?: string | null;
       intervalSeconds: number;
       enabled?: boolean;
+      messageTemplate?: string;
+      credentialId?: number | null;
     }) => Promise<unknown>;
     update: (guildId: string, alertId: number, input: {
       target?: string;
       channelId?: string;
       mentionRoleId?: string | null;
+      credentialId?: number | null;
       intervalSeconds?: number;
       enabled?: boolean;
+      messageTemplate?: string;
     }) => Promise<boolean>;
     delete: (guildId: string, alertId: number) => Promise<boolean>;
   };
   automation?: {
     list: (guildId: string) => Promise<unknown[]>;
+    diagnostics: (guildId: string) => Promise<unknown>;
+    dryRun: (input: {
+      guildId: string;
+      event: string;
+      conditions: unknown[];
+      anyConditions: unknown[];
+      actions: unknown[];
+      content?: string;
+      userId?: string;
+      channelId?: string;
+      channelType?: import("@dsp/domain").AutomationChannelType;
+      userIsBot?: boolean;
+      permissions?: import("@dsp/domain").AutomationPermission[];
+      roleIds?: string[];
+      numeric?: Record<string, number>;
+    }) => Promise<unknown>;
     create: (guildId: string, input: {
       name: string;
       event: string;
@@ -86,9 +172,58 @@ type ApiOptions = {
       enabled?: boolean;
     }) => Promise<boolean>;
     delete: (guildId: string, ruleId: string) => Promise<boolean>;
+    listTemplates: (guildId: string) => Promise<unknown[]>;
+    setTemplate: (guildId: string, name: string, content: string) => Promise<void>;
+    deleteTemplate: (guildId: string, name: string) => Promise<boolean>;
+    listPresets: (guildId: string) => Promise<unknown[]>;
+    savePreset: (guildId: string, name: string, event: string, conditions: unknown[], anyConditions: unknown[], actions: unknown[], cooldownSeconds: number) => Promise<void>;
+    deletePreset: (guildId: string, name: string) => Promise<boolean>;
+  };
+  helpPages?: {
+    list: (guildId: string) => Promise<HelpPage[]>;
+    save: (guildId: string, slug: string, title: string, content: string, enabled?: boolean) => Promise<HelpPage>;
+    delete: (guildId: string, slug: string) => Promise<boolean>;
   };
   customCommands?: CustomCommandService;
-  moderation?: Moderation;
+  autoResponder?: AutoResponder;
+  forms?: Forms;
+  onboarding?: {
+    get: (guildId: string) => Promise<unknown>;
+    set: (guildId: string, input: { enabled?: boolean; trigger?: OnboardingTrigger; steps?: OnboardingStep[] }) => Promise<unknown>;
+    validate: (guildId: string) => Promise<unknown>;
+  };
+  tickets?: {
+    getFormFields: (guildId: string) => Promise<TicketFormField[]>;
+    setFormFields: (guildId: string, fields: TicketFormField[]) => Promise<TicketFormField[]>;
+    getCustomization: (guildId: string) => Promise<TicketCustomization>;
+    setCustomization: (guildId: string, customization: Partial<TicketCustomization>) => Promise<TicketCustomization>;
+    listTickets: (guildId: string, status?: "open" | "closed" | "closing") => Promise<unknown[]>;
+    updateTicketMetadata: (
+      guildId: string,
+      ticketId: number,
+      input: { priority?: "low" | "normal" | "high" | "urgent"; tags?: string[] }
+    ) => Promise<boolean>;
+    getSlaConfig: (guildId: string) => Promise<unknown>;
+    setSlaConfig: (guildId: string, input: Record<string, unknown>) => Promise<unknown>;
+    listPanels: (guildId: string) => Promise<unknown[]>;
+    createPanel: (guildId: string, input: { channelId: string; title: string; description: string; buttonLabel: string; enabled?: boolean }) => Promise<unknown>;
+    updatePanel: (guildId: string, panelId: number, input: { channelId?: string; title?: string; description?: string; buttonLabel?: string; enabled?: boolean }) => Promise<unknown>;
+    deletePanel: (guildId: string, panelId: number) => Promise<boolean>;
+  };
+  moderationPresets?: {
+    list: (guildId: string) => Promise<unknown[]>;
+    saveCurrent: (guildId: string, name: string) => Promise<void>;
+    apply: (guildId: string, name: string) => Promise<void>;
+    delete: (guildId: string, name: string) => Promise<boolean>;
+  };
+  moderation?: Moderation & {
+    listCleanupRules?: (guildId: string) => Promise<unknown[]>;
+    saveCleanupRule?: (guildId: string, channelId: string, intervalSeconds: number, maxMessages: number, enabled?: boolean) => Promise<void>;
+    deleteCleanupRule?: (guildId: string, id: number) => Promise<boolean>;
+    applyLockdown?: (guildId: string, actorUserId: string) => Promise<{ locked: number; failed: number }>;
+    releaseLockdown?: (guildId: string, actorUserId: string) => Promise<{ restored: number; failed: number }>;
+    lockdownStatus?: (guildId: string) => Promise<{ active: boolean; lockedChannels: number }>;
+  };
   music?: Music;
   leveling?: Leveling;
   economy?: Economy;
@@ -98,23 +233,51 @@ type ApiOptions = {
     list: (guildId: string) => Promise<unknown[]>;
     create: (
       guildId: string,
-      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }> },
+      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number; componentType?: "buttons" | "select" },
       callbacks: {
         deleteMessage: (channelId: string, messageId: string) => Promise<void>;
-        sendMessage: (channelId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => Promise<string>;
+        sendMessage: (
+          channelId: string,
+          content: string,
+          components: Array<
+            import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder> |
+            import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>
+          >
+        ) => Promise<string>;
       }
     ) => Promise<unknown>;
     update: (
       guildId: string,
       panelId: number,
-      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }> },
+      input: { channelId: string; title?: string; roles: Array<{ roleId: string; label: string }>; selectionMode?: "toggle" | "exclusive" | "max"; maxSelections?: number; durationMinutes?: number; componentType?: "buttons" | "select" },
       callbacks: {
-        editMessage: (channelId: string, messageId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => Promise<void>;
+        editMessage: (
+          channelId: string,
+          messageId: string,
+          content: string,
+          components: Array<
+            import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder> |
+            import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>
+          >
+        ) => Promise<void>;
         deleteMessage: (channelId: string, messageId: string) => Promise<void>;
-        sendMessage: (channelId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => Promise<string>;
+        sendMessage: (
+          channelId: string,
+          content: string,
+          components: Array<
+            import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder> |
+            import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>
+          >
+        ) => Promise<string>;
       }
     ) => Promise<unknown>;
     delete: (guildId: string, panelId: number, deleteMessage: (channelId: string, messageId: string) => Promise<void>) => Promise<boolean>;
+    listAutomationRules: (guildId: string) => Promise<unknown[]>;
+    saveAutomationRule: (
+      guildId: string,
+      input: { trigger: "member.join" | "voice.join" | "voice.leave"; channelId?: string; roleId: string; delaySeconds?: number; enabled?: boolean }
+    ) => Promise<void>;
+    deleteAutomationRule: (guildId: string, id: number) => Promise<boolean>;
   };
 };
 
@@ -123,9 +286,95 @@ type RateWindow = { startedAt: number; count: number };
 export class ManagementApiServer {
   private server?: Server;
   private readonly rateWindows = new Map<string, RateWindow>();
+  private readonly tiktokOauthStates = new Map<string, { guildId: string; redirectUri: string; expiresAt: number }>();
   private rateCleanupTimer?: NodeJS.Timeout;
 
   constructor(private readonly options: ApiOptions) {}
+
+  private createTikTokOauthUrl(guildId: string): string {
+    const clientKey = process.env.TIKTOK_CLIENT_KEY?.trim();
+    const redirectUri = process.env.TIKTOK_REDIRECT_URI?.trim();
+    if (!clientKey || !process.env.TIKTOK_CLIENT_SECRET?.trim() || !redirectUri) {
+      throw new Error("tiktok_oauth_not_configured");
+    }
+    const state = randomBytes(32).toString("base64url");
+    this.tiktokOauthStates.set(state, {
+      guildId,
+      redirectUri,
+      expiresAt: Date.now() + 10 * 60_000
+    });
+
+    const url = new URL("https://www.tiktok.com/v2/auth/authorize/");
+    url.searchParams.set("client_key", clientKey);
+    url.searchParams.set("scope", "user.info.basic,video.list");
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("redirect_uri", redirectUri);
+    url.searchParams.set("state", state);
+    return url.toString();
+  }
+
+  private async exchangeTikTokOauthCode(code: string, state: string): Promise<unknown> {
+    const pending = this.tiktokOauthStates.get(state);
+    this.tiktokOauthStates.delete(state);
+    if (!pending || pending.expiresAt < Date.now()) throw new Error("tiktok_oauth_state_invalid");
+
+    const clientKey = process.env.TIKTOK_CLIENT_KEY?.trim();
+    const clientSecret = process.env.TIKTOK_CLIENT_SECRET?.trim();
+    if (!clientKey || !clientSecret) throw new Error("tiktok_oauth_not_configured");
+
+    const response = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "Cache-Control": "no-cache" },
+      body: new URLSearchParams({
+        client_key: clientKey,
+        client_secret: clientSecret,
+        code,
+        grant_type: "authorization_code",
+        redirect_uri: pending.redirectUri
+      }).toString(),
+      signal: AbortSignal.timeout(10_000)
+    });
+    if (!response.ok) throw new Error("tiktok_oauth_exchange_http_" + response.status);
+
+    const token = await response.json() as {
+      access_token?: string;
+      refresh_token?: string;
+      open_id?: string;
+      expires_in?: number;
+      refresh_expires_in?: number;
+      scope?: string;
+      error?: string;
+      error_description?: string;
+    };
+    if (!token.access_token || !token.refresh_token || !token.open_id) {
+      throw new Error("tiktok_oauth_exchange_invalid_response");
+    }
+    if (!this.options.integrationCredentials) throw new Error("integration_credentials_unavailable");
+
+    const credential = await this.options.integrationCredentials.save(pending.guildId, {
+      provider: "tiktok",
+      label: "TikTok · " + token.open_id.slice(0, 12),
+      clientId: clientKey,
+      clientSecret,
+      accessToken: token.access_token,
+      refreshToken: token.refresh_token,
+      openId: token.open_id,
+      expiresAt: Date.now() + Math.max(60, Number(token.expires_in ?? 86_400)) * 1000,
+      refreshExpiresAt: Date.now() + Math.max(60, Number(token.refresh_expires_in ?? 31_536_000)) * 1000,
+      scope: token.scope ?? ""
+    });
+
+    await this.options.auditLog.record({
+      guildId: pending.guildId,
+      source: "dashboard",
+      action: "integration.tiktok.oauth.connected",
+      targetType: "integration-credential",
+      targetId: String(credential.id),
+      metadata: { openId: token.open_id, scope: token.scope ?? "" }
+    });
+
+    return { guildId: pending.guildId, credential };
+  }
 
   start(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -168,6 +417,92 @@ export class ManagementApiServer {
           const scopedGuild = path.match(/^\/api\/guilds\/([^/]+)/);
           if (scopedGuild && this.options.guildAccess && !this.options.guildAccess(scopedGuild[1] ?? "")) {
             this.json(res, 404, { error: "guild_not_found" });
+            return;
+          }
+
+          if (method === "POST" && path === "/api/bot/test") {
+            if (!this.options.botSetup) {
+              this.json(res, 500, { error: "bot_setup_unavailable" });
+              return;
+            }
+            const body = await readJson(req, 1024 * 1024);
+            if (typeof body.clientId !== "string" || typeof body.token !== "string") {
+              throw new RequestInputError("invalid_bot_credential_test", 400);
+            }
+            try {
+              const result = await this.options.botSetup.test({
+                clientId: body.clientId,
+                token: body.token
+              });
+              await this.options.auditLog.record({
+                source: "dashboard",
+                action: "bot.credentials.tested",
+                targetType: "bot-identity",
+                targetId: String((result as { id?: string }).id ?? body.clientId),
+                metadata: { clientId: body.clientId }
+              });
+              this.json(res, 200, { ok: true, bot: result });
+            } catch (error) {
+              this.json(res, 400, { error: String(error).replace(/^Error:\s*/, "") });
+            }
+            return;
+          }
+
+          if ((method === "GET" || method === "PUT") && path === "/api/bot") {
+            if (!this.options.botSetup) {
+              this.json(res, 500, { error: "bot_setup_unavailable" });
+              return;
+            }
+            if (method === "GET") {
+              this.json(res, 200, { bot: await this.options.botSetup.get() });
+              return;
+            }
+
+            const body = await readJson(req, 8 * 1024 * 1024);
+            const validProfileData = (value: unknown): value is string | null =>
+              value === null ||
+              (typeof value === "string" &&
+                value.length <= 3 * 1024 * 1024 &&
+                /^data:image\/(png|jpeg|gif);base64,[A-Za-z0-9+/=_-]+$/i.test(value));
+
+            if (
+              typeof body.clientId !== "string" ||
+              !/^\d{17,20}$/.test(body.clientId) ||
+              (body.token !== undefined && (typeof body.token !== "string" || body.token.length < 1 || body.token.length > 512)) ||
+              (body.enabled !== undefined && typeof body.enabled !== "boolean") ||
+              (body.presenceName !== undefined && body.presenceName !== null && (typeof body.presenceName !== "string" || body.presenceName.length > 128)) ||
+              (body.username !== undefined && (typeof body.username !== "string" || body.username.trim().length < 2 || body.username.trim().length > 32)) ||
+              (body.avatarData !== undefined && !validProfileData(body.avatarData)) ||
+              (body.bannerData !== undefined && !validProfileData(body.bannerData))
+            ) {
+              throw new RequestInputError("invalid_bot_registration", 400);
+            }
+
+            const result = await this.options.botSetup.update({
+              clientId: body.clientId,
+              ...(body.token !== undefined ? { token: body.token } : {}),
+              ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
+              ...(body.presenceName !== undefined ? { presenceName: body.presenceName === null ? null : body.presenceName.trim() } : {}),
+              ...(body.username !== undefined ? { username: body.username.trim() } : {}),
+              ...(body.avatarData !== undefined ? { avatarData: body.avatarData } : {}),
+              ...(body.bannerData !== undefined ? { bannerData: body.bannerData } : {})
+            });
+            await this.options.auditLog.record({
+              source: "dashboard",
+              action: "bot.credentials.updated",
+              targetType: "bot-identity",
+              targetId: String((result as { id?: string })?.id ?? "primary"),
+              metadata: {
+                clientId: body.clientId,
+                tokenChanged: body.token !== undefined,
+                enabled: body.enabled,
+                presenceNameChanged: body.presenceName !== undefined,
+                usernameChanged: body.username !== undefined,
+                avatarChanged: body.avatarData !== undefined,
+                bannerChanged: body.bannerData !== undefined
+              }
+            });
+            this.json(res, 200, { ok: true, bot: result });
             return;
           }
 
@@ -410,6 +745,95 @@ export class ManagementApiServer {
             return;
           }
 
+          const presetsMatch = path.match(/^\/api\/guilds\/([^/]+)\/presets$/);
+          const presetItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/presets\/(\d+)$/);
+          const presetApplyMatch = path.match(/^\/api\/guilds\/([^/]+)\/presets\/(\d+)\/apply$/);
+
+          if ((presetsMatch || presetItemMatch || presetApplyMatch) && !this.options.presets) {
+            this.json(res, 500, { error: "presets_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && presetsMatch) {
+            const guildId = presetsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, {
+              guildId,
+              presets: await this.options.presets!.list(guildId)
+            });
+            return;
+          }
+
+          if (method === "POST" && presetsMatch) {
+            const guildId = presetsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const name = body.name;
+            if (typeof name !== "string") {
+              throw new RequestInputError("invalid_preset_name", 400);
+            }
+            const preset = await this.options.presets!.save(guildId, name);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "config.preset.saved",
+              targetType: "preset",
+              targetId: String(preset.id),
+              metadata: { name: preset.name, moduleCount: preset.moduleCount }
+            });
+            this.json(res, 200, { ok: true, guildId, preset });
+            return;
+          }
+
+          if (method === "POST" && presetApplyMatch) {
+            const guildId = presetApplyMatch[1] ?? "";
+            const presetId = Number(presetApplyMatch[2]);
+            if (!guildId || !Number.isSafeInteger(presetId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_preset_not_found" });
+              return;
+            }
+            const preset = await this.options.presets!.apply(guildId, presetId);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "config.preset.applied",
+              targetType: "preset",
+              targetId: String(preset.id),
+              metadata: { name: preset.name, moduleCount: preset.moduleCount }
+            });
+            this.json(res, 200, { ok: true, guildId, preset });
+            return;
+          }
+
+          if (method === "DELETE" && presetItemMatch) {
+            const guildId = presetItemMatch[1] ?? "";
+            const presetId = Number(presetItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(presetId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_preset_not_found" });
+              return;
+            }
+            const deleted = await this.options.presets!.delete(guildId, presetId);
+            if (!deleted) {
+              this.json(res, 404, { error: "preset_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "config.preset.deleted",
+              targetType: "preset",
+              targetId: String(presetId)
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
           const backupMatch = path.match(/^\/api\/guilds\/([^/]+)\/backup$/);
           if (method === "POST" && backupMatch) {
             const guildId = backupMatch[1];
@@ -529,8 +953,218 @@ export class ManagementApiServer {
             return;
           }
 
+          const socialFeedsMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds\/social$/);
+          if (method === "POST" && socialFeedsMatch) {
+            if (!this.options.notifications) {
+              this.json(res, 500, { error: "notifications_unavailable" });
+              return;
+            }
+            const guildId = socialFeedsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const provider = body.provider;
+            if (provider !== "reddit" && provider !== "youtube" && provider !== "mastodon") {
+              throw new RequestInputError("invalid_social_provider", 400);
+            }
+            const target = typeof body.target === "string" ? body.target : "";
+            const channelId = typeof body.channelId === "string" ? body.channelId : "";
+            const intervalSeconds = Number(body.intervalSeconds ?? 300);
+            if (!target || target.length > 300 || !/^\d{17,20}$/.test(channelId) || !Number.isFinite(intervalSeconds)) {
+              throw new RequestInputError("invalid_social_feed", 400);
+            }
+            const feed = await this.options.notifications.createSocial(
+              guildId,
+              provider,
+              target,
+              channelId,
+              intervalSeconds,
+              {
+                messageTemplate: typeof body.messageTemplate === "string" ? body.messageTemplate : undefined,
+                includeKeywords: Array.isArray(body.includeKeywords) ? body.includeKeywords.filter((v): v is string => typeof v === "string") : undefined,
+                excludeKeywords: Array.isArray(body.excludeKeywords) ? body.excludeKeywords.filter((v): v is string => typeof v === "string") : undefined,
+                embedConfig: await normalizeNotificationEmbedConfig(
+                  body.embedConfig && typeof body.embedConfig === "object" && !Array.isArray(body.embedConfig)
+                    ? body.embedConfig as Record<string, unknown>
+                    : null
+                )
+              }
+            );
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "feed.social.created",
+              targetType: "notification-feed", targetId: String((feed as { id: number }).id),
+              metadata: { provider }
+            });
+            this.json(res, 200, { ok: true, guildId, feed });
+            return;
+          }
+
+
+          if (method === "GET" && path.match(/^\/api\/guilds\/([^/]+)\/tiktok\/oauth\/start$/)) {
+            const match = path.match(/^\/api\/guilds\/([^/]+)\/tiktok\/oauth\/start$/);
+            const guildId = match?.[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            try {
+              this.json(res, 200, { authorizationUrl: this.createTikTokOauthUrl(guildId) });
+            } catch (error) {
+              this.json(res, 400, { error: String(error).replace(/^Error:\s*/, "") });
+            }
+            return;
+          }
+
+          if (method === "POST" && path === "/api/tiktok/oauth/exchange") {
+            const body = await readJson(req);
+            if (typeof body.code !== "string" || typeof body.state !== "string") {
+              throw new RequestInputError("invalid_tiktok_oauth_exchange", 400);
+            }
+            try {
+              const result = await this.exchangeTikTokOauthCode(body.code, body.state);
+              this.json(res, 200, { ok: true, result });
+            } catch (error) {
+              this.json(res, 400, { error: String(error).replace(/^Error:\s*/, "") });
+            }
+            return;
+          }
+
+          const tiktokFeedsMatch = path.match(/^\/api\/guilds\/([^/]+)\/tiktok-feeds$/);
+          const tiktokFeedItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/tiktok-feeds\/(\d+)$/);
+          const tiktokFeedTestMatch = path.match(/^\/api\/guilds\/([^/]+)\/tiktok-feeds\/(\d+)\/test$/);
+
+          if ((tiktokFeedsMatch || tiktokFeedItemMatch || tiktokFeedTestMatch) && !this.options.notifications) {
+            this.json(res, 500, { error: "notifications_unavailable" });
+            return;
+          }
+          if (method === "GET" && tiktokFeedsMatch) {
+            const guildId = tiktokFeedsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, feeds: await this.options.notifications!.listTikTokFeeds(guildId) });
+            return;
+          }
+          if (method === "POST" && tiktokFeedsMatch) {
+            const guildId = tiktokFeedsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const channelId = typeof body.channelId === "string" ? body.channelId : "";
+            const credentialId = Number(body.credentialId);
+            const intervalSeconds = Number(body.intervalSeconds ?? 300);
+            if (!/^\d{17,20}$/.test(channelId) || !Number.isSafeInteger(credentialId) ||
+                !Number.isFinite(intervalSeconds)) {
+              throw new RequestInputError("invalid_tiktok_feed", 400);
+            }
+            const feed = await this.options.notifications!.createTikTokFeed(
+              guildId, channelId, credentialId, intervalSeconds, {
+                messageTemplate: typeof body.messageTemplate === "string" ? body.messageTemplate : undefined,
+                includeKeywords: Array.isArray(body.includeKeywords)
+                  ? body.includeKeywords.filter((v): v is string => typeof v === "string")
+                  : undefined,
+                excludeKeywords: Array.isArray(body.excludeKeywords)
+                  ? body.excludeKeywords.filter((v): v is string => typeof v === "string")
+                  : undefined,
+                embedConfig: body.embedConfig && typeof body.embedConfig === "object" && !Array.isArray(body.embedConfig)
+                  ? body.embedConfig as Record<string, unknown>
+                  : null
+              }
+            );
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "tiktok_feed.created",
+              targetType: "notification-tiktok-feed", targetId: String((feed as { id: number }).id)
+            });
+            this.json(res, 200, { ok: true, feed });
+            return;
+          }
+          if (method === "POST" && tiktokFeedTestMatch) {
+            const guildId = tiktokFeedTestMatch[1] ?? "";
+            const feedId = Number(tiktokFeedTestMatch[2]);
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !Number.isSafeInteger(feedId)) {
+              this.json(res, 404, { error: "guild_or_feed_not_found" });
+              return;
+            }
+            try {
+              const result = await this.options.notifications!.testTikTokFeed(guildId, feedId);
+              await this.options.auditLog.record({
+                guildId, source: "dashboard", action: "tiktok_feed.test",
+                targetType: "notification-tiktok-feed", targetId: String(feedId)
+              });
+              this.json(res, 200, { ok: true, result });
+            } catch (error) {
+              this.json(res, 400, { error: String(error).replace(/^Error:\s*/, "") });
+            }
+            return;
+          }
+          if (method === "PUT" && tiktokFeedItemMatch) {
+            const guildId = tiktokFeedItemMatch[1] ?? "";
+            const feedId = Number(tiktokFeedItemMatch[2]);
+            const body = await readJson(req);
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !Number.isSafeInteger(feedId) || typeof body.enabled !== "boolean") {
+              this.json(res, 400, { error: "invalid_tiktok_feed_update" });
+              return;
+            }
+            const updated = await this.options.notifications!.setTikTokFeedEnabled(guildId, feedId, body.enabled);
+            if (!updated) {
+              this.json(res, 404, { error: "tiktok_feed_not_found" });
+              return;
+            }
+            this.json(res, 200, { ok: true });
+            return;
+          }
+          if (method === "DELETE" && tiktokFeedItemMatch) {
+            const guildId = tiktokFeedItemMatch[1] ?? "";
+            const feedId = Number(tiktokFeedItemMatch[2]);
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !Number.isSafeInteger(feedId)) {
+              this.json(res, 404, { error: "guild_or_feed_not_found" });
+              return;
+            }
+            const deleted = await this.options.notifications!.deleteTikTokFeed(guildId, feedId);
+            if (!deleted) {
+              this.json(res, 404, { error: "tiktok_feed_not_found" });
+              return;
+            }
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
           const feedsMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds$/);
-          const feedItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds\/(\\d+)$/);
+          const feedTestMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds\/(\d+)\/test$/);
+          const feedItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds\/(\d+)$/);
+
+          if (method === "POST" && feedTestMatch) {
+            if (!this.options.notifications) {
+              this.json(res, 500, { error: "notifications_unavailable" });
+              return;
+            }
+            const guildId = feedTestMatch[1] ?? "";
+            const feedId = Number(feedTestMatch[2]);
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !Number.isSafeInteger(feedId)) {
+              this.json(res, 404, { error: "guild_or_feed_not_found" });
+              return;
+            }
+            try {
+              const result = await this.options.notifications.testFeed(guildId, feedId);
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "feed.test",
+                targetType: "feed",
+                targetId: String(feedId),
+                metadata: { title: result.title.slice(0, 200) }
+              });
+              this.json(res, 200, { ok: true, result });
+            } catch (error) {
+              this.json(res, 400, { error: String(error).replace(/^Error:\s*/, "") });
+            }
+            return;
+          }
 
           if ((feedsMatch || feedItemMatch) && !this.options.notifications) {
             this.json(res, 500, { error: "notifications_unavailable" });
@@ -564,17 +1198,62 @@ export class ManagementApiServer {
               }
               const channel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(body.channelId);
               if (!channel || channel.type !== 0) throw new RequestInputError("text_channel_required", 400);
-              const result = await this.options.notifications!.create(guildId, body.channelId, body.url, Math.trunc(body.intervalSeconds));
+              const includeKeywords = Array.isArray(body.includeKeywords)
+                ? body.includeKeywords.filter((value: unknown): value is string => typeof value === "string").slice(0,20)
+                : [];
+              const excludeKeywords = Array.isArray(body.excludeKeywords)
+                ? body.excludeKeywords.filter((value: unknown): value is string => typeof value === "string").slice(0,20)
+                : [];
+              const messageTemplate = typeof body.messageTemplate === "string" ? body.messageTemplate.slice(0,1800) : undefined;
+              const embedConfig = await normalizeNotificationEmbedConfig(
+                body.embedConfig && typeof body.embedConfig === "object" && !Array.isArray(body.embedConfig)
+                  ? body.embedConfig as Record<string, unknown>
+                  : null
+              );
+              const result = await this.options.notifications!.create(
+                guildId,
+                body.channelId,
+                body.url,
+                Math.trunc(body.intervalSeconds),
+                { messageTemplate, includeKeywords, excludeKeywords, embedConfig }
+              );
               await this.options.auditLog.record({ guildId, source: "dashboard", action: "feed.created", targetType: "feed", targetId: String((result as { id?: number })?.id ?? "unknown") });
               this.json(res, 200, { ok: true, feed: result });
               return;
             }
 
-            const input: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean } = {};
+            const input: {
+              channelId?: string;
+              url?: string;
+              intervalSeconds?: number;
+              enabled?: boolean;
+              messageTemplate?: string;
+              includeKeywords?: string[];
+              excludeKeywords?: string[];
+              embedConfig?: Record<string, unknown> | null;
+            } = {};
             if (typeof body.channelId === "string") input.channelId = body.channelId;
             if (typeof body.url === "string") input.url = body.url;
             if (typeof body.intervalSeconds === "number") input.intervalSeconds = body.intervalSeconds;
             if (typeof body.enabled === "boolean") input.enabled = body.enabled;
+            if (typeof body.messageTemplate === "string") input.messageTemplate = body.messageTemplate.slice(0, 1800);
+            if (Array.isArray(body.includeKeywords)) {
+              input.includeKeywords = body.includeKeywords
+                .filter((value: unknown): value is string => typeof value === "string")
+                .slice(0,20);
+            }
+            if (Array.isArray(body.excludeKeywords)) {
+              input.excludeKeywords = body.excludeKeywords
+                .filter((value: unknown): value is string => typeof value === "string")
+                .slice(0,20);
+            }
+            if (body.embedConfig !== undefined) {
+              input.embedConfig = await normalizeNotificationEmbedConfig(
+                body.embedConfig && typeof body.embedConfig === "object" && !Array.isArray(body.embedConfig)
+                  ? body.embedConfig as Record<string, unknown>
+                  : null
+              );
+            }
 
             if (input.channelId !== undefined) {
               const channel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(input.channelId);
@@ -611,8 +1290,107 @@ export class ManagementApiServer {
             return;
           }
 
+          const integrationCredentialsMatch = path.match(/^\/api\/guilds\/([^/]+)\/integration-credentials$/);
+          const integrationCredentialItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/integration-credentials\/(\d+)$/);
+          if ((integrationCredentialsMatch || integrationCredentialItemMatch) && !this.options.integrationCredentials) {
+            this.json(res, 500, { error: "integration_credentials_unavailable" });
+            return;
+          }
+          if (method === "GET" && integrationCredentialsMatch) {
+            const guildId = integrationCredentialsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, credentials: await this.options.integrationCredentials!.list(guildId) });
+            return;
+          }
+          if (method === "POST" && integrationCredentialsMatch) {
+            const guildId = integrationCredentialsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const provider = body.provider;
+            if (typeof provider !== "string" || !["twitch","youtube","kick","tiktok"].includes(provider) || typeof body.label !== "string") {
+              throw new RequestInputError("invalid_integration_credential", 400);
+            }
+            const credential = await this.options.integrationCredentials!.save(guildId, {
+              provider: provider as IntegrationCredentialProvider,
+              label: body.label,
+              clientId: typeof body.clientId === "string" ? body.clientId : undefined,
+              clientSecret: typeof body.clientSecret === "string" ? body.clientSecret : undefined,
+              apiKey: typeof body.apiKey === "string" ? body.apiKey : undefined,
+              accessToken: typeof body.accessToken === "string" ? body.accessToken : undefined,
+              refreshToken: typeof body.refreshToken === "string" ? body.refreshToken : undefined,
+              openId: typeof body.openId === "string" ? body.openId : undefined,
+              expiresAt: typeof body.expiresAt === "number" ? body.expiresAt : undefined,
+              refreshExpiresAt: typeof body.refreshExpiresAt === "number" ? body.refreshExpiresAt : undefined,
+              scope: typeof body.scope === "string" ? body.scope : undefined
+            });
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "integration.credential.saved",
+              targetType: "integration-credential", targetId: String(credential.id),
+              metadata: { provider: credential.provider, label: credential.label }
+            });
+            this.json(res, 200, { ok: true, guildId, credential });
+            return;
+          }
+          if (method === "POST" && integrationCredentialItemMatch) {
+            const guildId = integrationCredentialItemMatch[1] ?? "";
+            const credentialId = Number(integrationCredentialItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(credentialId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_credential_not_found" });
+              return;
+            }
+            try {
+              const result = await this.options.integrationCredentials!.test(guildId, credentialId);
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "integration.credential.tested",
+                targetType: "integration-credential",
+                targetId: String(credentialId),
+                metadata: { provider: result.provider, latencyMs: result.latencyMs }
+              });
+              this.json(res, 200, { ok: true, credentialId, ...result });
+            } catch (error) {
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "integration.credential.test_failed",
+                targetType: "integration-credential",
+                targetId: String(credentialId),
+                metadata: { error: String(error).slice(0, 180) }
+              });
+              this.json(res, 502, { error: error instanceof Error ? error.message : "integration_credential_test_failed" });
+            }
+            return;
+          }
+
+          if (method === "DELETE" && integrationCredentialItemMatch) {
+            const guildId = integrationCredentialItemMatch[1] ?? "";
+            const credentialId = Number(integrationCredentialItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(credentialId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_credential_not_found" });
+              return;
+            }
+            const deleted = await this.options.integrationCredentials!.delete(guildId, credentialId);
+            if (!deleted) {
+              this.json(res, 404, { error: "integration_credential_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "integration.credential.deleted",
+              targetType: "integration-credential", targetId: String(credentialId)
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
           const streamAlertsMatch = path.match(/^\/api\/guilds\/([^/]+)\/stream-alerts$/);
-          const streamAlertItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/stream-alerts\/(\\d+)$/);
+          const streamAlertItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/stream-alerts\/(\d+)$/);
 
           if ((streamAlertsMatch || streamAlertItemMatch) && !this.options.streamAlerts) {
             this.json(res, 500, { error: "stream_alerts_unavailable" });
@@ -625,7 +1403,7 @@ export class ManagementApiServer {
               this.json(res, 404, { error: "guild_not_found" });
               return;
             }
-            this.json(res, 200, { guildId, providers: this.options.streamAlerts!.providers(), alerts: await this.options.streamAlerts!.list(guildId) });
+            this.json(res, 200, { guildId, providers: await this.options.streamAlerts!.providers(guildId), alerts: await this.options.streamAlerts!.list(guildId) });
             return;
           }
 
@@ -640,8 +1418,10 @@ export class ManagementApiServer {
             const target = typeof body.target === "string" ? body.target.trim() : "";
             const channelId = typeof body.channelId === "string" ? body.channelId : "";
             const mentionRoleId = body.mentionRoleId == null ? null : typeof body.mentionRoleId === "string" ? body.mentionRoleId : "";
+            const messageTemplate = typeof body.messageTemplate === "string" ? body.messageTemplate.slice(0, 1000) : undefined;
             const intervalSeconds = Number(body.intervalSeconds);
-            if (!["twitch","youtube","vk"].includes(platform) || !target || target.length > 200 || !/^\d{17,20}$/.test(channelId) || (mentionRoleId && !/^\d{17,20}$/.test(mentionRoleId)) || !Number.isFinite(intervalSeconds)) {
+            const credentialId = body.credentialId == null ? null : Number(body.credentialId);
+            if (!["twitch","youtube","vk","kick"].includes(platform) || !target || target.length > 200 || !/^\d{17,20}$/.test(channelId) || (mentionRoleId && !/^\d{17,20}$/.test(mentionRoleId)) || !Number.isFinite(intervalSeconds) || (credentialId !== null && (!Number.isSafeInteger(credentialId) || credentialId < 1))) {
               throw new RequestInputError("invalid_stream_alert", 400);
             }
             const guild = this.options.client.guilds.cache.get(guildId);
@@ -650,7 +1430,7 @@ export class ManagementApiServer {
             if (mentionRoleId && !guild?.roles.cache.has(mentionRoleId)) throw new RequestInputError("role_not_found", 400);
             const created = await this.options.streamAlerts!.create(guildId, {
               platform: platform as StreamAlertPlatform, target, channelId, mentionRoleId,
-              intervalSeconds: Math.trunc(intervalSeconds), enabled: body.enabled !== false
+              intervalSeconds: Math.trunc(intervalSeconds), enabled: body.enabled !== false, messageTemplate, credentialId
             });
             await this.options.auditLog.record({ guildId, source: "dashboard", action: "stream-alert.created", targetType: "stream-alert", targetId: String((created as { id?: number }).id ?? "unknown") });
             this.json(res, 200, { ok: true, alert: created });
@@ -665,12 +1445,14 @@ export class ManagementApiServer {
               return;
             }
             const body = await readJson(req);
-            const input: { target?: string; channelId?: string; mentionRoleId?: string | null; intervalSeconds?: number; enabled?: boolean } = {};
+            const input: { target?: string; channelId?: string; mentionRoleId?: string | null; credentialId?: number | null; intervalSeconds?: number; enabled?: boolean; messageTemplate?: string } = {};
             if (typeof body.target === "string") input.target = body.target.trim();
             if (typeof body.channelId === "string") input.channelId = body.channelId;
             if (body.mentionRoleId === null) input.mentionRoleId = null;
             else if (typeof body.mentionRoleId === "string") input.mentionRoleId = body.mentionRoleId;
             if (typeof body.intervalSeconds === "number") input.intervalSeconds = Math.trunc(body.intervalSeconds);
+            if (body.credentialId === null) input.credentialId = null;
+            else if (typeof body.credentialId === "number" && Number.isSafeInteger(body.credentialId) && body.credentialId > 0) input.credentialId = body.credentialId;
             if (typeof body.enabled === "boolean") input.enabled = body.enabled;
             const guild = this.options.client.guilds.cache.get(guildId);
             if (input.channelId) {
@@ -705,6 +1487,24 @@ export class ManagementApiServer {
             return;
           }
 
+          const communityMatch = path.match(/^\/api\/guilds\/([^/]+)\/community\/overview$/);
+          if (method === "GET" && communityMatch) {
+            const guildId = communityMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (!this.options.community) {
+              this.json(res, 500, { error: "community_unavailable" });
+              return;
+            }
+            this.json(res, 200, {
+              guildId,
+              overview: await this.options.community.overview(guildId)
+            });
+            return;
+          }
+
           const analyticsMatch = path.match(/^\/api\/guilds\/([^/]+)\/analytics$/);
           if (method === "GET" && analyticsMatch) {
             if (!this.options.analytics) {
@@ -725,11 +1525,165 @@ export class ManagementApiServer {
             return;
           }
 
+          const analyticsSettingsMatch = path.match(/^\/api\/guilds\/([^/]+)\/analytics\/settings$/);
+          if (analyticsSettingsMatch && !this.options.analytics) {
+            this.json(res, 500, { error: "analytics_unavailable" });
+            return;
+          }
+          if (analyticsSettingsMatch) {
+            const guildId = analyticsSettingsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (method === "GET") {
+              this.json(res, 200, { guildId, settings: await this.options.analytics!.getSettings(guildId) });
+              return;
+            }
+            if (method === "PUT") {
+              const body = await readJson(req);
+              if (
+                body.retentionDays !== undefined && (typeof body.retentionDays !== "number" || !Number.isFinite(body.retentionDays)) ||
+                body.visibleCounters !== undefined && (!Array.isArray(body.visibleCounters) || body.visibleCounters.some((item: unknown) => typeof item !== "string"))
+              ) {
+                throw new RequestInputError("invalid_analytics_settings", 400);
+              }
+              const settings = await this.options.analytics!.setSettings(guildId, {
+                retentionDays: body.retentionDays as number | undefined,
+                visibleCounters: body.visibleCounters as string[] | undefined
+              });
+              await this.options.auditLog.record({
+                guildId, source: "dashboard", action: "analytics.settings.updated", targetType: "analytics-settings", targetId: guildId
+              });
+              this.json(res, 200, { guildId, settings });
+              return;
+            }
+          }
+          const analyticsActivityMatch = path.match(/^\/api\/guilds\/([^/]+)\/analytics\/activity$/);
+          const analyticsExportMatch = path.match(/^\/api\/guilds\/([^/]+)\/analytics\/export$/);
+
+          if (analyticsActivityMatch || analyticsExportMatch) {
+            const guildId = (analyticsActivityMatch ?? analyticsExportMatch)?.[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+          }
+
+          if (method === "GET" && analyticsActivityMatch) {
+            const guildId = analyticsActivityMatch[1] ?? "";
+            const limit = Math.min(Math.max(Number.parseInt(url.searchParams.get("limit") ?? "50",10) || 50,1),200);
+            this.json(res, 200, { guildId, activity: await this.options.auditLog.recent(guildId, limit) });
+            return;
+          }
+
+          if (method === "GET" && analyticsExportMatch) {
+            if (!this.options.analytics) {
+              this.json(res, 500, { error: "analytics_unavailable" });
+              return;
+            }
+            const guildId = analyticsExportMatch[1] ?? "";
+            const hours = Number.parseInt(url.searchParams.get("hours") ?? "24",10);
+            if (!Number.isInteger(hours) || hours < 1 || hours > 168) {
+              this.json(res, 400, { error: "invalid_hours" });
+              return;
+            }
+            const report = await this.options.analytics.report(guildId, hours) as { points: Array<{ bucketStart: string; eventType: string; count: number }>; counters: Record<string, number> };
+            const rows = [["bucket_start","event_type","count"], ...report.points.map((point) => [point.bucketStart,point.eventType,String(point.count)])];
+            rows.push(["summary","messageCount",String(report.counters.messageCount ?? 0)]);
+            rows.push(["summary","memberJoins",String(report.counters.memberJoins ?? 0)]);
+            rows.push(["summary","memberLeaves",String(report.counters.memberLeaves ?? 0)]);
+            rows.push(["summary","voiceJoins",String(report.counters.voiceJoins ?? 0)]);
+            rows.push(["summary","voiceLeaves",String(report.counters.voiceLeaves ?? 0)]);
+            rows.push(["summary","voiceMoves",String(report.counters.voiceMoves ?? 0)]);
+            const csv = rows
+              .map((row) => row.map((value) => '"' + String(value).replaceAll('"', '""') + '"').join(","))
+              .join("\n") + "\n";
+            res.writeHead(200, {
+              "content-type": "text/csv; charset=utf-8",
+              "content-disposition": "attachment; filename=\"analytics-" + guildId + "-" + hours + "h.csv\"",
+              "cache-control": "no-store"
+            });
+            res.end(csv);
+            return;
+          }
+          const helpPagesMatch = path.match(/^\/api\/guilds\/([^/]+)\/help-pages$/);
+          const helpPageItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/help-pages\/([^/]+)$/);
+
+          if ((helpPagesMatch || helpPageItemMatch) && !this.options.helpPages) {
+            this.json(res, 500, { error: "help_pages_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && helpPagesMatch) {
+            const guildId = helpPagesMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, pages: await this.options.helpPages!.list(guildId) });
+            return;
+          }
+
+          if (method === "POST" && helpPagesMatch) {
+            const guildId = helpPagesMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            if (typeof body.slug !== "string" || typeof body.title !== "string" || typeof body.content !== "string" ||
+                body.slug.length > 40 || body.title.length > 100 || body.content.length > 3900 ||
+                (body.enabled !== undefined && typeof body.enabled !== "boolean")) {
+              throw new RequestInputError("invalid_help_page", 400);
+            }
+            const page = await this.options.helpPages!.save(guildId, body.slug, body.title, body.content, body.enabled !== false);
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "help-page.saved", targetType: "help-page", targetId: page.slug
+            });
+            this.json(res, 200, { guildId, page });
+            return;
+          }
+
+          if (method === "DELETE" && helpPageItemMatch) {
+            const guildId = helpPageItemMatch[1] ?? "";
+            const slug = decodeURIComponent(helpPageItemMatch[2] ?? "");
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const deleted = await this.options.helpPages!.delete(guildId, slug);
+            if (!deleted) {
+              this.json(res, 404, { error: "help_page_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "help-page.deleted", targetType: "help-page", targetId: slug.toLowerCase()
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
           const automationMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation$/);
+          const automationDryRunMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/dry-run$/);
+          const automationDiagnosticsMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/diagnostics$/);
           const automationItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/([^/]+)$/);
 
-          if ((automationMatch || automationItemMatch) && !this.options.automation) {
+          if ((automationMatch || automationDryRunMatch || automationDiagnosticsMatch || automationItemMatch) && !this.options.automation) {
             this.json(res, 500, { error: "automation_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && automationDiagnosticsMatch) {
+            const guildId = automationDiagnosticsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, {
+              guildId,
+              diagnostics: await this.options.automation!.diagnostics(guildId)
+            });
             return;
           }
 
@@ -740,6 +1694,67 @@ export class ManagementApiServer {
               return;
             }
             this.json(res, 200, { guildId, rules: await this.options.automation!.list(guildId) });
+            return;
+          }
+
+          if (method === "POST" && automationDryRunMatch) {
+            const guildId = automationDryRunMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const event = typeof body.event === "string" ? body.event : "";
+            const conditions = body.conditions;
+            const anyConditions = body.anyConditions ?? [];
+            const actions = body.actions;
+            const cooldownSeconds = typeof body.cooldownSeconds === "number" ? body.cooldownSeconds : 0;
+            if (
+              typeof event !== "string" || event.length > 64 ||
+              !Array.isArray(conditions) || conditions.length > 10 ||
+              !Array.isArray(anyConditions) || anyConditions.length > 10 ||
+              conditions.length + anyConditions.length > 10 ||
+              !Array.isArray(actions) || actions.length < 1 || actions.length > 10 ||
+              !Number.isFinite(cooldownSeconds) || cooldownSeconds < 0 || cooldownSeconds > 86400
+            ) {
+              throw new RequestInputError("invalid_automation_rule", 400);
+            }
+            validateAutomationPayload(this.options.client, guildId, event, [...conditions, ...anyConditions], actions);
+            const result = await this.options.automation!.dryRun({
+              guildId,
+              event,
+              conditions,
+              anyConditions,
+              actions,
+              content: typeof body.content === "string" ? body.content.slice(0, 2000) : "",
+              userId: typeof body.userId === "string" ? body.userId : undefined,
+              userIsBot: typeof body.userIsBot === "boolean" ? body.userIsBot : undefined,
+              channelId: typeof body.channelId === "string" ? body.channelId : undefined,
+              channelType: typeof body.channelType === "string" ? body.channelType as import("@dsp/domain").AutomationChannelType : undefined,
+              permissions: Array.isArray(body.permissions)
+                ? body.permissions
+                    .filter((v: unknown): v is import("@dsp/domain").AutomationPermission => [
+                      "Administrator","ManageGuild","ManageChannels","ManageRoles",
+                      "ManageMessages","KickMembers","BanMembers","ModerateMembers"
+                    ].includes(v as import("@dsp/domain").AutomationPermission))
+                    .slice(0, 20)
+                : [],
+              roleIds: Array.isArray(body.roleIds)
+                ? body.roleIds.filter((v: unknown): v is string => typeof v === "string").slice(0, 20)
+                : [],
+              numeric: body.numeric && typeof body.numeric === "object" && !Array.isArray(body.numeric)
+                ? Object.fromEntries(
+                    Object.entries(body.numeric as Record<string, unknown>)
+                      .filter(([key, value]) => [
+                        "memberCount","messageLength","mentionCount","previousLength",
+                        "caseId","ticketId","giveawayId","winnerCount","timestamp",
+                        "minute","hour","dayOfWeek","dayOfMonth"
+                      ].includes(key) && typeof value === "number" && Number.isFinite(value))
+                      .slice(0, 20)
+                  ) as Record<string, number>
+                : {}
+            });
+            this.json(res, 200, { ok: true, result });
             return;
           }
 
@@ -822,6 +1837,207 @@ export class ManagementApiServer {
               action: "automation.deleted",
               targetType: "automation-rule",
               targetId: ruleId
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const automationPresetsMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/presets$/);
+          const automationPresetItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/presets\/([^/]+)$/);
+
+          if ((automationPresetsMatch || automationPresetItemMatch) && !this.options.automation) {
+            this.json(res, 500, { error: "automation_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && automationPresetsMatch) {
+            const guildId = automationPresetsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, presets: await this.options.automation!.listPresets(guildId) });
+            return;
+          }
+
+          if (method === "POST" && automationPresetsMatch) {
+            const guildId = automationPresetsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const name = typeof body.name === "string" ? body.name.trim() : "";
+            const event = typeof body.event === "string" ? body.event : "";
+            const conditions = body.conditions;
+            const anyConditions = body.anyConditions ?? [];
+            const actions = body.actions;
+            const cooldownSeconds = typeof body.cooldownSeconds === "number" ? body.cooldownSeconds : 0;
+
+            if (
+              !name || name.length > 40 ||
+              !Array.isArray(conditions) || conditions.length > 10 ||
+              !Array.isArray(anyConditions) || anyConditions.length > 10 ||
+              conditions.length + anyConditions.length > 10 ||
+              !Array.isArray(actions) || actions.length < 1 || actions.length > 10 ||
+              !Number.isFinite(cooldownSeconds) || cooldownSeconds < 0 || cooldownSeconds > 86400
+            ) {
+              throw new RequestInputError("invalid_automation_preset", 400);
+            }
+
+            validateAutomationPayload(this.options.client, guildId, event, [...conditions, ...anyConditions], actions);
+            await this.options.automation!.savePreset(
+              guildId,
+              name,
+              event,
+              conditions,
+              anyConditions,
+              actions,
+              cooldownSeconds
+            );
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "automation.preset.saved",
+              targetType: "automation-preset",
+              targetId: name.toLowerCase()
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          if (method === "DELETE" && automationPresetItemMatch) {
+            const guildId = automationPresetItemMatch[1] ?? "";
+            const name = decodeURIComponent(automationPresetItemMatch[2] ?? "").toLowerCase();
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const deleted = await this.options.automation!.deletePreset(guildId, name);
+            if (!deleted) {
+              this.json(res, 404, { error: "automation_preset_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "automation.preset.deleted",
+              targetType: "automation-preset",
+              targetId: name
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const automationTemplatesMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/templates$/);
+          const automationTemplateItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/automation\/templates\/([^/]+)$/);
+
+          if ((automationTemplatesMatch || automationTemplateItemMatch) && !this.options.automation) {
+            this.json(res, 500, { error: "automation_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && automationTemplatesMatch) {
+            const guildId = automationTemplatesMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, templates: await this.options.automation!.listTemplates(guildId) });
+            return;
+          }
+
+          if (method === "POST" && automationTemplatesMatch) {
+            const guildId = automationTemplatesMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const name = typeof body.name === "string" ? body.name.trim().toLowerCase() : "";
+            const content = typeof body.content === "string" ? body.content : "";
+            if (!/^[a-z0-9_-]{1,40}$/.test(name) || !content.trim() || content.length > 2000) {
+              throw new RequestInputError("invalid_automation_template", 400);
+            }
+            await this.options.automation!.setTemplate(guildId, name, content);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "automation.template.saved",
+              targetType: "automation-template",
+              targetId: name
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          if (method === "DELETE" && automationTemplateItemMatch) {
+            const guildId = automationTemplateItemMatch[1] ?? "";
+            const name = decodeURIComponent(automationTemplateItemMatch[2] ?? "").toLowerCase();
+            if (!guildId || !/^[a-z0-9_-]{1,40}$/.test(name) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_template_not_found" });
+              return;
+            }
+            const deleted = await this.options.automation!.deleteTemplate(guildId, name);
+            if (!deleted) {
+              this.json(res, 404, { error: "template_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "automation.template.deleted",
+              targetType: "automation-template",
+              targetId: name
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const embedMatch = path.match(/^\/api\/guilds\/([^/]+)\/embed$/);
+          if (method === "POST" && embedMatch) {
+            const guildId = embedMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const channelId = typeof body.channelId === "string" ? body.channelId : "";
+            const channel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(channelId);
+            if (!/^\d{17,20}$/.test(channelId) || channel?.type !== 0) {
+              throw new RequestInputError("text_channel_required", 400);
+            }
+            const title = typeof body.title === "string" ? body.title.trim().slice(0,256) : "";
+            const description = typeof body.description === "string" ? body.description.slice(0,4096) : "";
+            const footer = typeof body.footer === "string" ? body.footer.slice(0,2048) : "";
+            const url = typeof body.url === "string" ? body.url.trim() : "";
+            const image = typeof body.image === "string" ? body.image.trim() : "";
+            const thumbnail = typeof body.thumbnail === "string" ? body.thumbnail.trim() : "";
+            const color = typeof body.color === "string" ? body.color.trim() : "";
+            if (!title && !description && !footer && !image && !thumbnail) {
+              throw new RequestInputError("embed_content_required", 400);
+            }
+            for (const value of [url,image,thumbnail]) {
+              if (value && !/^https?:\/\//i.test(value)) throw new RequestInputError("embed_url_must_be_http", 400);
+            }
+            if (color && !/^#[0-9a-fA-F]{6}$/.test(color)) {
+              throw new RequestInputError("embed_color_invalid", 400);
+            }
+            const embed = new EmbedBuilder();
+            if (title) embed.setTitle(title);
+            if (description) embed.setDescription(description);
+            if (url) embed.setURL(url);
+            if (color) embed.setColor(parseInt(color.slice(1),16));
+            if (footer) embed.setFooter({ text: footer });
+            if (image) embed.setImage(image);
+            if (thumbnail) embed.setThumbnail(thumbnail);
+            await channel.send({ embeds: [embed] });
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "embed.published",
+              targetType: "channel",
+              targetId: channelId
             });
             this.json(res, 200, { ok: true });
             return;
@@ -946,6 +2162,13 @@ export class ManagementApiServer {
               this.json(res, 404, { error: "automod_rule_not_found" });
               return;
             }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "automod.rule.deleted",
+              targetType: "automod-rule",
+              targetId: String(id)
+            });
             this.json(res, 200, { ok: true });
             return;
           }
@@ -1116,6 +2339,14 @@ export class ManagementApiServer {
               throw new RequestInputError("invalid_leveling_exclusion", 400);
             }
             await this.options.leveling!.setExclusion(guildId, kind, refId, body.enabled);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "leveling.exclusion.updated",
+              targetType: kind,
+              targetId: refId,
+              metadata: { enabled: body.enabled }
+            });
             this.json(res, 200, { ok: true, exclusions: await this.options.leveling!.listExclusions(guildId) });
             return;
           }
@@ -1192,6 +2423,259 @@ export class ManagementApiServer {
             return;
           }
 
+          const moderationCleanupMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/cleanup$/);
+          const moderationCleanupItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/cleanup\/(\d+)$/);
+
+          if ((moderationCleanupMatch || moderationCleanupItemMatch) && !this.options.moderation) {
+            this.json(res, 500, { error: "moderation_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && moderationCleanupMatch) {
+            const guildId = moderationCleanupMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, rules: await this.options.moderation!.listCleanupRules(guildId) });
+            return;
+          }
+
+          if (method === "POST" && moderationCleanupMatch) {
+            const guildId = moderationCleanupMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const channelId = typeof body.channelId === "string" ? body.channelId : "";
+            const intervalSeconds = Number(body.intervalSeconds);
+            const maxMessages = Number(body.maxMessages);
+            const enabled = body.enabled !== false;
+            if (!/^\d{17,20}$/.test(channelId) || !Number.isInteger(intervalSeconds) || intervalSeconds < 60 || intervalSeconds > 604800 || !Number.isInteger(maxMessages) || maxMessages < 1 || maxMessages > 100) {
+              throw new RequestInputError("invalid_cleanup_rule", 400);
+            }
+            await this.options.moderation!.saveCleanupRule(guildId, channelId, intervalSeconds, maxMessages, enabled);
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "moderation.autopurge.configured",
+              targetType: "channel", targetId: channelId,
+              metadata: { intervalSeconds, maxMessages, enabled }
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          if (method === "DELETE" && moderationCleanupItemMatch) {
+            const guildId = moderationCleanupItemMatch[1] ?? "";
+            const id = Number(moderationCleanupItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(id) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_cleanup_not_found" });
+              return;
+            }
+            const removed = await this.options.moderation!.deleteCleanupRule(guildId, id);
+            if (!removed) {
+              this.json(res, 404, { error: "cleanup_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "moderation.autopurge.removed",
+              targetType: "cleanup-rule", targetId: String(id)
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const moderationPresetsMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/presets$/);
+          const moderationPresetItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/presets\/([^/]+)$/);
+
+          if ((moderationPresetsMatch || moderationPresetItemMatch) && !this.options.moderationPresets) {
+            this.json(res, 500, { error: "moderation_presets_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && moderationPresetsMatch) {
+            const guildId = moderationPresetsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, presets: await this.options.moderationPresets!.list(guildId) });
+            return;
+          }
+
+          if (method === "POST" && moderationPresetsMatch) {
+            const guildId = moderationPresetsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const name = typeof body.name === "string" ? body.name.trim() : "";
+            if (!/^[a-z0-9_-]{1,40}$/i.test(name)) {
+              throw new RequestInputError("invalid_moderation_preset_name", 400);
+            }
+            await this.options.moderationPresets!.saveCurrent(guildId, name);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "moderation.preset.saved",
+              targetType: "moderation-preset",
+              targetId: name.toLowerCase()
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          if (method === "POST" && moderationPresetItemMatch) {
+            const guildId = moderationPresetItemMatch[1] ?? "";
+            const name = decodeURIComponent(moderationPresetItemMatch[2] ?? "").toLowerCase();
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            await this.options.moderationPresets!.apply(guildId, name);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "moderation.preset.applied",
+              targetType: "moderation-preset",
+              targetId: name
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          if (method === "DELETE" && moderationPresetItemMatch) {
+            const guildId = moderationPresetItemMatch[1] ?? "";
+            const name = decodeURIComponent(moderationPresetItemMatch[2] ?? "").toLowerCase();
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const deleted = await this.options.moderationPresets!.delete(guildId, name);
+            if (!deleted) {
+              this.json(res, 404, { error: "moderation_preset_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "moderation.preset.deleted",
+              targetType: "moderation-preset",
+              targetId: name
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const moderationLockdownMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/lockdown$/);
+
+          if (moderationLockdownMatch && !this.options.moderation) {
+            this.json(res, 500, { error: "moderation_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && moderationLockdownMatch) {
+            const guildId = moderationLockdownMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, ...(await this.options.moderation!.lockdownStatus(guildId)) });
+            return;
+          }
+
+          if (method === "POST" && moderationLockdownMatch) {
+            const guildId = moderationLockdownMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            if (typeof body.enabled !== "boolean") throw new RequestInputError("invalid_lockdown_state",400);
+            const result = body.enabled
+              ? await this.options.moderation!.applyLockdown(guildId,"dashboard")
+              : await this.options.moderation!.releaseLockdown(guildId,"dashboard");
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: body.enabled ? "moderation.lockdown.applied" : "moderation.lockdown.released",
+              targetType: "guild", targetId: guildId, metadata: result
+            });
+            this.json(res,200,{ok:true,result});
+            return;
+          }
+          const moderationEscalationsMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/escalations$/);
+          const moderationEscalationItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/escalations\/(\d+)$/);
+
+          if ((moderationEscalationsMatch || moderationEscalationItemMatch) && !this.options.moderation) {
+            this.json(res, 500, { error: "moderation_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && moderationEscalationsMatch) {
+            const guildId = moderationEscalationsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, rules: await this.options.moderation!.listEscalations(guildId) });
+            return;
+          }
+
+          if (method === "POST" && moderationEscalationsMatch) {
+            const guildId = moderationEscalationsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const warnCount = Number(body.warnCount);
+            const action = typeof body.action === "string" ? body.action : "";
+            const durationMinutes = Number(body.durationMinutes ?? 0);
+            const reason = typeof body.reason === "string" ? body.reason : "";
+            if (!Number.isInteger(warnCount) || warnCount < 1 || warnCount > 100 ||
+                !["timeout","ban"].includes(action) ||
+                !Number.isInteger(durationMinutes) || durationMinutes < 0 || durationMinutes > 40320 ||
+                !reason.trim()) {
+              throw new RequestInputError("invalid_escalation", 400);
+            }
+            await this.options.moderation!.setEscalation(
+              guildId, warnCount, action as "timeout" | "ban", durationMinutes, reason
+            );
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "moderation.escalation.configured",
+              targetType: "escalation",
+              targetId: String(warnCount),
+              metadata: { action, durationMinutes, reason: reason.trim().slice(0,500) }
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
+          if (method === "DELETE" && moderationEscalationItemMatch) {
+            const guildId = moderationEscalationItemMatch[1] ?? "";
+            const warnCount = Number(moderationEscalationItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(warnCount) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_escalation_not_found" });
+              return;
+            }
+            const removed = await this.options.moderation!.removeEscalation(guildId, warnCount);
+            if (!removed) {
+              this.json(res, 404, { error: "escalation_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "moderation.escalation.removed",
+              targetType: "escalation",
+              targetId: String(warnCount)
+            });
+            this.json(res, 200, { ok: true });
+            return;
+          }
+
           const moderationHistoryMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/history$/);
           if (method === "GET" && moderationHistoryMatch) {
             if (!this.options.moderation) {
@@ -1209,6 +2693,463 @@ export class ManagementApiServer {
               userId,
               cases: await this.options.moderation.history(guildId, userId, 50)
             });
+            return;
+          }
+
+          const ticketsQueueMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets$/);
+          const ticketsQueueItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/(\d+)$/);
+
+          if ((ticketsQueueMatch || ticketsQueueItemMatch) && !this.options.tickets) {
+            this.json(res, 500, { error: "tickets_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && ticketsQueueMatch) {
+            const guildId = ticketsQueueMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const requested = url.searchParams.get("status");
+            const status = requested === "open" || requested === "closed" || requested === "closing" ? requested : undefined;
+            this.json(res, 200, { guildId, tickets: await this.options.tickets!.listTickets(guildId, status) });
+            return;
+          }
+
+          if (method === "PUT" && ticketsQueueItemMatch) {
+            const guildId = ticketsQueueItemMatch[1] ?? "";
+            const ticketId = Number(ticketsQueueItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(ticketId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_ticket_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const input: { priority?: "low" | "normal" | "high" | "urgent"; tags?: string[] } = {};
+            if (body.priority !== undefined) {
+              if (typeof body.priority !== "string" || !["low","normal","high","urgent"].includes(body.priority)) {
+                throw new RequestInputError("invalid_ticket_priority",400);
+              }
+              input.priority = body.priority as "low" | "normal" | "high" | "urgent";
+            }
+            if (body.tags !== undefined) {
+              if (!Array.isArray(body.tags) || body.tags.length > 10 || body.tags.some((tag: unknown) => typeof tag !== "string" || !tag.trim() || tag.length > 40)) {
+                throw new RequestInputError("invalid_ticket_tags",400);
+              }
+              input.tags = [...new Set(body.tags.map((tag: string) => tag.trim().slice(0,40)))];
+            }
+            if (input.priority === undefined && input.tags === undefined) {
+              throw new RequestInputError("ticket_metadata_empty",400);
+            }
+            const updated = await this.options.tickets!.updateTicketMetadata(guildId,ticketId,input);
+            if (!updated) {
+              this.json(res,404,{error:"ticket_not_found"});
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source:"dashboard",
+              action:"ticket.metadata.updated",
+              targetType:"ticket",
+              targetId:String(ticketId),
+              metadata:input
+            });
+            this.json(res,200,{ok:true});
+            return;
+          }
+
+          const formsMatch = path.match(/^\/api\/guilds\/([^/]+)\/forms$/);
+          const formItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/forms\/([^/]+)$/);
+          const formPublishMatch = path.match(/^\/api\/guilds\/([^/]+)\/forms\/([^/]+)\/publish$/);
+
+          if ((formsMatch || formItemMatch || formPublishMatch) && !this.options.forms) {
+            this.json(res, 500, { error: "forms_unavailable" });
+            return;
+          }
+          if (formsMatch || formItemMatch || formPublishMatch) {
+            const guildId = formsMatch?.[1] ?? formItemMatch?.[1] ?? formPublishMatch?.[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+
+            if (method === "GET" && formsMatch) {
+              this.json(res, 200, { guildId, forms: await this.options.forms!.list(guildId) });
+              return;
+            }
+
+            if (method === "POST" && formsMatch) {
+              const body = await readJson(req);
+              if (typeof body.name !== "string") throw new RequestInputError("invalid_form_name", 400);
+              const form = await this.options.forms!.save(guildId, {
+                name: body.name,
+                title: typeof body.title === "string" ? body.title : undefined,
+                description: typeof body.description === "string" ? body.description : undefined,
+                panelChannelId: typeof body.panelChannelId === "string" ? body.panelChannelId : body.panelChannelId === null ? null : undefined,
+                responseChannelId: typeof body.responseChannelId === "string" ? body.responseChannelId : body.responseChannelId === null ? null : undefined,
+                buttonLabel: typeof body.buttonLabel === "string" ? body.buttonLabel : undefined,
+                enabled: typeof body.enabled === "boolean" ? body.enabled : undefined,
+                fields: Array.isArray(body.fields) ? body.fields as CustomForm["fields"] : undefined
+              } satisfies Partial<CustomForm> & { name: string });
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "forms.created",
+                targetType: "form",
+                targetId: form.name,
+                metadata: { fieldCount: form.fields.length }
+              });
+              this.json(res, 200, { ok: true, guildId, form });
+              return;
+            }
+
+            if (method === "PUT" && formItemMatch) {
+              const name = decodeURIComponent(formItemMatch[2] ?? "");
+              const body = await readJson(req);
+              const form = await this.options.forms!.save(guildId, {
+                name,
+                title: typeof body.title === "string" ? body.title : undefined,
+                description: typeof body.description === "string" ? body.description : undefined,
+                panelChannelId: typeof body.panelChannelId === "string" ? body.panelChannelId : body.panelChannelId === null ? null : undefined,
+                responseChannelId: typeof body.responseChannelId === "string" ? body.responseChannelId : body.responseChannelId === null ? null : undefined,
+                buttonLabel: typeof body.buttonLabel === "string" ? body.buttonLabel : undefined,
+                enabled: typeof body.enabled === "boolean" ? body.enabled : undefined,
+                fields: Array.isArray(body.fields) ? body.fields as CustomForm["fields"] : undefined
+              } satisfies Partial<CustomForm> & { name: string });
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "forms.updated",
+                targetType: "form",
+                targetId: form.name,
+                metadata: { fieldCount: form.fields.length }
+              });
+              this.json(res, 200, { ok: true, guildId, form });
+              return;
+            }
+
+            if (method === "DELETE" && formItemMatch) {
+              const name = decodeURIComponent(formItemMatch[2] ?? "");
+              const deleted = await this.options.forms!.delete(guildId, name);
+              if (!deleted) {
+                this.json(res, 404, { error: "form_not_found" });
+                return;
+              }
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "forms.deleted",
+                targetType: "form",
+                targetId: name.toLowerCase()
+              });
+              this.json(res, 200, { ok: true });
+              return;
+            }
+
+            if (method === "POST" && formPublishMatch) {
+              const name = decodeURIComponent(formPublishMatch[2] ?? "");
+              const body = await readJson(req).catch(() => ({} as Record<string, unknown>));
+              const result = await this.options.forms!.publish(
+                guildId,
+                name,
+                typeof body.channelId === "string" ? body.channelId : undefined
+              );
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "forms.published",
+                targetType: "form",
+                targetId: name.toLowerCase(),
+                metadata: result
+              });
+              this.json(res, 200, { ok: true, guildId, ...result });
+              return;
+            }
+          }
+
+          const ticketPanelsMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/panels$/);
+          const ticketPanelItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/panels\/(\d+)$/);
+
+          if (ticketPanelsMatch || ticketPanelItemMatch) {
+            if (!this.options.tickets) {
+              this.json(res, 500, { error: "tickets_unavailable" });
+              return;
+            }
+            const guildId = ticketPanelsMatch?.[1] ?? ticketPanelItemMatch?.[1] ?? "";
+            const panelId = ticketPanelItemMatch ? Number(ticketPanelItemMatch[2]) : null;
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) ||
+                (panelId !== null && !Number.isSafeInteger(panelId))) {
+              this.json(res, 404, { error: "guild_or_ticket_panel_not_found" });
+              return;
+            }
+
+            if (method === "GET" && ticketPanelsMatch) {
+              this.json(res, 200, { guildId, panels: await this.options.tickets!.listPanels(guildId) });
+              return;
+            }
+
+            if (method === "POST" && ticketPanelsMatch) {
+              const body = await readJson(req);
+              const input = {
+                channelId: typeof body.channelId === "string" ? body.channelId : "",
+                title: typeof body.title === "string" ? body.title : "",
+                description: typeof body.description === "string" ? body.description : "",
+                buttonLabel: typeof body.buttonLabel === "string" ? body.buttonLabel : "",
+                enabled: body.enabled !== false
+              };
+              const panel = await this.options.tickets!.createPanel(guildId, input);
+              await this.options.auditLog.record({
+                guildId, source: "dashboard", action: "ticket.panel.created",
+                targetType: "ticket-panel", targetId: String((panel as { id: number }).id)
+              });
+              this.json(res, 200, { ok: true, guildId, panel });
+              return;
+            }
+
+            if (method === "PUT" && ticketPanelItemMatch) {
+              const body = await readJson(req);
+              const input: { channelId?: string; title?: string; description?: string; buttonLabel?: string; enabled?: boolean } = {};
+              if (body.channelId !== undefined) {
+                if (typeof body.channelId !== "string") throw new RequestInputError("invalid_ticket_panel", 400);
+                input.channelId = body.channelId;
+              }
+              if (body.title !== undefined) {
+                if (typeof body.title !== "string") throw new RequestInputError("invalid_ticket_panel", 400);
+                input.title = body.title;
+              }
+              if (body.description !== undefined) {
+                if (typeof body.description !== "string") throw new RequestInputError("invalid_ticket_panel", 400);
+                input.description = body.description;
+              }
+              if (body.buttonLabel !== undefined) {
+                if (typeof body.buttonLabel !== "string") throw new RequestInputError("invalid_ticket_panel", 400);
+                input.buttonLabel = body.buttonLabel;
+              }
+              if (body.enabled !== undefined) {
+                if (typeof body.enabled !== "boolean") throw new RequestInputError("invalid_ticket_panel", 400);
+                input.enabled = body.enabled;
+              }
+
+              const panel = await this.options.tickets!.updatePanel(guildId, panelId!, input);
+              if (!panel) {
+                this.json(res, 404, { error: "ticket_panel_not_found" });
+                return;
+              }
+              await this.options.auditLog.record({
+                guildId, source: "dashboard", action: "ticket.panel.updated",
+                targetType: "ticket-panel", targetId: String(panelId)
+              });
+              this.json(res, 200, { ok: true, guildId, panel });
+              return;
+            }
+
+            if (method === "DELETE" && ticketPanelItemMatch) {
+              const deleted = await this.options.tickets!.deletePanel(guildId, panelId!);
+              if (!deleted) {
+                this.json(res, 404, { error: "ticket_panel_not_found" });
+                return;
+              }
+              await this.options.auditLog.record({
+                guildId, source: "dashboard", action: "ticket.panel.deleted",
+                targetType: "ticket-panel", targetId: String(panelId)
+              });
+              this.json(res, 200, { ok: true });
+              return;
+            }
+          }
+
+          const ticketFormMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/form$/);
+          if (ticketFormMatch && !this.options.tickets) {
+            this.json(res, 500, { error: "tickets_unavailable" });
+            return;
+          }
+          if (method === "GET" && ticketFormMatch) {
+            const guildId = ticketFormMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, fields: await this.options.tickets!.getFormFields(guildId) });
+            return;
+          }
+          if (method === "PUT" && ticketFormMatch) {
+            const guildId = ticketFormMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            if (!Array.isArray(body.fields)) throw new RequestInputError("invalid_ticket_form", 400);
+            const fields = await this.options.tickets!.setFormFields(guildId, body.fields as TicketFormField[]);
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "tickets.form.updated",
+              targetType: "ticket-form", targetId: guildId,
+              metadata: { fieldCount: fields.length, fieldIds: fields.map((field) => field.id) }
+            });
+            this.json(res, 200, { ok: true, guildId, fields });
+            return;
+          }
+
+          const ticketSlaMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/sla$/);
+
+          if (ticketSlaMatch && !this.options.tickets) {
+            this.json(res, 500, { error: "tickets_unavailable" });
+            return;
+          }
+
+          if (ticketSlaMatch) {
+            const guildId = ticketSlaMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+
+            if (method === "GET") {
+              this.json(res, 200, { guildId, sla: await this.options.tickets!.getSlaConfig(guildId) });
+              return;
+            }
+
+            if (method === "PUT") {
+              const body = await readJson(req);
+              const allowed = new Set(["enabled","firstResponseMinutes","reminderMinutes","escalationMinutes","escalationRoleId"]);
+              const input: Record<string, unknown> = {};
+              for (const [key,value] of Object.entries(body)) {
+                if (allowed.has(key)) input[key] = value;
+              }
+              if (
+                input.enabled !== undefined && typeof input.enabled !== "boolean" ||
+                input.firstResponseMinutes !== undefined && (typeof input.firstResponseMinutes !== "number" || !Number.isFinite(input.firstResponseMinutes)) ||
+                input.reminderMinutes !== undefined && (typeof input.reminderMinutes !== "number" || !Number.isFinite(input.reminderMinutes)) ||
+                input.escalationMinutes !== undefined && (typeof input.escalationMinutes !== "number" || !Number.isFinite(input.escalationMinutes)) ||
+                input.escalationRoleId !== undefined && input.escalationRoleId !== null && (typeof input.escalationRoleId !== "string" || !/^\d{17,20}$/.test(input.escalationRoleId))
+              ) {
+                throw new RequestInputError("invalid_ticket_sla", 400);
+              }
+              const sla = await this.options.tickets!.setSlaConfig(guildId, input);
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "tickets.sla.updated",
+                targetType: "ticket-sla",
+                targetId: guildId
+              });
+              this.json(res, 200, { guildId, sla });
+              return;
+            }
+          }
+          const ticketCustomizationMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/customization$/);
+          if (ticketCustomizationMatch && !this.options.tickets) {
+            this.json(res, 500, { error: "tickets_unavailable" });
+            return;
+          }
+          if (method === "GET" && ticketCustomizationMatch) {
+            const guildId = ticketCustomizationMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, customization: await this.options.tickets!.getCustomization(guildId) });
+            return;
+          }
+          if (method === "PUT" && ticketCustomizationMatch) {
+            const guildId = ticketCustomizationMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const customization = await this.options.tickets!.setCustomization(guildId, {
+              panelTitle: typeof body.panelTitle === "string" ? body.panelTitle : undefined,
+              panelDescription: typeof body.panelDescription === "string" ? body.panelDescription : undefined,
+              createButtonLabel: typeof body.createButtonLabel === "string" ? body.createButtonLabel : undefined,
+              claimButtonLabel: typeof body.claimButtonLabel === "string" ? body.claimButtonLabel : undefined,
+              closeButtonLabel: typeof body.closeButtonLabel === "string" ? body.closeButtonLabel : undefined
+            });
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "tickets.customization.updated",
+              targetType: "ticket-customization", targetId: guildId,
+              metadata: { keys: Object.keys(body).filter((key) => ["panelTitle","panelDescription","createButtonLabel","claimButtonLabel","closeButtonLabel"].includes(key)) }
+            });
+            this.json(res, 200, { ok: true, guildId, customization });
+            return;
+          }
+
+          const autoResponderMatch = path.match(/^\/api\/guilds\/([^/]+)\/autoresponder$/);
+          const autoResponderItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/autoresponder\/(\d+)$/);
+
+          if ((autoResponderMatch || autoResponderItemMatch) && !this.options.autoResponder) {
+            this.json(res, 500, { error: "autoresponder_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && autoResponderMatch) {
+            const guildId = autoResponderMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, rules: await this.options.autoResponder!.list(guildId) });
+            return;
+          }
+
+          if ((method === "POST" || method === "PUT") && (autoResponderMatch || autoResponderItemMatch)) {
+            const guildId = autoResponderMatch?.[1] ?? autoResponderItemMatch?.[1] ?? "";
+            const id = autoResponderItemMatch ? Number(autoResponderItemMatch[2]) : null;
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || (id !== null && !Number.isSafeInteger(id))) {
+              this.json(res, 404, { error: "guild_or_autoresponder_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const input: AutoResponderInput = {
+              trigger: typeof body.trigger === "string" ? body.trigger : "",
+              matchType: typeof body.matchType === "string" ? body.matchType as AutoResponderInput["matchType"] : "contains",
+              response: typeof body.response === "string" ? body.response : "",
+              enabled: typeof body.enabled === "boolean" ? body.enabled : true,
+              deleteTrigger: typeof body.deleteTrigger === "boolean" ? body.deleteTrigger : false,
+              cooldownSeconds: typeof body.cooldownSeconds === "number" ? body.cooldownSeconds : 0,
+              priority: typeof body.priority === "number" ? body.priority : 0,
+              allowedRoleIds: Array.isArray(body.allowedRoleIds) ? body.allowedRoleIds.filter((v: unknown): v is string => typeof v === "string") : [],
+              ignoredRoleIds: Array.isArray(body.ignoredRoleIds) ? body.ignoredRoleIds.filter((v: unknown): v is string => typeof v === "string") : [],
+              allowedChannelIds: Array.isArray(body.allowedChannelIds) ? body.allowedChannelIds.filter((v: unknown): v is string => typeof v === "string") : [],
+              ignoredChannelIds: Array.isArray(body.ignoredChannelIds) ? body.ignoredChannelIds.filter((v: unknown): v is string => typeof v === "string") : []
+            };
+            const result = id === null
+              ? await this.options.autoResponder!.create(guildId, input)
+              : await this.options.autoResponder!.update(guildId, id, input);
+            if (id !== null && !result) {
+              this.json(res, 404, { error: "autoresponder_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: id === null ? "autoresponder.created" : "autoresponder.updated",
+              targetType: "autoresponder",
+              targetId: String(id ?? (result as { id?: number })?.id ?? "unknown")
+            });
+            this.json(res, 200, { ok: true, rule: result });
+            return;
+          }
+
+          if (method === "DELETE" && autoResponderItemMatch) {
+            const guildId = autoResponderItemMatch[1] ?? "";
+            const id = Number(autoResponderItemMatch[2]);
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !Number.isSafeInteger(id)) {
+              this.json(res, 404, { error: "guild_or_autoresponder_not_found" });
+              return;
+            }
+            const deleted = await this.options.autoResponder!.delete(guildId, id);
+            if (!deleted) {
+              this.json(res, 404, { error: "autoresponder_not_found" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "autoresponder.deleted",
+              targetType: "autoresponder",
+              targetId: String(id)
+            });
+            this.json(res, 200, { ok: true });
             return;
           }
 
@@ -1293,7 +3234,12 @@ export class ManagementApiServer {
               enabled: typeof body.enabled === "boolean" ? body.enabled : true,
               prefixEnabled: typeof body.prefixEnabled === "boolean" ? body.prefixEnabled : true,
               slashEnabled: typeof body.slashEnabled === "boolean" ? body.slashEnabled : false,
-              actionType: body.actionType === "alias" ? ("alias" as const) : ("response" as const),
+              actionType:
+                body.actionType === "alias" ? "alias" as const :
+                body.actionType === "add_role" ? "add_role" as const :
+                body.actionType === "remove_role" ? "remove_role" as const :
+                body.actionType === "toggle_role" ? "toggle_role" as const :
+                "response" as const,
               response: typeof body.response === "string" ? body.response : "",
               aliasTarget: typeof body.aliasTarget === "string" ? body.aliasTarget : null,
               allowedRoleIds: Array.isArray(body.allowedRoleIds) ? body.allowedRoleIds.filter((v: unknown): v is string => typeof v === "string") : [],
@@ -1394,6 +3340,76 @@ export class ManagementApiServer {
             return;
           }
 
+          const onboardingValidateMatch = path.match(/^\/api\/guilds\/([^/]+)\/onboarding\/validate$/);
+          if (onboardingValidateMatch) {
+            if (!this.options.onboarding) {
+              this.json(res, 500, { error: "onboarding_unavailable" });
+              return;
+            }
+            const guildId = onboardingValidateMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (method !== "GET") {
+              this.json(res, 405, { error: "method_not_allowed" });
+              return;
+            }
+            this.json(res, 200, {
+              guildId,
+              validation: await this.options.onboarding.validate(guildId)
+            });
+            return;
+          }
+
+          const onboardingMatch = path.match(/^\/api\/guilds\/([^/]+)\/onboarding$/);
+          if (onboardingMatch) {
+            if (!this.options.onboarding) {
+              this.json(res, 500, { error: "onboarding_unavailable" });
+              return;
+            }
+            const guildId = onboardingMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (method === "GET") {
+              this.json(res, 200, { guildId, flow: await this.options.onboarding.get(guildId) });
+              return;
+            }
+            if (method === "PUT") {
+              const body = await readJson(req);
+              const input: { enabled?: boolean; trigger?: OnboardingTrigger; steps?: OnboardingStep[] } = {};
+              if (body.enabled !== undefined) {
+                if (typeof body.enabled !== "boolean") throw new RequestInputError("invalid_onboarding_enabled", 400);
+                input.enabled = body.enabled;
+              }
+              if (body.trigger !== undefined) {
+                try {
+                  input.trigger = normalizeOnboardingTrigger(body.trigger);
+                } catch {
+                  throw new RequestInputError("invalid_onboarding_trigger", 400);
+                }
+              }
+              if (body.steps !== undefined) {
+                try {
+                  input.steps = normalizeOnboardingSteps(body.steps);
+                } catch (error) {
+                  throw new RequestInputError(error instanceof Error ? error.message : "invalid_onboarding_steps", 400);
+                }
+              }
+              const flow = await this.options.onboarding.set(guildId, input);
+              await this.options.auditLog.record({
+                guildId, source: "dashboard", action: "onboarding.updated",
+                targetType: "onboarding-flow", targetId: guildId,
+                metadata: { enabled: input.enabled, trigger: input.trigger, stepCount: input.steps?.length }
+              });
+              this.json(res, 200, { ok: true, guildId, flow });
+              return;
+            }
+            this.json(res, 405, { error: "method_not_allowed" });
+            return;
+          }
           const settingsMatch = path.match(/^\/api\/guilds\/([^/]+)\/settings\/([^/]+)$/);
           if (settingsMatch) {
             const guildId = settingsMatch[1];
@@ -1445,6 +3461,79 @@ export class ManagementApiServer {
             }
           }
 
+          const roleAutomationMatch = path.match(/^\/api\/guilds\/([^/]+)\/role-automation$/);
+          const roleAutomationItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/role-automation\/(\d+)$/);
+
+          if ((roleAutomationMatch || roleAutomationItemMatch) && !this.options.rolePanels) {
+            this.json(res, 500, { error: "roles_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && roleAutomationMatch) {
+            const guildId = roleAutomationMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, rules: await this.options.rolePanels!.listAutomationRules(guildId) });
+            return;
+          }
+
+          if (method === "POST" && roleAutomationMatch) {
+            const guildId = roleAutomationMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const trigger = body.trigger;
+            const roleId = typeof body.roleId === "string" ? body.roleId : "";
+            const channelId = typeof body.channelId === "string" ? body.channelId : undefined;
+            const delaySeconds = body.delaySeconds === undefined ? 0 : Number(body.delaySeconds);
+            if (
+              typeof trigger !== "string" ||
+              !["member.join","voice.join","voice.leave"].includes(trigger) ||
+              !/^\d{17,20}$/.test(roleId) ||
+              !Number.isInteger(delaySeconds) || delaySeconds < 0 || delaySeconds > 604800
+            ) {
+              throw new RequestInputError("invalid_role_automation",400);
+            }
+            await this.options.rolePanels!.saveAutomationRule(guildId,{
+              trigger: trigger as "member.join" | "voice.join" | "voice.leave",
+              channelId,
+              roleId,
+              delaySeconds,
+              enabled: body.enabled !== false
+            });
+            await this.options.auditLog.record({
+              guildId, source:"dashboard", action:"role.automation.saved",
+              targetType:"role", targetId:roleId,
+              metadata:{trigger,channelId,delaySeconds,enabled:body.enabled !== false}
+            });
+            this.json(res,200,{ok:true});
+            return;
+          }
+
+          if (method === "DELETE" && roleAutomationItemMatch) {
+            const guildId = roleAutomationItemMatch[1] ?? "";
+            const id = Number(roleAutomationItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(id) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res,404,{error:"guild_or_role_automation_not_found"});
+              return;
+            }
+            const deleted = await this.options.rolePanels!.deleteAutomationRule(guildId,id);
+            if (!deleted) {
+              this.json(res,404,{error:"role_automation_not_found"});
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId, source:"dashboard", action:"role.automation.deleted",
+              targetType:"role-automation", targetId:String(id)
+            });
+            this.json(res,200,{ok:true});
+            return;
+          }
+
           const rolePanelsMatch = path.match(/^\/api\/guilds\/([^/]+)\/role-panels$/);
           const rolePanelItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/role-panels\/(\d+)$/);
 
@@ -1466,11 +3555,33 @@ export class ManagementApiServer {
             const channelId = body.channelId;
             const title = body.title;
             const rawRoles = body.roles;
+            const selectionModeValue = body.selectionMode;
+            const selectionMode = typeof selectionModeValue === "string" && ["toggle","exclusive","max"].includes(selectionModeValue)
+              ? selectionModeValue as "toggle" | "exclusive" | "max"
+              : "toggle";
+            const componentTypeValue = body.componentType;
+            const componentType = typeof componentTypeValue === "string" && ["buttons","select"].includes(componentTypeValue)
+              ? componentTypeValue as "buttons" | "select"
+              : "buttons";
+            const maxSelectionsValue = body.maxSelections;
+            const maxSelections = typeof maxSelectionsValue === "number" && Number.isFinite(maxSelectionsValue)
+              ? Math.trunc(maxSelectionsValue)
+              : 1;
+            const durationMinutesValue = body.durationMinutes;
+            const durationMinutes = typeof durationMinutesValue === "number" && Number.isFinite(durationMinutesValue)
+              ? Math.trunc(durationMinutesValue)
+              : 0;
 
             if (
               typeof channelId !== "string" ||
               channelId.length > 64 ||
               (title !== undefined && (typeof title !== "string" || title.length > 100)) ||
+              !["toggle","exclusive","max"].includes(selectionMode) ||
+              !Number.isInteger(maxSelections) ||
+              maxSelections < 1 ||
+              maxSelections > 5 ||
+              durationMinutes < 0 ||
+              durationMinutes > 43200 ||
               !Array.isArray(rawRoles) ||
               rawRoles.length < 1 ||
               rawRoles.length > 5
@@ -1505,11 +3616,23 @@ export class ManagementApiServer {
             const input = {
               channelId,
               title: typeof title === "string" ? title : undefined,
-              roles
+              roles,
+              selectionMode,
+              maxSelections,
+              durationMinutes,
+              componentType
             };
 
             const helpers = {
-              editMessage: async (oldChannelId: string, messageId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => {
+              editMessage: async (
+                oldChannelId: string,
+                messageId: string,
+                content: string,
+                components: Array<
+                  import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder> |
+                  import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>
+                >
+              ) => {
                 const oldChannel = guild.channels.cache.get(oldChannelId);
                 if (!oldChannel || oldChannel.type !== 0) throw new Error("role_panel_old_channel_missing");
                 const message = await oldChannel.messages.fetch(messageId);
@@ -1520,7 +3643,14 @@ export class ManagementApiServer {
                 if (!oldChannel || oldChannel.type !== 0) return;
                 await oldChannel.messages.delete(messageId).catch(() => undefined);
               },
-              sendMessage: async (newChannelId: string, content: string, components: import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder>[]) => {
+              sendMessage: async (
+                newChannelId: string,
+                content: string,
+                components: Array<
+                  import("discord.js").ActionRowBuilder<import("discord.js").ButtonBuilder> |
+                  import("discord.js").ActionRowBuilder<import("discord.js").StringSelectMenuBuilder>
+                >
+              ) => {
                 const target = guild.channels.cache.get(newChannelId);
                 if (!target || target.type !== 0) throw new Error("role_panel_channel_missing");
                 const message = await target.send({ content, components });
@@ -1607,9 +3737,79 @@ export class ManagementApiServer {
               return;
             }
 
+            const source = url.searchParams.get("source") || undefined;
+            if (source && !["discord", "dashboard", "system"].includes(source)) {
+              this.json(res, 400, { error: "invalid_source" });
+              return;
+            }
+
+            const action = url.searchParams.get("action")?.trim() || undefined;
+            if (action && action.length > 120) {
+              this.json(res, 400, { error: "invalid_action_filter" });
+              return;
+            }
+
+            const actorUserId = url.searchParams.get("actorUserId")?.trim() || undefined;
+            if (actorUserId && !/^\\d{17,20}$/.test(actorUserId)) {
+              this.json(res, 400, { error: "invalid_actor_user_id" });
+              return;
+            }
+
+            const before = url.searchParams.get("before") || undefined;
+            if (before && Number.isNaN(new Date(before).getTime())) {
+              this.json(res, 400, { error: "invalid_before" });
+              return;
+            }
+
+            const events = await this.options.auditLog.query(guildId, {
+              limit,
+              source: source as import("./audit.js").AuditEvent["source"] | undefined,
+              action,
+              actorUserId,
+              before
+            });
+
             this.json(res, 200, {
               guildId,
-              events: await this.options.auditLog.recent(guildId, limit)
+              events,
+              nextBefore: events.length === limit ? String((events[events.length - 1] as { created_at?: string })?.created_at ?? "") : null
+            });
+            return;
+          }
+
+          const moduleActivityMatch = path.match(/^\/api\/guilds\/([^/]+)\/modules\/([^/]+)\/activity$/);
+          if (method === "GET" && moduleActivityMatch) {
+            const guildId = moduleActivityMatch[1] ?? "";
+            const moduleKey = moduleActivityMatch[2] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (!MODULE_CATALOG.some((module) => module.key === moduleKey)) {
+              this.json(res, 400, { error: "unknown_module" });
+              return;
+            }
+
+            const limitRaw = url.searchParams.get("limit");
+            const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 40;
+            if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+              this.json(res, 400, { error: "invalid_limit" });
+              return;
+            }
+            const before = url.searchParams.get("before") || undefined;
+            if (before && Number.isNaN(new Date(before).getTime())) {
+              this.json(res, 400, { error: "invalid_before" });
+              return;
+            }
+
+            const events = await this.options.auditLog.moduleActivity(guildId, moduleKey, limit, before);
+            this.json(res, 200, {
+              guildId,
+              moduleKey,
+              events,
+              nextBefore: events.length === limit
+                ? String((events[events.length - 1] as { created_at?: string })?.created_at ?? "")
+                : null
             });
             return;
           }
@@ -1750,66 +3950,26 @@ function validateAutomationPayload(
   guildId: string,
   event: string,
   conditions: unknown[],
-  actions: unknown[]
+  actions: unknown[],
+  depth = 0
 ): void {
   const supportedEvents = new Set([
     "member.join","member.leave","member.role.add","member.role.remove",
-    "message.create","message.delete","message.edit","reaction.add",
+    "message.create","message.delete","message.edit","reaction.add","reaction.remove",
+    "channel.delete","role.delete","member.ban",
     "voice.join","voice.leave","voice.move","moderation.case",
     "ticket.create","ticket.close","giveaway.end","schedule"
   ]);
   if (!supportedEvents.has(event)) throw new RequestInputError("unsupported_automation_event", 400);
+  if (depth > 2) throw new RequestInputError("automation_branch_too_deep", 400);
 
   const guild = client.guilds.cache.get(guildId);
   if (!guild) throw new RequestInputError("guild_not_found", 404);
 
-  const stringFields = new Set(["content","userId","channelId","messageId","guildId"]);
-  const numericFields = new Set(["memberCount","messageLength","mentionCount","previousLength","giveawayId","winnerCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"]);
+  const stringFields = new Set(["content","userId","moderatorUserId","channelId","roleId","action","reason","messageId","guildId","channelType"]);
+  const numericFields = new Set(["memberCount","messageLength","mentionCount","previousLength","caseId","ticketId","giveawayId","winnerCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"]);
 
-  for (const condition of conditions) {
-    if (!condition || typeof condition !== "object" || Array.isArray(condition)) {
-      throw new RequestInputError("invalid_automation_condition", 400);
-    }
-    const item = condition as Record<string, unknown>;
-    switch (item.type) {
-      case "channel-is": {
-        if (typeof item.channelId !== "string" || !/^\\d{17,20}$/.test(item.channelId)) throw new RequestInputError("invalid_condition_channel", 400);
-        const channel = guild.channels.cache.get(item.channelId);
-        if (!channel || !channel.isTextBased()) throw new RequestInputError("invalid_condition_channel", 400);
-        break;
-      }
-      case "contains":
-      case "equals":
-        if (typeof item.left !== "string" || !stringFields.has(item.left) || typeof item.right !== "string" || item.right.length > 200) {
-          throw new RequestInputError("invalid_content_condition", 400);
-        }
-        break;
-      case "matches":
-        if (typeof item.left !== "string" || !stringFields.has(item.left) || typeof item.pattern !== "string" || item.pattern.length > 120) {
-          throw new RequestInputError("invalid_regex_condition", 400);
-        }
-        try { new RegExp(item.pattern); } catch { throw new RequestInputError("invalid_regex_condition", 400); }
-        break;
-      case "number-gte":
-      case "number-lte":
-        if (typeof item.left !== "string" || !numericFields.has(item.left) || typeof item.right !== "number" || !Number.isFinite(item.right)) {
-          throw new RequestInputError("invalid_numeric_condition", 400);
-        }
-        break;
-      case "has-role":
-        if (typeof item.userId !== "string" || (!/^\\d{17,20}$/.test(item.userId)) ||
-            typeof item.roleId !== "string" || !/^\\d{17,20}$/.test(item.roleId) ||
-            !guild.roles.cache.has(item.roleId)) {
-          throw new RequestInputError("invalid_role_condition", 400);
-        }
-        break;
-      case "cooldown-clear":
-        if (typeof item.key !== "string" || !item.key.trim() || item.key.length > 100) throw new RequestInputError("invalid_cooldown_key", 400);
-        break;
-      default:
-        throw new RequestInputError("unsupported_automation_condition", 400);
-    }
-  }
+  for (const condition of conditions) validateAutomationCondition(condition, guild, stringFields, numericFields);
 
   for (const action of actions) {
     if (!action || typeof action !== "object" || Array.isArray(action)) {
@@ -1821,59 +3981,186 @@ function validateAutomationPayload(
         if (typeof item.message !== "string" || !item.message.length || item.message.length > 1000) throw new RequestInputError("invalid_log_action", 400);
         break;
       case "send-message": {
-        if (typeof item.channelId !== "string" || typeof item.content !== "string" || !item.content.length || item.content.length > 2000) {
-          throw new RequestInputError("invalid_send_message_action", 400);
-        }
+        if (typeof item.channelId !== "string" || typeof item.content !== "string" || !item.content.length || item.content.length > 2000) throw new RequestInputError("invalid_send_message_action", 400);
         const channel = guild.channels.cache.get(item.channelId);
         if (!channel || channel.type !== 0) throw new RequestInputError("invalid_send_message_channel", 400);
         break;
       }
       case "dm-user":
-        if (typeof item.userId !== "string" || (item.userId !== "@event" && !/^\\d{17,20}$/.test(item.userId)) ||
-            typeof item.content !== "string" || !item.content.length || item.content.length > 2000) {
-          throw new RequestInputError("invalid_dm_action", 400);
-        }
+        if (!isAutomationUserRef(item.userId) || typeof item.content !== "string" || !item.content.length || item.content.length > 2000) throw new RequestInputError("invalid_dm_action", 400);
         break;
       case "add-role":
       case "remove-role":
-        if (typeof item.userId !== "string" || (item.userId !== "@event" && !/^\\d{17,20}$/.test(item.userId)) ||
-            typeof item.roleId !== "string" || !/^\\d{17,20}$/.test(item.roleId) ||
-            !guild.roles.cache.get(item.roleId)) {
-          throw new RequestInputError("invalid_role_action", 400);
-        }
+        if (!isAutomationUserRef(item.userId) || typeof item.roleId !== "string" || !/^\\d{17,20}$/.test(item.roleId) || !guild.roles.cache.get(item.roleId)) throw new RequestInputError("invalid_role_action", 400);
         break;
       case "timeout":
-        if (typeof item.userId !== "string" || (item.userId !== "@event" && !/^\\d{17,20}$/.test(item.userId)) ||
-            typeof item.durationSeconds !== "number" || !Number.isInteger(item.durationSeconds) || item.durationSeconds < 1 || item.durationSeconds > 2419200 ||
-            typeof item.reason !== "string" || !item.reason.length || item.reason.length > 500) {
-          throw new RequestInputError("invalid_timeout_action", 400);
+        if (!isAutomationUserRef(item.userId) || typeof item.durationSeconds !== "number" || !Number.isInteger(item.durationSeconds) || item.durationSeconds < 1 || item.durationSeconds > 2419200 || typeof item.reason !== "string" || !item.reason.length || item.reason.length > 500) throw new RequestInputError("invalid_timeout_action", 400);
+        break;
+      case "warn":
+      case "kick":
+        if (!isAutomationUserRef(item.userId) || typeof item.reason !== "string" || !item.reason.length || item.reason.length > 500) throw new RequestInputError("invalid_" + item.type + "_action", 400);
+        break;
+      case "ban":
+        if (!isAutomationUserRef(item.userId) || typeof item.reason !== "string" || !item.reason.length || item.reason.length > 500 ||
+            (item.durationMinutes !== undefined && (typeof item.durationMinutes !== "number" || !Number.isInteger(item.durationMinutes) || item.durationMinutes < 1 || item.durationMinutes > 40320))) {
+          throw new RequestInputError("invalid_ban_action", 400);
         }
         break;
-      case "delete-message": {
-        if (typeof item.channelId !== "string" || (item.channelId !== "@event" && !/^\\d{17,20}$/.test(item.channelId)) ||
-            typeof item.messageId !== "string" || (item.messageId !== "@event" && !/^\\d{17,20}$/.test(item.messageId))) {
-          throw new RequestInputError("invalid_delete_message_action", 400);
-        }
+      case "delete-message":
+        if (typeof item.channelId !== "string" || (item.channelId !== "@event" && !/^\d{17,20}$/.test(item.channelId)) ||
+            typeof item.messageId !== "string" || (item.messageId !== "@event" && !/^\d{17,20}$/.test(item.messageId))) throw new RequestInputError("invalid_delete_message_action", 400);
         if (item.channelId !== "@event") {
           const channel = guild.channels.cache.get(item.channelId);
           if (!channel || !channel.isTextBased()) throw new RequestInputError("invalid_delete_message_channel", 400);
         }
         break;
+      case "set-nickname":
+        if (!isAutomationUserRef(item.userId) ||
+            (item.nickname !== null && (typeof item.nickname !== "string" || item.nickname.length > 32))) {
+          throw new RequestInputError("invalid_set_nickname_action", 400);
+        }
+        break;
+      case "react-message":
+        if (!isAutomationResourceRef(item.channelId) || !isAutomationResourceRef(item.messageId) ||
+            typeof item.emoji !== "string" || !item.emoji.trim() || item.emoji.length > 100) {
+          throw new RequestInputError("invalid_react_message_action", 400);
+        }
+        if (item.channelId !== "@event") {
+          const channel = guild.channels.cache.get(item.channelId as string);
+          if (!channel || !channel.isTextBased()) throw new RequestInputError("invalid_react_message_channel", 400);
+        }
+        break;
+      case "ticket-close":
+        if (typeof item.ticketId !== "string" || (item.ticketId !== "@event" && !/^\d{1,12}$/.test(item.ticketId))) {
+          throw new RequestInputError("invalid_ticket_close_action", 400);
+        }
+        break;
+      case "giveaway-end":
+      case "giveaway-reroll":
+        if (typeof item.giveawayId !== "number" || !Number.isSafeInteger(item.giveawayId) || item.giveawayId < 1) {
+          throw new RequestInputError("invalid_giveaway_action", 400);
+        }
+        break;
+      case "notification-feed-toggle":
+        if (typeof item.feedId !== "number" || !Number.isSafeInteger(item.feedId) || item.feedId < 1 || typeof item.enabled !== "boolean") {
+          throw new RequestInputError("invalid_notification_feed_action", 400);
+        }
+        break;
+      case "music-control": {
+        const validMusicActions = ["pause","resume","skip","stop","shuffle","repeat","seek","volume","autoplay"];
+        if (typeof item.action !== "string" || !validMusicActions.includes(item.action)) {
+          throw new RequestInputError("invalid_music_control_action", 400);
+        }
+        if (item.action === "repeat" && (typeof item.mode !== "string" || !["off","track","queue"].includes(item.mode))) {
+          throw new RequestInputError("invalid_music_repeat_mode", 400);
+        }
+        if (item.action === "autoplay" && typeof item.enabled !== "boolean") {
+          throw new RequestInputError("invalid_music_autoplay", 400);
+        }
+        if (item.action === "seek" && (typeof item.value !== "number" || !Number.isInteger(item.value) || item.value < 0 || item.value > 86400)) {
+          throw new RequestInputError("invalid_music_seek", 400);
+        }
+        if (item.action === "volume" && (typeof item.value !== "number" || !Number.isInteger(item.value) || item.value < 0 || item.value > 200)) {
+          throw new RequestInputError("invalid_music_volume", 400);
+        }
+        break;
       }
+      case "delay":
+        if (typeof item.seconds !== "number" || !Number.isInteger(item.seconds) || item.seconds < 1 || item.seconds > 3600) throw new RequestInputError("invalid_delay_action", 400);
+        break;
+      case "webhook":
+        if (typeof item.url !== "string" || !/^https:\/\/[^\s<>]+$/i.test(item.url) || item.url.length > 2000 ||
+            typeof item.content !== "string" || !item.content.length || item.content.length > 2000) throw new RequestInputError("invalid_webhook_action", 400);
+        break;
+      case "branch":
+        if (!item.condition || typeof item.condition !== "object" || Array.isArray(item.condition) ||
+            !Array.isArray(item.thenActions) || item.thenActions.length < 1 || item.thenActions.length > 10 ||
+            !Array.isArray(item.elseActions) || item.elseActions.length > 10) {
+          throw new RequestInputError("invalid_branch_action", 400);
+        }
+        validateAutomationCondition(item.condition, guild, stringFields, numericFields);
+        validateAutomationPayload(client, guildId, event, [], item.thenActions, depth + 1);
+        if (item.elseActions.length > 0) validateAutomationPayload(client, guildId, event, [], item.elseActions, depth + 1);
+        break;
       default:
         throw new RequestInputError("unsupported_automation_action", 400);
     }
   }
+
+  function isAutomationUserRef(value: unknown): value is string {
+    return typeof value === "string" && (value === "@event" || /^\d{17,20}$/.test(value));
+  }
+
+  function isAutomationResourceRef(value: unknown): value is string {
+    return typeof value === "string" && (value === "@event" || /^\d{17,20}$/.test(value));
+  }
+
+  function validateAutomationCondition(
+    condition: unknown,
+    currentGuild: import("discord.js").Guild,
+    allowedStringFields: Set<string>,
+    allowedNumericFields: Set<string>
+  ): void {
+    if (!condition || typeof condition !== "object" || Array.isArray(condition)) throw new RequestInputError("invalid_automation_condition", 400);
+    const item = condition as Record<string, unknown>;
+    switch (item.type) {
+      case "channel-is": {
+        if (typeof item.channelId !== "string" || !/^\d{17,20}$/.test(item.channelId)) throw new RequestInputError("invalid_condition_channel", 400);
+        const channel = currentGuild.channels.cache.get(item.channelId);
+        if (!channel || !channel.isTextBased()) throw new RequestInputError("invalid_condition_channel", 400);
+        break;
+      }
+      case "contains":
+      case "equals":
+        if (typeof item.left !== "string" || !allowedStringFields.has(item.left) || typeof item.right !== "string" || item.right.length > 200) throw new RequestInputError("invalid_content_condition", 400);
+        break;
+      case "matches":
+        if (typeof item.left !== "string" || !allowedStringFields.has(item.left) || typeof item.pattern !== "string" || item.pattern.length > 120) throw new RequestInputError("invalid_regex_condition", 400);
+        try { new RegExp(item.pattern); } catch { throw new RequestInputError("invalid_regex_condition", 400); }
+        break;
+      case "number-gte":
+      case "number-lte":
+        if (typeof item.left !== "string" || !allowedNumericFields.has(item.left) || typeof item.right !== "number" || !Number.isFinite(item.right)) throw new RequestInputError("invalid_numeric_condition", 400);
+        break;
+      case "has-role":
+      case "not-has-role":
+        if (!isAutomationUserRef(item.userId) ||
+            typeof item.roleId !== "string" || !/^\d{17,20}$/.test(item.roleId) || !currentGuild.roles.cache.has(item.roleId)) throw new RequestInputError("invalid_role_condition", 400);
+        break;
+      case "channel-type-is":
+        if (typeof item.channelType !== "string" ||
+            !["text","announcement","forum","voice","stage","category","thread","other"].includes(item.channelType)) {
+          throw new RequestInputError("invalid_channel_type_condition", 400);
+        }
+        break;
+      case "user-is-bot":
+        if (!isAutomationUserRef(item.userId) || typeof item.value !== "boolean") {
+          throw new RequestInputError("invalid_user_bot_condition", 400);
+        }
+        break;
+      case "has-permission":
+        if (!isAutomationUserRef(item.userId) || typeof item.permission !== "string" ||
+            !["Administrator","ManageGuild","ManageChannels","ManageRoles","ManageMessages","KickMembers","BanMembers","ModerateMembers"].includes(item.permission)) {
+          throw new RequestInputError("invalid_permission_condition", 400);
+        }
+        break;
+      case "cooldown-clear":
+        if (typeof item.key !== "string" || !item.key.trim() || item.key.length > 100) throw new RequestInputError("invalid_cooldown_key", 400);
+        break;
+      default:
+        throw new RequestInputError("unsupported_automation_condition", 400);
+    }
+  }
 }
 
-async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function readJson(req: IncomingMessage, maxBytes = 64 * 1024): Promise<Record<string, unknown>> {
   let size = 0;
   const chunks: Buffer[] = [];
 
   for await (const chunk of req) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += buffer.length;
-    if (size > 64 * 1024) {
+    if (size > maxBytes) {
       throw new RequestInputError("request_too_large", 413);
     }
     chunks.push(buffer);

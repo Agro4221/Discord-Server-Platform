@@ -32,9 +32,22 @@ export type CommandDefinition = {
 export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
   { name: "help", label: "Help", module: "system", prefix: true, slash: true },
   { name: "ping", label: "Ping", module: "system", prefix: false, slash: true },
+  { name: "serverinfo", label: "Server info", module: "system", prefix: true, slash: true },
+  { name: "userinfo", label: "User info", module: "system", prefix: true, slash: true },
+  { name: "roleinfo", label: "Role info", module: "system", prefix: true, slash: true },
+  { name: "channelinfo", label: "Channel info", module: "system", prefix: true, slash: true },
+  { name: "embed", label: "Embed Builder", module: "system", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: false, slash: true },
   { name: "level", label: "Level", module: "leveling", prefix: true, slash: true },
   { name: "rank", label: "Rank", module: "leveling", prefix: true, slash: true },
   { name: "top", label: "Top", module: "leveling", prefix: true, slash: true },
+  { name: "stats", label: "Server statistics", module: "analytics", prefix: false, slash: true },
+  { name: "poll", label: "Polls", module: "polls", prefix: true, slash: true },
+  { name: "suggestion", label: "Suggestions", module: "polls", prefix: true, slash: true },
+  { name: "invites", label: "Invite statistics", module: "invite-tracking", prefix: true, slash: true },
+  { name: "achievements", label: "Achievements", module: "birthdays", prefix: true, slash: true },
+  { name: "birthday", label: "Birthdays", module: "birthdays", prefix: true, slash: true },
+  { name: "rep", label: "Reputation", module: "reputation", prefix: true, slash: true },
+  { name: "profile", label: "Profile", module: "reputation", prefix: true, slash: true },
   { name: "history", label: "Moderation history", module: "moderation", requiredPermission: PermissionFlagsBits.ModerateMembers, prefix: true, slash: false },
   { name: "clear", label: "Clear messages", module: "moderation", requiredPermission: PermissionFlagsBits.ManageMessages, prefix: true, slash: true },
   { name: "slowmode", label: "Slowmode", module: "moderation", requiredPermission: PermissionFlagsBits.ManageChannels, prefix: true, slash: true },
@@ -52,15 +65,19 @@ export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
   { name: "security", label: "Security", module: "security", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true },
   { name: "verify", label: "Verification", module: "verification", prefix: true, slash: true },
   { name: "ticket", label: "Tickets", module: "tickets", prefix: true, slash: true },
+  { name: "form", label: "Reusable forms", module: "forms", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: false, slash: true },
   { name: "roles", label: "Role panels", module: "roles", requiredPermission: PermissionFlagsBits.ManageRoles, prefix: true, slash: true },
-  { name: "giveaway", label: "Giveaways", module: "giveaways", prefix: true, slash: true },
+  { name: "giveaway", label: "Giveaways", module: "giveaways", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true },
   { name: "economy", label: "Economy", module: "economy", prefix: true, slash: true },
   { name: "shop", label: "Economy shop", module: "economy", prefix: true, slash: true },
+  { name: "afk", label: "AFK / Away", module: "reminders", prefix: true, slash: true },
   { name: "remind", label: "Reminder", module: "reminders", prefix: true, slash: true },
-  { name: "ticket", label: "Ticket", module: "tickets", prefix: true, slash: true },
+  { name: "schedule", label: "Scheduled message", module: "reminders", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true },
+  { name: "sticky", label: "Sticky message", module: "reminders", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true },
   { name: "starboard", label: "Starboard", module: "starboard", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true },
   { name: "analytics", label: "Analytics", module: "analytics", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: false, slash: true },
   { name: "feed", label: "Notifications", module: "notifications", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: true, slash: true },
+  { name: "streamalert", label: "Stream alerts", module: "notifications", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: false, slash: true },
   { name: "music", label: "Music group", module: "music", prefix: true, slash: true },
   { name: "play", label: "Play", module: "music", prefix: true, slash: true },
   { name: "pause", label: "Pause", module: "music", prefix: true, slash: true },
@@ -71,10 +88,20 @@ export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
   { name: "queue", label: "Queue", module: "music", prefix: true, slash: true },
   { name: "playlist", label: "Playlist", module: "music", prefix: true, slash: true },
   { name: "nowplaying", label: "Now Playing", module: "music", prefix: true, slash: true },
+  { name: "previous", label: "Previous", module: "music", prefix: true, slash: true },
+  { name: "lyrics", label: "Lyrics", module: "music", prefix: true, slash: true },
+  { name: "favorite", label: "Favorite", module: "music", prefix: false, slash: true },
+  { name: "filter", label: "Filter", module: "music", prefix: false, slash: true },
+  { name: "queue-policy", label: "Queue access policy", module: "music", requiredPermission: PermissionFlagsBits.ManageGuild, prefix: false, slash: true },
+  { name: "247", label: "24/7", module: "music", prefix: false, slash: true },
+  { name: "providers", label: "Music providers", module: "music", prefix: false, slash: true },
   { name: "repeat", label: "Repeat", module: "music", prefix: true, slash: true },
   { name: "seek", label: "Seek", module: "music", prefix: true, slash: true },
   { name: "volume", label: "Volume", module: "music", prefix: true, slash: true },
   { name: "autoplay", label: "Autoplay", module: "music", prefix: true, slash: true },
+  { name: "queue-add", label: "Music queue — add", module: "music", prefix: false, slash: false },
+  { name: "queue-remove", label: "Music queue — remove", module: "music", prefix: false, slash: false },
+  { name: "queue-move", label: "Music queue — move", module: "music", prefix: false, slash: false },
   { name: "balance", label: "Balance", module: "economy", prefix: true, slash: false },
   { name: "daily", label: "Daily", module: "economy", prefix: true, slash: false },
   { name: "leaderboard", label: "Economy leaderboard", module: "economy", prefix: true, slash: false },
@@ -232,6 +259,31 @@ export class CommandPolicyService {
     }
 
     return this.acquireCooldown(policy, interaction.guildId!, interaction.user.id);
+  }
+
+  async hasStoredPolicy(guildId: string, commandName: string): Promise<boolean> {
+    const result = await this.db.query(
+      "SELECT 1 FROM command_policies WHERE guild_id=$1 AND command_name=$2 LIMIT 1",
+      [guildId, commandName]
+    );
+    return result.rows.length > 0;
+  }
+
+  async checkMemberAction(
+    guildId: string,
+    commandName: string,
+    member: import("discord.js").GuildMember,
+    channelId: string
+  ): Promise<boolean> {
+    const policy = await this.get(guildId, commandName);
+    if (!policy.enabled) return false;
+
+    const definition = COMMAND_DEFINITIONS.find((item) => item.name === commandName);
+    if (definition?.requiredPermission && !member.permissions.has(definition.requiredPermission)) {
+      return false;
+    }
+
+    return passesScope(policy, member.roles.cache.map((role) => role.id), channelId);
   }
 
   async checkMessage(message: Message, commandName: string): Promise<boolean> {

@@ -1,6 +1,7 @@
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, chunkMusicFilterActions, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicSearchProvider, resolveMusicSearchRequest, chunkMusicLyrics, musicLyricsPageCount, normalizeMusicLyricsPage, isValidMusicLyricsPage, normalizeMusicTimedLyrics, findMusicTimedLyricIndex, formatMusicSyncedLyrics, normalizeMusicPitch, normalizeMusicSpeed, normalizeMusicEqBand, normalizeMusicEqGain, MUSIC_EQ_BAND_COUNT, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canControlMusic, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
+import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd, toggleMusicDistortion } from "../src/modules/music.js";
 
 test("music controls require the same voice channel unless Manage Server is granted", () => {
   assert.equal(canControlMusic("voice-1", "voice-1", false), true);
@@ -9,6 +10,18 @@ test("music controls require the same voice channel unless Manage Server is gran
   assert.equal(canControlMusic("voice-2", null, false), false);
   assert.equal(canControlMusic(null, "voice-1", true), true);
   assert.equal(canControlMusic("voice-2", "voice-1", true), true);
+});
+
+test("Music playlist visibility normalizes to personal or shared", async () => {
+  assert.equal(normalizeMusicPlaylistVisibility(false), "personal");
+  assert.equal(normalizeMusicPlaylistVisibility(true), "shared");
+});
+
+test("Music request approval mode accepts only off or approval", () => {
+  assert.equal(normalizeMusicRequestApprovalMode("off"), "off");
+  assert.equal(normalizeMusicRequestApprovalMode("approval"), "approval");
+  assert.equal(normalizeMusicRequestApprovalMode("APPROVAL"), null);
+  assert.equal(normalizeMusicRequestApprovalMode("anything"), null);
 });
 
 test("Music repeat mode validator accepts only supported modes", () => {
@@ -42,4 +55,682 @@ test("Music node health is degraded only when every Lavalink node is unavailable
   assert.equal(musicNodeHealth(2), "ready");
 });
 
+test("Music failover requires a different connected node", () => {
+  assert.equal(canFailoverMusicNode("local", []), false);
+  assert.equal(canFailoverMusicNode("local", ["local"]), false);
+  assert.equal(canFailoverMusicNode("local", ["local-2"]), true);
+  assert.equal(canFailoverMusicNode("local", ["local", "local-2"]), true);
+});
 
+
+
+
+test("Music repeat controller cycles through off, track and queue", () => {
+  assert.equal(nextMusicRepeatMode("off"), "track");
+  assert.equal(nextMusicRepeatMode("track"), "queue");
+  assert.equal(nextMusicRepeatMode("queue"), "off");
+});
+
+test("Music volume controller clamps values to the Discord player range", () => {
+  assert.equal(clampMusicVolume(-10), 0);
+  assert.equal(clampMusicVolume(105), 105);
+  assert.equal(clampMusicVolume(999), 200);
+});
+
+test("Music controller separates queue loop from Loop One", () => {
+  assert.equal(nextMusicQueueRepeatMode("off"), "queue");
+  assert.equal(nextMusicQueueRepeatMode("queue"), "off");
+  assert.equal(nextMusicQueueRepeatMode("track"), "queue");
+});
+
+test("Music progress formatter handles paused and live tracks", () => {
+  const track = { info: { duration: 125000 } } as never;
+  const pausedPlayer = { paused: true, lastPosition: 65000, lastPositionChange: Date.now() - 5000 } as never;
+  assert.equal(formatTrackProgress(pausedPlayer, track), "`1:05 / 2:05`");
+
+  const liveTrack = { info: { duration: 0 } } as never;
+  const livePlayer = { paused: true, lastPosition: 5000 } as never;
+  assert.equal(formatTrackProgress(livePlayer, liveTrack), "`0:05 / live`");
+});
+
+test("Music skip-to keeps the selected queued track at the front", () => {
+  const queue = ["one", "two", "three"];
+  const target = trimMusicQueueToPosition(queue, 2);
+  assert.equal(target, "two");
+  assert.deepEqual(queue, ["two", "three"]);
+  assert.equal(trimMusicQueueToPosition(queue, 0), null);
+  assert.deepEqual(queue, ["two", "three"]);
+});
+
+
+test("music search selection accepts only existing result indexes", async () => {
+  const { isValidMusicSearchSelection } = await import("../src/modules/music.js");
+  assert.equal(isValidMusicSearchSelection(0, 5), true);
+  assert.equal(isValidMusicSearchSelection(4, 5), true);
+  assert.equal(isValidMusicSearchSelection(-1, 5), false);
+  assert.equal(isValidMusicSearchSelection(5, 5), false);
+  assert.equal(isValidMusicSearchSelection(1.5, 5), false);
+});
+
+
+test("music queue export contains safe track metadata", async () => {
+  const { buildMusicQueueExport, buildMusicQueueShare } = await import("../src/modules/music.js");
+  const tracks = [
+    {
+      info: {
+        identifier: "abc",
+        title: "Song",
+        author: "Artist",
+        duration: 123000,
+        uri: "https://youtube.com/watch?v=abc"
+      },
+      requester: { id: "123456789012345678" }
+    }
+  ] as never;
+
+  const payload = JSON.parse(buildMusicQueueExport(tracks)) as {
+    schemaVersion: number;
+    tracks: Array<Record<string, unknown>>;
+  };
+  assert.equal(payload.schemaVersion, 1);
+  assert.equal(payload.tracks[0]?.title, "Song");
+  assert.equal(payload.tracks[0]?.requesterId, "123456789012345678");
+  assert.equal(payload.tracks[0]?.secret, undefined);
+
+  const shared = buildMusicQueueShare(tracks);
+  assert.match(shared, /Song/);
+  assert.match(shared, /Artist/);
+  assert.match(shared, /youtube\.com/);
+});
+
+test("music queue share truncates safely for long queues", async () => {
+  const { buildMusicQueueShare } = await import("../src/modules/music.js");
+  const tracks = Array.from({ length: 100 }, (_, index) => ({
+    info: {
+      identifier: "id-" + index,
+      title: "Very long track title " + index + " ".repeat(15),
+      author: "Artist"
+    }
+  })) as never;
+
+  const shared = buildMusicQueueShare(tracks);
+  assert.equal(shared.length <= 1900, true);
+  assert.match(shared, /используй|export/i);
+});
+
+
+test("music quick filter actions allow only known presets", async () => {
+  const { isMusicFilterAction } = await import("../src/modules/music.js");
+  for (const action of [
+    "clear",
+    "bassboost-low",
+    "bassboost-medium",
+    "bassboost-high",
+    "rock",
+    "classic",
+    "pop",
+    "electronic",
+    "fullsound",
+    "karaoke",
+    "tremolo",
+    "vibrato",
+    "distortion",
+    "lowpass",
+    "channelmix",
+    "gaming",
+    "nightcore",
+    "8d"
+  ]) {
+    assert.equal(isMusicFilterAction(action), true, action);
+  }
+  for (const action of ["unknown", "volume", "seek"]) {
+    assert.equal(isMusicFilterAction(action), false, action);
+  }
+});
+
+
+test("Music Custom EQ normalizes a 15-band range and Lavalink gain bounds", () => {
+  assert.equal(MUSIC_EQ_BAND_COUNT, 15);
+  assert.equal(normalizeMusicEqBand(0), 0);
+  assert.equal(normalizeMusicEqBand(14), 14);
+  assert.equal(normalizeMusicEqBand(-1), null);
+  assert.equal(normalizeMusicEqBand(15), null);
+  assert.equal(normalizeMusicEqGain(-0.25), -0.25);
+  assert.equal(normalizeMusicEqGain(1), 1);
+  assert.equal(normalizeMusicEqGain(0.12349), 0.123);
+  assert.equal(normalizeMusicEqGain(-0.251), null);
+  assert.equal(normalizeMusicEqGain(1.001), null);
+});
+
+test("Music filter palette keeps every Discord action row at five buttons or fewer", () => {
+  const chunks = chunkMusicFilterActions([
+    "clear",
+    "bassboost-low",
+    "bassboost-medium",
+    "bassboost-high",
+    "rock",
+    "classic",
+    "pop",
+    "electronic",
+    "fullsound",
+    "karaoke",
+    "tremolo",
+    "vibrato",
+    "distortion",
+    "lowpass",
+    "channelmix",
+    "gaming",
+    "nightcore",
+    "8d"
+  ]);
+  assert.deepEqual(chunks.map((chunk) => chunk.length), [5, 5, 5, 3]);
+  assert.equal(chunks.every((chunk) => chunk.length <= 5), true);
+});
+
+test("Music distortion toggle produces a Lavalink-compatible distortion payload", () => {
+  const enabled = toggleMusicDistortion(undefined);
+  assert.deepEqual(enabled, {
+    sinOffset: 0.4,
+    sinScale: 1.5,
+    cosOffset: 0.4,
+    cosScale: 1.5,
+    tanOffset: 0.4,
+    tanScale: 1.5,
+    offset: 0.4,
+    scale: 1.5
+  });
+  assert.equal(toggleMusicDistortion(enabled), null);
+  assert.equal(toggleMusicDistortion(null) !== null, true);
+});
+
+test("Music playlist snapshot keeps current track first and caps at 500", () => {
+  const queued = Array.from({ length: 600 }, (_, index) => "Q" + index);
+  const snapshot = buildMusicPlaylistSnapshot("CURRENT", queued);
+  assert.equal(snapshot.length, 500);
+  assert.equal(snapshot[0], "CURRENT");
+  assert.equal(snapshot[499], "Q498");
+  assert.notEqual(snapshot, queued);
+});
+
+test("Music playlist import URL accepts only HTTP(S)", () => {
+  assert.equal(normalizeMusicPlaylistImportUrl("https://example.com/playlist?id=42"), "https://example.com/playlist?id=42");
+  assert.equal(normalizeMusicPlaylistImportUrl(" http://example.com/list "), "http://example.com/list");
+  assert.equal(normalizeMusicPlaylistImportUrl("ftp://example.com/list"), null);
+  assert.equal(normalizeMusicPlaylistImportUrl("not a url"), null);
+});
+
+test("Music playlist search normalizes input", () => {
+  assert.equal(normalizeMusicPlaylistSearch("  evening set  "), "evening set");
+  assert.equal(normalizeMusicPlaylistSearch("   "), null);
+  assert.equal(normalizeMusicPlaylistSearch("x".repeat(100))?.length, 80);
+});
+
+test("Music playlist track removal and movement preserve order", () => {
+  const tracks = ["A", "B", "C", "D"];
+  assert.deepEqual(removeMusicPlaylistTrack(tracks, 2), ["A", "C", "D"]);
+  assert.deepEqual(removeMusicPlaylistTrack(tracks, 0), null);
+  assert.deepEqual(removeMusicPlaylistTrack(tracks, 5), null);
+  assert.deepEqual(moveMusicPlaylistTrack(tracks, 4, 2), ["A", "D", "B", "C"]);
+  assert.deepEqual(moveMusicPlaylistTrack(tracks, 1, 4), ["B", "C", "D", "A"]);
+  assert.deepEqual(moveMusicPlaylistTrack(tracks, 2, 2), ["A", "B", "C", "D"]);
+  assert.deepEqual(moveMusicPlaylistTrack(tracks, 1, 5), null);
+  assert.deepEqual(tracks, ["A", "B", "C", "D"]);
+});
+
+test("music playlist names normalize whitespace and reject blanks", async () => {
+  const { normalizeMusicPlaylistName } = await import("../src/modules/music.js");
+  assert.equal(normalizeMusicPlaylistName("  Evening   Set  "), "Evening Set");
+  assert.equal(normalizeMusicPlaylistName(""), null);
+  assert.equal(normalizeMusicPlaylistName("   "), null);
+  assert.equal(normalizeMusicPlaylistName("x".repeat(100))?.length, 80);
+});
+
+
+test("Music playlist continuation batches preserve order and finish at the end", () => {
+  const order = [4, 1, 7, 2, 0];
+  assert.deepEqual(musicPlaylistContinuationBatch(order, 0, 2), { indexes: [4, 1], nextIndex: 2, done: false });
+  assert.deepEqual(musicPlaylistContinuationBatch(order, 2, 2), { indexes: [7, 2], nextIndex: 4, done: false });
+  assert.deepEqual(musicPlaylistContinuationBatch(order, 4, 2), { indexes: [0], nextIndex: 5, done: true });
+  assert.deepEqual(musicPlaylistContinuationBatch(order, 9, 2), { indexes: [], nextIndex: 5, done: true });
+});
+
+test("Music playlist pagination stays within page bounds", () => {
+  assert.equal(MUSIC_PLAYLIST_PAGE_SIZE, 25);
+  assert.equal(musicPlaylistPageCount(0), 1);
+  assert.equal(musicPlaylistPageCount(25), 1);
+  assert.equal(musicPlaylistPageCount(26), 2);
+  assert.equal(musicPlaylistPageCount(500), 20);
+  assert.equal(normalizeMusicPlaylistPage(-2, 3), 0);
+  assert.equal(normalizeMusicPlaylistPage(9, 3), 2);
+  assert.equal(isValidMusicPlaylistPage(0, 3), true);
+  assert.equal(isValidMusicPlaylistPage(2, 3), true);
+  assert.equal(isValidMusicPlaylistPage(3, 3), false);
+  assert.equal(isValidMusicPlaylistPage(1.5, 3), false);
+});
+
+test("favorite play shortcut validates 1-based positions within the visible 25 favorites", () => {
+  assert.equal(isValidMusicSavedPosition(1, 25), true);
+  assert.equal(isValidMusicSavedPosition(25, 25), true);
+  assert.equal(isValidMusicSavedPosition(26, 25), false);
+  assert.equal(isValidMusicSavedPosition(0, 25), false);
+  assert.equal(isValidMusicSavedPosition(1.5, 25), false);
+  assert.equal(isValidMusicSavedPosition(3, 2), false);
+});
+
+test("music playlist shuffle returns a copy without mutating source", async () => {
+  const { shuffleMusicItems } = await import("../src/modules/music.js");
+  const source = [1, 2, 3, 4, 5];
+  const shuffled = shuffleMusicItems(source);
+  assert.notEqual(shuffled, source);
+  assert.deepEqual(source, [1, 2, 3, 4, 5]);
+  assert.deepEqual([...shuffled].sort((a, b) => a - b), source);
+});
+
+
+test("music vote skip threshold scales with human listeners", async () => {
+  const { voteSkipThreshold } = await import("../src/modules/music.js");
+  assert.equal(voteSkipThreshold(1), 1);
+  assert.equal(voteSkipThreshold(2), 2);
+  assert.equal(voteSkipThreshold(3), 2);
+  assert.equal(voteSkipThreshold(5), 3);
+  assert.equal(voteSkipThreshold(10), 6);
+});
+
+
+test("music request cooldown reports only positive remaining time", async () => {
+  const { remainingMusicRequestCooldown } = await import("../src/modules/music.js");
+  assert.equal(remainingMusicRequestCooldown(10_500, 10_000), 500);
+  assert.equal(remainingMusicRequestCooldown(10_000, 10_500), 0);
+  assert.equal(remainingMusicRequestCooldown(10_000, 10_000), 0);
+});
+
+
+test("music per-user queue limit helpers enforce bounds and available slots", async () => {
+  const {
+    normalizeMusicQueueLimit,
+    countMusicQueuedByUser,
+    remainingMusicQueueSlots
+  } = await import("../src/modules/music.js");
+
+  assert.equal(normalizeMusicQueueLimit(-5), 0);
+  assert.equal(normalizeMusicQueueLimit(10.9), 10);
+  assert.equal(normalizeMusicQueueLimit(999), 100);
+  assert.equal(normalizeMusicQueueLimit(Number.NaN), 10);
+
+  const tracks = [
+    { requester: { id: "u1" } },
+    { requester: { id: "u2" } },
+    { requester: { id: "u1" } }
+  ];
+  assert.equal(countMusicQueuedByUser(tracks, "u1"), 2);
+  assert.equal(countMusicQueuedByUser(tracks, "u3"), 0);
+  assert.equal(remainingMusicQueueSlots(2, 10), 8);
+  assert.equal(remainingMusicQueueSlots(10, 10), 0);
+  assert.equal(remainingMusicQueueSlots(999, 0), null);
+});
+
+
+test("music guild queue size helpers enforce bounds and remaining capacity", async () => {
+  const { normalizeMusicQueueSize, remainingMusicGuildQueueSlots } = await import("../src/modules/music.js");
+  assert.equal(normalizeMusicQueueSize(-5), 0);
+  assert.equal(normalizeMusicQueueSize(100.9), 100);
+  assert.equal(normalizeMusicQueueSize(999), 500);
+  assert.equal(normalizeMusicQueueSize(Number.NaN), 100);
+  assert.equal(remainingMusicGuildQueueSlots(40, 100), 60);
+  assert.equal(remainingMusicGuildQueueSlots(100, 100), 0);
+  assert.equal(remainingMusicGuildQueueSlots(999, 0), null);
+});
+
+
+test("music autoplay controller toggle flips the persisted state target", async () => {
+  const { toggleMusicAutoplay } = await import("../src/modules/music.js");
+  assert.equal(toggleMusicAutoplay(false), true);
+  assert.equal(toggleMusicAutoplay(true), false);
+});
+
+
+test("music vote-to-skip threshold scales with listeners and honors minimum", async () => {
+  const { calculateMusicVoteSkipRequired } = await import("../src/modules/music.js");
+  assert.equal(calculateMusicVoteSkipRequired(0, 0.5, 2), 2);
+  assert.equal(calculateMusicVoteSkipRequired(1, 0.5, 2), 1);
+  assert.equal(calculateMusicVoteSkipRequired(4, 0.5, 2), 2);
+  assert.equal(calculateMusicVoteSkipRequired(9, 0.5, 2), 5);
+  assert.equal(calculateMusicVoteSkipRequired(20, 0.2, 6), 6);
+  assert.equal(calculateMusicVoteSkipRequired(20, 0.8, 2), 16);
+});
+
+
+test("Fair Queue rotates requester groups while preserving each requester's order", async () => {
+  const { rebalanceMusicQueueByRequester } = await import("../src/modules/music.js");
+  const tracks = [
+    { id: "a1", requester: "A" },
+    { id: "a2", requester: "A" },
+    { id: "a3", requester: "A" },
+    { id: "b1", requester: "B" },
+    { id: "b2", requester: "B" }
+  ];
+
+  const result = rebalanceMusicQueueByRequester(
+    tracks,
+    (track) => track.requester
+  );
+
+  assert.deepEqual(result.map((track) => track.id), ["a1", "b1", "a2", "b2", "a3"]);
+});
+
+test("Fair Queue leaves a single requester unchanged", async () => {
+  const { rebalanceMusicQueueByRequester } = await import("../src/modules/music.js");
+  const tracks = [
+    { id: "a1", requester: "A" },
+    { id: "a2", requester: "A" }
+  ];
+
+  assert.deepEqual(
+    rebalanceMusicQueueByRequester(tracks, (track) => track.requester).map((track) => track.id),
+    ["a1", "a2"]
+  );
+});
+
+test("Fair Queue keeps unknown requesters in their own rotation group", async () => {
+  const { rebalanceMusicQueueByRequester } = await import("../src/modules/music.js");
+  const tracks = [
+    { id: "u1", requester: null },
+    { id: "a1", requester: "A" },
+    { id: "u2", requester: null },
+    { id: "a2", requester: "A" }
+  ];
+
+  assert.deepEqual(
+    rebalanceMusicQueueByRequester(tracks, (track) => track.requester).map((track) => track.id),
+    ["u1", "a1", "u2", "a2"]
+  );
+});
+
+
+test("music progress formatter clamps position and formats elapsed time", async () => {
+  const { formatMusicProgress, formatMusicTime } = await import("../src/modules/music.js");
+  assert.equal(formatMusicTime(0), "0:00");
+  assert.equal(formatMusicTime(65_000), "1:05");
+  assert.equal(formatMusicTime(3_661_000), "1:01:01");
+
+  const full = formatMusicProgress(60_000, 120_000, 10);
+  assert.equal(full, "━━━━━───── 1:00 / 2:00");
+
+  const over = formatMusicProgress(999_000, 120_000, 10);
+  assert.equal(over, "━━━━━━━━━━ 2:00 / 2:00");
+});
+
+
+test("Music playlist merge preserves target order and skips duplicate identifiers", () => {
+  const target = [
+    { info: { identifier: "a", title: "A" } },
+    { info: { identifier: "b", title: "B" } }
+  ];
+  const source = [
+    { info: { identifier: "b", title: "B duplicate" } },
+    { info: { identifier: "c", title: "C" } },
+    { info: { identifier: "c", title: "C duplicate in source" } },
+    { info: { identifier: "d", title: "D" } }
+  ];
+
+  const merged = mergeMusicPlaylistTracks(
+    target,
+    source,
+    (track) => track.info.identifier
+  );
+
+  assert.deepEqual(merged.tracks.map((track) => track.info.identifier), ["a", "b", "c", "d"]);
+  assert.equal(merged.added, 2);
+  assert.equal(merged.duplicates, 2);
+  assert.equal(merged.truncated, 0);
+  assert.deepEqual(target.map((track) => track.info.identifier), ["a", "b"]);
+});
+
+test("Music playlist merge stops at the 500-track capacity", () => {
+  const target = Array.from({ length: 499 }, (_, index) => ({ info: { identifier: "target-" + index } }));
+  const source = [
+    { info: { identifier: "source-1" } },
+    { info: { identifier: "source-2" } },
+    { info: { identifier: "source-3" } }
+  ];
+
+  const merged = mergeMusicPlaylistTracks(
+    target,
+    source,
+    (track) => track.info.identifier
+  );
+
+  assert.equal(merged.tracks.length, 500);
+  assert.equal(merged.added, 1);
+  assert.equal(merged.duplicates, 0);
+  assert.equal(merged.truncated, 2);
+  assert.equal(merged.tracks.at(-1)?.info.identifier, "source-1");
+});
+
+
+test("Music playlist continuation invalidates only the edited playlist", () => {
+  assert.equal(shouldInvalidateMusicPlaylistContinuation("playlist-1", "playlist-1"), true);
+  assert.equal(shouldInvalidateMusicPlaylistContinuation("playlist-1", "playlist-2"), false);
+  assert.equal(shouldInvalidateMusicPlaylistContinuation(null, "playlist-1"), false);
+  assert.equal(shouldInvalidateMusicPlaylistContinuation(undefined, "playlist-1"), false);
+});
+
+
+test("Music autoplay candidate skips current, queued and recent track identifiers or URLs", () => {
+  const excludedIdentifiers = new Set(["current", "queued", "recent-id"]);
+  const excludedUris = new Set(["https://music.example/recent-url"]);
+
+  assert.equal(
+    isMusicAutoplayCandidateAllowed({ info: { identifier: "current", uri: "https://music.example/current" } }, excludedIdentifiers, excludedUris),
+    false
+  );
+  assert.equal(
+    isMusicAutoplayCandidateAllowed({ info: { identifier: "queued", uri: "https://music.example/queued" } }, excludedIdentifiers, excludedUris),
+    false
+  );
+  assert.equal(
+    isMusicAutoplayCandidateAllowed({ info: { identifier: "new-id", uri: "https://music.example/recent-url" } }, excludedIdentifiers, excludedUris),
+    false
+  );
+  assert.equal(
+    isMusicAutoplayCandidateAllowed({ info: { identifier: "new-id", uri: "https://music.example/new" } }, excludedIdentifiers, excludedUris),
+    true
+  );
+});
+
+
+test("Music artist-aware autoplay prefers a different recent-safe track by the same artist", () => {
+  const excludedIdentifiers = new Set(["current"]);
+  const excludedUris = new Set<string>();
+  const tracks = [
+    { info: { identifier: "other-artist", author: "Other Artist", uri: "https://music.example/other" } },
+    { info: { identifier: "same-artist", author: "My Artist", uri: "https://music.example/same" } }
+  ];
+
+  assert.equal(normalizeMusicArtistName("  My   Artist "), "my artist");
+  assert.equal(
+    selectMusicArtistAwareAutoplayCandidate(tracks, "My Artist", excludedIdentifiers, excludedUris)?.info.identifier,
+    "same-artist"
+  );
+});
+
+test("Music artist-aware autoplay falls back to any allowed result when same-artist result is unavailable", () => {
+  const tracks = [
+    { info: { identifier: "other-artist", author: "Other Artist", uri: "https://music.example/other" } },
+    { info: { identifier: "blocked", author: "My Artist", uri: "https://music.example/blocked" } }
+  ];
+
+  assert.equal(
+    selectMusicArtistAwareAutoplayCandidate(
+      tracks,
+      "My Artist",
+      new Set(["blocked"]),
+      new Set()
+    )?.info.identifier,
+    "other-artist"
+  );
+});
+
+
+test("Music radio mode normalizes supported modes and builds the expected seed query", () => {
+  assert.equal(normalizeMusicRadioMode("artist"), "artist");
+  assert.equal(normalizeMusicRadioMode("genre"), "genre");
+  assert.equal(normalizeMusicRadioMode("search"), "search");
+  assert.equal(normalizeMusicRadioMode("radio"), null);
+  assert.equal(buildMusicRadioQuery("artist", "  Linkin   Park "), "Linkin Park songs");
+  assert.equal(buildMusicRadioQuery("genre", " liquid  drum and bass "), "liquid drum and bass music mix");
+  assert.equal(buildMusicRadioQuery("search", "summer night drive"), "summer night drive");
+});
+
+
+test("Music pitch normalization accepts the supported range and rounds to cents", () => {
+  assert.equal(normalizeMusicPitch(0.5), 0.5);
+  assert.equal(normalizeMusicPitch(1), 1);
+  assert.equal(normalizeMusicPitch(1.234), 1.23);
+  assert.equal(normalizeMusicPitch(2), 2);
+  assert.equal(normalizeMusicPitch(0.49), null);
+  assert.equal(normalizeMusicPitch(2.01), null);
+  assert.equal(normalizeMusicPitch(Number.NaN), null);
+});
+
+
+test("Music speed normalization accepts the supported range and rounds to cents", () => {
+  assert.equal(normalizeMusicSpeed(0.5), 0.5);
+  assert.equal(normalizeMusicSpeed(1), 1);
+  assert.equal(normalizeMusicSpeed(1.234), 1.23);
+  assert.equal(normalizeMusicSpeed(2), 2);
+  assert.equal(normalizeMusicSpeed(0.49), null);
+  assert.equal(normalizeMusicSpeed(2.01), null);
+  assert.equal(normalizeMusicSpeed(Number.NaN), null);
+});
+
+
+test("Music provider resolver routes Yandex and Spotify searches and preserves direct URLs", () => {
+  assert.equal(normalizeMusicSearchProvider("youtube"), "youtube");
+  assert.equal(normalizeMusicSearchProvider("yandex"), "yandex");
+  assert.equal(normalizeMusicSearchProvider("spotify"), "spotify");
+  assert.equal(normalizeMusicSearchProvider("applemusic"), "applemusic");
+  assert.equal(normalizeMusicSearchProvider("deezer"), "deezer");
+  assert.equal(normalizeMusicSearchProvider("vkmusic"), "vkmusic");
+  assert.equal(normalizeMusicSearchProvider("tidal"), "tidal");
+  assert.equal(normalizeMusicSearchProvider("qobuz"), "qobuz");
+  assert.equal(normalizeMusicSearchProvider("jiosaavn"), "jiosaavn");
+  assert.equal(normalizeMusicSearchProvider("vk"), null);
+
+  assert.deepEqual(resolveMusicSearchRequest("animals", "yandex"), {
+    query: "animals",
+    source: "ymsearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("animals architects", "spotify"), {
+    query: "animals architects",
+    source: "spsearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("animals architects", "applemusic"), {
+    query: "animals architects",
+    source: "amsearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("animals architects", "deezer"), {
+    query: "animals architects",
+    source: "dzsearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("animals architects", "vkmusic"), {
+    query: "animals architects",
+    source: "vksearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("animals architects", "tidal"), {
+    query: "animals architects",
+    source: "tdsearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("animals architects", "qobuz"), {
+    query: "animals architects",
+    source: "qbsearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("animals architects", "jiosaavn"), {
+    query: "animals architects",
+    source: "jssearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("ymsearch:animals architects"), {
+    query: "animals architects",
+    source: "ymsearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("spsearch:animals architects"), {
+    query: "animals architects",
+    source: "spsearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("amsearch:animals architects"), {
+    query: "animals architects",
+    source: "amsearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("dzsearch:animals architects"), {
+    query: "animals architects",
+    source: "dzsearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("vksearch:animals architects"), {
+    query: "animals architects",
+    source: "vksearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("tdsearch:animals architects"), {
+    query: "animals architects",
+    source: "tdsearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("qbsearch:animals architects"), {
+    query: "animals architects",
+    source: "qbsearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("jssearch:animals architects"), {
+    query: "animals architects",
+    source: "jssearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("https://music.yandex.ru/track/71663565", "yandex"), {
+    query: "https://music.yandex.ru/track/71663565"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("https://open.spotify.com/track/0eG08cBeKk0mzykKjw4hcQ", "spotify"), {
+    query: "https://open.spotify.com/track/0eG08cBeKk0mzykKjw4hcQ"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("https://music.apple.com/us/album/animals/1533388849?i=1533388859", "applemusic"), {
+    query: "https://music.apple.com/us/album/animals/1533388849?i=1533388859"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("animals"), {
+    query: "animals",
+    source: "ytsearch"
+  });
+});
+
+
+test("Music lyrics pagination keeps readable page boundaries and safe page indexes", () => {
+  const textValue = Array.from({ length: 80 }, (_, index) =>
+    "Verse line " + String(index + 1).padStart(2, "0") + " " + "word ".repeat(12).trim()
+  ).join("\n");
+
+  const chunks = chunkMusicLyrics(textValue, 500);
+  assert.equal(chunks.length > 1, true);
+  assert.equal(chunks.join("\n").replace(/\n+/g, "\n"), textValue);
+  assert.equal(musicLyricsPageCount(chunks), chunks.length);
+  assert.equal(normalizeMusicLyricsPage(-4, chunks.length), 0);
+  assert.equal(normalizeMusicLyricsPage(999, chunks.length), chunks.length - 1);
+  assert.equal(isValidMusicLyricsPage(0, chunks.length), true);
+  assert.equal(isValidMusicLyricsPage(chunks.length - 1, chunks.length), true);
+  assert.equal(isValidMusicLyricsPage(chunks.length, chunks.length), false);
+});
+
+
+test("Music synced lyrics normalize timestamps, select the active line and render a focused window", () => {
+  const lines = normalizeMusicTimedLyrics([
+    { timestamp: 2000, duration: 1500, line: "Second" },
+    { timestamp: 0, duration: null, line: "First" },
+    { timestamp: 5000, duration: null, line: "Third" },
+    { timestamp: "invalid", line: "Ignored" },
+    { timestamp: 3000, line: "" }
+  ]);
+
+  assert.deepEqual(lines.map((item) => item.line), ["First", "Second", "Third"]);
+  assert.equal(findMusicTimedLyricIndex(lines, 0), 0);
+  assert.equal(findMusicTimedLyricIndex(lines, 1999), 0);
+  assert.equal(findMusicTimedLyricIndex(lines, 2000), 1);
+  assert.equal(findMusicTimedLyricIndex(lines, 99999), 2);
+
+  const rendered = formatMusicSyncedLyrics(lines, 2200, 1);
+  assert.match(rendered, /First/);
+  assert.match(rendered, /\[0:02\] Second/);
+  assert.match(rendered, /▶ \*\*\[0:02\] Second\*\*/);
+});

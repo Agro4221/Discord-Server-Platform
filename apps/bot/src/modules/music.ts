@@ -1,8 +1,14 @@
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
+  ChannelType,
   ButtonBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   ButtonStyle,
   EmbedBuilder,
+  type ButtonInteraction,
   type ChatInputCommandInteraction,
   type Client,
   type Interaction,
@@ -20,9 +26,584 @@ import type { AppConfig } from "../config.js";
 import type { BotIdentityRepository } from "../bot-identity.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
+import type { CommandPolicyService } from "../command-policy.js";
 import { logger } from "../logger.js";
 
+declare module "lavalink-client" {
+  interface TrackRequester {
+    id?: string;
+  }
+}
+
 type MusicRepeatMode = "off" | "track" | "queue";
+type MusicPlaylistVisibility = "personal" | "shared";
+
+type MusicPlaylistContinuation = {
+  playlistId: string;
+  nextIndex: number;
+  order: number[] | null;
+  requesterUserId: string;
+};
+
+export function normalizeMusicPlaylistVisibility(shared: boolean): MusicPlaylistVisibility {
+  return shared ? "shared" : "personal";
+}
+
+export type MusicSearchProvider = "youtube" | "yandex" | "spotify" | "applemusic" | "deezer" | "vkmusic" | "tidal" | "qobuz" | "jiosaavn";
+
+export function normalizeMusicSearchProvider(value: string | null | undefined): MusicSearchProvider | null {
+  if (value === "youtube" || value === "yandex" || value === "spotify" || value === "applemusic" || value === "deezer" || value === "vkmusic" || value === "tidal" || value === "qobuz" || value === "jiosaavn") return value;
+  return null;
+}
+
+export function resolveMusicSearchRequest(
+  query: string,
+  provider?: MusicSearchProvider | null
+): { query: string; source?: "ytsearch" | "ymsearch" | "spsearch" | "amsearch" | "dzsearch" | "vksearch" | "tdsearch" | "qbsearch" | "jssearch" } {
+  const normalized = query.trim();
+  if (/^https?:\/\//i.test(normalized)) return { query: normalized };
+  if (/^ymsearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^ymsearch:\s*/i, ""), source: "ymsearch" };
+  }
+  if (/^spsearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^spsearch:\s*/i, ""), source: "spsearch" };
+  }
+  if (/^amsearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^amsearch:\s*/i, ""), source: "amsearch" };
+  }
+  if (/^dzsearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^dzsearch:\s*/i, ""), source: "dzsearch" };
+  }
+  if (/^vksearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^vksearch:\s*/i, ""), source: "vksearch" };
+  }
+  if (/^tdsearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^tdsearch:\s*/i, ""), source: "tdsearch" };
+  }
+  if (/^qbsearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^qbsearch:\s*/i, ""), source: "qbsearch" };
+  }
+  if (/^jssearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^jssearch:\s*/i, ""), source: "jssearch" };
+  }
+  if (/^ytsearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^ytsearch:\s*/i, ""), source: "ytsearch" };
+  }
+  if (provider === "yandex") return { query: normalized, source: "ymsearch" };
+  if (provider === "spotify") return { query: normalized, source: "spsearch" };
+  if (provider === "applemusic") return { query: normalized, source: "amsearch" };
+  if (provider === "deezer") return { query: normalized, source: "dzsearch" };
+  if (provider === "vkmusic") return { query: normalized, source: "vksearch" };
+  if (provider === "tidal") return { query: normalized, source: "tdsearch" };
+  if (provider === "qobuz") return { query: normalized, source: "qbsearch" };
+  if (provider === "jiosaavn") return { query: normalized, source: "jssearch" };
+  return { query: normalized, source: "ytsearch" };
+}
+
+export function normalizeMusicPlaylistSearch(value: string): string | null {
+  const normalized = value.trim().slice(0, 80);
+  return normalized ? normalized : null;
+}
+
+export function isValidMusicSavedPosition(position: number, length: number): boolean {
+  return Number.isInteger(position) && position >= 1 && position <= Math.min(length, 25);
+}
+
+export function chunkMusicLyrics(text: string, maxLength = 3600): string[] {
+  const normalized = text.trim();
+  if (!normalized) return [];
+  const limit = Math.max(500, Math.min(3900, Math.floor(maxLength)));
+  const chunks: string[] = [];
+  let remaining = normalized;
+
+  while (remaining.length > limit) {
+    let splitAt = remaining.lastIndexOf("\n", limit);
+    if (splitAt < Math.floor(limit * 0.5)) splitAt = remaining.lastIndexOf(" ", limit);
+    if (splitAt < Math.floor(limit * 0.5)) splitAt = limit;
+    chunks.push(remaining.slice(0, splitAt).trim());
+    remaining = remaining.slice(splitAt).trimStart();
+  }
+
+  if (remaining) chunks.push(remaining);
+  return chunks;
+}
+
+export function musicLyricsPageCount(chunks: readonly unknown[]): number {
+  return Math.max(1, chunks.length);
+}
+
+export function normalizeMusicLyricsPage(page: number, totalPages: number): number {
+  const maxPage = Math.max(1, Math.floor(totalPages)) - 1;
+  return Math.min(Math.max(Math.trunc(page), 0), maxPage);
+}
+
+export function isValidMusicLyricsPage(page: number, totalPages: number): boolean {
+  return Number.isInteger(page) && page >= 0 && page < Math.max(1, Math.floor(totalPages));
+}
+
+export type MusicTimedLyricLine = {
+  timestamp: number;
+  duration: number | null;
+  line: string;
+};
+
+export function normalizeMusicTimedLyrics(lines: unknown): MusicTimedLyricLine[] {
+  if (!Array.isArray(lines)) return [];
+  return lines
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const timestamp = Number(row.timestamp);
+      const line = typeof row.line === "string" ? row.line.trim() : "";
+      if (!Number.isFinite(timestamp) || timestamp < 0 || !line) return null;
+      const durationValue = row.duration === null || row.duration === undefined ? null : Number(row.duration);
+      return {
+        timestamp: Math.floor(timestamp),
+        duration: durationValue !== null && Number.isFinite(durationValue) && durationValue >= 0 ? Math.floor(durationValue) : null,
+        line
+      };
+    })
+    .filter((item): item is MusicTimedLyricLine => item !== null)
+    .sort((a,b) => a.timestamp - b.timestamp);
+}
+
+export function findMusicTimedLyricIndex(lines: readonly MusicTimedLyricLine[], positionMs: number): number {
+  const position = Math.max(0, Math.floor(Number(positionMs)));
+  let index = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i]!.timestamp > position) break;
+    index = i;
+  }
+  return index;
+}
+
+export function formatMusicSyncedLyrics(
+  lines: readonly MusicTimedLyricLine[],
+  positionMs: number,
+  radius = 2
+): string {
+  if (!lines.length) return "Нет тайм-кодов.";
+  const current = findMusicTimedLyricIndex(lines, positionMs);
+  const center = current < 0 ? 0 : current;
+  const safeRadius = Math.max(0, Math.min(4, Math.floor(radius)));
+  const start = Math.max(0, center - safeRadius);
+  const end = Math.min(lines.length, center + safeRadius + 1);
+  return lines.slice(start,end).map((item,index) => {
+    const absoluteIndex = start + index;
+    const marker = absoluteIndex === current ? "▶ **" : "   ";
+    const close = absoluteIndex === current ? "**" : "";
+    const total = Math.floor(item.timestamp / 1000);
+    const minutes = Math.floor(total / 60);
+    const seconds = total % 60;
+    return marker + "[" + minutes + ":" + String(seconds).padStart(2,"0") + "] " + item.line + close;
+  }).join("\n");
+}
+
+export function normalizeMusicPlaylistImportUrl(value: string): string | null {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+export function buildMusicPlaylistSnapshot<T>(current: T | null | undefined, queued: readonly T[], limit = MAX_PLAYLIST_TRACKS): T[] {
+  const safeLimit = Math.max(0, Math.min(MAX_PLAYLIST_TRACKS, Math.floor(limit)));
+  return [
+    ...(current === null || current === undefined ? [] : [current]),
+    ...queued
+  ].slice(0, safeLimit);
+}
+
+export function musicPlaylistContinuationBatch(
+  order: readonly number[],
+  nextIndex: number,
+  limit: number
+): { indexes: number[]; nextIndex: number; done: boolean } {
+  const start = Math.max(0, Math.min(order.length, Math.floor(nextIndex)));
+  const size = Math.max(1, Math.min(MAX_PLAYLIST_TRACKS, Math.floor(limit)));
+  const indexes = [...order.slice(start,start + size)];
+  const newIndex = start + indexes.length;
+  return { indexes, nextIndex: newIndex, done: newIndex >= order.length };
+}
+
+export function shouldInvalidateMusicPlaylistContinuation(
+  continuationPlaylistId: string | null | undefined,
+  editedPlaylistId: string
+): boolean {
+  return Boolean(continuationPlaylistId) && continuationPlaylistId === editedPlaylistId;
+}
+
+export type MusicAutoplayTrackLike = {
+  info: {
+    identifier?: string;
+    author?: string | null;
+    uri?: string | null;
+  };
+};
+
+export function isMusicAutoplayCandidateAllowed<T extends MusicAutoplayTrackLike>(
+  track: T,
+  excludedIdentifiers: ReadonlySet<string>,
+  excludedUris: ReadonlySet<string>
+): boolean {
+  const identifier = track.info.identifier?.trim();
+  const uri = typeof track.info.uri === "string" ? track.info.uri.trim() : "";
+  if (identifier && excludedIdentifiers.has(identifier)) return false;
+  if (uri && excludedUris.has(uri)) return false;
+  return true;
+}
+
+export function normalizeMusicArtistName(value: string | null | undefined): string {
+  return String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+export function selectMusicArtistAwareAutoplayCandidate<T extends MusicAutoplayTrackLike>(
+  tracks: readonly T[],
+  artist: string | null | undefined,
+  excludedIdentifiers: ReadonlySet<string>,
+  excludedUris: ReadonlySet<string>
+): T | null {
+  const allowed = tracks.filter((track) =>
+    isMusicAutoplayCandidateAllowed(track, excludedIdentifiers, excludedUris)
+  );
+  if (!allowed.length) return null;
+
+  const normalizedArtist = normalizeMusicArtistName(artist);
+  if (!normalizedArtist) return allowed[0] ?? null;
+
+  return allowed.find((track) =>
+    normalizeMusicArtistName(track.info.author) === normalizedArtist
+  ) ?? allowed[0] ?? null;
+}
+
+export const MUSIC_AUTOPLAY_RECENT_HISTORY_LIMIT = 20;
+
+export function mergeMusicPlaylistTracks<T>(
+  target: readonly T[],
+  source: readonly T[],
+  getIdentifier: (track: T) => string | null | undefined,
+  limit = MAX_PLAYLIST_TRACKS
+): { tracks: T[]; added: number; duplicates: number; truncated: number } {
+  const safeLimit = Math.max(0, Math.min(MAX_PLAYLIST_TRACKS, Math.floor(limit)));
+  const tracks = [...target].slice(0, safeLimit);
+  const seen = new Set<string>();
+  for (const track of tracks) {
+    const identifier = getIdentifier(track);
+    if (identifier) seen.add(identifier);
+  }
+
+  let added = 0;
+  let duplicates = 0;
+  let truncated = 0;
+  for (const track of source) {
+    if (tracks.length >= safeLimit) {
+      truncated += 1;
+      continue;
+    }
+    const identifier = getIdentifier(track);
+    if (identifier && seen.has(identifier)) {
+      duplicates += 1;
+      continue;
+    }
+    if (identifier) seen.add(identifier);
+    tracks.push(track);
+    added += 1;
+  }
+
+  return { tracks, added, duplicates, truncated };
+}
+
+export function removeMusicPlaylistTrack<T>(tracks: T[], position: number): T[] | null {
+  if (!Number.isInteger(position) || position < 1 || position > tracks.length) return null;
+  const index = position - 1;
+  return [...tracks.slice(0, index), ...tracks.slice(index + 1)];
+}
+
+export function moveMusicPlaylistTrack<T>(tracks: T[], from: number, to: number): T[] | null {
+  if (
+    !Number.isInteger(from) ||
+    !Number.isInteger(to) ||
+    from < 1 ||
+    from > tracks.length ||
+    to < 1 ||
+    to > tracks.length
+  ) {
+    return null;
+  }
+  const result = [...tracks];
+  const [item] = result.splice(from - 1, 1);
+  if (item === undefined) return null;
+  result.splice(to - 1, 0, item);
+  return result;
+}
+
+const MAX_PLAYLIST_TRACKS = 500;
+export const MUSIC_REQUEST_COOLDOWN_MS = 5_000;
+export const MUSIC_REQUEST_APPROVAL_TTL_MS = 15 * 60_000;
+
+type MusicRequestApprovalMode = "off" | "approval";
+
+export function normalizeMusicRequestApprovalMode(value: string): MusicRequestApprovalMode | null {
+  return value === "off" || value === "approval" ? value : null;
+}
+
+const MUSIC_FILTER_ACTIONS = [
+  "clear", "bassboost-low", "bassboost-medium", "bassboost-high",
+  "rock", "classic", "pop", "electronic", "fullsound", "karaoke", "tremolo", "vibrato", "distortion", "lowpass", "channelmix", "gaming", "nightcore", "8d"
+] as const;
+
+type MusicFilterAction = (typeof MUSIC_FILTER_ACTIONS)[number];
+
+type MusicChannelMixData = {
+  leftToLeft?: number;
+  leftToRight?: number;
+  rightToLeft?: number;
+  rightToRight?: number;
+};
+
+export function nextMusicChannelMixOutput(
+  current: MusicChannelMixData | null | undefined
+): "mono" | "stereo" {
+  const isMono =
+    current?.leftToLeft === 0.5 &&
+    current?.leftToRight === 0.5 &&
+    current?.rightToLeft === 0.5 &&
+    current?.rightToRight === 0.5;
+  return isMono ? "stereo" : "mono";
+}
+
+type MusicDistortionSettings = {
+  sinOffset?: number;
+  sinScale?: number;
+  cosOffset?: number;
+  cosScale?: number;
+  tanOffset?: number;
+  tanScale?: number;
+  offset?: number;
+  scale?: number;
+};
+
+const MUSIC_DISTORTION_PRESET: Readonly<MusicDistortionSettings> = Object.freeze({
+  sinOffset: 0.4,
+  sinScale: 1.5,
+  cosOffset: 0.4,
+  cosScale: 1.5,
+  tanOffset: 0.4,
+  tanScale: 1.5,
+  offset: 0.4,
+  scale: 1.5
+});
+
+export function toggleMusicDistortion(
+  current: MusicDistortionSettings | null | undefined
+): MusicDistortionSettings | null {
+  return current ? null : { ...MUSIC_DISTORTION_PRESET };
+}
+
+export function shuffleMusicItems<T>(items: readonly T[]): T[] {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const target = Math.floor(Math.random() * (index + 1));
+    const current = result[index]!;
+    result[index] = result[target]!;
+    result[target] = current;
+  }
+  return result;
+}
+
+export function normalizeMusicPlaylistName(value: string): string | null {
+  const name = value.trim().replace(/\s+/g, " ").slice(0, 80);
+  return name.length >= 1 ? name : null;
+}
+
+export function isMusicFilterAction(value: string): value is MusicFilterAction {
+  return (MUSIC_FILTER_ACTIONS as readonly string[]).includes(value);
+}
+
+export function chunkMusicFilterActions(
+  actions: readonly MusicFilterAction[],
+  chunkSize = 5
+): MusicFilterAction[][] {
+  const safeChunkSize = Math.max(1, Math.floor(chunkSize));
+  const chunks: MusicFilterAction[][] = [];
+  for (let index = 0; index < actions.length; index += safeChunkSize) {
+    chunks.push([...actions.slice(index, index + safeChunkSize)]);
+  }
+  return chunks;
+}
+
+export function nextMusicRepeatMode(mode: MusicRepeatMode): MusicRepeatMode {
+  if (mode === "off") return "track";
+  if (mode === "track") return "queue";
+  return "off";
+}
+
+export function nextMusicQueueRepeatMode(mode: MusicRepeatMode): MusicRepeatMode {
+  return mode === "queue" ? "off" : "queue";
+}
+
+export function clampMusicVolume(value: number): number {
+  return Math.min(200, Math.max(0, Math.round(value)));
+}
+type MusicQueueTrackLike = {
+  encoded?: string;
+  info: {
+    identifier?: string;
+    title?: string;
+    author?: string | null;
+    duration?: number;
+    uri?: string | null;
+    isSeekable?: boolean;
+    isStream?: boolean;
+    position?: number;
+    artworkUrl?: string | null;
+    isrc?: string | null;
+    sourceName?: string;
+    length?: number;
+  };
+  requester?: { id?: string };
+};
+
+export function buildMusicQueueExport(tracks: MusicQueueTrackLike[]): string {
+  return JSON.stringify({
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    tracks: tracks.map((track, index) => ({
+      position: index + 1,
+      identifier: track.info.identifier,
+      title: track.info.title,
+      author: track.info.author ?? null,
+      durationMs: Number(track.info.duration ?? 0),
+      uri: (track.info as typeof track.info & { uri?: string | null }).uri ?? null,
+      requesterId: typeof track.requester?.id === "string" ? track.requester.id : null
+    }))
+  }, null, 2);
+}
+
+export function buildMusicQueueShare(tracks: MusicQueueTrackLike[]): string {
+  const lines = tracks.map((track, index) => {
+    const requester = typeof track.requester?.id === "string" ? " · <@" + track.requester.id + ">" : "";
+    const uri = (track.info as typeof track.info & { uri?: string | null }).uri;
+    const target = uri ? " — " + uri : "";
+    return (index + 1) + ". **" + track.info.title + "** — " + (track.info.author ?? "Unknown artist") + requester + target;
+  });
+  const full = "📋 **Music Queue — " + tracks.length + " трек(ов)**\n" + lines.join("\n");
+  if (full.length <= 1900) return full;
+  const visible: string[] = [];
+  let length = 45;
+  for (const line of lines) {
+    if (length + line.length + 1 > 1750) break;
+    visible.push(line);
+    length += line.length + 1;
+  }
+  const remaining = tracks.length - visible.length;
+  return "📋 **Music Queue — " + tracks.length + " трек(ов)**\n" + visible.join("\n") +
+    "\n… и ещё **" + remaining + "**. Используй export для полной очереди.";
+}
+
+export function remainingMusicRequestCooldown(cooldownUntil: number, now = Date.now()): number {
+  return Math.max(0, cooldownUntil - now);
+}
+
+export function normalizeMusicQueueLimit(value: number): number {
+  if (!Number.isFinite(value)) return 10;
+  return Math.min(100, Math.max(0, Math.trunc(value)));
+}
+
+export function normalizeMusicQueueSize(value: number): number {
+  if (!Number.isFinite(value)) return 100;
+  return Math.min(500, Math.max(0, Math.trunc(value)));
+}
+
+export function remainingMusicGuildQueueSlots(queueSize: number, limit: number): number | null {
+  const normalizedLimit = normalizeMusicQueueSize(limit);
+  if (normalizedLimit === 0) return null;
+  return Math.max(0, normalizedLimit - Math.max(0, Math.trunc(queueSize)));
+}
+
+export function countMusicQueuedByUser<T extends { requester?: { id?: string } }>(tracks: readonly T[], userId: string): number {
+  return tracks.reduce((count, track) => count + (track.requester?.id === userId ? 1 : 0), 0);
+}
+
+export function remainingMusicQueueSlots(queuedCount: number, limit: number): number | null {
+  const normalizedLimit = normalizeMusicQueueLimit(limit);
+  if (normalizedLimit === 0) return null;
+  return Math.max(0, normalizedLimit - Math.max(0, Math.trunc(queuedCount)));
+}
+
+export function rebalanceMusicQueueByRequester<T>(
+  tracks: readonly T[],
+  getRequesterKey: (track: T) => string | null | undefined
+): T[] {
+  const groups = new Map<string | null, { items: T[]; index: number }>();
+
+  for (const track of tracks) {
+    const key = getRequesterKey(track) ?? null;
+    const group = groups.get(key);
+    if (group) {
+      group.items.push(track);
+    } else {
+      groups.set(key, { items: [track], index: 0 });
+    }
+  }
+
+  if (groups.size <= 1) return [...tracks];
+
+  const result: T[] = [];
+  while (result.length < tracks.length) {
+    let added = false;
+
+    for (const group of groups.values()) {
+      const item = group.items[group.index];
+      if (item === undefined) continue;
+      group.index += 1;
+      result.push(item);
+      added = true;
+    }
+
+    if (!added) break;
+  }
+
+  return result;
+}
+
+export function voteSkipThreshold(listenerCount: number): number {
+  const safe = Math.max(1, Math.floor(listenerCount));
+  return Math.max(1, Math.ceil(safe * 0.6));
+}
+
+export function isValidMusicSearchSelection(index: number, length: number): boolean {
+  return Number.isInteger(index) && index >= 0 && index < length;
+}
+
+export const MUSIC_PLAYLIST_PAGE_SIZE = 25;
+
+export function normalizeMusicPlaylistPage(page: number, totalPages: number): number {
+  const maxPage = Math.max(0, Math.floor(totalPages) - 1);
+  if (!Number.isFinite(page)) return 0;
+  return Math.min(maxPage, Math.max(0, Math.floor(page)));
+}
+
+export function musicPlaylistPageCount(totalItems: number, pageSize = MUSIC_PLAYLIST_PAGE_SIZE): number {
+  const safeSize = Math.max(1, Math.floor(pageSize));
+  return Math.max(1, Math.ceil(Math.max(0, Math.floor(totalItems)) / safeSize));
+}
+
+export function isValidMusicPlaylistPage(page: number, totalPages: number): boolean {
+  return Number.isInteger(page) && page >= 0 && page < Math.max(1, Math.floor(totalPages));
+}
+
+export function trimMusicQueueToPosition<T>(queue: T[], position: number): T | null {
+  if (!Number.isInteger(position) || position < 1 || position > queue.length) return null;
+  const target = queue[position - 1] ?? null;
+  if (!target) return null;
+  queue.splice(0, position - 1);
+  return target;
+}
+
 
 class PostgresQueueStore implements QueueStoreManager {
   constructor(
@@ -87,19 +668,60 @@ export class Music implements PlatformModule {
   private readonly lastPlayedTracks = new Map<string, Track>();
   private readonly autoplayInFlight = new Set<string>();
   private readonly autoLeaveTimers = new Map<string, NodeJS.Timeout>();
+  private readonly requestInFlight = new Set<string>();
+  private readonly requestCooldownUntil = new Map<string, number>();
+  private readonly failoverInFlight = new Set<string>();
+  private readonly playlistContinuations = new Map<string, MusicPlaylistContinuation>();
+  private readonly voteSkipSessions = new Map<string, { trackIdentifier: string; voters: Set<string>; expiresAt: number }>();
+  private readonly searchSessions = new Map<string, { guildId: string; userId: string; tracks: Track[]; expiresAt: number }>();
+  private readonly playlistPaginationSessions = new Map<string, {
+    guildId: string;
+    userId: string;
+    action: "list" | "search" | "view";
+    name?: string;
+    query?: string;
+    sharedOnly?: boolean;
+    expiresAt: number;
+  }>();
+  private readonly lyricsPaginationSessions = new Map<string, {
+    guildId: string;
+    userId: string;
+    trackIdentifier: string;
+    chunks: string[];
+    expiresAt: number;
+  }>();
+  private readonly lyricsSyncTimers = new Map<string, NodeJS.Timeout>();
+  private searchSequence = 0;
+  private playlistPaginationSequence = 0;
+  private lyricsPaginationSequence = 0;
+  private commandPolicy?: CommandPolicyService;
+  private auditLog?: ModuleContext["auditLog"];
 
   constructor(
     private readonly db: Database,
     private readonly config: AppConfig,
-    private readonly identities: BotIdentityRepository
-  ) {}
+    private readonly identities: BotIdentityRepository,
+    commandPolicy?: CommandPolicyService
+  ) {
+    this.commandPolicy = commandPolicy;
+  }
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+    this.auditLog = context.auditLog;
     this.setModuleHealth = context.setModuleHealth;
     this.connectedNodes.clear();
     this.lastPlayedTracks.clear();
     this.autoplayInFlight.clear();
+    this.requestInFlight.clear();
+    this.requestCooldownUntil.clear();
+    this.failoverInFlight.clear();
+    this.playlistContinuations.clear();
+    this.voteSkipSessions.clear();
+    this.playlistPaginationSessions.clear();
+    for (const timer of this.lyricsSyncTimers.values()) clearInterval(timer);
+    this.lyricsSyncTimers.clear();
+    this.lyricsPaginationSessions.clear();
     for (const timer of this.autoLeaveTimers.values()) clearTimeout(timer);
     this.autoLeaveTimers.clear();
 
@@ -192,6 +814,9 @@ export class Music implements PlatformModule {
           return;
         }
         this.lastPlayedTracks.set(player.guildId, track);
+        await this.recordHistory(player.guildId, track).catch((error) => {
+          logger.warn("Music history write failed", { guildId: player.guildId, error: String(error) });
+        });
         if (await this.announceTrackStart(player.guildId)) {
           await this.announce(channelId, `🎵 Сейчас играет **${track.info.title}** — ${track.info.author}`);
         }
@@ -209,13 +834,19 @@ export class Music implements PlatformModule {
       void this.syncController(player);
       void (async () => {
         try {
-          const autoplay = await this.autoplayEnabled(player.guildId);
-          if (lastTrack && shouldAutoplayAfterQueueEnd(
-            autoplay,
-            player.repeatMode,
-            player.queue.tracks.length
-          )) {
-            await this.autoplayNext(player, lastTrack);
+          const continued = await this.continueMusicPlaylist(player);
+          const radio = await this.musicRadioSettings(player.guildId);
+          if (!continued && radio.enabled && player.repeatMode === "off" && player.queue.tracks.length === 0) {
+            await this.radioNext(player, lastTrack ?? null);
+          } else {
+            const autoplay = await this.autoplayEnabled(player.guildId);
+            if (!continued && !radio.enabled && lastTrack && shouldAutoplayAfterQueueEnd(
+              autoplay,
+              player.repeatMode,
+              player.queue.tracks.length
+            )) {
+              await this.autoplayNext(player, lastTrack);
+            }
           }
         } catch (error) {
           logger.warn("Music autoplay cycle failed", {
@@ -240,6 +871,14 @@ export class Music implements PlatformModule {
       this.cancelAutoLeave(player.guildId);
       this.lastPlayedTracks.delete(player.guildId);
       this.autoplayInFlight.delete(player.guildId);
+      this.playlistContinuations.delete(player.guildId);
+      for (const [token, timer] of this.lyricsSyncTimers) {
+        clearInterval(timer);
+        this.lyricsSyncTimers.delete(token);
+      }
+      for (const [token, session] of this.lyricsPaginationSessions) {
+        if (session.guildId === player.guildId) this.lyricsPaginationSessions.delete(token);
+      }
       void this.db.query(
         "DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
         [player.guildId, this.config.botIdentityId]
@@ -288,6 +927,7 @@ export class Music implements PlatformModule {
         node: node.id,
         reason: String(reason)
       });
+      void this.failoverPlayersFromNode(node.id);
     });
 
     this.manager.nodeManager.on("destroy", (node) => {
@@ -296,6 +936,7 @@ export class Music implements PlatformModule {
       logger.warn("Lavalink node destroyed", {
         node: node.id
       });
+      void this.failoverPlayersFromNode(node.id);
     });
 
     this.manager.nodeManager.on("error", (node, error) => {
@@ -308,9 +949,11 @@ export class Music implements PlatformModule {
 
     const a = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const b = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
+    const d = context.events.on("message.create", (message) => this.onRequestMessage(message));
     this.unsubscribe = () => {
       a();
       b();
+      d();
     };
 
     this.healthTimer = setTimeout(() => this.publishNodeHealth(), 0);
@@ -334,6 +977,7 @@ export class Music implements PlatformModule {
     this.connectedNodes.clear();
     this.lastPlayedTracks.clear();
     this.autoplayInFlight.clear();
+    this.failoverInFlight.clear();
     for (const timer of this.autoLeaveTimers.values()) clearTimeout(timer);
     this.autoLeaveTimers.clear();
 
@@ -342,6 +986,7 @@ export class Music implements PlatformModule {
     this.manager = undefined;
     this.client = undefined;
     this.setModuleHealth = undefined;
+    this.auditLog = undefined;
     this.initialized = false;
   }
 
@@ -357,6 +1002,7 @@ export class Music implements PlatformModule {
     current: { title: string; author: string; durationMs: number; positionMs: number } | null;
     queue: Array<{ title: string; author: string; durationMs: number }>;
     nodeCount: number;
+    providers: Array<{ name: string; enabled: boolean; mode: "direct" | "mirror" }>;
   }> {
     const enabled = await moduleEnabled(this.db, guildId, "music", false);
     const player = this.manager?.players.get(guildId);
@@ -381,18 +1027,32 @@ export class Music implements PlatformModule {
         positionMs
       } : null,
       queue: (player?.queue.tracks.slice(0, 25) ?? []).map((track) => ({
-        title: track.info.title,
+        title: track.info.title ?? "Unknown track",
         author: track.info.author ?? "Unknown artist",
         durationMs: Number(track.info.duration ?? 0)
       })),
-      nodeCount: this.connectedNodes.size
+      nodeCount: this.connectedNodes.size,
+      providers: [
+        { name: "YouTube", enabled: true, mode: "direct" },
+        { name: "SoundCloud", enabled: true, mode: "direct" },
+        { name: "Spotify", enabled: process.env.LAVASRC_SPOTIFY_ENABLED === "true" && Boolean(process.env.SPOTIFY_CLIENT_ID?.trim()) && Boolean(process.env.SPOTIFY_CLIENT_SECRET?.trim()), mode: "mirror" },
+        { name: "Apple Music", enabled: process.env.LAVASRC_APPLEMUSIC_ENABLED === "true" && Boolean(process.env.APPLE_MUSIC_API_TOKEN?.trim()), mode: "mirror" },
+        { name: "Apple Music", enabled: process.env.LAVASRC_APPLEMUSIC_ENABLED === "true", mode: "mirror" },
+        { name: "Deezer", enabled: process.env.LAVASRC_DEEZER_ENABLED === "true" && Boolean(process.env.DEEZER_ARL?.trim()) && Boolean(process.env.DEEZER_MASTER_DECRYPTION_KEY?.trim()), mode: "direct" },
+        { name: "Yandex Music", enabled: process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true", mode: "direct" },
+        { name: "VK Music", enabled: process.env.LAVASRC_VKMUSIC_ENABLED === "true" && Boolean(process.env.VK_MUSIC_USER_TOKEN?.trim()), mode: "direct" },
+        { name: "Tidal", enabled: process.env.LAVASRC_TIDAL_ENABLED === "true" && Boolean(process.env.TIDAL_TOKEN?.trim()), mode: "mirror" },
+        { name: "Qobuz", enabled: process.env.LAVASRC_QOBUZ_ENABLED === "true" && Boolean(process.env.QOBUZ_USER_OAUTH_TOKEN?.trim()), mode: "direct" },
+        { name: "yt-dlp", enabled: process.env.LAVASRC_YTDLP_ENABLED === "true", mode: "direct" },
+        { name: "JioSaavn", enabled: process.env.LAVASRC_JIOSAAVN_ENABLED === "true", mode: "direct" }
+      ]
     };
   }
 
   async dashboardControl(
     guildId: string,
     action: "play" | "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay",
-    input: { query?: string; voiceChannelId?: string; value?: number; mode?: string; enabled?: boolean }
+    input: { query?: string; voiceChannelId?: string; value?: number; mode?: string; provider?: string; enabled?: boolean }
   ): Promise<void> {
     if (!await moduleEnabled(this.db, guildId, "music", false)) throw new Error("music_disabled");
     if (!this.manager || !this.initialized) throw new Error("music_unavailable");
@@ -423,11 +1083,12 @@ export class Music implements PlatformModule {
 
       const query = String(input.query ?? "").trim();
       if (!query) throw new Error("music_query_required");
-      const source = /^https?:\/\//i.test(query) ? undefined : "ytsearch";
-      const result = await player.search(source ? { query, source } : { query }, this.client?.user);
+      const resolved = resolveMusicSearchRequest(query, normalizeMusicSearchProvider(String(input.provider ?? "")));
+      const result = await player.search(resolved.source ? { query: resolved.query, source: resolved.source } : { query: resolved.query }, this.client?.user);
       if (!result.tracks.length) throw new Error("music_track_not_found");
 
       player.queue.add(result.tracks[0]!);
+      await this.applyFairQueue(player);
       if (!player.playing) await player.play();
       await this.persistPlayer(player);
       return;
@@ -473,11 +1134,61 @@ export class Music implements PlatformModule {
     this.setModuleHealth?.(this.name, musicNodeHealth(this.connectedNodes.size));
   }
 
+  private async failoverPlayersFromNode(failedNodeId: string): Promise<void> {
+    if (!this.manager || !this.initialized) return;
+
+    const available = this.manager.nodeManager.leastUsedNodes("playingPlayers")
+      .filter((node) => node.id !== failedNodeId && node.connected && Boolean(node.sessionId));
+    if (!canFailoverMusicNode(failedNodeId, available.map((node) => node.id))) {
+      logger.warn("Music node failover unavailable", {
+        identity: this.config.botIdentityId,
+        failedNode: failedNodeId
+      });
+      return;
+    }
+
+    const players = [...this.manager.players.values()].filter(
+      (player) => player.node.id === failedNodeId
+    );
+
+    for (const player of players) {
+      if (this.failoverInFlight.has(player.guildId)) continue;
+      this.failoverInFlight.add(player.guildId);
+      try {
+        const current = this.manager?.players.get(player.guildId);
+        if (!current || current.node.id !== failedNodeId) continue;
+
+        const target = this.manager?.nodeManager
+          .leastUsedNodes("playingPlayers")
+          .find((node) => node.id !== failedNodeId && node.connected && Boolean(node.sessionId));
+        if (!target) continue;
+
+        await current.moveNode(target.id);
+        await this.persistPlayer(current);
+        logger.warn("Music player failed over to another Lavalink node", {
+          identity: this.config.botIdentityId,
+          guildId: current.guildId,
+          fromNode: failedNodeId,
+          toNode: current.node.id
+        });
+      } catch (error) {
+        logger.warn("Music player failover failed", {
+          identity: this.config.botIdentityId,
+          guildId: player.guildId,
+          failedNode: failedNodeId,
+          error: String(error)
+        });
+      } finally {
+        this.failoverInFlight.delete(player.guildId);
+      }
+    }
+  }
+
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!interaction.inGuild()) return;
     const directAliases = new Set([
-      "play", "pause", "resume", "skip", "stop", "shuffle",
-      "playlist", "queue", "repeat", "seek", "volume", "autoplay", "nowplaying"
+      "play", "search", "pause", "resume", "previous", "skip", "vote-skip", "stop", "shuffle",
+      "playlist", "favorite", "filter", "queue-policy", "queue-limit", "queue-size", "queue", "repeat", "seek", "volume", "pitch", "speed", "eq", "autoplay", "radio", "247", "providers", "nowplaying", "lyrics"
     ]);
     if (interaction.commandName !== "music" && !directAliases.has(interaction.commandName)) return;
 
@@ -509,6 +1220,9 @@ export class Music implements PlatformModule {
       case "play":
         await this.play(interaction, voice?.id ?? null);
         break;
+      case "search":
+        await this.search(interaction, voice?.id ?? null);
+        break;
       case "pause":
         await this.pause(interaction, true);
         break;
@@ -518,6 +1232,21 @@ export class Music implements PlatformModule {
       case "skip":
         await this.skip(interaction);
         break;
+      case "vote-skip":
+        await this.voteSkip(interaction);
+        break;
+      case "queue-limit":
+        await this.queueLimit(interaction);
+        break;
+      case "queue-size":
+        await this.queueSize(interaction);
+        break;
+      case "skip-to":
+        await this.skipTo(interaction);
+        break;
+      case "history":
+        await this.history(interaction);
+        break;
       case "stop":
         await this.stop(interaction);
         break;
@@ -525,6 +1254,15 @@ export class Music implements PlatformModule {
         await this.shuffle(interaction);
         break;
       case "playlist":
+        if (interaction.commandName === "music") await this.savedPlaylist(interaction);
+        else await this.queue(interaction);
+        break;
+      case "favorite":
+        await this.favorite(interaction);
+        break;
+      case "filter":
+        await this.filter(interaction);
+        break;
       case "queue":
         await this.queue(interaction);
         break;
@@ -534,16 +1272,103 @@ export class Music implements PlatformModule {
       case "autoplay":
         await this.autoplay(interaction);
         break;
+      case "radio":
+        await this.radio(interaction);
+        break;
+      case "247":
+        await this.twentyFourSeven(interaction);
+        break;
+      case "providers":
+        await this.providers(interaction);
+        break;
       case "seek":
         await this.seek(interaction);
         break;
       case "volume":
         await this.volume(interaction);
         break;
+      case "pitch":
+        await this.pitch(interaction);
+        break;
+      case "speed":
+        await this.speed(interaction);
+        break;
+      case "eq":
+        await this.eq(interaction);
+        break;
       case "nowplaying":
         await this.nowPlaying(interaction);
         break;
+      case "previous":
+        await this.previous(interaction);
+        break;
+      case "lyrics":
+        await this.lyrics(interaction);
+        break;
     }
+  }
+
+  private async search(interaction: ChatInputCommandInteraction, voiceChannelId: string | null): Promise<void> {
+    if (!voiceChannelId) {
+      await interaction.reply({ content: "Сначала зайди в голосовой канал.", ephemeral: true });
+      return;
+    }
+    const query = interaction.options.getString("query", true).trim();
+    if (!query) {
+      await interaction.reply({ content: "Поисковый запрос пуст.", ephemeral: true });
+      return;
+    }
+    const provider = normalizeMusicSearchProvider(interaction.options.getString("provider"));
+    if (!this.manager) throw new Error("music_manager_unavailable");
+
+    const existing = this.manager.players.get(interaction.guildId!);
+    const player = existing ?? await this.manager.createPlayer({
+      guildId: interaction.guildId!,
+      voiceChannelId,
+      textChannelId: await this.preferredTextChannelId(interaction.guildId!, interaction.channelId),
+      volume: await this.defaultVolume(interaction.guildId!),
+      selfDeaf: true
+    });
+    if (player.voiceChannelId !== voiceChannelId) throw new Error("music_player_in_other_voice");
+    if (!player.connected) await player.connect();
+
+    const resolved = resolveMusicSearchRequest(query, provider);
+    const result = await player.search(
+      resolved.source ? { query: resolved.query, source: resolved.source } : { query: resolved.query },
+      interaction.user
+    );
+    const tracks = result.tracks.slice(0, 5) as Track[];
+    if (!tracks.length) {
+      await interaction.reply({ content: "Ничего не найдено.", ephemeral: true });
+      return;
+    }
+
+    const token = Date.now().toString(36) + "-" + (++this.searchSequence).toString(36);
+    this.searchSessions.set(token, {
+      guildId: interaction.guildId!,
+      userId: interaction.user.id,
+      tracks,
+      expiresAt: Date.now() + 60_000
+    });
+
+    const rows = tracks.map((track, index) =>
+      new ButtonBuilder()
+        .setCustomId("dsp:music:search:" + token + ":" + index)
+        .setLabel(String(index + 1))
+        .setStyle(ButtonStyle.Secondary)
+    );
+
+    const description = tracks.map((track, index) =>
+      "**" + (index + 1) + ".** " + track.info.title.slice(0, 80) +
+      " — " + String(track.info.author ?? "Unknown").slice(0, 50) +
+      " (" + Math.round(Number(track.info.duration ?? 0) / 1000) + "s)"
+    ).join("\n");
+
+    await interaction.reply({
+      embeds: [new EmbedBuilder().setTitle("🔎 Результаты поиска").setDescription(description)],
+      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(...rows)],
+      ephemeral: true
+    });
   }
 
   private async play(interaction: ChatInputCommandInteraction, voiceChannelId: string | null): Promise<void> {
@@ -557,35 +1382,1700 @@ export class Music implements PlatformModule {
       await interaction.reply({ content: "Поисковый запрос пуст.", ephemeral: true });
       return;
     }
+    const provider = normalizeMusicSearchProvider(interaction.options.getString("provider"));
 
-    const player = await this.getOrCreatePlayer(interaction, voiceChannelId);
-    if (player.voiceChannelId !== voiceChannelId) {
-      await interaction.reply({ content: "Музыкальный бот уже находится в другом голосовом канале этого сервера.", ephemeral: true });
+    const cooldownKey = interaction.guildId! + ":" + interaction.user.id;
+    const remaining = remainingMusicRequestCooldown(this.requestCooldownUntil.get(cooldownKey) ?? 0);
+    if (remaining > 0) {
+      await interaction.reply({ content: "⏳ Подожди ещё " + Math.ceil(remaining / 1000) + " сек. перед следующим запросом.", ephemeral: true });
       return;
     }
 
-    if (!player.connected) {
-      await player.connect();
+    const queued = await this.queueQuery(
+      interaction.guildId!,
+      voiceChannelId,
+      interaction.channelId,
+      query,
+      interaction.user,
+      false,
+      false,
+      provider
+    );
+
+    if (queued.pending) {
+      this.requestCooldownUntil.set(cooldownKey, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
+      await interaction.reply({ content: "🕒 Запрос отправлен на подтверждение DJ или Manage Server.", ephemeral: true });
+      return;
     }
 
-    const source = /^https?:\/\//i.test(query) ? undefined : "ytsearch";
+    if (!queued.added) {
+      await interaction.reply({
+        content: queued.limited ? "Лимит ожидающих треков для тебя уже достигнут." : "Ничего не найдено.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    this.requestCooldownUntil.set(cooldownKey, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
+    const suffix = queued.limited
+      ? " (добавлено только в пределах твоего лимита)"
+      : queued.truncated
+        ? ` (добавлены первые ${MAX_PLAYLIST_TRACKS} треков)`
+        : "";
+    await interaction.reply({
+      content: `Добавлено в очередь: **${queued.added}** трек(ов)${suffix}. Первый: **${queued.firstTitle}** — ${queued.firstAuthor}`,
+      ephemeral: true
+    });
+  }
+
+  private serializedTrack(track: MusicQueueTrackLike): { encoded?: string; info: Record<string, unknown> } {
+    return {
+      encoded: track.encoded,
+      info: {
+        identifier: track.info.identifier ?? "",
+        isSeekable: Boolean(track.info.isSeekable),
+        author: track.info.author ?? "",
+        length: Number((track.info as typeof track.info & { length?: number; duration?: number }).length ?? (track.info as typeof track.info & { duration?: number }).duration ?? 0),
+        isStream: Boolean(track.info.isStream),
+        position: Number((track.info as typeof track.info & { position?: number }).position ?? 0),
+        title: track.info.title,
+        uri: (track.info as typeof track.info & { uri?: string | null }).uri ?? null,
+        artworkUrl: (track.info as typeof track.info & { artworkUrl?: string | null }).artworkUrl ?? null,
+        isrc: (track.info as typeof track.info & { isrc?: string | null }).isrc ?? null,
+        sourceName: track.info.sourceName
+      }
+    };
+  }
+
+  private async filter(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guild!.id);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
+
+    const action = interaction.options.getString("action", true);
+    if (!isMusicFilterAction(action)) {
+      await interaction.reply({ content: "Неизвестный filter action.", ephemeral: true });
+      return;
+    }
+    try {
+      await this.applyFilterAction(player, action);
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await interaction.reply({ content: "🎚️ Filter применён: **" + action + "**.", ephemeral: true });
+    } catch (error) {
+      logger.warn("Music filter operation failed", {
+        guildId: interaction.guild!.id,
+        action,
+        error: String(error)
+      });
+      await interaction.reply({ content: "Не удалось применить этот filter на текущем Lavalink node.", ephemeral: true });
+    }
+  }
+
+  private async applyFilterAction(player: Player, action: MusicFilterAction): Promise<void> {
+    switch (action) {
+      case "clear":
+        await player.filterManager.resetFilters();
+        break;
+      case "bassboost-low":
+        await player.filterManager.setEQPreset("BassboostLow");
+        break;
+      case "bassboost-medium":
+        await player.filterManager.setEQPreset("BassboostMedium");
+        break;
+      case "bassboost-high":
+        await player.filterManager.setEQPreset("BassboostHigh");
+        break;
+      case "rock":
+        await player.filterManager.setEQPreset("Rock");
+        break;
+      case "classic":
+        await player.filterManager.setEQPreset("Classic");
+        break;
+      case "pop":
+        await player.filterManager.setEQPreset("Pop");
+        break;
+      case "electronic":
+        await player.filterManager.setEQPreset("Electronic");
+        break;
+      case "fullsound":
+        await player.filterManager.setEQPreset("FullSound");
+        break;
+      case "karaoke":
+        await player.filterManager.toggleKaraoke();
+        break;
+      case "tremolo":
+        await player.filterManager.toggleTremolo();
+        break;
+      case "vibrato":
+        await player.filterManager.toggleVibrato();
+        break;
+      case "distortion": {
+        const nextDistortion = toggleMusicDistortion(player.filterManager.data?.distortion);
+        if (nextDistortion) player.filterManager.data.distortion = nextDistortion;
+        else delete player.filterManager.data.distortion;
+        await player.filterManager.applyPlayerFilters();
+        break;
+      }
+      case "lowpass":
+        await player.filterManager.toggleLowPass();
+        break;
+      case "channelmix":
+        await player.filterManager.setAudioOutput(
+          nextMusicChannelMixOutput(player.filterManager.data?.channelMix)
+        );
+        break;
+      case "gaming":
+        await player.filterManager.setEQPreset("Gaming");
+        break;
+      case "nightcore":
+        await player.filterManager.toggleNightcore();
+        break;
+      case "8d":
+        await player.filterManager.toggleRotation(0.4);
+        break;
+    }
+  }
+
+  private filterPalette(): ActionRowBuilder<ButtonBuilder>[] {
+    const labels: Record<MusicFilterAction, string> = {
+      clear: "Clear",
+      "bassboost-low": "Bass Low",
+      "bassboost-medium": "Bass Med",
+      "bassboost-high": "Bass High",
+      rock: "Rock",
+      classic: "Classic",
+      pop: "Pop",
+      electronic: "Electronic",
+      fullsound: "Full Sound",
+      karaoke: "Karaoke",
+      tremolo: "Tremolo",
+      vibrato: "Vibrato",
+      distortion: "Distortion",
+      lowpass: "Low Pass",
+      channelmix: "Channel Mix",
+      gaming: "Gaming",
+      nightcore: "Nightcore",
+      "8d": "8D"
+    };
+    return chunkMusicFilterActions(MUSIC_FILTER_ACTIONS).map((actions) =>
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        ...actions.map((action) =>
+          new ButtonBuilder().setCustomId("dsp:music:filter:" + action).setLabel(labels[action]).setStyle(ButtonStyle.Secondary)
+        )
+      )
+    );
+  }
+
+  private async favorite(interaction: ChatInputCommandInteraction): Promise<void> {
+    const action = interaction.options.getString("action", true);
+    const player = this.manager?.players.get(interaction.guild!.id);
+
+    if (action === "list") {
+      const result = await this.db.query<{ track: { info?: { title?: string; author?: string } } }>(
+        "SELECT track FROM music_favorites WHERE guild_id=$1 AND user_id=$2 ORDER BY created_at DESC LIMIT 25",
+        [interaction.guild!.id, interaction.user.id]
+      );
+      const lines = result.rows.map((row, index) =>
+        (index + 1) + ". **" + String(row.track?.info?.title ?? "Unknown track") + "** — " + String(row.track?.info?.author ?? "Unknown artist")
+      );
+      await interaction.reply({
+        content: lines.length ? "❤️ **Избранное**\n" + lines.join("\n") : "❤️ Избранное пока пусто.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (action === "play") {
+      const position = interaction.options.getInteger("track");
+      if (position === null || !isValidMusicSavedPosition(position, 25)) {
+        await interaction.reply({ content: "Укажи номер трека из избранного от 1 до 25.", ephemeral: true });
+        return;
+      }
+
+      const result = await this.db.query<{
+        track: { info?: { uri?: string | null; identifier?: string; title?: string } };
+      }>(
+        "SELECT track FROM music_favorites WHERE guild_id=$1 AND user_id=$2 ORDER BY created_at DESC LIMIT 25 OFFSET $3",
+        [interaction.guild!.id,interaction.user.id,position - 1]
+      );
+      const saved = result.rows[0]?.track;
+      const query = String(saved?.info?.uri ?? saved?.info?.identifier ?? "");
+      if (!query) {
+        await interaction.reply({ content: "Не удалось восстановить выбранный трек.", ephemeral: true });
+        return;
+      }
+
+      const voice = (await interaction.guild!.members.fetch(interaction.user.id)).voice.channelId;
+      if (!voice) {
+        await interaction.reply({ content: "Сначала зайди в голосовой канал.", ephemeral: true });
+        return;
+      }
+
+      const cooldownKey = interaction.guild!.id + ":" + interaction.user.id;
+      const remaining = remainingMusicRequestCooldown(this.requestCooldownUntil.get(cooldownKey) ?? 0);
+      if (remaining > 0) {
+        await interaction.reply({ content: "⏳ Подожди ещё " + Math.ceil(remaining / 1000) + " сек. перед следующим запросом.", ephemeral: true });
+        return;
+      }
+
+      const queued = await this.queueQuery(
+        interaction.guild!.id,
+        voice,
+        interaction.channelId,
+        query,
+        interaction.user
+      );
+      this.requestCooldownUntil.set(cooldownKey, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
+
+      if (queued.pending) {
+        await interaction.reply({ content: "🕒 Избранный трек отправлен на подтверждение DJ или Manage Server.", ephemeral: true });
+        return;
+      }
+      if (!queued.added) {
+        await interaction.reply({
+          content: queued.limited ? "⛔ Лимит очереди уже достигнут." : "Не удалось добавить выбранный трек.",
+          ephemeral: true
+        });
+        return;
+      }
+      await interaction.reply({
+        content: "▶️ Запущен трек из избранного" + (queued.firstTitle ? ": **" + queued.firstTitle + "**" : "."),
+        ephemeral: true
+      });
+      return;
+    }
+
+    const track = player?.queue.current;
+    if (!track) {
+      await interaction.reply({ content: "Нужен текущий трек в плеере.", ephemeral: true });
+      return;
+    }
+
+    if (action === "add") {
+      await this.db.query(
+        "INSERT INTO music_favorites(guild_id,user_id,identifier,track) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT(guild_id,user_id,identifier) DO UPDATE SET track=EXCLUDED.track",
+        [interaction.guild!.id,interaction.user.id,track.info.identifier,JSON.stringify(this.serializedTrack(track))]
+      );
+      await interaction.reply({ content: "❤️ Трек сохранён в избранное.", ephemeral: true });
+      return;
+    }
+
+    if (action === "remove") {
+      const deleted = await this.db.query(
+        "DELETE FROM music_favorites WHERE guild_id=$1 AND user_id=$2 AND identifier=$3",
+        [interaction.guild!.id,interaction.user.id,track.info.identifier]
+      );
+      await interaction.reply({
+        content: deleted.rowCount ? "🗑️ Трек удалён из избранного." : "Этого трека нет в избранном.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    await interaction.reply({ content: "Неизвестное действие favorite.", ephemeral: true });
+  }
+
+  private async savedPlaylist(interaction: ChatInputCommandInteraction): Promise<void> {
+    const action = interaction.options.getString("action", true);
+    const name = interaction.options.getString("name")?.trim().slice(0, 80) ?? "";
+    const query = normalizeMusicPlaylistSearch(interaction.options.getString("query") ?? "");
+    const shared = interaction.options.getBoolean("shared") === true;
+    const sharedOnly = interaction.options.getBoolean("shared-only") === true;
+    const guildId = interaction.guild!.id;
+
+    if (action === "import") {
+      const importUrl = normalizeMusicPlaylistImportUrl(interaction.options.getString("query") ?? "");
+      if (!importUrl) {
+        await interaction.reply({ content: "Укажи корректный HTTP(S) URL плейлисты.", ephemeral: true });
+        return;
+      }
+      if (!name) {
+        await interaction.reply({ content: "Укажи имя новой плейлисты.", ephemeral: true });
+        return;
+      }
+
+      const visibility = normalizeMusicPlaylistVisibility(shared);
+      if (visibility === "shared" && !await this.canManageMusicMember(
+        guildId,
+        await interaction.guild!.members.fetch(interaction.user.id).catch(() => null)
+      )) {
+        await interaction.reply({ content: "Импортировать shared-плейлисты могут только DJ или Manage Server.", ephemeral: true });
+        return;
+      }
+      if (!this.manager) throw new Error("music_manager_unavailable");
+
+      const voiceChannelId = (await interaction.guild!.members.fetch(interaction.user.id)).voice.channelId;
+      if (!voiceChannelId) {
+        await interaction.reply({ content: "Для импорта сначала зайди в голосовой канал, чтобы Music смогла получить список треков.", ephemeral: true });
+        return;
+      }
+
+      try {
+        const existing = this.manager.players.get(guildId);
+        const player = existing ?? await this.manager.createPlayer({
+          guildId,
+          voiceChannelId,
+          textChannelId: await this.preferredTextChannelId(guildId, interaction.channelId),
+          volume: await this.defaultVolume(guildId),
+          selfDeaf: true
+        });
+        if (player.voiceChannelId !== voiceChannelId) {
+          await interaction.reply({ content: "Музыкальный бот уже занят другим голосовым каналом.", ephemeral: true });
+          return;
+        }
+        if (!player.connected) await player.connect();
+
+        const result = await player.search({ query: importUrl }, interaction.user);
+        if (!result.tracks.length) {
+          await interaction.reply({ content: "По этому URL не удалось получить ни одного трека.", ephemeral: true });
+          return;
+        }
+
+        const seen = new Set<string>();
+        const imported = (result.tracks as Track[]).filter((track) => {
+          const identifier = String(track.info.identifier ?? track.info.uri ?? "");
+          if (!identifier || seen.has(identifier)) return false;
+          seen.add(identifier);
+          return true;
+        }).slice(0, MAX_PLAYLIST_TRACKS);
+
+        if (!imported.length) {
+          await interaction.reply({ content: "В импортируемой плейлисте не осталось уникальных треков.", ephemeral: true });
+          return;
+        }
+
+        try {
+          await this.db.query(
+            "INSERT INTO music_playlists(guild_id,user_id,name,visibility,tracks) VALUES($1,$2,$3,$4,$5::jsonb)",
+            [guildId,interaction.user.id,name,visibility,JSON.stringify(imported.map((track) => this.serializedTrack(track)))]
+          );
+        } catch {
+          await interaction.reply({
+            content: visibility === "shared"
+              ? "Shared-плейлист с таким именем уже существует."
+              : "Личный плейлист с таким именем уже существует.",
+            ephemeral: true
+          });
+          return;
+        }
+
+        const limited = result.tracks.length > imported.length;
+        await interaction.reply({
+          content: "📥 " + (visibility === "shared" ? "Shared-плейлист" : "Плейлист") + " **" + name + "** импортирован: **" +
+            imported.length + "** треков" + (limited ? " (лишние/дубликаты отброшены)" : "") + ".",
+          ephemeral: true
+        });
+      } catch (error) {
+        logger.warn("Music playlist URL import failed", {
+          guildId,
+          userId: interaction.user.id,
+          error: String(error)
+        });
+        await interaction.reply({ content: "Не удалось импортировать плейлист по этому URL.", ephemeral: true });
+      }
+      return;
+    }
+
+    if (action === "save-queue") {
+      const player = this.manager?.players.get(guildId);
+      if (!player) {
+        await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+        return;
+      }
+
+      const member = await interaction.guild!.members.fetch(interaction.user.id).catch(() => null);
+      if (!canControlMusic(
+        member?.voice.channelId ?? null,
+        player.voiceChannelId,
+        member?.permissions.has("ManageGuild") ?? false
+      )) {
+        await interaction.reply({ content: "Сохранять очередь можно из того же голосового канала.", ephemeral: true });
+        return;
+      }
+
+      if (!name) {
+        await interaction.reply({ content: "Укажи имя плейлиста.", ephemeral: true });
+        return;
+      }
+
+      const visibility = normalizeMusicPlaylistVisibility(shared);
+      if (visibility === "shared" && !await this.canManageMusicMember(guildId, member)) {
+        await interaction.reply({ content: "Создавать shared-плейлисты могут только DJ или Manage Server.", ephemeral: true });
+        return;
+      }
+
+      const tracks = buildMusicPlaylistSnapshot(player.queue.current, player.queue.tracks);
+
+      if (!tracks.length) {
+        await interaction.reply({ content: "Нечего сохранять: очередь пуста.", ephemeral: true });
+        return;
+      }
+
+      try {
+        await this.db.query(
+          "INSERT INTO music_playlists(guild_id,user_id,name,visibility,tracks) VALUES($1,$2,$3,$4,$5::jsonb)",
+          [
+            guildId,
+            interaction.user.id,
+            name,
+            visibility,
+            JSON.stringify(tracks.map((track) => this.serializedTrack(track)))
+          ]
+        );
+      } catch (error) {
+        if (/unique|duplicate|23505/i.test(String(error))) {
+          await interaction.reply({
+            content: (visibility === "shared" ? "Shared-плейлист" : "Плейлист") + " **" + name + "** уже существует. Выбери другое имя.",
+            ephemeral: true
+          });
+          return;
+        }
+        logger.warn("Music queue playlist save failed", {
+          guildId,
+          userId: interaction.user.id,
+          error: String(error)
+        });
+        await interaction.reply({ content: "Не удалось сохранить текущую очередь.", ephemeral: true });
+        return;
+      }
+
+      await interaction.reply({
+        content: "💾 Очередь сохранена в " + (visibility === "shared" ? "shared-плейлист" : "личный плейлист") + " **" + name + "**: **" + tracks.length + "** трек(ов).",
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (action === "list") {
+      const token = this.createMusicPlaylistPaginationSession({
+        guildId,
+        userId: interaction.user.id,
+        action: "list"
+      });
+      await this.renderMusicPlaylistPagination(interaction,token,this.playlistPaginationSessions.get(token)!,0);
+      return;
+    }
+
+    if (action === "search") {
+      if (!query) {
+        await interaction.reply({ content: "Укажи текст для поиска.", ephemeral: true });
+        return;
+      }
+      const token = this.createMusicPlaylistPaginationSession({
+        guildId,
+        userId: interaction.user.id,
+        action: "search",
+        query,
+        sharedOnly
+      });
+      await this.renderMusicPlaylistPagination(interaction,token,this.playlistPaginationSessions.get(token)!,0);
+      return;
+    }
+
+    if (!name) {
+      await interaction.reply({ content: "Укажи имя плейлиста.", ephemeral: true });
+      return;
+    }
+
+    if (action === "create") {
+      const visibility = normalizeMusicPlaylistVisibility(shared);
+      if (visibility === "shared" && !await this.canManageMusicMember(
+        guildId,
+        await interaction.guild!.members.fetch(interaction.user.id).catch(() => null)
+      )) {
+        await interaction.reply({ content: "Создавать shared-плейлисты могут только DJ или Manage Server.", ephemeral: true });
+        return;
+      }
+      try {
+        await this.db.query(
+          "INSERT INTO music_playlists(guild_id,user_id,name,visibility) VALUES($1,$2,$3,$4)",
+          [guildId,interaction.user.id,name,visibility]
+        );
+      } catch {
+        await interaction.reply({
+          content: visibility === "shared"
+            ? "Shared-плейлист с таким именем уже существует."
+            : "Личный плейлист с таким именем уже существует.",
+          ephemeral: true
+        });
+        return;
+      }
+      await interaction.reply({
+        content: "🎼 " + (visibility === "shared" ? "Shared-плейлист" : "Плейлист") + " **" + name + "** создан.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    const playlist = await this.db.query<{
+      id: string;
+      tracks: unknown[];
+      visibility: MusicPlaylistVisibility;
+      user_id: string;
+    }>(
+      "SELECT id,tracks,visibility,user_id FROM music_playlists WHERE guild_id=$1 AND name=$2 AND (user_id=$3 OR visibility='shared') ORDER BY CASE WHEN user_id=$3 THEN 0 ELSE 1 END LIMIT 1",
+      [guildId,name,interaction.user.id]
+    );
+    const row = playlist.rows[0];
+    if (!row) {
+      await interaction.reply({ content: "Плейлист не найден.", ephemeral: true });
+      return;
+    }
+
+    const canEdit = row.user_id === interaction.user.id ||
+      await this.canManageMusicMember(
+        guildId,
+        await interaction.guild!.members.fetch(interaction.user.id).catch(() => null)
+      );
+
+    if (action === "delete") {
+      if (!canEdit) {
+        await interaction.reply({ content: "Удалять этот shared-плейлист могут только его создатель, DJ или Manage Server.", ephemeral: true });
+        return;
+      }
+      await this.db.query("DELETE FROM music_playlists WHERE id=$1", [row.id]);
+      await this.invalidatePlaylistContinuation(guildId, row.id);
+      await interaction.reply({ content: "🗑️ Плейлист **" + name + "** удалён.", ephemeral: true });
+      return;
+    }
+
+    const stored = Array.isArray(row.tracks) ? [...row.tracks] : [];
+
+    if (action === "view") {
+      const token = this.createMusicPlaylistPaginationSession({
+        guildId,
+        userId: interaction.user.id,
+        action: "view",
+        name,
+      });
+      await this.renderMusicPlaylistPagination(interaction,token,this.playlistPaginationSessions.get(token)!,0);
+      return;
+    }
+
+    const current = this.manager?.players.get(guildId);
+    const shouldShuffle = (action === "load" || action === "play") && interaction.options.getBoolean("shuffle") === true;
+
+    const trackPosition = interaction.options.getInteger("track");
+    const targetPosition = interaction.options.getInteger("to");
+    const sourceName = normalizeMusicPlaylistName(interaction.options.getString("source") ?? "");
+
+    if (action === "merge") {
+      if (!canEdit) {
+        await interaction.reply({ content: "Объединять этот плейлист могут только его создатель, DJ или Manage Server.", ephemeral: true });
+        return;
+      }
+      if (!sourceName) {
+        await interaction.reply({ content: "Укажи имя исходного плейлиста в параметре source.", ephemeral: true });
+        return;
+      }
+      if (sourceName === name) {
+        await interaction.reply({ content: "Исходный и целевой плейлисты должны быть разными.", ephemeral: true });
+        return;
+      }
+
+      const sourceResult = await this.db.query<{
+        id: string;
+        tracks: unknown[];
+        visibility: MusicPlaylistVisibility;
+        user_id: string;
+        name: string;
+      }>(
+        "SELECT id,tracks,visibility,user_id,name FROM music_playlists WHERE guild_id=$1 AND name=$2 AND (user_id=$3 OR visibility='shared') ORDER BY CASE WHEN user_id=$3 THEN 0 ELSE 1 END LIMIT 1",
+        [guildId,sourceName,interaction.user.id]
+      );
+      const source = sourceResult.rows[0];
+      if (!source) {
+        await interaction.reply({ content: "Исходный плейлист не найден или недоступен.", ephemeral: true });
+        return;
+      }
+      if (source.id === row.id) {
+        await interaction.reply({ content: "Исходный и целевой плейлисты должны быть разными.", ephemeral: true });
+        return;
+      }
+
+      const targetTracks = Array.isArray(row.tracks) ? row.tracks : [];
+      const sourceTracks = Array.isArray(source.tracks) ? source.tracks : [];
+      const merged = mergeMusicPlaylistTracks(
+        targetTracks,
+        sourceTracks,
+        (item) => {
+          const obj = item as { info?: { identifier?: unknown; uri?: unknown } };
+          const identifier = obj.info?.identifier;
+          if (typeof identifier === "string" && identifier) return identifier;
+          const uri = obj.info?.uri;
+          return typeof uri === "string" && uri ? uri : null;
+        }
+      );
+
+      if (merged.added === 0) {
+        await interaction.reply({
+          content: "Нечего добавлять: все треки из **" + source.name + "** уже есть в **" + name + "** или плейлист уже заполнен (500 треков).",
+          ephemeral: true
+        });
+        return;
+      }
+
+      await this.db.query(
+        "UPDATE music_playlists SET tracks=$1::jsonb,updated_at=now() WHERE id=$2",
+        [JSON.stringify(merged.tracks),row.id]
+      );
+      await this.invalidatePlaylistContinuation(guildId, row.id);
+      const suffix = merged.truncated > 0 ? " Лишние треки отброшены из-за лимита 500." : "";
+      await interaction.reply({
+        content: "🔀 В **" + name + "** добавлено **" + merged.added + "** уникальных треков из **" + source.name + "**; дублей пропущено: **" + merged.duplicates + "**." + suffix,
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (action === "remove" || action === "move") {
+      if (!canEdit) {
+        await interaction.reply({ content: "Изменять этот плейлист могут только его создатель, DJ или Manage Server.", ephemeral: true });
+        return;
+      }
+      if (trackPosition === null || (action === "move" && targetPosition === null)) {
+        await interaction.reply({
+          content: action === "move" ? "Для перемещения укажи номер трека и новую позицию." : "Укажи номер трека.",
+          ephemeral: true
+        });
+        return;
+      }
+
+      const updated = action === "remove"
+        ? removeMusicPlaylistTrack(stored, trackPosition)
+        : moveMusicPlaylistTrack(stored, trackPosition, targetPosition!);
+
+      if (!updated) {
+        await interaction.reply({ content: "Такого номера трека/позиции в плейлисте нет.", ephemeral: true });
+        return;
+      }
+
+      if (action === "move" && trackPosition === targetPosition) {
+        await interaction.reply({ content: "Трек уже находится на этой позиции.", ephemeral: true });
+        return;
+      }
+
+      await this.db.query(
+        "UPDATE music_playlists SET tracks=$1::jsonb,updated_at=now() WHERE id=$2",
+        [JSON.stringify(updated),row.id]
+      );
+      await this.invalidatePlaylistContinuation(guildId, row.id);
+      await interaction.reply({
+        content: action === "remove"
+          ? "🗑️ Трек №" + trackPosition + " удалён из **" + name + "**."
+          : "↕️ Трек №" + trackPosition + " перемещён на позицию №" + targetPosition + " в **" + name + "**.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (action === "add") {
+      if (!canEdit) {
+        await interaction.reply({ content: "Изменять этот shared-плейлист могут только его создатель, DJ или Manage Server.", ephemeral: true });
+        return;
+      }
+      const track = current?.queue.current;
+      if (!track) {
+        await interaction.reply({ content: "Нужен текущий трек в плеере.", ephemeral: true });
+        return;
+      }
+      if (stored.length >= MAX_PLAYLIST_TRACKS) {
+        await interaction.reply({ content: "Плейлист уже содержит максимум 500 треков.", ephemeral: true });
+        return;
+      }
+
+      const existingIds = new Set(
+        stored.map((item) => {
+          const obj = item as { info?: { identifier?: string } };
+          return obj.info?.identifier ?? "";
+        })
+      );
+      if (existingIds.has(track.info.identifier)) {
+        await interaction.reply({ content: "Этот трек уже есть в плейлисте.", ephemeral: true });
+        return;
+      }
+
+      stored.push(this.serializedTrack(track));
+      await this.db.query(
+        "UPDATE music_playlists SET tracks=$1::jsonb,updated_at=now() WHERE id=$2",
+        [JSON.stringify(stored),row.id]
+      );
+      await this.invalidatePlaylistContinuation(guildId, row.id);
+      await interaction.reply({ content: "➕ Трек добавлен в **" + name + "**.", ephemeral: true });
+      return;
+    }
+
+    if (action === "load" || action === "play") {
+      const voice = (await interaction.guild!.members.fetch(interaction.user.id)).voice.channelId;
+      if (!voice) {
+        await interaction.reply({ content: "Сначала зайди в голосовой канал.", ephemeral: true });
+        return;
+      }
+
+      if (!await this.canQueueMusic(guildId, interaction.user.id, interaction.channelId)) {
+        await interaction.reply({ content: "Добавление в очередь запрещено политикой Music.", ephemeral: true });
+        return;
+      }
+
+      const player = current ?? await this.getOrCreatePlayer(interaction, voice);
+      if (player.voiceChannelId !== voice) {
+        await interaction.reply({ content: "Музыкальный бот уже занят другим голосовым каналом.", ephemeral: true });
+        return;
+      }
+      if (!player.connected) await player.connect();
+
+      const settings = await this.musicSettings(guildId);
+      const queuedByUser = countMusicQueuedByUser(player.queue.tracks, interaction.user.id);
+      const remainingUserSlots = remainingMusicQueueSlots(queuedByUser, settings.maxQueuedPerUser);
+      const remainingGuildSlots = remainingMusicGuildQueueSlots(player.queue.tracks.length, settings.maxQueueSize);
+      if (remainingUserSlots === 0 || remainingGuildSlots === 0) {
+        await interaction.reply({ content: "⛔ Доступный лимит очереди для тебя или сервера уже достигнут.", ephemeral: true });
+        return;
+      }
+
+      const loadLimit = Math.min(
+        MAX_PLAYLIST_TRACKS,
+        ...(remainingUserSlots === null ? [] : [remainingUserSlots]),
+        ...(remainingGuildSlots === null ? [] : [remainingGuildSlots])
+      );
+      const playlistOrder = shouldShuffle
+        ? shuffleMusicItems(stored.map((_, index) => index))
+        : stored.map((_, index) => index);
+      const itemsToLoad = playlistOrder.slice(0, loadLimit).map((index) => stored[index]).filter((item): item is unknown => item !== undefined);
+      const builtTracks: Track[] = [];
+      for (const item of itemsToLoad) {
+        try {
+          const built = this.manager?.utils.buildTrack(
+            item as Parameters<LavalinkManager["utils"]["buildTrack"]>[0],
+            interaction.user
+          );
+          if (built) builtTracks.push(built);
+        } catch (error) {
+          logger.warn("Saved music track restore failed", {
+            guildId,
+            playlist: name,
+            error: String(error)
+          });
+        }
+      }
+
+      let added = 0;
+      for (const built of builtTracks) {
+        player.queue.add(built);
+        added += 1;
+      }
+
+      await this.applyFairQueue(player, settings.fairQueueEnabled);
+      if (!player.playing && added > 0) await player.play();
+      const continuationRemaining = itemsToLoad.length < stored.length;
+      if (continuationRemaining) {
+        this.playlistContinuations.set(guildId, {
+          playlistId: row.id,
+          nextIndex: itemsToLoad.length,
+          order: shouldShuffle ? playlistOrder : null,
+          requesterUserId: interaction.user.id
+        });
+      } else {
+        this.playlistContinuations.delete(guildId);
+      }
+
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      const limitedSuffix =
+        ((remainingUserSlots !== null || remainingGuildSlots !== null) && stored.length > added)
+          ? " — в пределах лимита очереди"
+          : "";
+      await interaction.reply({
+        content: "▶️ В очередь добавлено **" + added + "** треков из **" + name + "**" + (shouldShuffle ? " в случайном порядке" : "") + limitedSuffix + ".",
+        ephemeral: true
+      });
+      return;
+    }
+
+    await interaction.reply({ content: "Неизвестное действие playlist.", ephemeral: true });
+  }
+
+  private musicPlaylistPaginationComponents(token: string, page: number, totalPages: number): ActionRowBuilder<ButtonBuilder>[] {
+    if (totalPages <= 1) return [];
+    const previous = new ButtonBuilder()
+      .setCustomId("dsp:music:playlist-page:" + token + ":" + (page - 1))
+      .setLabel("◀")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page <= 0);
+    const next = new ButtonBuilder()
+      .setCustomId("dsp:music:playlist-page:" + token + ":" + (page + 1))
+      .setLabel("▶")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page >= totalPages - 1);
+    const counter = new ButtonBuilder()
+      .setCustomId("dsp:music:playlist-page:" + token + ":" + page)
+      .setLabel((page + 1) + "/" + totalPages)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true);
+    return [new ActionRowBuilder<ButtonBuilder>().addComponents(previous, counter, next)];
+  }
+
+  private createMusicPlaylistPaginationSession(input: {
+    guildId: string;
+    userId: string;
+    action: "list" | "search" | "view";
+    name?: string;
+    query?: string;
+    sharedOnly?: boolean;
+  }): string {
+    const token = Date.now().toString(36) + "-" + (++this.playlistPaginationSequence).toString(36);
+    this.playlistPaginationSessions.set(token, {
+      ...input,
+      expiresAt: Date.now() + 10 * 60_000
+    });
+    return token;
+  }
+
+  private async renderMusicPlaylistPagination(
+    interaction: ChatInputCommandInteraction | ButtonInteraction,
+    token: string,
+    session: {
+      guildId: string;
+      userId: string;
+      action: "list" | "search" | "view";
+      name?: string;
+      query?: string;
+      sharedOnly?: boolean;
+      expiresAt: number;
+    },
+    page: number
+  ): Promise<void> {
+    if (session.action === "view") {
+      const result = await this.db.query<{ tracks: unknown[]; visibility: MusicPlaylistVisibility }>(
+        "SELECT tracks,visibility FROM music_playlists WHERE guild_id=$1 AND name=$2 AND (user_id=$3 OR visibility='shared') ORDER BY CASE WHEN user_id=$3 THEN 0 ELSE 1 END LIMIT 1",
+        [session.guildId,session.name ?? "",session.userId]
+      );
+      const row = result.rows[0];
+      if (!row) {
+        if (interaction.isButton()) {
+          await interaction.update({ content: "Плейлист больше недоступен.", components: [] });
+        } else {
+          await interaction.reply({ content: "Плейлист больше недоступен.", ephemeral: true });
+        }
+        return;
+      }
+
+      const tracks = Array.isArray(row.tracks) ? row.tracks : [];
+      const totalPages = musicPlaylistPageCount(tracks.length);
+      const currentPage = normalizeMusicPlaylistPage(page,totalPages);
+      const offset = currentPage * MUSIC_PLAYLIST_PAGE_SIZE;
+      const visible = tracks.slice(offset,offset + MUSIC_PLAYLIST_PAGE_SIZE);
+      const lines = visible.map((item,index) => {
+        const obj = item as { info?: { title?: string; author?: string } };
+        return (offset + index + 1) + ". **" + String(obj.info?.title ?? "Unknown track") + "** — " + String(obj.info?.author ?? "Unknown artist");
+      });
+      const content = "🎼 **" + session.name + "** (" + (row.visibility === "shared" ? "🌐 shared" : "👤 личный") + ") · страница " +
+        (currentPage + 1) + "/" + totalPages + "\n" + (lines.length ? lines.join("\n") : "Плейлист пуст.");
+      const components = this.musicPlaylistPaginationComponents(token,currentPage,totalPages);
+      if (interaction.isButton()) await interaction.update({ content,components });
+      else await interaction.reply({ content,components,ephemeral: true });
+      return;
+    }
+
+    const queryText = session.query ?? "";
+    const pattern = "%" + queryText + "%";
+    const where = session.action === "search"
+      ? " AND ($4=false OR visibility='shared') AND name ILIKE $3"
+      : "";
+    const countArgs = session.action === "search"
+      ? [session.guildId,session.userId,pattern,Boolean(session.sharedOnly)]
+      : [session.guildId,session.userId];
+    const count = await this.db.query<{ total: number }>(
+      "SELECT COUNT(*)::int AS total FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared')" + where,
+      countArgs
+    );
+    const totalItems = Number(count.rows[0]?.total ?? 0);
+    const totalPages = musicPlaylistPageCount(totalItems);
+    const currentPage = normalizeMusicPlaylistPage(page,totalPages);
+    const offset = currentPage * MUSIC_PLAYLIST_PAGE_SIZE;
+    const selectSql = session.action === "search"
+      ? "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') AND ($4=false OR visibility='shared') AND name ILIKE $3 ORDER BY visibility DESC,updated_at DESC LIMIT $5 OFFSET $6"
+      : "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') ORDER BY visibility DESC,updated_at DESC LIMIT $3 OFFSET $4";
+    const selectArgs = session.action === "search"
+      ? [session.guildId,session.userId,pattern,Boolean(session.sharedOnly),MUSIC_PLAYLIST_PAGE_SIZE,offset]
+      : [session.guildId,session.userId,MUSIC_PLAYLIST_PAGE_SIZE,offset];
+    const result = await this.db.query<{ name: string; tracks: unknown[]; visibility: MusicPlaylistVisibility }>(
+      selectSql,
+      selectArgs
+    );
+    const lines = result.rows.map((row,index) =>
+      (offset + index + 1) + ". " + (row.visibility === "shared" ? "🌐" : "👤") + " **" + row.name + "** — " +
+      String(Array.isArray(row.tracks) ? row.tracks.length : 0) + " треков"
+    );
+    const heading = session.action === "search" ? "🔎 **Результаты поиска: " + queryText + "**" : "🎼 **Доступные плейлисты**";
+    const content = heading + " · страница " + (currentPage + 1) + "/" + totalPages + "\n" +
+      (lines.length ? lines.join("\n") : "Плейлистов не найдено.");
+    const components = this.musicPlaylistPaginationComponents(token,currentPage,totalPages);
+    if (interaction.isButton()) await interaction.update({ content,components });
+    else await interaction.reply({ content,components,ephemeral: true });
+  }
+
+  private async previous(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guild!.id);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
+    await this.previousInteraction(player, interaction);
+  }
+
+  private async previousInteraction(player: Player, interaction: ChatInputCommandInteraction | import("discord.js").ButtonInteraction): Promise<void> {
+    const previous = player.queue.previous;
+    if (!Array.isArray(previous) || previous.length === 0) {
+      await interaction.reply({ content: "⏮️ Предыдущего трека нет.", ephemeral: true });
+      return;
+    }
+    try {
+      await player.queue.shiftPrevious();
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await interaction.reply({ content: "⏮️ Вернулся к предыдущему треку.", ephemeral: true });
+    } catch (error) {
+      logger.warn("Music previous track failed", {
+        guildId: player.guildId,
+        error: String(error)
+      });
+      await interaction.reply({ content: "Не удалось вернуть предыдущий трек.", ephemeral: true });
+    }
+  }
+
+  private async lyrics(interaction: ChatInputCommandInteraction): Promise<void> {
+    const action = interaction.options.getString("action") ?? "show";
+    if (action === "sync") {
+      const player = this.manager?.players.get(interaction.guild!.id);
+      if (!player || !player.queue.current) {
+        await interaction.reply({ content: "📜 Сейчас ничего не играет.", ephemeral: true });
+        return;
+      }
+      if (!await this.canControl(interaction, player.voiceChannelId)) return;
+
+      try {
+        const current = player.queue.current;
+        const result = await player.getLyrics(current);
+        const lines = normalizeMusicTimedLyrics(result && typeof result === "object" ? (result as { lines?: unknown }).lines : null);
+        if (lines.length < 2) {
+          await interaction.reply({
+            content: "📜 Для этого трека нет достаточных тайм-кодов для live sync.",
+            ephemeral: true
+          });
+          return;
+        }
+
+        const token = Date.now().toString(36) + "-" + (++this.lyricsPaginationSequence).toString(36);
+        const trackIdentifier = current.info.identifier ?? current.info.uri ?? current.info.title;
+        let stopped = false;
+
+        const update = async (): Promise<void> => {
+          if (stopped) return;
+          const active = this.manager?.players.get(interaction.guild!.id);
+          const activeTrack = active?.queue.current;
+          const identifier = activeTrack?.info.identifier ?? activeTrack?.info.uri ?? activeTrack?.info.title;
+          if (!active || !activeTrack || identifier !== trackIdentifier) {
+            stopped = true;
+            const timer = this.lyricsSyncTimers.get(token);
+            if (timer) clearInterval(timer);
+            this.lyricsSyncTimers.delete(token);
+            return;
+          }
+
+          const basePosition = Math.max(0, Number(active.lastPosition ?? 0));
+          const elapsed = active.paused
+            ? 0
+            : Math.max(0, Date.now() - Number(active.lastPositionChange ?? Date.now()));
+          const positionMs = basePosition + elapsed;
+
+          const currentIndex = findMusicTimedLyricIndex(lines, positionMs);
+          const content =
+            "📜 **Live lyrics**\n\n" +
+            formatMusicSyncedLyrics(lines, positionMs) +
+            (currentIndex >= lines.length - 1 ? "\n\n✅ Песня почти закончилась." : "");
+
+          await interaction.editReply({ content }).catch(() => {
+            stopped = true;
+          });
+
+          if (stopped || currentIndex >= lines.length - 1) {
+            const timer = this.lyricsSyncTimers.get(token);
+            if (timer) clearInterval(timer);
+            this.lyricsSyncTimers.delete(token);
+          }
+        };
+
+        await interaction.reply({
+          content: "📜 **Live lyrics**\n\n" + formatMusicSyncedLyrics(lines, Number(player.lastPosition ?? 0)),
+          ephemeral: true
+        });
+
+        const timer = setInterval(() => { void update(); }, 2000);
+        this.lyricsSyncTimers.set(token, timer);
+        timer.unref();
+        await update();
+      } catch (error) {
+        logger.warn("Music synced lyrics lookup failed", {
+          guildId: interaction.guild!.id,
+          error: String(error)
+        });
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({
+            content: "Не удалось получить синхронизированный текст трека.",
+            ephemeral: true
+          });
+        }
+      }
+      return;
+    }
+
+    if (action === "status") {
+      const configuredSources = [
+        ["YouTube", true],
+        ["Spotify", true],
+        ["Deezer", true],
+        ["Yandex Music", true]
+      ] as const;
+      const lines = configuredSources.map(([name, enabled]) =>
+        (enabled ? "🟢" : "⚪") + " **" + name + "** · LavaLyrics"
+      );
+      await interaction.reply({
+        content:
+          "📜 **Lyrics status**\n" +
+          "LavaLyrics: " + (this.initialized && this.connectedNodes.size > 0 ? "🟢 доступен" : "🟡 node недоступен") +
+          "\n\n" + lines.join("\n") +
+          "\n\nИсточники определяются конфигурацией Lavalink/LavaLyrics; отсутствие текста у отдельного трека не означает неисправность lyrics-модуля.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    const player = this.manager?.players.get(interaction.guild!.id);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+    if (!await this.canControl(interaction, player.voiceChannelId)) return;
+
+    try {
+      const current = player.queue.current;
+      if (!current) {
+        await interaction.reply({ content: "📜 Сейчас ничего не играет.", ephemeral: true });
+        return;
+      }
+
+      const result = await player.getLyrics(current);
+      if (!result) {
+        await interaction.reply({ content: "📜 Для этого трека текст не найден.", ephemeral: true });
+        return;
+      }
+
+      const textValue = typeof result.text === "string" && result.text.trim()
+        ? result.text.trim()
+        : Array.isArray(result.lines)
+          ? result.lines.map((line) => String(line.line ?? "")).filter(Boolean).join("\n")
+          : "";
+
+      const chunks = chunkMusicLyrics(textValue);
+      if (!chunks.length) {
+        await interaction.reply({ content: "📜 Для этого трека текст не найден.", ephemeral: true });
+        return;
+      }
+
+      const token = Date.now().toString(36) + "-" + (++this.lyricsPaginationSequence).toString(36);
+      this.lyricsPaginationSessions.set(token, {
+        guildId: interaction.guild!.id,
+        userId: interaction.user.id,
+        trackIdentifier: current.info.identifier ?? current.info.uri ?? current.info.title,
+        chunks,
+        expiresAt: Date.now() + 5 * 60_000
+      });
+
+      const page = this.buildLyricsPage(token, 0);
+      await interaction.reply({
+        content: page.content,
+        components: page.components,
+        ephemeral: true
+      });
+    } catch (error) {
+      logger.warn("Music lyrics lookup failed", {
+        guildId: interaction.guild!.id,
+        error: String(error)
+      });
+      if (interaction.replied || interaction.deferred) return;
+      await interaction.reply({
+        content: "Не удалось получить текст трека. Возможно, для него нет lyrics source.",
+        ephemeral: true
+      });
+    }
+  }
+
+  private buildLyricsPage(token: string, requestedPage: number): {
+    content: string;
+    components: ActionRowBuilder<ButtonBuilder>[];
+  } {
+    const session = this.lyricsPaginationSessions.get(token);
+    if (!session) {
+      return { content: "📜 Эта навигация устарела. Запроси текст заново.", components: [] };
+    }
+
+    const totalPages = musicLyricsPageCount(session.chunks);
+    const page = normalizeMusicLyricsPage(requestedPage, totalPages);
+    const content =
+      "📜 **Текст** · " + (page + 1) + "/" + totalPages + "\n\n" +
+      session.chunks[page];
+
+    const components = totalPages > 1
+      ? [
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+              .setCustomId("dsp:music:lyrics-page:" + token + ":" + Math.max(0, page - 1))
+              .setEmoji("⬅️")
+              .setLabel("Назад")
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(page === 0),
+            new ButtonBuilder()
+              .setCustomId("dsp:music:lyrics-page:" + token + ":" + Math.min(totalPages - 1, page + 1))
+              .setEmoji("➡️")
+              .setLabel("Дальше")
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(page >= totalPages - 1)
+          )
+        ]
+      : [];
+
+    return { content, components };
+  }
+
+
+  private async queueQuery(
+    guildId: string,
+    voiceChannelId: string,
+    textChannelId: string,
+    query: string,
+    requester: import("discord.js").User,
+    bypassApproval = false,
+    bypassPolicy = false,
+    provider?: MusicSearchProvider | null
+  ): Promise<{ added: number; truncated: boolean; limited: boolean; pending: boolean; approvalId: string | null; firstTitle: string; firstAuthor: string }> {
+    if (!this.manager) throw new Error("music_manager_unavailable");
+
+    const settings = await this.musicSettings(guildId);
+    if (!bypassApproval && settings.requestApprovalMode === "approval") {
+      const approvalId = await this.createMusicRequestApproval({
+        guildId,
+        requesterUserId: requester.id,
+        requesterVoiceChannelId: voiceChannelId,
+        sourceChannelId: textChannelId,
+        query: provider === "yandex" && !/^https?:\/\//i.test(query)
+          ? "ymsearch:" + query
+          : provider === "spotify" && !/^https?:\/\//i.test(query)
+            ? "spsearch:" + query
+            : provider === "applemusic" && !/^https?:\/\//i.test(query)
+              ? "amsearch:" + query
+              : provider === "deezer" && !/^https?:\/\//i.test(query)
+                ? "dzsearch:" + query
+                : provider === "vkmusic" && !/^https?:\/\//i.test(query)
+                  ? "vksearch:" + query
+                  : provider === "tidal" && !/^https?:\/\//i.test(query)
+                    ? "tdsearch:" + query
+                    : provider === "qobuz" && !/^https?:\/\//i.test(query)
+                      ? "qbsearch:" + query
+                      : provider === "jiosaavn" && !/^https?:\/\//i.test(query)
+                        ? "jssearch:" + query
+                        : query,
+        track: null,
+        source: "query"
+      });
+      return { added: 0, truncated: false, limited: false, pending: true, approvalId, firstTitle: "", firstAuthor: "" };
+    }
+
+    if (!bypassPolicy && !await this.canQueueMusic(guildId, requester.id, textChannelId)) {
+      throw new Error("music_queue_permission_denied");
+    }
+
+    const existing = this.manager.players.get(guildId);
+    const queued = existing?.queue.tracks ?? [];
+    const queuedByUser = countMusicQueuedByUser(queued, requester.id);
+    const remainingUserSlots = remainingMusicQueueSlots(queuedByUser, settings.maxQueuedPerUser);
+    const remainingGuildSlots = remainingMusicGuildQueueSlots(queued.length, settings.maxQueueSize);
+    if (remainingUserSlots === 0 || remainingGuildSlots === 0) {
+      return { added: 0, truncated: false, limited: true, pending: false, approvalId: null, firstTitle: "", firstAuthor: "" };
+    }
+    const player = existing ?? await this.manager.createPlayer({
+      guildId,
+      voiceChannelId,
+      textChannelId: await this.preferredTextChannelId(guildId, textChannelId),
+      volume: await this.defaultVolume(guildId),
+      selfDeaf: true
+    });
+
+    if (player.voiceChannelId !== voiceChannelId) {
+      throw new Error("music_player_in_other_voice");
+    }
+    if (!player.connected) await player.connect();
+
+    const resolved = resolveMusicSearchRequest(query, provider);
     const result = await player.search(
-      source ? { query, source } : { query },
-      interaction.user
+      resolved.source ? { query: resolved.query, source: resolved.source } : { query: resolved.query },
+      requester
     );
 
     if (!result.tracks.length) {
-      await interaction.reply({ content: "Ничего не найдено.", ephemeral: true });
+      return { added: 0, truncated: false, limited: false, pending: false, approvalId: null, firstTitle: "", firstAuthor: "" };
+    }
+
+    const maxTracks = Math.min(
+      MAX_PLAYLIST_TRACKS,
+      ...(remainingUserSlots === null ? [] : [remainingUserSlots]),
+      ...(remainingGuildSlots === null ? [] : [remainingGuildSlots])
+    );
+    const tracks = result.tracks.slice(0, maxTracks);
+    for (const track of tracks) player.queue.add(track);
+    await this.applyFairQueue(player, settings.fairQueueEnabled);
+    if (!player.playing) await player.play();
+
+    await this.persistPlayer(player);
+    await this.syncController(player);
+
+    const first = tracks[0]!;
+    return {
+      added: tracks.length,
+      truncated: result.tracks.length > tracks.length && remainingUserSlots === null && remainingGuildSlots === null,
+      limited: (remainingUserSlots !== null || remainingGuildSlots !== null) && result.tracks.length > tracks.length,
+      pending: false,
+      approvalId: null,
+      firstTitle: first.info.title,
+      firstAuthor: first.info.author ?? "Unknown artist"
+    };
+  }
+
+  private async createMusicRequestApproval(input: {
+    guildId: string;
+    requesterUserId: string;
+    requesterVoiceChannelId: string;
+    sourceChannelId: string;
+    query: string;
+    track: MusicQueueTrackLike | null;
+    source: "query" | "search";
+  }): Promise<string> {
+    const expiresAt = new Date(Date.now() + MUSIC_REQUEST_APPROVAL_TTL_MS).toISOString();
+    const inserted = await this.db.query<{ id: string }>(
+      `INSERT INTO music_request_approvals(
+        guild_id,requester_user_id,requester_voice_channel_id,source_channel_id,query,track,expires_at
+      ) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7)
+      RETURNING id`,
+      [
+        input.guildId,
+        input.requesterUserId,
+        input.requesterVoiceChannelId,
+        input.sourceChannelId,
+        input.query,
+        input.track ? JSON.stringify(this.serializedTrack(input.track)) : null,
+        expiresAt
+      ]
+    );
+
+    const id = String(inserted.rows[0]?.id ?? "");
+    if (!id) throw new Error("music_approval_create_failed");
+
+    const approvalChannelId = await this.requestChannelId(input.guildId) ?? input.sourceChannelId;
+    const channel = this.client?.channels.cache.get(approvalChannelId);
+    if (!channel?.isTextBased() || !("send" in channel)) {
+      await this.db.query("DELETE FROM music_request_approvals WHERE id=$1", [id]);
+      throw new Error("music_approval_channel_unavailable");
+    }
+
+    try {
+      const sent = await channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle("🎵 Запрос на музыку")
+            .setDescription(
+              "**Запрос:** " + input.query.slice(0, 1000) +
+              "\n**Пользователь:** <@" + input.requesterUserId + ">" +
+              "\n\nТребуется подтверждение DJ или Manage Server."
+            )
+        ],
+        components: [this.musicRequestApprovalComponents(id)]
+      });
+
+      await this.db.query(
+        `UPDATE music_request_approvals
+            SET approval_message_channel_id=$1,approval_message_id=$2
+          WHERE id=$3`,
+        [approvalChannelId, sent.id, id]
+      );
+    } catch (error) {
+      await this.db.query("DELETE FROM music_request_approvals WHERE id=$1", [id]).catch(() => undefined);
+      throw new Error("music_approval_publish_failed:" + String(error));
+    }
+
+    try {
+      await this.auditLog?.record({
+        guildId: input.guildId,
+        actorUserId: input.requesterUserId,
+        source: "discord",
+        action: "music.request.created",
+        targetType: "music_request_approval",
+        targetId: id,
+        metadata: { source: input.source, query: input.query.slice(0, 200) }
+      });
+    } catch (error) {
+      logger.warn("Music request approval audit failed", {
+        guildId: input.guildId,
+        requestId: id,
+        error: String(error)
+      });
+    }
+
+    return id;
+  }
+
+  private musicRequestApprovalComponents(id: string, disabled = false): ActionRowBuilder<ButtonBuilder> {
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId("dsp:music:request:approve:" + id)
+        .setLabel("Одобрить")
+        .setEmoji("✅")
+        .setStyle(ButtonStyle.Success)
+        .setDisabled(disabled),
+      new ButtonBuilder()
+        .setCustomId("dsp:music:request:reject:" + id)
+        .setLabel("Отклонить")
+        .setEmoji("❌")
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(disabled)
+    );
+  }
+
+  private async updateMusicRequestApprovalMessage(
+    interaction: ButtonInteraction,
+    status: "approved" | "rejected" | "expired" | "failed",
+    requestId: string,
+    detail: string
+  ): Promise<void> {
+    const title =
+      status === "approved" ? "✅ Музыкальный запрос одобрен" :
+      status === "rejected" ? "❌ Музыкальный запрос отклонён" :
+      status === "expired" ? "⌛ Музыкальный запрос истёк" :
+      "⚠️ Музыкальный запрос не обработан";
+
+    await interaction.message.edit({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(title)
+          .setDescription(detail)
+          .setFooter({ text: "Request #" + requestId })
+      ],
+      components: [this.musicRequestApprovalComponents(requestId, true)]
+    }).catch(() => undefined);
+  }
+
+  private async handleMusicRequestApproval(interaction: ButtonInteraction): Promise<void> {
+    const parts = interaction.customId.split(":");
+    const action = parts[3];
+    const requestId = parts[4];
+    if ((action !== "approve" && action !== "reject") || !requestId) {
+      await interaction.reply({ content: "Некорректный запрос.", ephemeral: true });
       return;
     }
 
-    player.queue.add(result.tracks[0]!);
-    if (!player.playing) await player.play();
+    const member = await interaction.guild!.members.fetch(interaction.user.id).catch(() => null);
+    if (!await this.canManageMusicMember(interaction.guild!.id, member)) {
+      await interaction.reply({ content: "Подтверждать музыкальные запросы могут только DJ или Manage Server.", ephemeral: true });
+      return;
+    }
 
-    await interaction.reply({
-      content: `Добавлено в очередь: **${result.tracks[0]!.info.title}** — ${result.tracks[0]!.info.author}`,
-      ephemeral: true
+    await interaction.deferUpdate();
+
+    const claim = await this.db.query<{
+      id: string;
+      guild_id: string;
+      requester_user_id: string;
+      requester_voice_channel_id: string;
+      source_channel_id: string;
+      query: string;
+      track: unknown;
+      expires_at: string;
+    }>(
+      `UPDATE music_request_approvals
+          SET status='processing'
+        WHERE id=$1 AND status='pending' AND expires_at > now()
+      RETURNING id,guild_id,requester_user_id,requester_voice_channel_id,source_channel_id,query,track,expires_at`,
+      [requestId]
+    );
+    const request = claim.rows[0];
+
+    if (!request) {
+      const current = await this.db.query<{ status: string }>(
+        "SELECT status FROM music_request_approvals WHERE id=$1",
+        [requestId]
+      );
+      if (current.rows[0]?.status === "pending") {
+        await this.db.query(
+          "UPDATE music_request_approvals SET status='expired',resolved_by=$1,resolved_at=now() WHERE id=$2 AND status='pending'",
+          [interaction.user.id, requestId]
+        );
+        await this.updateMusicRequestApprovalMessage(interaction, "expired", requestId, "Этот запрос больше нельзя обработать.");
+      } else {
+        await this.updateMusicRequestApprovalMessage(
+          interaction,
+          "failed",
+          requestId,
+          current.rows[0] ? "Запрос уже обработан: **" + current.rows[0].status + "**." : "Запрос не найден."
+        );
+      }
+      return;
+    }
+
+    const requester = await interaction.client.users.fetch(request.requester_user_id).catch(() => null);
+    if (!requester) {
+      await this.db.query(
+        "UPDATE music_request_approvals SET status='failed',resolved_by=$1,resolved_at=now() WHERE id=$2 AND status='processing'",
+        [interaction.user.id, requestId]
+      );
+      await this.updateMusicRequestApprovalMessage(
+        interaction,
+        "failed",
+        requestId,
+        "Автор запроса больше недоступен."
+      );
+      return;
+    }
+
+    if (action === "reject") {
+      await this.db.query(
+        `UPDATE music_request_approvals
+            SET status='rejected',resolved_by=$1,resolved_at=now()
+          WHERE id=$2`,
+        [interaction.user.id, requestId]
+      );
+      try {
+        await this.auditLog?.record({
+          guildId: request.guild_id,
+          actorUserId: interaction.user.id,
+          source: "discord",
+          action: "music.request.rejected",
+          targetType: "music_request_approval",
+          targetId: requestId,
+          metadata: { requesterUserId: request.requester_user_id }
+        });
+      } catch {}
+      await this.updateMusicRequestApprovalMessage(interaction, "rejected", requestId, "Модератор: <@" + interaction.user.id + ">.");
+      return;
+    }
+
+    try {
+      const queued = request.track && typeof request.track === "object"
+        ? await this.enqueueApprovedStoredTrack(request, requester)
+        : await this.queueQuery(
+            request.guild_id,
+            request.requester_voice_channel_id,
+            request.source_channel_id,
+            request.query,
+            requester,
+            true,
+            true
+          );
+
+      if (!queued.added) {
+        throw new Error(queued.limited ? "music_request_queue_full" : "music_request_track_not_found");
+      }
+
+      await this.db.query(
+        `UPDATE music_request_approvals
+            SET status='approved',resolved_by=$1,resolved_at=now(),result_title=$2
+          WHERE id=$3`,
+        [interaction.user.id, queued.firstTitle, requestId]
+      );
+
+      try {
+        await this.auditLog?.record({
+          guildId: request.guild_id,
+          actorUserId: interaction.user.id,
+          source: "discord",
+          action: "music.request.approved",
+          targetType: "music_request_approval",
+          targetId: requestId,
+          metadata: { requesterUserId: request.requester_user_id, title: queued.firstTitle }
+        });
+      } catch {}
+
+      await this.updateMusicRequestApprovalMessage(
+        interaction,
+        "approved",
+        requestId,
+        "Одобрил: <@" + interaction.user.id + ">\nДобавлено треков: **" + queued.added + "**."
+      );
+    } catch (error) {
+      await this.db.query(
+        "UPDATE music_request_approvals SET status='pending' WHERE id=$1 AND status='processing'",
+        [requestId]
+      ).catch(() => undefined);
+
+      try {
+        await this.auditLog?.record({
+          guildId: request.guild_id,
+          actorUserId: interaction.user.id,
+          source: "discord",
+          action: "music.request.failed",
+          targetType: "music_request_approval",
+          targetId: requestId,
+          metadata: { requesterUserId: request.requester_user_id, error: String(error).slice(0, 300) }
+        });
+      } catch {}
+
+      await interaction.followUp({
+        content: String(error).includes("music_request_queue_full")
+          ? "Очередь заполнена. Запрос оставлен ожидающим — попробуй одобрить позже."
+          : "Не удалось выполнить запрос. Он оставлен ожидающим.",
+        ephemeral: true
+      }).catch(() => undefined);
+    }
+  }
+
+  private async enqueueApprovedStoredTrack(
+    request: {
+      guild_id: string;
+      requester_user_id: string;
+      requester_voice_channel_id: string;
+      source_channel_id: string;
+      query: string;
+      track: unknown;
+    },
+    requester: import("discord.js").User
+  ): Promise<{ added: number; firstTitle: string; firstAuthor: string; limited: boolean }> {
+    if (!this.manager) throw new Error("music_manager_unavailable");
+
+    const owner = await this.identities.musicVoiceOwner(request.guild_id, request.requester_voice_channel_id);
+    if (owner && owner !== this.config.botIdentityId) throw new Error("music_voice_assigned_elsewhere");
+    if (!owner && this.config.botIdentityId !== "primary") throw new Error("music_voice_not_assigned");
+
+    const settings = await this.musicSettings(request.guild_id);
+    const player = this.manager.players.get(request.guild_id) ?? await this.manager.createPlayer({
+      guildId: request.guild_id,
+      voiceChannelId: request.requester_voice_channel_id,
+      textChannelId: await this.preferredTextChannelId(request.guild_id, request.source_channel_id),
+      volume: await this.defaultVolume(request.guild_id),
+      selfDeaf: true
     });
+
+    if (player.voiceChannelId !== request.requester_voice_channel_id) throw new Error("music_player_in_other_voice");
+    if (!player.connected) await player.connect();
+
+    const queuedByUser = countMusicQueuedByUser(player.queue.tracks, request.requester_user_id);
+    const remainingUserSlots = remainingMusicQueueSlots(queuedByUser, settings.maxQueuedPerUser);
+    const remainingGuildSlots = remainingMusicGuildQueueSlots(player.queue.tracks.length, settings.maxQueueSize);
+    if (remainingUserSlots === 0 || remainingGuildSlots === 0) {
+      return { added: 0, firstTitle: "", firstAuthor: "", limited: true };
+    }
+
+    const built = this.manager.utils.buildTrack(
+      request.track as Parameters<LavalinkManager["utils"]["buildTrack"]>[0],
+      requester
+    );
+    if (!built) return { added: 0, firstTitle: "", firstAuthor: "", limited: false };
+
+    player.queue.add(built);
+    await this.applyFairQueue(player, settings.fairQueueEnabled);
+    if (!player.playing) await player.play();
+    await this.persistPlayer(player);
+    await this.syncController(player);
+
+    return {
+      added: 1,
+      firstTitle: built.info.title,
+      firstAuthor: built.info.author ?? "Unknown artist",
+      limited: false
+    };
+  }
+
+  private async onRequestMessage(message: Message): Promise<void> {
+    if (!message.guild || message.author.bot || message.webhookId) return;
+    if (!await moduleEnabled(this.db, message.guild.id, "music", false)) return;
+
+    const requestChannelId = await this.requestChannelId(message.guild.id);
+    if (!requestChannelId || message.channelId !== requestChannelId) return;
+
+    const query = message.content.trim();
+    if (!query) return;
+
+    const key = `${message.guild.id}:${message.author.id}`;
+    const remaining = remainingMusicRequestCooldown(this.requestCooldownUntil.get(key) ?? 0);
+    if (remaining > 0) {
+      await message.reply("⏳ Подожди ещё " + Math.ceil(remaining / 1000) + " сек. перед следующим запросом.").catch(() => undefined);
+      return;
+    }
+    if (this.requestInFlight.has(key)) {
+      await message.reply("⏳ Твой предыдущий запрос ещё обрабатывается.").catch(() => undefined);
+      return;
+    }
+
+    const member = message.member ?? await message.guild.members.fetch(message.author.id).catch(() => null);
+    const voiceChannelId = member?.voice.channelId ?? null;
+    if (!voiceChannelId) {
+      await message.reply("🎧 Сначала зайди в голосовой канал.").catch(() => undefined);
+      return;
+    }
+
+    const owner = await this.identities.musicVoiceOwner(message.guild.id, voiceChannelId);
+    if (owner && owner !== this.config.botIdentityId) {
+      await message.reply(`🎧 Этот голосовой канал закреплён за bot identity **${owner}**.`).catch(() => undefined);
+      return;
+    }
+    if (!owner && this.config.botIdentityId !== "primary") {
+      await message.reply("🎧 Эта voice channel не назначена данной bot identity.").catch(() => undefined);
+      return;
+    }
+
+    this.requestInFlight.add(key);
+    try {
+      const queued = await this.queueQuery(
+        message.guild.id,
+        voiceChannelId,
+        message.channelId,
+        query,
+        message.author
+      );
+      if (queued.pending) {
+        this.requestCooldownUntil.set(key, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
+        await message.reply("🕒 Запрос отправлен на подтверждение DJ или Manage Server.").catch(() => undefined);
+        return;
+      }
+      if (!queued.added) {
+        await message.reply("🔎 Ничего не найдено.").catch(() => undefined);
+        return;
+      }
+
+      this.requestCooldownUntil.set(key, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
+      const suffix = queued.truncated
+        ? ` — добавлены первые ${MAX_PLAYLIST_TRACKS} треков`
+        : "";
+      await message.reply(
+        `✅ В очередь добавлено: **${queued.added}**. Первый: **${queued.firstTitle}** — ${queued.firstAuthor}${suffix}`
+      ).catch(() => undefined);
+    } catch (error) {
+      const messageText = String(error);
+      await message.reply(
+        messageText.includes("music_player_in_other_voice")
+          ? "🎧 Музыкальный бот уже занят другим voice-каналом этого сервера."
+          : "❌ Не удалось добавить запрос в очередь."
+      ).catch(() => undefined);
+      logger.warn("Music channel request failed", {
+        guildId: message.guild.id,
+        userId: message.author.id,
+        error: messageText
+      });
+    } finally {
+      this.requestInFlight.delete(key);
+    }
   }
 
   private async getOrCreatePlayer(
@@ -631,6 +3121,48 @@ export class Music implements PlatformModule {
     await interaction.reply({ content: "⏭️ Пропущено.", ephemeral: true });
   }
 
+  private async voteSkip(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player?.queue.current) {
+      await interaction.reply({ content: "Сейчас нечего пропускать.", ephemeral: true });
+      return;
+    }
+
+    const member = await interaction.guild!.members.fetch(interaction.user.id).catch(() => null);
+    if (!member?.voice.channelId || member.voice.channelId !== player.voiceChannelId) {
+      await interaction.reply({ content: "Голосовать за skip можно только из того же голосового канала.", ephemeral: true });
+      return;
+    }
+
+    const voice = interaction.guild!.channels.cache.get(player.voiceChannelId);
+    const listeners = voice && (voice.type === ChannelType.GuildVoice || voice.type === ChannelType.GuildStageVoice)
+      ? [...voice.members.values()].filter((candidate) => !candidate.user.bot && !candidate.voice.selfDeaf && !candidate.voice.serverDeaf)
+      : [];
+    const threshold = voteSkipThreshold(listeners.length);
+    const trackIdentifier = player.queue.current.info.identifier;
+    const existing = this.voteSkipSessions.get(interaction.guildId!);
+    const session = !existing || existing.trackIdentifier !== trackIdentifier || existing.expiresAt < Date.now()
+      ? { trackIdentifier, voters: new Set<string>(), expiresAt: Date.now() + 45_000 }
+      : existing;
+
+    session.voters.add(interaction.user.id);
+    this.voteSkipSessions.set(interaction.guildId!, session);
+
+    if (session.voters.size >= threshold) {
+      await player.skip();
+      this.voteSkipSessions.delete(interaction.guildId!);
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await interaction.reply({ content: "⏭️ Vote Skip принят: **" + session.voters.size + "/" + threshold + "**. Трек пропущен.", ephemeral: true });
+      return;
+    }
+
+    await interaction.reply({
+      content: "🗳️ Vote Skip: **" + session.voters.size + "/" + threshold + "** голосов. Голоса действуют 45 секунд.",
+      ephemeral: true
+    });
+  }
+
   private async stop(interaction: ChatInputCommandInteraction): Promise<void> {
     const player = this.manager?.players.get(interaction.guildId!);
     if (!player) {
@@ -638,6 +3170,7 @@ export class Music implements PlatformModule {
       return;
     }
     if (!await this.canControl(interaction, player.voiceChannelId)) return;
+    this.playlistContinuations.delete(interaction.guildId!);
     await player.stopPlaying();
     await interaction.reply({ content: "⏹️ Остановлено.", ephemeral: true });
   }
@@ -677,6 +3210,46 @@ export class Music implements PlatformModule {
     await interaction.reply({ content: `🔁 Repeat: **${mode}**`, ephemeral: true });
   }
 
+  private async providers(interaction: ChatInputCommandInteraction): Promise<void> {
+    const providers: Array<[string,string,boolean]> = [
+      ["YouTube","yt",true],
+      ["SoundCloud","Lavalink",true],
+      ["Spotify","LavaSrc",process.env.LAVASRC_SPOTIFY_ENABLED === "true" && Boolean(process.env.SPOTIFY_CLIENT_ID?.trim()) && Boolean(process.env.SPOTIFY_CLIENT_SECRET?.trim())],
+      ["Apple Music","LavaSrc",process.env.LAVASRC_APPLEMUSIC_ENABLED === "true"],
+      ["Deezer","LavaSrc",process.env.LAVASRC_DEEZER_ENABLED === "true"],
+      ["Yandex Music","LavaSrc",process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true" && Boolean(process.env.YANDEX_MUSIC_ACCESS_TOKEN?.trim())],
+      ["VK Music","LavaSrc",process.env.LAVASRC_VKMUSIC_ENABLED === "true"],
+      ["Tidal","LavaSrc",process.env.LAVASRC_TIDAL_ENABLED === "true"],
+      ["Qobuz","LavaSrc",process.env.LAVASRC_QOBUZ_ENABLED === "true"],
+      ["yt-dlp","LavaSrc",process.env.LAVASRC_YTDLP_ENABLED === "true"],
+      ["JioSaavn","LavaSrc",process.env.LAVASRC_JIOSAAVN_ENABLED === "true"]
+    ];
+    const lines = providers.map(([name, source, enabled]) =>
+      (enabled ? "🟢" : "⚪") + " **" + name + "** · " + source
+    );
+    await interaction.reply({
+      content: "🎵 **Music providers**\n" + lines.join("\n") +
+        "\n\n🟡 Spotify/Apple Music могут использовать mirror playback, а не прямой audio source.",
+      ephemeral: true
+    });
+  }
+
+  private async twentyFourSeven(interaction: ChatInputCommandInteraction): Promise<void> {
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "24/7 режим настраивается пользователями с DJ-ролью или Manage Server.", ephemeral: true });
+      return;
+    }
+    const enabled = interaction.options.getBoolean("enabled");
+    const settings = await this.musicSettings(interaction.guildId!);
+    if (enabled === null) {
+      await interaction.reply({ content: "24/7: **" + (settings.twentyFourSeven ? "включён" : "выключен") + "**", ephemeral: true });
+      return;
+    }
+    await this.setTwentyFourSeven(interaction.guildId!, enabled);
+    await interaction.reply({ content: "24/7 режим " + (enabled ? "включён" : "выключен") + ".", ephemeral: true });
+  }
+
   private async autoplay(interaction: ChatInputCommandInteraction): Promise<void> {
     const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
     if (!await this.canManageMusicMember(interaction.guildId!, member)) {
@@ -693,6 +3266,79 @@ export class Music implements PlatformModule {
 
     await this.setAutoplay(interaction.guildId!, enabled);
     await interaction.reply({ content: `Autoplay ${enabled ? "включён" : "выключен"}.`, ephemeral: true });
+  }
+
+  private async radio(interaction: ChatInputCommandInteraction): Promise<void> {
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Radio настраивается пользователями с DJ-ролью или Manage Server.", ephemeral: true });
+      return;
+    }
+
+    const action = interaction.options.getString("action", true);
+    const current = await this.musicRadioSettings(interaction.guildId!);
+
+    if (action === "status") {
+      const seedSuffix = current.seed ? " · seed: **" + current.seed + "**" : "";
+      await interaction.reply({
+        content: "📻 Radio: **" + (current.enabled ? "включено" : "выключено") + "** · режим: **" + current.mode + "**" + seedSuffix,
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (action === "stop") {
+      await this.setMusicRadio(interaction.guildId!, false, current.mode, current.seed);
+      await interaction.reply({ content: "📻 Radio выключено.", ephemeral: true });
+      return;
+    }
+
+    if (action !== "start") {
+      await interaction.reply({ content: "Неизвестное действие Radio.", ephemeral: true });
+      return;
+    }
+
+    const mode = normalizeMusicRadioMode(interaction.options.getString("mode")) ?? current.mode;
+    const seedInput = interaction.options.getString("seed");
+    const player = this.manager?.players.get(interaction.guildId!);
+    const currentTrack = player?.queue.current ?? null;
+    const seed = seedInput?.trim() || (mode === "artist" ? String(currentTrack?.info.author ?? "").trim() : "");
+    if (!seed) {
+      await interaction.reply({
+        content: mode === "artist"
+          ? "Для artist-радио нужен текущий трек или параметр seed."
+          : "Для этого режима обязательно укажи seed.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    const voice = member?.voice.channelId;
+    if (!voice) {
+      await interaction.reply({ content: "Сначала зайди в голосовой канал.", ephemeral: true });
+      return;
+    }
+
+    if (!await this.canQueueMusic(interaction.guildId!, interaction.user.id, interaction.channelId)) {
+      await interaction.reply({ content: "Добавление Radio запрещено политикой Music.", ephemeral: true });
+      return;
+    }
+
+    const radioPlayer = player ?? await this.getOrCreatePlayer(interaction, voice);
+    if (radioPlayer.voiceChannelId !== voice) {
+      await interaction.reply({ content: "Музыкальный бот уже занят другим голосовым каналом.", ephemeral: true });
+      return;
+    }
+    if (!radioPlayer.connected) await radioPlayer.connect();
+
+    await this.setMusicRadio(interaction.guildId!, true, mode, seed);
+    const added = await this.radioNext(radioPlayer, currentTrack);
+    await interaction.reply({
+      content: added
+        ? "📻 Radio запущено: **" + mode + "** · **" + seed + "**."
+        : "📻 Radio сохранено, но сейчас не удалось подобрать первый трек. Следующая попытка будет при окончании очереди.",
+      ephemeral: true
+    });
   }
 
   private async seek(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -759,6 +3405,109 @@ export class Music implements PlatformModule {
     return allowed;
   }
 
+  private async queueAccess(guildId: string): Promise<"everyone" | "dj"> {
+    const result = await this.db.query<{ queue_access: "everyone" | "dj" }>("SELECT queue_access FROM music_settings WHERE guild_id=$1",[guildId]);
+    return result.rows[0]?.queue_access === "dj" ? "dj" : "everyone";
+  }
+
+  private async canQueueMusic(guildId: string, userId: string, channelId: string): Promise<boolean> {
+    const guild = this.client?.guilds.cache.get(guildId);
+    const member = guild ? await guild.members.fetch(userId).catch(() => null) : null;
+    if (!member) return false;
+
+    if (this.commandPolicy && !await this.commandPolicy.checkMemberAction(guildId, "queue-add", member, channelId)) {
+      return false;
+    }
+
+    if (await this.queueAccess(guildId) === "everyone") return true;
+    return this.canManageMusicMember(guildId, member);
+  }
+
+  private async queueMutationAllowed(
+    guildId: string,
+    userId: string,
+    channelId: string,
+    policyName: "queue-remove" | "queue-move"
+  ): Promise<boolean> {
+    const guild = this.client?.guilds.cache.get(guildId);
+    const member = guild ? await guild.members.fetch(userId).catch(() => null) : null;
+    if (!member) return false;
+
+    if (this.commandPolicy && await this.commandPolicy.hasStoredPolicy(guildId, policyName)) {
+      return this.commandPolicy.checkMemberAction(guildId, policyName, member, channelId);
+    }
+
+    return this.canManageMusicMember(guildId, member);
+  }
+
+  private async queueSize(interaction: ChatInputCommandInteraction): Promise<void> {
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Queue size меняется только DJ или Manage Server.", ephemeral: true });
+      return;
+    }
+    const value = interaction.options.getInteger("size");
+    const current = (await this.musicSettings(interaction.guildId!)).maxQueueSize;
+    if (value === null) {
+      await interaction.reply({
+        content: "🎵 Максимальный размер очереди: **" + (current === 0 ? "без лимита" : current) + "**.",
+        ephemeral: true
+      });
+      return;
+    }
+    const normalized = normalizeMusicQueueSize(value);
+    await this.db.query(
+      "INSERT INTO music_settings(guild_id,max_queue_size) VALUES($1,$2) ON CONFLICT(guild_id) DO UPDATE SET max_queue_size=EXCLUDED.max_queue_size,updated_at=now()",
+      [interaction.guildId!, normalized]
+    );
+    await interaction.reply({
+      content: "🎵 Максимальный размер очереди установлен: **" + (normalized === 0 ? "без лимита" : normalized) + "**.",
+      ephemeral: true
+    });
+  }
+
+  private async queueLimit(interaction: ChatInputCommandInteraction): Promise<void> {
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Queue limit меняется только DJ или Manage Server.", ephemeral: true });
+      return;
+    }
+    const value = interaction.options.getInteger("limit");
+    const current = (await this.musicSettings(interaction.guildId!)).maxQueuedPerUser;
+    if (value === null) {
+      await interaction.reply({
+        content: "🎵 Лимит ожидающих треков на пользователя: **" + (current === 0 ? "без лимита" : current) + "**.",
+        ephemeral: true
+      });
+      return;
+    }
+    const normalized = normalizeMusicQueueLimit(value);
+    await this.db.query(
+      "INSERT INTO music_settings(guild_id,max_queued_per_user) VALUES($1,$2) ON CONFLICT(guild_id) DO UPDATE SET max_queued_per_user=EXCLUDED.max_queued_per_user,updated_at=now()",
+      [interaction.guildId!, normalized]
+    );
+    await interaction.reply({
+      content: "🎵 Лимит ожидающих треков на пользователя установлен: **" + (normalized === 0 ? "без лимита" : normalized) + "**.",
+      ephemeral: true
+    });
+  }
+
+  private async queuePolicy(interaction: ChatInputCommandInteraction): Promise<void> {
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Queue policy меняется только DJ или Manage Server.", ephemeral: true });
+      return;
+    }
+    const value = interaction.options.getString("mode") as "everyone" | "dj" | null;
+    const current = await this.queueAccess(interaction.guildId!);
+    if (!value) {
+      await interaction.reply({ content: "🎵 Queue access: **" + current + "**", ephemeral: true });
+      return;
+    }
+    await this.db.query("INSERT INTO music_settings(guild_id,queue_access) VALUES($1,$2) ON CONFLICT(guild_id) DO UPDATE SET queue_access=EXCLUDED.queue_access,updated_at=now()", [interaction.guildId!,value]);
+    await interaction.reply({ content: "🎵 Добавлять треки теперь могут: **" + (value === "dj" ? "только DJ / Manage Server" : "все участники") + "**.", ephemeral: true });
+  }
+
   private async djRoleId(guildId: string): Promise<string | null> {
     const result = await this.db.query<{ dj_role_id: string | null }>(
       "SELECT dj_role_id FROM guild_settings WHERE guild_id=$1",
@@ -774,6 +3523,81 @@ export class Music implements PlatformModule {
     return Boolean(djRole && member.roles.cache.has(djRole));
   }
 
+  private async skipTo(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Skip-to доступен DJ или Manage Server.", ephemeral: true });
+      return;
+    }
+    const position = interaction.options.getInteger("position", true);
+    const target = trimMusicQueueToPosition(player.queue.tracks, position);
+    if (!target) {
+      await interaction.reply({ content: "Укажи позицию существующего трека из очереди.", ephemeral: true });
+      return;
+    }
+    await player.skip();
+    await this.persistPlayer(player);
+    await this.syncController(player);
+    await interaction.reply({ content: "⏭️ Пропущено до #" + position + ": **" + target.info.title + "**", ephemeral: true });
+  }
+
+  private async history(interaction: ChatInputCommandInteraction): Promise<void> {
+    const rows = await this.recentHistory(interaction.guildId!, 20);
+    if (!rows.length) {
+      await interaction.reply({ content: "🎵 История проигрывания пока пуста.", ephemeral: true });
+      return;
+    }
+    const lines = rows.map((row, index) =>
+      (index + 1) + ". **" + row.title + "** — " + row.author +
+      (row.requesterId ? " · <@" + row.requesterId + ">" : "") +
+      " · " + formatDurationSeconds(Math.floor(row.durationMs / 1000))
+    );
+    await interaction.reply({ content: "📜 **Недавно проиграно**\n" + lines.join("\n"), ephemeral: true });
+  }
+
+  private async recentHistory(guildId: string, limit = 20): Promise<Array<{
+    title: string;
+    author: string;
+    requesterId: string | null;
+    durationMs: number;
+    playedAt: string;
+  }>> {
+    const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 50);
+    const result = await this.db.query<{
+      title: string;
+      author: string;
+      requester_id: string | null;
+      duration_ms: string;
+      played_at: string;
+    }>(
+      "SELECT title,author,requester_id,duration_ms,played_at FROM music_history WHERE guild_id=$1 AND bot_identity_id=$2 ORDER BY played_at DESC,id DESC LIMIT $3",
+      [guildId, this.config.botIdentityId, safeLimit]
+    );
+    return result.rows.map((row) => ({
+      title: row.title,
+      author: row.author,
+      requesterId: row.requester_id,
+      durationMs: Number(row.duration_ms) || 0,
+      playedAt: row.played_at
+    }));
+  }
+
+  private async recordHistory(guildId: string, track: Track): Promise<void> {
+    const requesterId = typeof track.requester?.id === "string" ? track.requester.id : null;
+    await this.db.query(
+      "INSERT INTO music_history(guild_id,bot_identity_id,requester_id,identifier,title,author,url,duration_ms) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
+      [guildId,this.config.botIdentityId,requesterId,String(track.info.identifier ?? "").slice(0,300) || null,String(track.info.title ?? "Unknown track").slice(0,500),String(track.info.author ?? "").slice(0,300),(track.info.uri ?? null) as string | null,Math.max(0,Math.trunc(Number(track.info.duration ?? 0)))]
+    );
+    await this.db.query(
+      "DELETE FROM music_history WHERE id IN (SELECT id FROM music_history WHERE guild_id=$1 AND bot_identity_id=$2 ORDER BY played_at DESC,id DESC OFFSET 200)",
+      [guildId, this.config.botIdentityId]
+    );
+  }
   private async queue(interaction: ChatInputCommandInteraction): Promise<void> {
     const player = this.manager?.players.get(interaction.guildId!);
     if (!player) {
@@ -781,17 +3605,99 @@ export class Music implements PlatformModule {
       return;
     }
 
-    const tracks = player.queue.tracks.slice(0, 15);
-    const lines = tracks.map((track, index) =>
-      `${index + 1}. **${track.info.title}** — ${track.info.author}`
-    );
-
+    const action = interaction.options.getString("action") ?? "view";
+    if (action === "export" || action === "share") {
+      const tracks = player.queue.tracks;
+      if (!tracks.length) {
+        await interaction.reply({ content: "Очередь пуста.", ephemeral: true });
+        return;
+      }
+      if (action === "share") {
+        await interaction.reply({ content: buildMusicQueueShare(player.queue.tracks), ephemeral: true });
+      } else {
+        const payload = buildMusicQueueExport(player.queue.tracks);
+        await interaction.reply({
+          content: "📦 Полная очередь экспортирована в JSON.",
+          files: [new AttachmentBuilder(Buffer.from(payload, "utf8"), { name: "vexa-music-queue.json" })],
+          ephemeral: true
+        });
+      }
+      return;
+    }
+    if (action !== "view") {
+      const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+      const mutationPolicy = action === "move" || action === "front" ? "queue-move" : "queue-remove";
+      if (!await this.queueMutationAllowed(interaction.guildId!, interaction.user.id, interaction.channelId, mutationPolicy)) {
+        await interaction.reply({ content: "Это изменение очереди запрещено политикой Music.", ephemeral: true });
+        return;
+      }
+      const queue = player.queue.tracks;
+      const position = interaction.options.getInteger("position");
+      const to = interaction.options.getInteger("to");
+      const from = interaction.options.getInteger("from");
+      const end = interaction.options.getInteger("end");
+      if (action === "clear") {
+        this.playlistContinuations.delete(interaction.guildId!);
+        queue.splice(0, queue.length);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await interaction.reply({ content: "🧹 Очередь очищена. Текущий трек не остановлен.", ephemeral: true });
+        return;
+      }
+      if (action === "remove") {
+        if (!position || position > queue.length) {
+          await interaction.reply({ content: "Укажи существующую позицию трека.", ephemeral: true });
+          return;
+        }
+        const removed = queue.splice(position - 1, 1)[0];
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await interaction.reply({ content: "🗑️ Удалён трек #" + position + ": **" + removed?.info.title + "**", ephemeral: true });
+        return;
+      }
+      if (action === "remove-range") {
+        const startPosition = from ?? position;
+        const finish = end ?? to;
+        if (!startPosition || !finish || startPosition > finish || startPosition < 1 || finish > queue.length) {
+          await interaction.reply({ content: "Укажи корректный диапазон from/end.", ephemeral: true });
+          return;
+        }
+        const removed = queue.splice(startPosition - 1, finish - startPosition + 1);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await interaction.reply({ content: "🗑️ Удалено треков: **" + removed.length + "** (#" + startPosition + "–" + finish + ").", ephemeral: true });
+        return;
+      }
+      if (action === "move" || action === "front") {
+        if (!position || position > queue.length) {
+          await interaction.reply({ content: "Укажи существующую позицию трека.", ephemeral: true });
+          return;
+        }
+        const destination = action === "front" ? 1 : (to ?? 0);
+        if (destination < 1 || destination > queue.length) {
+          await interaction.reply({ content: "Укажи корректную destination position.", ephemeral: true });
+          return;
+        }
+        const moved = queue.splice(position - 1, 1)[0];
+        if (!moved) {
+          await interaction.reply({ content: "Трек не найден.", ephemeral: true });
+          return;
+        }
+        queue.splice(destination - 1, 0, moved);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await interaction.reply({ content: "↕️ Трек перемещён: **" + moved.info.title + "** → #" + destination, ephemeral: true });
+        return;
+      }
+      return;
+    }
+    const page = this.buildQueuePage(player, 0);
     await interaction.reply({
-      content: lines.length ? `📋 **Очередь**\n${lines.join("\n")}` : "Очередь пуста.",
+      content: page.content,
+      components: page.components,
       ephemeral: true
     });
   }
-
   private async volume(interaction: ChatInputCommandInteraction): Promise<void> {
     const player = this.manager?.players.get(interaction.guildId!);
     if (!player) {
@@ -815,6 +3721,165 @@ export class Music implements PlatformModule {
     await interaction.reply({ content: `🔊 Громкость: **${value}**`, ephemeral: true });
   }
 
+  private async pitch(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+
+    const value = interaction.options.getNumber("value");
+    const currentPitch = Number((player.filterManager.data?.timescale as { pitch?: number } | undefined)?.pitch ?? 1);
+    if (value === null) {
+      await interaction.reply({ content: "🎚️ Pitch: **" + currentPitch.toFixed(2) + "×**", ephemeral: true });
+      return;
+    }
+
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Менять pitch могут пользователи с DJ-ролью или Manage Server.", ephemeral: true });
+      return;
+    }
+
+    const pitch = normalizeMusicPitch(value);
+    if (pitch === null) {
+      await interaction.reply({ content: "Pitch должен быть от 0.5 до 2.0.", ephemeral: true });
+      return;
+    }
+    try {
+      await player.filterManager.setPitch(pitch);
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await interaction.reply({
+        content: "🎚️ Pitch: **" + pitch.toFixed(2) + "×**" + (pitch === 1 ? " (норма)" : ""),
+        ephemeral: true
+      });
+    } catch (error) {
+      logger.warn("Music pitch operation failed", {
+        guildId: interaction.guildId!,
+        pitch,
+        error: String(error)
+      });
+      await interaction.reply({ content: "Не удалось изменить pitch на текущем Lavalink node.", ephemeral: true });
+    }
+  }
+
+  private async speed(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+
+    const value = interaction.options.getNumber("value");
+    const currentSpeed = Number((player.filterManager.data?.timescale as { speed?: number } | undefined)?.speed ?? 1);
+    if (value === null) {
+      await interaction.reply({ content: "⏩ Speed: **" + currentSpeed.toFixed(2) + "×**", ephemeral: true });
+      return;
+    }
+
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Менять speed могут пользователи с DJ-ролью или Manage Server.", ephemeral: true });
+      return;
+    }
+
+    const speed = normalizeMusicSpeed(value);
+    if (speed === null) {
+      await interaction.reply({ content: "Speed должен быть от 0.5 до 2.0.", ephemeral: true });
+      return;
+    }
+
+    try {
+      await player.filterManager.setSpeed(speed);
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await interaction.reply({
+        content: "⏩ Speed: **" + speed.toFixed(2) + "×**" + (speed === 1 ? " (норма)" : ""),
+        ephemeral: true
+      });
+    } catch (error) {
+      logger.warn("Music speed operation failed", {
+        guildId: interaction.guildId!,
+        speed,
+        error: String(error)
+      });
+      await interaction.reply({ content: "Не удалось изменить speed на текущем Lavalink node.", ephemeral: true });
+    }
+  }
+
+  private async eq(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+
+    const action = interaction.options.getString("action", true);
+    if (action === "show") {
+      const lines = Array.from({ length: MUSIC_EQ_BAND_COUNT }, (_, band) => {
+        const gain = Number(player.filterManager.equalizerBands[band]?.gain ?? 0);
+        return `Band ${band}: **${gain.toFixed(3)}**`;
+      });
+      await interaction.reply({
+        content: "🎚️ **Custom EQ**\nДиапазон gain: **-0.25…1.00**\n\n" + lines.join("\n"),
+        ephemeral: true
+      });
+      return;
+    }
+
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Редактировать EQ могут пользователи с DJ-ролью или Manage Server.", ephemeral: true });
+      return;
+    }
+
+    try {
+      if (action === "reset") {
+        await player.filterManager.clearEQ();
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await interaction.reply({ content: "🎚️ Custom EQ сброшен.", ephemeral: true });
+        return;
+      }
+
+      const bandValue = interaction.options.getInteger("band");
+      const gainValue = interaction.options.getNumber("gain");
+      if (bandValue === null || gainValue === null) {
+        await interaction.reply({
+          content: "Для **set** укажи band (0–14) и gain (-0.25…1.00).",
+          ephemeral: true
+        });
+        return;
+      }
+
+      const band = normalizeMusicEqBand(bandValue);
+      const gain = normalizeMusicEqGain(gainValue);
+      if (band === null || gain === null) {
+        await interaction.reply({
+          content: "Band должен быть 0–14, gain — от -0.25 до 1.00.",
+          ephemeral: true
+        });
+        return;
+      }
+
+      await player.filterManager.setEQ([{ band, gain }]);
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await interaction.reply({
+        content: "🎚️ EQ band **" + band + "**: gain **" + gain.toFixed(3) + "**.",
+        ephemeral: true
+      });
+    } catch (error) {
+      logger.warn("Music custom EQ operation failed", {
+        guildId: interaction.guildId!,
+        action,
+        error: String(error)
+      });
+      await interaction.reply({ content: "Не удалось изменить Custom EQ на текущем Lavalink node.", ephemeral: true });
+    }
+  }
+
   private async nowPlaying(interaction: ChatInputCommandInteraction): Promise<void> {
     const player = this.manager?.players.get(interaction.guildId!);
     const track = player?.queue.current;
@@ -823,17 +3888,17 @@ export class Music implements PlatformModule {
       return;
     }
 
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId("dsp:music:pause").setLabel("Пауза").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId("dsp:music:skip").setLabel("Следующий").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId("dsp:music:stop").setLabel("Стоп").setStyle(ButtonStyle.Danger)
-    );
-
     const autoplay = await this.autoplayEnabled(interaction.guildId!);
+    const components = this.buildControllerComponents(player, autoplay);
     const embed = new EmbedBuilder()
       .setTitle("🎵 Сейчас играет")
       .setDescription(`**${track.info.title}**\n${track.info.author}`)
       .addFields(
+        {
+          name: "Прогресс",
+          value: formatTrackProgress(player, track),
+          inline: true
+        },
         {
           name: "Состояние",
           value: player.paused ? "⏸️ Пауза" : "▶️ Играет",
@@ -851,7 +3916,7 @@ export class Music implements PlatformModule {
         }
       );
 
-    await interaction.reply({ embeds: [embed], components: [row] });
+    await interaction.reply({ embeds: [embed], components });
   }
 
   async handlePrefixCommand(message: Message, commandName: string, args: string[]): Promise<boolean> {
@@ -860,8 +3925,8 @@ export class Music implements PlatformModule {
     const aliases: Record<string, string> = { playlist: "queue" };
     const action = aliases[commandName] ?? commandName;
     const supported = new Set([
-      "play", "pause", "resume", "skip", "stop", "shuffle",
-      "queue", "nowplaying", "repeat", "seek", "volume", "autoplay"
+      "play", "pause", "resume", "previous", "skip", "skip-to", "history", "stop", "shuffle",
+      "queue", "nowplaying", "lyrics", "repeat", "seek", "volume", "pitch", "speed", "eq", "autoplay"
     ]);
     if (!supported.has(action)) return false;
 
@@ -904,30 +3969,43 @@ export class Music implements PlatformModule {
         return true;
       }
 
-      const nextPlayer = player ?? this.manager.createPlayer({
-        guildId: message.guild.id,
-        voiceChannelId,
-        textChannelId: await this.preferredTextChannelId(message.guild.id, message.channelId),
-        volume: await this.defaultVolume(message.guild.id),
-        selfDeaf: true
-      });
+      try {
+        const queued = await this.queueQuery(
+          message.guild.id,
+          voiceChannelId,
+          message.channelId,
+          query,
+          message.author
+        );
+        if (queued.pending) {
+          await message.reply("🕒 Запрос отправлен на подтверждение DJ или Manage Server.");
+          return true;
+        }
+        if (!queued.added) {
+          await message.reply("Ничего не найдено.");
+          return true;
+        }
 
-      if (nextPlayer.voiceChannelId !== voiceChannelId) {
-        await message.reply("Музыкальный бот уже находится в другом голосовом канале.");
-        return true;
+        const suffix = queued.truncated
+          ? " — добавлены первые " + MAX_PLAYLIST_TRACKS + " треков"
+          : "";
+        await message.reply(
+          "🎵 Добавлено в очередь: " + queued.added + ". Первый: " +
+          queued.firstTitle + " — " + queued.firstAuthor + suffix
+        );
+      } catch (error) {
+        const messageText = String(error);
+        await message.reply(
+          messageText.includes("music_player_in_other_voice")
+            ? "Музыкальный бот уже находится в другом голосовом канале."
+            : "Не удалось добавить запрос в очередь."
+        );
+        logger.warn("Music prefix play failed", {
+          guildId: message.guild.id,
+          userId: message.author.id,
+          error: messageText
+        });
       }
-      if (!nextPlayer.connected) await nextPlayer.connect();
-
-      const source = /^https?:\/\//i.test(query) ? undefined : "ytsearch";
-      const result = await nextPlayer.search(source ? { query, source } : { query }, message.author);
-      if (!result.tracks.length) {
-        await message.reply("Ничего не найдено.");
-        return true;
-      }
-
-      nextPlayer.queue.add(result.tracks[0]!);
-      if (!nextPlayer.playing) await nextPlayer.play();
-      await message.reply("🎵 Добавлено: " + result.tracks[0]!.info.title + " — " + result.tracks[0]!.info.author);
       return true;
     }
 
@@ -950,6 +4028,24 @@ export class Music implements PlatformModule {
     } else if (action === "skip") {
       await player.skip();
       await message.reply("⏭️ Следующий трек.");
+    } else if (action === "skip-to") {
+      const position = Number(args[0]);
+      const target = trimMusicQueueToPosition(player.queue.tracks, position);
+      if (!target) {
+        await message.reply("Использование: !skip-to <позиция>.");
+        return true;
+      }
+      await player.skip();
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await message.reply("⏭️ Пропущено до #" + position + ": **" + target.info.title + "**");
+    } else if (action === "history") {
+      const rows = await this.recentHistory(message.guild.id, 20);
+      if (!rows.length) {
+        await message.reply("🎵 История проигрывания пока пуста.");
+        return true;
+      }
+      await message.reply("📜 **Недавно проиграно**\n" + rows.map((row, index) => (index + 1) + ". **" + row.title + "** — " + row.author).join("\n"));
     } else if (action === "stop") {
       await player.stopPlaying();
       await message.reply("⏹️ Остановлено.");
@@ -961,15 +4057,28 @@ export class Music implements PlatformModule {
       await Promise.resolve(player.queue.shuffle());
       await this.persistPlayer(player);
       await message.reply("🔀 Очередь перемешана.");
+    } else if (action === "previous") {
+      const previous = player.queue.previous;
+      if (!Array.isArray(previous) || previous.length === 0) {
+        await message.reply("⏮️ Предыдущего трека нет.");
+        return true;
+      }
+      try {
+        await player.queue.shiftPrevious();
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await message.reply("⏮️ Вернулся к предыдущему треку.");
+      } catch (error) {
+        logger.warn("Music prefix previous track failed", { guildId: message.guild.id, error: String(error) });
+        await message.reply("Не удалось вернуть предыдущий трек.");
+      }
+      return true;
+    } else if (action === "lyrics") {
+      await message.reply("Используй /music lyrics или кнопку 📜 в контроллере.");
+      return true;
     } else if (action === "queue") {
-      const tracks = player.queue.tracks.slice(0, 15);
-      const lines = tracks.map((track, index) => (index + 1) + ". **" + track.info.title + "** — " + track.info.author);
-      const embed = new EmbedBuilder()
-        .setTitle("🎶 Playlist / Queue")
-        .setDescription(lines.length ? lines.join("\n") : "Очередь пуста.")
-        .setFooter({ text: message.guild.name })
-        .setTimestamp();
-      await message.reply({ embeds: [embed] });
+      const page = this.buildQueuePage(player, 0);
+      await message.reply({ content: page.content, components: page.components });
     } else if (action === "nowplaying") {
       const track = player.queue.current;
       if (!track) {
@@ -984,7 +4093,8 @@ export class Music implements PlatformModule {
           { name: "Repeat", value: player.repeatMode, inline: true },
           { name: "Volume", value: String(player.volume), inline: true }
         );
-      await message.reply({ embeds: [embed] });
+      const autoplay = await this.autoplayEnabled(message.guild.id);
+      await message.reply({ embeds: [embed], components: this.buildControllerComponents(player, autoplay) });
     } else if (action === "repeat") {
       const mode = normalizeMusicRepeatMode((args[0] ?? "").toLowerCase());
       if (!mode) {
@@ -1020,6 +4130,140 @@ export class Music implements PlatformModule {
       }
       await player.setVolume(value);
       await message.reply("🔊 Громкость: " + value);
+    } else if (action === "pitch") {
+      const value = args.length ? Number(args[0]) : null;
+      if (value === null) {
+        const currentPitch = Number((player.filterManager.data?.timescale as { pitch?: number } | undefined)?.pitch ?? 1);
+        await message.reply("🎚️ Pitch: " + currentPitch.toFixed(2) + "×");
+        return true;
+      }
+      const pitch = normalizeMusicPitch(value);
+      if (pitch === null || !(manageGuild || dj)) {
+        await message.reply("Pitch требует DJ / Manage Server и значение от 0.5 до 2.0. Значение 1.0 — норма.");
+        return true;
+      }
+      try {
+        await player.filterManager.setPitch(pitch);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await message.reply("🎚️ Pitch: " + pitch.toFixed(2) + "×");
+      } catch (error) {
+        logger.warn("Music prefix pitch operation failed", { guildId: message.guild.id, pitch, error: String(error) });
+        await message.reply("Не удалось изменить pitch на текущем Lavalink node.");
+      }
+    } else if (action === "speed") {
+      const value = args.length ? Number(args[0]) : null;
+      if (value === null) {
+        const currentSpeed = Number((player.filterManager.data?.timescale as { speed?: number } | undefined)?.speed ?? 1);
+        await message.reply("⏩ Speed: " + currentSpeed.toFixed(2) + "×");
+        return true;
+      }
+      const speed = normalizeMusicSpeed(value);
+      if (speed === null || !(manageGuild || dj)) {
+        await message.reply("Speed требует DJ / Manage Server и значение от 0.5 до 2.0. Значение 1.0 — норма.");
+        return true;
+      }
+      try {
+        await player.filterManager.setSpeed(speed);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await message.reply("⏩ Speed: " + speed.toFixed(2) + "×");
+      } catch (error) {
+        logger.warn("Music prefix speed operation failed", { guildId: message.guild.id, speed, error: String(error) });
+        await message.reply("Не удалось изменить speed на текущем Lavalink node.");
+      }
+    } else if (action === "eq") {
+      const mode = (args[0] ?? "show").toLowerCase();
+      if (mode === "show") {
+        const lines = Array.from({ length: MUSIC_EQ_BAND_COUNT }, (_, band) => {
+          const gain = Number(player.filterManager.equalizerBands[band]?.gain ?? 0);
+          return "Band " + band + ": **" + gain.toFixed(3) + "**";
+        });
+        await message.reply("🎚️ **Custom EQ**\nДиапазон gain: **-0.25…1.00**\n\n" + lines.join("\n"));
+        return true;
+      }
+      if (!(manageGuild || dj)) {
+        await message.reply("Редактировать EQ могут пользователи с DJ-ролью или Manage Server.");
+        return true;
+      }
+      if (mode === "reset") {
+        try {
+          await player.filterManager.clearEQ();
+          await this.persistPlayer(player);
+          await this.syncController(player);
+          await message.reply("🎚️ Custom EQ сброшен.");
+        } catch (error) {
+          logger.warn("Music prefix custom EQ reset failed", { guildId: message.guild.id, error: String(error) });
+          await message.reply("Не удалось сбросить Custom EQ на текущем Lavalink node.");
+        }
+        return true;
+      }
+      if (mode !== "set") {
+        await message.reply("Использование: !eq show | !eq set <band 0-14> <gain -0.25..1.00> | !eq reset.");
+        return true;
+      }
+      const band = normalizeMusicEqBand(Number(args[1] ?? ""));
+      const gain = normalizeMusicEqGain(Number(args[2] ?? ""));
+      if (band === null || gain === null) {
+        await message.reply("Использование: !eq set <band 0-14> <gain -0.25..1.00>.");
+        return true;
+      }
+      try {
+        await player.filterManager.setEQ([{ band, gain }]);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await message.reply("🎚️ EQ band " + band + ": gain " + gain.toFixed(3) + ".");
+      } catch (error) {
+        logger.warn("Music prefix custom EQ set failed", { guildId: message.guild.id, band, gain, error: String(error) });
+        await message.reply("Не удалось изменить Custom EQ на текущем Lavalink node.");
+      }
+      return true;
+    } else if (action === "eq") {
+      const mode = (args[0] ?? "show").toLowerCase();
+      if (mode === "show") {
+        const lines = Array.from({ length: MUSIC_EQ_BAND_COUNT }, (_, band) => {
+          const gain = Number(player.filterManager.equalizerBands[band]?.gain ?? 0);
+          return "Band " + band + ": **" + gain.toFixed(3) + "**";
+        });
+        await message.reply("🎚️ **Custom EQ**\nДиапазон gain: **-0.25…1.00**\n\n" + lines.join("\n"));
+        return true;
+      }
+      if (!(manageGuild || dj)) {
+        await message.reply("Редактировать EQ могут пользователи с DJ-ролью или Manage Server.");
+        return true;
+      }
+      if (mode === "reset") {
+        try {
+          await player.filterManager.clearEQ();
+          await this.persistPlayer(player);
+          await this.syncController(player);
+          await message.reply("🎚️ Custom EQ сброшен.");
+        } catch (error) {
+          logger.warn("Music prefix custom EQ reset failed", { guildId: message.guild.id, error: String(error) });
+          await message.reply("Не удалось сбросить Custom EQ на текущем Lavalink node.");
+        }
+        return true;
+      }
+      if (mode !== "set") {
+        await message.reply("Использование: !eq show | !eq set <band 0-14> <gain -0.25..1.00> | !eq reset.");
+        return true;
+      }
+      const band = normalizeMusicEqBand(Number(args[1] ?? ""));
+      const gain = normalizeMusicEqGain(Number(args[2] ?? ""));
+      if (band === null || gain === null) {
+        await message.reply("Использование: !eq set <band 0-14> <gain -0.25..1.00>.");
+        return true;
+      }
+      try {
+        await player.filterManager.setEQ([{ band, gain }]);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await message.reply("🎚️ EQ band " + band + ": gain " + gain.toFixed(3) + ".");
+      } catch (error) {
+        logger.warn("Music prefix custom EQ set failed", { guildId: message.guild.id, band, gain, error: String(error) });
+        await message.reply("Не удалось изменить Custom EQ на текущем Lavalink node.");
+      }
+      return true;
     } else if (action === "autoplay") {
       if (!(manageGuild || dj)) {
         await message.reply("Autoplay настраивается пользователями с DJ-ролью или Manage Server.");
@@ -1039,7 +4283,207 @@ export class Music implements PlatformModule {
     return true;
   }
 
+  private async controllerPolicyAllowed(
+    guildId: string,
+    action: string,
+    member: import("discord.js").GuildMember | null,
+    channelId: string
+  ): Promise<boolean> {
+    if (!member) return false;
+    if (!this.commandPolicy) return true;
+    const commandName =
+      action === "loop-one" ? "repeat" :
+      action.startsWith("seek-") ? "seek" :
+      action.startsWith("volume-") ? "volume" :
+      action.startsWith("filter:") || action === "filters" ? "filter" :
+      action === "save-queue" ? "queue" :
+      action === "autoplay-toggle" ? "autoplay" :
+      action === "search" ? "play" :
+      action;
+    return this.commandPolicy.checkMemberAction(guildId, commandName, member, channelId);
+  }
+
   private async onInteraction(interaction: Interaction): Promise<void> {
+    if (interaction.isButton() && interaction.customId.startsWith("dsp:music:request:") && interaction.guild) {
+      await this.handleMusicRequestApproval(interaction);
+      return;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId === "dsp:music:save-queue" && interaction.guild) {
+      const player = this.manager?.players.get(interaction.guild.id);
+      if (!player) {
+        await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+        return;
+      }
+      const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+      if (!canControlMusic(member?.voice.channelId ?? null, player.voiceChannelId, interaction.memberPermissions?.has("ManageGuild") ?? false)) {
+        await interaction.reply({ content: "Сохранять очередь можно из того же голосового канала.", ephemeral: true });
+        return;
+      }
+
+      const name = normalizeMusicPlaylistName(interaction.fields.getTextInputValue("name"));
+      if (!name) {
+        await interaction.reply({ content: "Название плейлиста пустое или некорректное.", ephemeral: true });
+        return;
+      }
+
+      const tracks = buildMusicPlaylistSnapshot(player.queue.current, player.queue.tracks);
+
+      if (!tracks.length) {
+        await interaction.reply({ content: "Нечего сохранять: очередь пуста.", ephemeral: true });
+        return;
+      }
+
+      try {
+        await this.db.query(
+          "INSERT INTO music_playlists(guild_id,user_id,name,tracks) VALUES($1,$2,$3,$4::jsonb)",
+          [
+            interaction.guild.id,
+            interaction.user.id,
+            name,
+            JSON.stringify(tracks.map((track) => this.serializedTrack(track)))
+          ]
+        );
+      } catch (error) {
+        const message = String(error);
+        if (/unique|duplicate|23505/i.test(message)) {
+          await interaction.reply({ content: "Плейлист **" + name + "** уже существует. Выбери другое имя.", ephemeral: true });
+          return;
+        }
+        logger.warn("Music queue playlist save failed", {
+          guildId: interaction.guild.id,
+          userId: interaction.user.id,
+          error: message
+        });
+        await interaction.reply({ content: "Не удалось сохранить текущую очередь.", ephemeral: true });
+        return;
+      }
+
+      await interaction.reply({
+        content: "💾 Очередь сохранена в **" + name + "**: **" + tracks.length + "** трек(ов).",
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith("dsp:music:search:") && interaction.guild) {
+      const parts = interaction.customId.split(":");
+      const token = parts[3];
+      const index = Number(parts[4]);
+      if (!token) {
+        await interaction.reply({ content: "Результаты поиска устарели или недоступны.", ephemeral: true });
+        return;
+      }
+      const session = this.searchSessions.get(token);
+      if (!session || session.guildId !== interaction.guild.id || session.userId !== interaction.user.id || session.expiresAt < Date.now() || !isValidMusicSearchSelection(index, session.tracks.length)) {
+        await interaction.reply({ content: "Результаты поиска устарели или недоступны.", ephemeral: true });
+        if (token) this.searchSessions.delete(token);
+        return;
+      }
+
+      const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+      if (!await this.canQueueMusic(interaction.guild.id, interaction.user.id, interaction.channelId)) {
+        await interaction.reply({ content: "Добавление в очередь запрещено политикой Music.", ephemeral: true });
+        return;
+      }
+      const player = this.manager?.players.get(interaction.guild.id);
+      if (!player || !canControlMusic(member?.voice.channelId ?? null, player.voiceChannelId, interaction.memberPermissions?.has("ManageGuild") ?? false)) {
+        await interaction.reply({ content: "Выбор результата нужно подтверждать из того же голосового канала.", ephemeral: true });
+        return;
+      }
+
+      const selected = session.tracks[index];
+      if (!selected) {
+        await interaction.reply({ content: "Результат больше недоступен.", ephemeral: true });
+        return;
+      }
+      const settings = await this.musicSettings(interaction.guild.id);
+      const requesterVoiceChannelId = member?.voice.channelId;
+      if (!requesterVoiceChannelId) {
+        await interaction.reply({ content: "Сначала зайди в голосовой канал.", ephemeral: true });
+        return;
+      }
+      if (settings.requestApprovalMode === "approval") {
+        const approvalId = await this.createMusicRequestApproval({
+          guildId: interaction.guild.id,
+          requesterUserId: interaction.user.id,
+          requesterVoiceChannelId,
+          sourceChannelId: interaction.channelId,
+          query: selected.info.title,
+          track: selected,
+          source: "search"
+        });
+        this.searchSessions.delete(token);
+        await interaction.update({
+          content: "🕒 Запрос отправлен на подтверждение DJ или Manage Server. Request #" + approvalId,
+          embeds: [],
+          components: []
+        });
+        return;
+      }
+      if (!await this.canQueueMusic(interaction.guild.id, interaction.user.id, interaction.channelId)) {
+        await interaction.reply({ content: "Добавление в очередь запрещено политикой Music.", ephemeral: true });
+        return;
+      }
+      const queuedByUser = countMusicQueuedByUser(player.queue.tracks, interaction.user.id);
+      const remainingUserSlots = remainingMusicQueueSlots(queuedByUser, settings.maxQueuedPerUser);
+      const remainingGuildSlots = remainingMusicGuildQueueSlots(player.queue.tracks.length, settings.maxQueueSize);
+      if (remainingUserSlots === 0 || remainingGuildSlots === 0) {
+        this.searchSessions.delete(token);
+        await interaction.update({ content: "⛔ Твой лимит ожидающих треков уже достигнут.", embeds: [], components: [] });
+        return;
+      }
+      player.queue.add(selected);
+      await this.applyFairQueue(player, settings.fairQueueEnabled);
+      if (!player.playing) await player.play();
+      this.requestCooldownUntil.set(interaction.guild.id + ":" + interaction.user.id, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      this.searchSessions.delete(token);
+      await interaction.update({ content: "✅ Добавлено: **" + selected.info.title + "**", embeds: [], components: [] });
+      return;
+    }
+
+
+    if (interaction.isButton() && interaction.customId.startsWith("dsp:music:lyrics-page:") && interaction.guild) {
+      const parts = interaction.customId.split(":");
+      const token = parts[3] ?? "";
+      const page = Number(parts[4]);
+      const session = this.lyricsPaginationSessions.get(token);
+      if (
+        !session ||
+        session.guildId !== interaction.guild.id ||
+        session.userId !== interaction.user.id ||
+        session.expiresAt < Date.now() ||
+        !isValidMusicLyricsPage(page, musicLyricsPageCount(session?.chunks ?? []))
+      ) {
+        await interaction.update({ content: "📜 Эта навигация устарела. Запроси текст заново.", components: [] });
+        if (token) this.lyricsPaginationSessions.delete(token);
+        return;
+      }
+      await interaction.update(this.buildLyricsPage(token, page));
+      return;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith("dsp:music:playlist-page:") && interaction.guild) {
+      const parts = interaction.customId.split(":");
+      const token = parts[3] ?? "";
+      const page = Number(parts[4]);
+      const session = this.playlistPaginationSessions.get(token);
+      if (
+        !session ||
+        session.guildId !== interaction.guild.id ||
+        session.userId !== interaction.user.id ||
+        session.expiresAt < Date.now() ||
+        !isValidMusicPlaylistPage(page, session.action === "view" ? 1 : Number.MAX_SAFE_INTEGER)
+      ) {
+        await interaction.update({ content: "Эта навигация устарела. Выполни команду ещё раз.", components: [] });
+        return;
+      }
+      await this.renderMusicPlaylistPagination(interaction,token,session,page);
+      return;
+    }
+
     if (!interaction.isButton() || !interaction.customId.startsWith("dsp:music:") || !interaction.guild) return;
 
     const player = this.manager?.players.get(interaction.guild.id);
@@ -1059,30 +4503,161 @@ export class Music implements PlatformModule {
     }
 
     const action = interaction.customId.slice("dsp:music:".length);
+    if (!await this.controllerPolicyAllowed(interaction.guild.id, action, member, interaction.channelId)) {
+      await interaction.reply({ content: "Это действие запрещено политикой Music для твоей роли или канала.", ephemeral: true });
+      return;
+    }
+
+    if (action === "autoplay-toggle") {
+      if (!await this.canManageMusicMember(interaction.guild.id, member)) {
+        await interaction.reply({ content: "Autoplay настраивается пользователями с DJ-ролью или Manage Server.", ephemeral: true });
+        return;
+      }
+      const enabled = toggleMusicAutoplay(await this.autoplayEnabled(interaction.guild.id));
+      await this.setAutoplay(interaction.guild.id, enabled);
+      await this.syncController(player);
+      await interaction.reply({
+        content: "📻 Autoplay " + (enabled ? "включён" : "выключен") + ".",
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (action === "save-queue") {
+      const modal = new ModalBuilder()
+        .setCustomId("dsp:music:save-queue")
+        .setTitle("Сохранить текущую очередь");
+      const nameInput = new TextInputBuilder()
+        .setCustomId("name")
+        .setLabel("Имя плейлиста")
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(80)
+        .setRequired(true)
+        .setPlaceholder("Например: Вечерний сет");
+      modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput));
+      await interaction.showModal(modal);
+      return;
+    }
+
+    if (action === "filters") {
+      await interaction.reply({
+        content: "🎚️ Выбери фильтр или FX. Действия применяются к текущему треку сразу.",
+        components: this.filterPalette(),
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (action.startsWith("filter:")) {
+      const filterAction = action.slice("filter:".length);
+      if (!isMusicFilterAction(filterAction)) {
+        await interaction.reply({ content: "Неизвестный filter action.", ephemeral: true });
+        return;
+      }
+      try {
+        await this.applyFilterAction(player, filterAction);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await interaction.reply({
+          content: "🎚️ Filter применён: **" + filterAction + "**.",
+          ephemeral: true
+        });
+      } catch (error) {
+        logger.warn("Music quick filter operation failed", {
+          guildId: interaction.guild.id,
+          action: filterAction,
+          error: String(error)
+        });
+        await interaction.reply({
+          content: "Не удалось применить этот filter на текущем Lavalink node.",
+          ephemeral: true
+        });
+      }
+      return;
+    }
+
+    let response = "";
+
     if (action === "pause") {
       if (player.paused) await player.resume();
       else await player.pause();
-    }
-    else if (action === "skip") await player.skip();
-    else if (action === "stop") await player.stopPlaying();
-    else if (action === "shuffle") {
+      response = player.paused ? "⏸️ Пауза." : "▶️ Продолжаю.";
+    } else if (action === "skip") {
+      await player.skip();
+      response = "⏭️ Следующий трек.";
+    } else if (action === "stop") {
+      await player.stopPlaying();
+      response = "⏹️ Стоп.";
+    } else if (action === "shuffle") {
       if (player.queue.tracks.length < 2) {
         await interaction.reply({ content: "В очереди недостаточно треков для shuffle.", ephemeral: true });
         return;
       }
       await Promise.resolve(player.queue.shuffle());
       await this.persistPlayer(player);
+      response = "🔀 Очередь перемешана.";
+    } else if (action === "repeat") {
+      const mode = nextMusicQueueRepeatMode(player.repeatMode);
+      await player.setRepeatMode(mode);
+      await this.persistPlayer(player);
+      response = "🔁 Queue Loop: **" + (mode === "queue" ? "on" : "off") + "**";
+    } else if (action === "loop-one") {
+      const mode = player.repeatMode === "track" ? "off" : "track";
+      await player.setRepeatMode(mode);
+      await this.persistPlayer(player);
+      response = "🔂 Loop One: **" + (mode === "track" ? "on" : "off") + "**";
+    } else if (action === "seek-back" || action === "seek-forward") {
+      const track = player.queue.current;
+      if (!track) {
+        await interaction.reply({ content: "Сейчас ничего не играет.", ephemeral: true });
+        return;
+      }
+      const durationMs = Math.max(0, Number(track.info.duration ?? 0));
+      const basePosition = Math.max(0, Number(player.lastPosition ?? 0));
+      const elapsed = player.paused
+        ? 0
+        : Math.max(0, Date.now() - Number(player.lastPositionChange ?? Date.now()));
+      const currentPosition = basePosition + elapsed;
+      const deltaMs = action === "seek-back" ? -15_000 : 30_000;
+      const nextPosition = Math.max(0, Math.min(durationMs > 0 ? Math.max(0, durationMs - 1_000) : currentPosition + deltaMs, currentPosition + deltaMs));
+      await player.seek(nextPosition);
+      await this.persistPlayer(player);
+      response = (deltaMs < 0 ? "⏪ " : "⏩ ") + Math.floor(nextPosition / 1000) + " сек.";
+    } else if (action === "volume-down" || action === "volume-up") {
+      const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+      if (!await this.canManageMusicMember(interaction.guild.id, member)) {
+        await interaction.reply({ content: "Громкость изменяют пользователи с DJ-ролью или Manage Server.", ephemeral: true });
+        return;
+      }
+      const delta = action === "volume-up" ? 10 : -10;
+      const next = clampMusicVolume(player.volume + delta);
+      await player.setVolume(next);
+      await this.persistPlayer(player);
+      response = `🔊 Громкость: **${next}**`;
+    } else if (action === "queue") {
+      const page = this.buildQueuePage(player, 0);
+      await interaction.reply({
+        content: page.content,
+        components: page.components,
+        ephemeral: true
+      });
+      return;
+    } else if (action.startsWith("queue-page:")) {
+      const pageNumber = Number(action.slice("queue-page:".length));
+      if (!Number.isInteger(pageNumber) || pageNumber < 0) return;
+      const page = this.buildQueuePage(player, pageNumber);
+      await interaction.reply({
+        content: page.content,
+        components: page.components,
+        ephemeral: true
+      });
+      return;
+    } else {
+      return;
     }
 
     await this.syncController(player);
-
-    await interaction.reply({
-      content:
-        action === "pause" ? (player.paused ? "⏸️ Пауза." : "▶️ Продолжаю.") :
-        action === "skip" ? "⏭️ Следующий трек." :
-        "⏹️ Стоп.",
-      ephemeral: true
-    });
+    await interaction.reply({ content: response, ephemeral: true });
   }
 
   private async restoreResumedPlayers(nodeId: string, fetchedPlayers: unknown[]): Promise<void> {
@@ -1117,12 +4692,34 @@ export class Music implements PlatformModule {
         voice_channel_id: string | null;
         text_channel_id: string | null;
         state: unknown;
+        playlist_id: string | null;
+        playlist_next_index: number;
+        playlist_order: unknown;
+        playlist_requester_user_id: string | null;
       }>(
-        "SELECT voice_channel_id,text_channel_id,state FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
+        "SELECT voice_channel_id,text_channel_id,state,playlist_id,playlist_next_index,playlist_order,playlist_requester_user_id FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
         [guildId, this.config.botIdentityId]
       );
       const savedRow = saved.rows[0];
       if (!savedRow?.voice_channel_id) continue;
+
+      if (
+        savedRow.playlist_id &&
+        savedRow.playlist_requester_user_id &&
+        Number.isInteger(Number(savedRow.playlist_next_index)) &&
+        Number(savedRow.playlist_next_index) >= 0
+      ) {
+        this.playlistContinuations.set(guildId, {
+          playlistId: savedRow.playlist_id,
+          nextIndex: Number(savedRow.playlist_next_index),
+          order: Array.isArray(savedRow.playlist_order) && savedRow.playlist_order.every((value) => Number.isInteger(Number(value)))
+            ? savedRow.playlist_order.map((value) => Number(value))
+            : null,
+          requesterUserId: savedRow.playlist_requester_user_id
+        });
+      } else {
+        this.playlistContinuations.delete(guildId);
+      }
 
       let savedState: { repeatMode?: unknown } = {};
       try {
@@ -1204,28 +4801,43 @@ export class Music implements PlatformModule {
     return result.rows[0]?.autoplay ?? false;
   }
 
-  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number }> {
-    const result = await this.db.query<{ preferred_text_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number }>(
-      "SELECT preferred_text_channel_id,default_volume,announce_track_start,auto_leave_seconds FROM music_settings WHERE guild_id=$1",
+  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number; twentyFourSeven: boolean; queueAccess: "everyone" | "dj"; maxQueuedPerUser: number; maxQueueSize: number; fairQueueEnabled: boolean; requestApprovalMode: MusicRequestApprovalMode }> {
+    const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number; twenty_four_seven: boolean; queue_access: "everyone" | "dj"; max_queued_per_user: number; max_queue_size: number; fair_queue_enabled: boolean; request_approval_mode: string }>(
+      "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds,twenty_four_seven,queue_access,max_queued_per_user,max_queue_size,fair_queue_enabled,request_approval_mode FROM music_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
     return {
       preferredTextChannelId: row?.preferred_text_channel_id ?? null,
+      requestChannelId: row?.request_channel_id ?? null,
       defaultVolume: Math.min(Math.max(Number(row?.default_volume ?? 100), 0), 200),
       announceTrackStart: row?.announce_track_start ?? true,
-      autoLeaveSeconds: Math.min(Math.max(Number(row?.auto_leave_seconds ?? 30), 0), 86400)
+      autoLeaveSeconds: Math.min(Math.max(Number(row?.auto_leave_seconds ?? 30), 0), 86400),
+      twentyFourSeven: row?.twenty_four_seven ?? false,
+      queueAccess: row?.queue_access === "dj" ? "dj" : "everyone",
+      maxQueuedPerUser: normalizeMusicQueueLimit(Number(row?.max_queued_per_user ?? 10)),
+      maxQueueSize: Math.min(500, Math.max(0, Math.trunc(Number(row?.max_queue_size ?? 100)))),
+      fairQueueEnabled: row?.fair_queue_enabled ?? false,
+      requestApprovalMode: normalizeMusicRequestApprovalMode(row?.request_approval_mode ?? "off") ?? "off"
     };
   }
 
   private async preferredTextChannelId(guildId: string, fallback: string | null | undefined): Promise<string | undefined> {
     const settings = await this.musicSettings(guildId);
-    const preferred = settings.preferredTextChannelId;
+    const preferred = settings.requestChannelId ?? settings.preferredTextChannelId;
     if (preferred) {
       const channel = this.client?.guilds.cache.get(guildId)?.channels.cache.get(preferred);
       if (channel?.isTextBased() && "send" in channel) return preferred;
     }
     return fallback ?? undefined;
+  }
+
+  private async requestChannelId(guildId: string): Promise<string | null> {
+    const settings = await this.musicSettings(guildId);
+    const channelId = settings.requestChannelId;
+    if (!channelId) return null;
+    const channel = this.client?.guilds.cache.get(guildId)?.channels.cache.get(channelId);
+    return channel?.isTextBased() && "send" in channel ? channelId : null;
   }
 
   private async defaultVolume(guildId: string): Promise<number> {
@@ -1244,8 +4856,9 @@ export class Music implements PlatformModule {
 
   private async scheduleAutoLeave(player: Player): Promise<void> {
     this.cancelAutoLeave(player.guildId);
-    const seconds = (await this.musicSettings(player.guildId)).autoLeaveSeconds;
-    if (seconds <= 0 || !this.manager) return;
+    const settings = await this.musicSettings(player.guildId);
+    if (settings.twentyFourSeven || settings.autoLeaveSeconds <= 0 || !this.manager) return;
+    const seconds = settings.autoLeaveSeconds;
     const timer = setTimeout(() => {
       const current = this.manager?.players.get(player.guildId);
       if (!current || current.queue.current || current.queue.tracks.length > 0) return;
@@ -1257,10 +4870,226 @@ export class Music implements PlatformModule {
     this.autoLeaveTimers.set(player.guildId, timer);
   }
 
+  private async setTwentyFourSeven(guildId: string, enabled: boolean): Promise<void> {
+    await this.db.query(
+      "INSERT INTO music_settings(guild_id,twenty_four_seven) VALUES($1,$2) ON CONFLICT(guild_id) DO UPDATE SET twenty_four_seven=EXCLUDED.twenty_four_seven,updated_at=now()",
+      [guildId, enabled]
+    );
+    if (enabled) this.cancelAutoLeave(guildId);
+  }
+
+  private async applyFairQueue(player: Player, enabled?: boolean): Promise<void> {
+    if (!enabled && enabled !== false) {
+      enabled = (await this.musicSettings(player.guildId)).fairQueueEnabled;
+    }
+    if (!enabled) return;
+
+    const queue = player.queue.tracks;
+    const balanced = rebalanceMusicQueueByRequester(
+      queue,
+      (track) => typeof track.requester?.id === "string" ? track.requester.id : null
+    );
+    queue.splice(0, queue.length, ...balanced);
+  }
+
   private async setAutoplay(guildId: string, enabled: boolean): Promise<void> {
     await this.db.query(
       "INSERT INTO music_settings(guild_id,autoplay) VALUES($1,$2) ON CONFLICT(guild_id) DO UPDATE SET autoplay=EXCLUDED.autoplay,updated_at=now()",
       [guildId, enabled]
+    );
+  }
+
+  private async musicRadioSettings(guildId: string): Promise<{
+    enabled: boolean;
+    mode: MusicRadioMode;
+    seed: string | null;
+  }> {
+    const result = await this.db.query<{
+      radio_enabled: boolean;
+      radio_mode: string;
+      radio_seed: string | null;
+    }>(
+      "SELECT radio_enabled,radio_mode,radio_seed FROM music_settings WHERE guild_id=$1",
+      [guildId]
+    );
+    return {
+      enabled: result.rows[0]?.radio_enabled ?? false,
+      mode: normalizeMusicRadioMode(result.rows[0]?.radio_mode ?? "artist") ?? "artist",
+      seed: result.rows[0]?.radio_seed ?? null
+    };
+  }
+
+  private async setMusicRadio(
+    guildId: string,
+    enabled: boolean,
+    mode?: MusicRadioMode,
+    seed?: string | null
+  ): Promise<void> {
+    const normalizedSeed = typeof seed === "string"
+      ? seed.trim().replace(/\s+/g, " ").slice(0, 200)
+      : null;
+    await this.db.query(
+      "INSERT INTO music_settings(guild_id,radio_enabled,radio_mode,radio_seed) VALUES($1,$2,$3,$4) ON CONFLICT(guild_id) DO UPDATE SET radio_enabled=EXCLUDED.radio_enabled,radio_mode=EXCLUDED.radio_mode,radio_seed=EXCLUDED.radio_seed,updated_at=now()",
+      [guildId,enabled,mode ?? "artist",normalizedSeed || null]
+    );
+  }
+
+  private async radioNext(player: Player, lastTrack: Track | null): Promise<boolean> {
+    const settings = await this.musicRadioSettings(player.guildId);
+    if (!settings.enabled) return false;
+    if (this.autoplayInFlight.has(player.guildId)) return false;
+
+    let seed = settings.seed?.trim() ?? "";
+    if (settings.mode === "artist" && !seed) {
+      seed = String(lastTrack?.info.author ?? "").trim();
+    }
+    if (!seed) {
+      logger.warn("Music radio has no usable seed", {
+        guildId: player.guildId,
+        mode: settings.mode
+      });
+      return false;
+    }
+
+    const recent = await this.db.query<{ identifier: string | null; url: string | null }>(
+      "SELECT identifier,url FROM music_history WHERE guild_id=$1 AND bot_identity_id=$2 ORDER BY played_at DESC,id DESC LIMIT $3",
+      [player.guildId,this.config.botIdentityId,MUSIC_AUTOPLAY_RECENT_HISTORY_LIMIT]
+    );
+    const excludedIdentifiers = new Set<string>();
+    const excludedUris = new Set<string>();
+    const addIdentifier = (value: unknown) => {
+      if (typeof value === "string" && value.trim()) excludedIdentifiers.add(value.trim());
+    };
+    const addUri = (value: unknown) => {
+      if (typeof value === "string" && value.trim()) excludedUris.add(value.trim());
+    };
+    addIdentifier(lastTrack?.info.identifier);
+    addUri(lastTrack?.info.uri);
+    for (const track of player.queue.tracks) {
+      addIdentifier(track.info.identifier);
+      addUri(track.info.uri);
+    }
+    for (const row of recent.rows) {
+      addIdentifier(row.identifier);
+      addUri(row.url);
+    }
+
+    const result = await player.search(
+      { query: buildMusicRadioQuery(settings.mode, seed), source: "ytsearch" },
+      this.client?.user
+    );
+    const candidate = selectMusicArtistAwareAutoplayCandidate(
+      result.tracks as Track[],
+      settings.mode === "artist" ? seed : null,
+      excludedIdentifiers,
+      excludedUris
+    );
+    if (!candidate) return false;
+
+    player.queue.add(candidate);
+    if (!player.playing) await player.play();
+    await this.persistPlayer(player);
+    return true;
+  }
+
+  private async continueMusicPlaylist(player: Player): Promise<boolean> {
+    if (player.repeatMode !== "off") return false;
+    const continuation = this.playlistContinuations.get(player.guildId);
+    if (!continuation) return false;
+
+    const result = await this.db.query<{ tracks: unknown[] }>(
+      "SELECT tracks FROM music_playlists WHERE id=$1 AND guild_id=$2",
+      [continuation.playlistId,player.guildId]
+    );
+    const stored = Array.isArray(result.rows[0]?.tracks) ? result.rows[0].tracks : [];
+    if (!stored.length) {
+      this.playlistContinuations.delete(player.guildId);
+      await this.persistPlayer(player);
+      return false;
+    }
+
+    const order = Array.isArray(continuation.order) && continuation.order.length === stored.length
+      ? continuation.order
+      : stored.map((_, index) => index);
+    const startIndex = Math.max(0, Math.min(continuation.nextIndex, order.length));
+    if (startIndex >= order.length) {
+      this.playlistContinuations.delete(player.guildId);
+      await this.persistPlayer(player);
+      return false;
+    }
+
+    const settings = await this.musicSettings(player.guildId);
+    const queuedByUser = countMusicQueuedByUser(player.queue.tracks, continuation.requesterUserId);
+    const remainingUserSlots = remainingMusicQueueSlots(queuedByUser, settings.maxQueuedPerUser);
+    const remainingGuildSlots = remainingMusicGuildQueueSlots(player.queue.tracks.length, settings.maxQueueSize);
+    if (remainingUserSlots === 0 || remainingGuildSlots === 0) {
+      await this.persistPlayer(player);
+      return false;
+    }
+
+    const loadLimit = Math.min(
+      MAX_PLAYLIST_TRACKS,
+      ...(remainingUserSlots === null ? [] : [remainingUserSlots]),
+      ...(remainingGuildSlots === null ? [] : [remainingGuildSlots])
+    );
+    const batch = musicPlaylistContinuationBatch(order,startIndex,loadLimit);
+    const indexes = batch.indexes;
+    const requester = await this.client?.users.fetch(continuation.requesterUserId).catch(() => null) ?? this.client?.user;
+    if (!requester) {
+      logger.warn("Music playlist continuation requester unavailable", {
+        guildId: player.guildId,
+        requesterUserId: continuation.requesterUserId
+      });
+      return false;
+    }
+
+    let added = 0;
+    for (const index of indexes) {
+      const item = stored[index];
+      if (!item) continue;
+      try {
+        const built = this.manager?.utils.buildTrack(
+          item as Parameters<LavalinkManager["utils"]["buildTrack"]>[0],
+          requester
+        );
+        if (!built) continue;
+        player.queue.add(built);
+        added += 1;
+      } catch (error) {
+        logger.warn("Saved music playlist continuation restore failed", {
+          guildId: player.guildId,
+          playlistId: continuation.playlistId,
+          error: String(error)
+        });
+      }
+    }
+
+    const nextIndex = batch.nextIndex;
+    if (batch.done) {
+      this.playlistContinuations.delete(player.guildId);
+    } else {
+      this.playlistContinuations.set(player.guildId, {
+        ...continuation,
+        nextIndex
+      });
+    }
+
+    if (added > 0) {
+      await this.applyFairQueue(player, settings.fairQueueEnabled);
+      if (!player.playing) await player.play();
+    }
+    await this.persistPlayer(player);
+    return added > 0;
+  }
+
+  private async invalidatePlaylistContinuation(guildId: string, playlistId: string): Promise<void> {
+    const continuation = this.playlistContinuations.get(guildId);
+    if (!shouldInvalidateMusicPlaylistContinuation(continuation?.playlistId, playlistId)) return;
+
+    this.playlistContinuations.delete(guildId);
+    await this.db.query(
+      "UPDATE music_players SET playlist_id=NULL,playlist_next_index=0,playlist_order=NULL,playlist_requester_user_id=NULL,updated_at=now() WHERE guild_id=$1 AND bot_identity_id=$2 AND playlist_id=$3",
+      [guildId,this.config.botIdentityId,playlistId]
     );
   }
 
@@ -1273,14 +5102,59 @@ export class Music implements PlatformModule {
       const seed = `${lastPlayedTrack.info.author ?? ""} ${lastPlayedTrack.info.title ?? ""}`.trim();
       if (!seed) return;
 
-      const result = await player.search(
-        { query: seed, source: "ytsearch" },
-        this.client?.user
+      const recent = await this.db.query<{ identifier: string | null; url: string | null }>(
+        "SELECT identifier,url FROM music_history WHERE guild_id=$1 AND bot_identity_id=$2 ORDER BY played_at DESC,id DESC LIMIT $3",
+        [player.guildId,this.config.botIdentityId,MUSIC_AUTOPLAY_RECENT_HISTORY_LIMIT]
       );
 
-      const candidate = result.tracks.find(
-        (track) => track.info.identifier !== lastPlayedTrack.info.identifier
-      );
+      const excludedIdentifiers = new Set<string>();
+      const excludedUris = new Set<string>();
+      const addIdentifier = (value: unknown) => {
+        if (typeof value === "string" && value.trim()) excludedIdentifiers.add(value.trim());
+      };
+      const addUri = (value: unknown) => {
+        if (typeof value === "string" && value.trim()) excludedUris.add(value.trim());
+      };
+
+      addIdentifier(lastPlayedTrack.info.identifier);
+      addUri(lastPlayedTrack.info.uri);
+      for (const track of player.queue.tracks) {
+        addIdentifier(track.info.identifier);
+        addUri(track.info.uri);
+      }
+      for (const row of recent.rows) {
+        addIdentifier(row.identifier);
+        addUri(row.url);
+      }
+
+      let candidate: Track | null = null;
+      const artist = String(lastPlayedTrack.info.author ?? "").trim();
+      if (artist) {
+        const artistResult = await player.search(
+          { query: artist + " songs", source: "ytsearch" },
+          this.client?.user
+        );
+        candidate = selectMusicArtistAwareAutoplayCandidate(
+          artistResult.tracks as Track[],
+          artist,
+          excludedIdentifiers,
+          excludedUris
+        );
+      }
+
+      if (!candidate) {
+        const result = await player.search(
+          { query: seed, source: "ytsearch" },
+          this.client?.user
+        );
+        candidate = selectMusicArtistAwareAutoplayCandidate(
+          result.tracks as Track[],
+          artist || null,
+          excludedIdentifiers,
+          excludedUris
+        );
+      }
+
       if (!candidate) return;
 
       player.queue.add(candidate);
@@ -1298,29 +5172,121 @@ export class Music implements PlatformModule {
   }): Promise<void> {
     await this.db.query(
       `INSERT INTO music_players(
-        guild_id,bot_identity_id,voice_channel_id,text_channel_id,state
+        guild_id,bot_identity_id,voice_channel_id,text_channel_id,state,
+        playlist_id,playlist_next_index,playlist_order,playlist_requester_user_id
       )
-      VALUES($1,$2,$3,$4,$5::jsonb)
+      VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8::jsonb,$9)
       ON CONFLICT(guild_id,bot_identity_id)
       DO UPDATE SET
         voice_channel_id=EXCLUDED.voice_channel_id,
         text_channel_id=EXCLUDED.text_channel_id,
         state=EXCLUDED.state,
+        playlist_id=EXCLUDED.playlist_id,
+        playlist_next_index=EXCLUDED.playlist_next_index,
+        playlist_order=EXCLUDED.playlist_order,
+        playlist_requester_user_id=EXCLUDED.playlist_requester_user_id,
         updated_at=now()`,
       [
         player.guildId,
         this.config.botIdentityId,
         player.voiceChannelId ?? null,
         player.textChannelId ?? null,
-        JSON.stringify(player.toJSON())
+        JSON.stringify(player.toJSON()),
+        this.playlistContinuations.get(player.guildId)?.playlistId ?? null,
+        this.playlistContinuations.get(player.guildId)?.nextIndex ?? 0,
+        this.playlistContinuations.get(player.guildId)?.order
+          ? JSON.stringify(this.playlistContinuations.get(player.guildId)?.order)
+          : null,
+        this.playlistContinuations.get(player.guildId)?.requesterUserId ?? null
       ]
     ).catch((error) => logger.warn("Failed to persist music player", { error: String(error) }));
+  }
+
+  private buildQueuePage(player: Player, requestedPage: number): {
+    content: string;
+    components: ActionRowBuilder<ButtonBuilder>[];
+  } {
+    const pageSize = 10;
+    const total = player.queue.tracks.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const page = Math.min(Math.max(Math.trunc(requestedPage), 0), totalPages - 1);
+    const start = page * pageSize;
+    const tracks = player.queue.tracks.slice(start, start + pageSize);
+    const lines = tracks.map((track, index) => {
+      const requester = typeof track.requester?.id === "string" ? " · <@" + track.requester.id + ">" : "";
+      return `${start + index + 1}. **${track.info.title}** — ${track.info.author ?? "Unknown artist"}${requester}`;
+    });
+
+    const components = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`dsp:music:queue-page:${Math.max(0, page - 1)}`)
+        .setEmoji("⬅️")
+        .setLabel("Назад")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page === 0),
+      new ButtonBuilder()
+        .setCustomId(`dsp:music:queue-page:${Math.min(totalPages - 1, page + 1)}`)
+        .setEmoji("➡️")
+        .setLabel("Дальше")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page >= totalPages - 1)
+    );
+
+    return {
+      content: lines.length
+        ? `📋 **Очередь** · страница ${page + 1}/${totalPages} · треков: ${total}\n\n${lines.join("\n")}`
+        : "📋 Очередь пуста.",
+      components: total > 0 ? [components] : []
+    };
+  }
+
+  private buildControllerComponents(player: Player, autoplayEnabled = false): ActionRowBuilder<ButtonBuilder>[] {
+    const repeat = player.repeatMode === "off" ? "🔁" : player.repeatMode === "track" ? "🔂" : "🔁";
+    return [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("dsp:music:previous").setEmoji("⏮️").setLabel("Назад").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:pause").setEmoji(player.paused ? "▶️" : "⏸️").setLabel(player.paused ? "Продолжить" : "Пауза").setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId("dsp:music:skip").setEmoji("⏭️").setLabel("Следующий").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:shuffle").setEmoji("🔀").setLabel("Shuffle").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:repeat").setEmoji(repeat).setLabel("Queue Loop").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:loop-one").setEmoji("🔂").setLabel("Loop One").setStyle(player.repeatMode === "track" ? ButtonStyle.Primary : ButtonStyle.Secondary)
+      ),
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("dsp:music:stop").setEmoji("⏹️").setLabel("Стоп").setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId("dsp:music:seek-back").setEmoji("⏪").setLabel("15с").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:seek-forward").setEmoji("⏩").setLabel("30с").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:volume-down").setEmoji("🔉").setLabel("-10").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:volume-up").setEmoji("🔊").setLabel("+10").setStyle(ButtonStyle.Secondary)
+      ),
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("dsp:music:queue").setEmoji("📋").setLabel("Очередь").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:lyrics").setEmoji("📜").setLabel("Текст").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:favorite").setEmoji("❤️").setLabel("В избранное").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:filters").setEmoji("🎚️").setLabel("Фильтры").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:save-queue").setEmoji("💾").setLabel("Сохранить").setStyle(ButtonStyle.Secondary)
+      ),
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId("dsp:music:autoplay-toggle")
+          .setEmoji(autoplayEnabled ? "📻" : "⏭️")
+          .setLabel(autoplayEnabled ? "Autoplay: On" : "Autoplay: Off")
+          .setStyle(autoplayEnabled ? ButtonStyle.Primary : ButtonStyle.Secondary)
+      )
+    ];
   }
 
   private async syncController(player: Player): Promise<void> {
     if (!this.client || !player.textChannelId) return;
 
-    const channel = this.client.channels.cache.get(player.textChannelId);
+    const preferredChannelId = await this.preferredTextChannelId(player.guildId, player.textChannelId);
+    if (preferredChannelId && preferredChannelId !== player.textChannelId) {
+      player.textChannelId = preferredChannelId;
+      await this.persistPlayer(player);
+    }
+
+    const channelId = player.textChannelId;
+    if (!channelId) return;
+    const channel = this.client.channels.cache.get(channelId);
     if (!channel?.isTextBased() || !("send" in channel)) return;
 
     const stored = await this.db.query<{ controller_message_id: string | null }>(
@@ -1328,11 +5294,6 @@ export class Music implements PlatformModule {
       [player.guildId,this.config.botIdentityId]
     );
     const storedId = stored.rows[0]?.controller_message_id ?? null;
-    const preferredChannelId = await this.preferredTextChannelId(player.guildId, player.textChannelId);
-    if (preferredChannelId && preferredChannelId !== player.textChannelId) {
-      player.textChannelId = preferredChannelId;
-      await this.persistPlayer(player);
-    }
     const current = player.queue.current;
     const queueLines = player.queue.tracks.slice(0,10).map((track,index) =>
       `${index + 1}. ${track.info.title} — ${track.info.author ?? "Unknown artist"}`
@@ -1344,6 +5305,7 @@ export class Music implements PlatformModule {
         ? `**${current.info.title}**\n${current.info.author ?? "Unknown artist"}`
         : "Сейчас ничего не играет.")
       .addFields(
+        ...(current ? [{ name: "Прогресс", value: formatTrackProgress(player, current), inline: true }] : []),
         { name: "Состояние", value: player.paused ? "⏸ Пауза" : "▶ Играет", inline: true },
         { name: "Повтор", value: player.repeatMode, inline: true },
         { name: "Громкость", value: String(player.volume), inline: true },
@@ -1351,14 +5313,8 @@ export class Music implements PlatformModule {
       )
       .setTimestamp();
 
-    const components = [
-      new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId("dsp:music:pause").setLabel(player.paused ? "Resume" : "Pause").setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId("dsp:music:skip").setLabel("Skip").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("dsp:music:shuffle").setLabel("Shuffle").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("dsp:music:stop").setLabel("Stop").setStyle(ButtonStyle.Danger)
-      )
-    ];
+    const autoplay = await this.autoplayEnabled(player.guildId);
+    const components = this.buildControllerComponents(player, autoplay);
 
     if (storedId) {
       const existing = await channel.messages.fetch(storedId).catch(() => null);
@@ -1400,8 +5356,114 @@ export function canControlMusic(
 }
 
 
+export function calculateMusicVoteSkipRequired(
+  listenerCount: number,
+  votePercent: number,
+  minimumVotes: number
+): number {
+  const listeners = Math.max(0, Math.floor(Number(listenerCount)));
+  const minimum = Math.max(1, Math.floor(Number(minimumVotes)));
+  if (listeners === 0) return minimum;
+
+  const percent = Math.min(1, Math.max(0, Number(votePercent)));
+  return Math.min(listeners, Math.max(1, minimum, Math.ceil(listeners * percent)));
+}
+
+export function formatMusicTime(milliseconds: number): string {
+  const totalSeconds = Math.max(0, Math.floor(Number(milliseconds) / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return hours + ":" + String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+  }
+
+  return Math.floor(totalSeconds / 60) + ":" + String(seconds).padStart(2, "0");
+}
+
+export function formatMusicProgress(
+  positionMs: number,
+  durationMs: number,
+  segments = 10
+): string {
+  const width = Math.max(1, Math.trunc(Number(segments)));
+  const duration = Math.max(0, Math.trunc(Number(durationMs)));
+  const position = Math.max(0, Math.trunc(Number(positionMs)));
+  const safePosition = duration > 0 ? Math.min(position, duration) : position;
+  const filled = duration > 0
+    ? Math.min(width, Math.max(0, Math.floor((safePosition / duration) * width)))
+    : 0;
+  const bar = "━".repeat(filled) + "─".repeat(width - filled);
+  const time = duration > 0
+    ? formatMusicTime(safePosition) + " / " + formatMusicTime(duration)
+    : formatMusicTime(safePosition) + " / live";
+
+  return bar + " " + time;
+}
+
+export function formatTrackProgress(player: Player, track: Track | null): string {
+  if (!track) return "—";
+  const durationMs = Math.max(0, Number(track.info.duration ?? 0));
+  const basePosition = Math.max(0, Number(player.lastPosition ?? 0));
+  const elapsedMs = player.paused
+    ? basePosition
+    : basePosition + Math.max(0, Date.now() - Number(player.lastPositionChange ?? Date.now()));
+  const safeElapsed = durationMs > 0 ? Math.min(elapsedMs, durationMs) : elapsedMs;
+  const elapsed = Math.floor(safeElapsed / 1000);
+  const total = Math.floor(durationMs / 1000);
+  return total > 0
+    ? "`" + formatDurationSeconds(elapsed) + " / " + formatDurationSeconds(total) + "`"
+    : "`" + formatDurationSeconds(elapsed) + " / live`";
+}
+
+function formatDurationSeconds(totalSeconds: number): string {
+  const safe = Math.max(0, Math.trunc(totalSeconds));
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return minutes + ":" + String(seconds).padStart(2, "0");
+}
 export function normalizeMusicRepeatMode(value: string): MusicRepeatMode | null {
   return value === "off" || value === "track" || value === "queue" ? value : null;
+}
+
+export function toggleMusicAutoplay(enabled: boolean): boolean {
+  return !enabled;
+}
+
+export type MusicRadioMode = "artist" | "genre" | "search";
+
+export function normalizeMusicRadioMode(value: string | null | undefined): MusicRadioMode | null {
+  return value === "artist" || value === "genre" || value === "search" ? value : null;
+}
+
+export function normalizeMusicPitch(value: number): number | null {
+  if (!Number.isFinite(value) || value < 0.5 || value > 2) return null;
+  return Math.round(value * 100) / 100;
+}
+
+export function normalizeMusicSpeed(value: number): number | null {
+  if (!Number.isFinite(value) || value < 0.5 || value > 2) return null;
+  return Math.round(value * 100) / 100;
+}
+
+export const MUSIC_EQ_BAND_COUNT = 15;
+
+export function normalizeMusicEqBand(value: number): number | null {
+  if (!Number.isInteger(value) || value < 0 || value >= MUSIC_EQ_BAND_COUNT) return null;
+  return value;
+}
+
+export function normalizeMusicEqGain(value: number): number | null {
+  if (!Number.isFinite(value) || value < -0.25 || value > 1) return null;
+  return Math.round(value * 1000) / 1000;
+}
+
+export function buildMusicRadioQuery(mode: MusicRadioMode, seed: string): string {
+  const normalized = seed.trim().replace(/\s+/g, " ");
+  if (mode === "artist") return normalized + " songs";
+  if (mode === "genre") return normalized + " music mix";
+  return normalized;
 }
 
 export function shouldAutoplayAfterQueueEnd(
@@ -1410,6 +5472,13 @@ export function shouldAutoplayAfterQueueEnd(
   queuedTrackCount: number
 ): boolean {
   return autoplayEnabled && repeatMode === "off" && queuedTrackCount === 0;
+}
+
+export function canFailoverMusicNode(
+  failedNodeId: string,
+  connectedNodeIds: readonly string[]
+): boolean {
+  return connectedNodeIds.some((nodeId) => nodeId !== failedNodeId);
 }
 
 export function musicNodeHealth(connectedNodeCount: number): "ready" | "degraded" {

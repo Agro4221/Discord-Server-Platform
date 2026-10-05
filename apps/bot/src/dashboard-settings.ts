@@ -11,6 +11,7 @@ export type SettingField = {
   min?: number;
   max?: number;
   step?: number;
+  maxLength?: number;
 };
 
 export type ModuleAction = { id: string; label: string; kind?: "safe" | "danger"; confirmation?: string };
@@ -62,8 +63,13 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "verifiedRoleId", label: "Verified role", type: "role" },
       { key: "quarantineRoleId", label: "Quarantine role", type: "role" },
       { key: "logChannelId", label: "Канал логов", type: "channel" },
-      { key: "codeTtlMinutes", label: "Время действия кода, мин.", type: "number", min: 2, max: 60 }
-    ]
+      { key: "codeTtlMinutes", label: "Время действия кода, мин.", type: "number", min: 2, max: 60 },
+      { key: "panelTitle", label: "Заголовок панели", type: "text", maxLength: 256 },
+      { key: "panelDescription", label: "Описание панели", type: "textarea", maxLength: 4096 },
+      { key: "issueButtonLabel", label: "Кнопка получения кода", type: "text", maxLength: 80 },
+      { key: "confirmButtonLabel", label: "Кнопка подтверждения", type: "text", maxLength: 80 }
+    ],
+    actions: [{ id: "publish-panel", label: "Опубликовать Verification panel", kind: "safe" }]
   },
   {
     key: "welcome",
@@ -73,13 +79,16 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "message", label: "Сообщение", type: "textarea" },
       { key: "dm", label: "Дублировать в ЛС", type: "boolean" },
       { key: "embed", label: "Embed", type: "boolean" },
+      { key: "imageUrl", label: "Welcome image URL", type: "text", maxLength: 2048, description: "Только HTTPS. Используется как большая картинка embed." },
       { key: "goodbyeEnabled", label: "Goodbye", type: "boolean" },
       { key: "goodbyeChannelId", label: "Канал Goodbye", type: "channel" },
       { key: "goodbyeMessage", label: "Сообщение Goodbye", type: "textarea" },
       { key: "goodbyeEmbed", label: "Goodbye Embed", type: "boolean" },
+      { key: "goodbyeImageUrl", label: "Goodbye image URL", type: "text", maxLength: 2048, description: "Только HTTPS. Используется как большая картинка goodbye embed." },
       { key: "starterRoleIds", label: "Стартовые роли", type: "textarea", description: "ID ролей через пробел." },
       { key: "restoreRoles", label: "Восстанавливать роли вернувшимся", type: "boolean" }
-    ]
+    ],
+    actions: [{ id: "preview", label: "Отправить Welcome preview", kind: "safe" }]
   },
   {
     key: "security",
@@ -90,7 +99,10 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "maxDestructiveActions", label: "Destructive actions до тревоги", type: "number", min: 2, max: 100 },
       { key: "destructiveWindowSeconds", label: "Окно destructive actions, сек.", type: "number", min: 5, max: 300 },
       { key: "quarantineRoleId", label: "Quarantine role", type: "role" },
-      { key: "logChannelId", label: "Security log channel", type: "channel" }
+      { key: "logChannelId", label: "Security log channel", type: "channel" },
+      { key: "raidQuarantineEnabled", label: "Quarantine при Anti-Raid", type: "boolean", description: "Автоматически добавлять quarantine role участникам при срабатывании Anti-Raid." },
+      { key: "destructiveRoleRemoval", label: "Снимать роли при destructive burst", type: "boolean", description: "Снимать управляемые роли у найденного исполнителя." },
+      { key: "destructiveQuarantineEnabled", label: "Quarantine при destructive burst", type: "boolean", description: "Добавлять quarantine role найденному исполнителю." }
     ],
     actions: [{ id: "check-hierarchy", label: "Проверить role hierarchy", kind: "safe" }]
   },
@@ -114,7 +126,17 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
     fields: [
       { key: "categoryId", label: "Категория тикетов", type: "channel" },
       { key: "staffRoleId", label: "Staff role", type: "role" },
-      { key: "transcriptChannelId", label: "Канал transcript", type: "channel" }
+      { key: "transcriptChannelId", label: "Канал transcript", type: "channel" },
+      { key: "maxOpenPerUser", label: "Максимум открытых тикетов на пользователя", type: "number", min: 1, max: 10 },
+      { key: "autoCloseMinutes", label: "Автозакрытие по неактивности, мин. (0 = выкл.)", type: "number", min: 0, max: 43200 }
+    ]
+  },
+  {
+    key: "birthdays",
+    title: "Birthdays",
+    fields: [
+      { key: "channelId", label: "Канал поздравлений", type: "channel" },
+      { key: "announcementTemplate", label: "Шаблон поздравления", type: "text", description: "Поддерживаются {user} и {server}." }
     ]
   },
   {
@@ -132,10 +154,21 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
     title: "Music / Lavalink",
     fields: [
       { key: "preferredTextChannelId", label: "Канал объявлений", type: "channel" },
+      { key: "requestChannelId", label: "Музыкальный канал (запросы + контроллер)", type: "channel", description: "Любой текст в этом канале от участника добавляется в очередь. Участник должен находиться в voice." },
       { key: "defaultVolume", label: "Громкость по умолчанию", type: "number", min: 0, max: 200 },
       { key: "announceTrackStart", label: "Объявлять начало трека", type: "boolean" },
       { key: "autoplay", label: "Autoplay", type: "boolean", description: "После окончания очереди искать следующий трек автоматически." },
-      { key: "autoLeaveSeconds", label: "Автовыход из voice после простоя, сек.", type: "number", min: 0, max: 86400 }
+      { key: "radioEnabled", label: "Radio", type: "boolean", description: "Продолжать воспроизведение по сохранённому artist / genre / search seed." },
+      { key: "radioMode", label: "Radio mode", type: "text", maxLength: 16, description: "artist, genre или search." },
+      { key: "radioSeed", label: "Radio seed", type: "text", maxLength: 200, description: "Исполнитель, жанр или поисковый запрос. Для artist может быть пустым." },
+      { key: "autoLeaveSeconds", label: "Автовыход из voice после простоя, сек.", type: "number", min: 0, max: 86400 },
+      { key: "twentyFourSeven", label: "24/7 режим", type: "boolean", description: "Не выходить из voice при пустой очереди." },
+      { key: "queueAccess", label: "Кто может добавлять треки", type: "text", description: "everyone или dj — режим DJ ограничивает добавление очереди DJ-ролью/Manage Server." },
+      { key: "voteSkipEnabled", label: "Vote-to-skip", type: "boolean" },
+      { key: "voteSkipPercent", label: "Vote-to-skip доля слушателей", type: "number", min: 0.1, max: 1, step: 0.05 },
+      { key: "voteSkipMinimum", label: "Vote-to-skip минимум голосов", type: "number", min: 1, max: 99 },
+      { key: "fairQueueEnabled", label: "Fair Queue / requester rotation", type: "boolean", description: "Чередовать треки разных участников, когда в очереди есть несколько requester." },
+      { key: "requestApprovalMode", label: "Request approval mode", type: "text", description: "off — запросы добавляются сразу; approval — новые пользовательские запросы сначала проходят подтверждение DJ или Manage Server." }
     ]
   }
 ];
@@ -181,7 +214,11 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       verifiedRoleId: "verified_role_id",
       quarantineRoleId: "quarantine_role_id",
       logChannelId: "log_channel_id",
-      codeTtlMinutes: "code_ttl_minutes"
+      codeTtlMinutes: "code_ttl_minutes",
+      panelTitle: "panel_title",
+      panelDescription: "panel_description",
+      issueButtonLabel: "issue_button_label",
+      confirmButtonLabel: "confirm_button_label"
     }
   },
   welcome: {
@@ -191,10 +228,12 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       message: "message",
       dm: "dm",
       embed: "embed",
+      imageUrl: "image_url",
       goodbyeEnabled: "goodbye_enabled",
       goodbyeChannelId: "goodbye_channel_id",
       goodbyeMessage: "goodbye_message",
       goodbyeEmbed: "goodbye_embed",
+      goodbyeImageUrl: "goodbye_image_url",
       starterRoleIds: "starter_role_ids",
       restoreRoles: "restore_roles"
     }
@@ -207,7 +246,10 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       maxDestructiveActions: "max_destructive_actions",
       destructiveWindowSeconds: "destructive_window_seconds",
       quarantineRoleId: "quarantine_role_id",
-      logChannelId: "log_channel_id"
+      logChannelId: "log_channel_id",
+      raidQuarantineEnabled: "raid_quarantine_enabled",
+      destructiveRoleRemoval: "destructive_role_removal",
+      destructiveQuarantineEnabled: "destructive_quarantine_enabled"
     }
   },
   leveling: {
@@ -228,7 +270,16 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
     columns: {
       categoryId: "category_id",
       staffRoleId: "staff_role_id",
-      transcriptChannelId: "transcript_channel_id"
+      transcriptChannelId: "transcript_channel_id",
+      maxOpenPerUser: "max_open_per_user",
+      autoCloseMinutes: "auto_close_minutes"
+    }
+  },
+  birthdays: {
+    table: "birthday_settings",
+    columns: {
+      channelId: "channel_id",
+      announcementTemplate: "announcement_template"
     }
   },
   starboard: {
@@ -244,10 +295,21 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
     table: "music_settings",
     columns: {
       preferredTextChannelId: "preferred_text_channel_id",
+      requestChannelId: "request_channel_id",
       defaultVolume: "default_volume",
       announceTrackStart: "announce_track_start",
       autoplay: "autoplay",
-      autoLeaveSeconds: "auto_leave_seconds"
+      radioEnabled: "radio_enabled",
+      radioMode: "radio_mode",
+      radioSeed: "radio_seed",
+      autoLeaveSeconds: "auto_leave_seconds",
+      twentyFourSeven: "twenty_four_seven",
+      queueAccess: "queue_access",
+      voteSkipEnabled: "vote_skip_enabled",
+      voteSkipPercent: "vote_skip_percent",
+      voteSkipMinimum: "vote_skip_minimum",
+      fairQueueEnabled: "fair_queue_enabled",
+      requestApprovalMode: "request_approval_mode"
     }
   }
 };
@@ -425,7 +487,8 @@ function validateValues(
         }
         result[field.key] = value.map((item) => item.trim()).filter(Boolean);
       } else {
-        if (typeof value !== "string" || value.length > 10_000) throw new Error(`invalid_${field.key}`);
+        const maxLength = field.maxLength ?? 10_000;
+        if (typeof value !== "string" || value.length > maxLength) throw new Error(`invalid_${field.key}`);
         result[field.key] = value;
       }
       continue;
@@ -433,8 +496,20 @@ function validateValues(
 
     if (field.type === "text" || field.type === "channel" || field.type === "role") {
       if (value !== null && typeof value !== "string") throw new Error(`invalid_${field.key}`);
-      if (typeof value === "string" && value.length > 200) throw new Error(`invalid_${field.key}`);
-      result[field.key] = value ?? null;
+      if (field.key === "radioMode" && value !== null && !["artist", "genre", "search"].includes(String(value).trim())) {
+        throw new Error("invalid_radioMode");
+      }
+      const maxLength = field.maxLength ?? 200;
+      if (typeof value === "string" && value.length > maxLength) throw new Error(`invalid_${field.key}`);
+      if ((field.key === "imageUrl" || field.key === "goodbyeImageUrl") && value) {
+        try {
+          const parsed = new URL(value.trim());
+          if (parsed.protocol !== "https:") throw new Error();
+        } catch {
+          throw new Error(`invalid_${field.key}`);
+        }
+      }
+      result[field.key] = typeof value === "string" ? value.trim() || null : value ?? null;
       continue;
     }
   }

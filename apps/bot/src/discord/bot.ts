@@ -9,10 +9,12 @@ import {
 import type { AppConfig } from "../config.js";
 import type { Database } from "../database.js";
 import { logger } from "../logger.js";
+import { getGuildLocale, t } from "../localization.js";
 import { buildCommands, handleCommand } from "./commands.js";
 import { TemporaryVoice } from "../modules/temporary-voice.js";
 import { Moderation } from "../modules/moderation.js";
 import type { PlatformEventBus } from "../events.js";
+import type { HelpPages } from "../help-pages.js";
 
 export function createDiscordClient(): Client {
   return new Client({
@@ -90,7 +92,11 @@ export function wireDiscordEvents(
   });
 
   client.on(Events.MessageReactionAdd, (reaction, user) => {
-    void emitReaction(events, reaction, user);
+    void emitReaction(events, "reaction.add", reaction, user);
+  });
+
+  client.on(Events.MessageReactionRemove, (reaction, user) => {
+    void emitReaction(events, "reaction.remove", reaction, user);
   });
 
   client.on(Events.GuildMemberAdd, (member) => {
@@ -125,6 +131,7 @@ export function wireDiscordEvents(
 
 async function emitReaction(
   events: PlatformEventBus,
+  eventType: "reaction.add" | "reaction.remove",
   reaction: import("discord.js").MessageReaction | import("discord.js").PartialMessageReaction,
   user: import("discord.js").User | import("discord.js").PartialUser
 ): Promise<void> {
@@ -149,7 +156,7 @@ async function emitReaction(
 
   if (!resolvedReaction || !resolvedUser) return;
 
-  await events.emit("reaction.add", {
+  await events.emit(eventType, {
     reaction: resolvedReaction,
     user: resolvedUser
   });
@@ -212,7 +219,8 @@ export async function routeCommand(
   interaction: ChatInputCommandInteraction,
   db: Database,
   temporaryVoice: TemporaryVoice,
-  moderation: Moderation
+  moderation: Moderation,
+  helpPages?: HelpPages
 ): Promise<void> {
   try {
     await handleCommand(
@@ -220,7 +228,8 @@ export async function routeCommand(
       interaction,
       db,
       temporaryVoice,
-      moderation
+      moderation,
+      helpPages
     );
   } catch (error) {
     logger.error("Command failed", {
@@ -230,8 +239,11 @@ export async function routeCommand(
       error: String(error)
     });
 
+    const locale = interaction.guildId
+      ? await getGuildLocale(db, interaction.guildId)
+      : "ru";
     const reply = {
-      content: "Произошла внутренняя ошибка.",
+      content: t(locale, "internal-error"),
       ephemeral: true
     };
 

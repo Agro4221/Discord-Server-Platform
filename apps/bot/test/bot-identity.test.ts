@@ -56,3 +56,52 @@ function restoreEnv(values: Record<string, string | undefined>): void {
     else process.env[key] = value;
   }
 }
+
+
+test("bot identity encrypts credentials at rest and does not expose ciphertext as token", async () => {
+  let stored: Record<string, unknown> | null = null;
+  const db = {
+    async query<T>(text: string, values: readonly unknown[] = []) {
+      if (text.startsWith("SELECT id,client_id,token_ciphertext,enabled")) {
+        return { rows: stored ? [stored] : [], rowCount: stored ? 1 : 0 } as { rows: T[]; rowCount: number };
+      }
+      if (text.startsWith("SELECT id,client_id AS") && text.includes("tokenConfigured")) {
+        return {
+          rows: stored ? [{
+            id: stored.id,
+            clientId: stored.client_id,
+            enabled: stored.enabled,
+            presenceName: stored.presence_name,
+            tokenConfigured: Boolean(stored.token_ciphertext)
+          }] : [],
+          rowCount: stored ? 1 : 0
+        } as { rows: T[]; rowCount: number };
+      }
+      if (text.startsWith("INSERT INTO bot_identities")) {
+        stored = {
+          id: String(values[0]),
+          client_id: String(values[1]),
+          enabled: values[2],
+          presence_name: values[3],
+          token_ciphertext: values[4]
+        };
+        return { rows: [], rowCount: 1 } as { rows: T[]; rowCount: number };
+      }
+      throw new Error("unexpected query: " + text);
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const repository = new (await import("../src/bot-identity.js")).BotIdentityRepository(db, "primary", "management-secret");
+  const saved = await repository.saveSettings({
+    clientId: "123456789012345678",
+    token: "super-secret-bot-token",
+    enabled: true,
+    presenceName: "DSP"
+  });
+  assert.equal(saved.tokenConfigured, true);
+  assert.equal(String(stored?.token_ciphertext).includes("super-secret-bot-token"), false);
+
+  const credentials = await repository.credentials();
+  assert.equal(credentials?.token, "super-secret-bot-token");
+  assert.equal(credentials?.clientId, "123456789012345678");
+});

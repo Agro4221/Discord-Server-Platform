@@ -1,10 +1,13 @@
 export type ModuleKey =
   | "moderation"
+  | "custom-commands"
+  | "autoresponder"
   | "automod"
   | "security"
   | "temporary-voice"
   | "welcome"
   | "verification"
+  | "onboarding"
   | "roles"
   | "leveling"
   | "tickets"
@@ -16,7 +19,12 @@ export type ModuleKey =
   | "stream-alerts"
   | "automation"
   | "music"
-  | "analytics";
+  | "analytics"
+  | "polls"
+  | "reputation"
+  | "birthdays"
+  | "invite-tracking"
+  | "forms";
 
 export const MODULE_CATALOG: readonly {
   key: ModuleKey;
@@ -25,11 +33,14 @@ export const MODULE_CATALOG: readonly {
   defaultEnabled: boolean;
 }[] = [
   { key: "moderation", title: "Moderation", description: "Warnings and moderation actions", defaultEnabled: true },
+  { key: "custom-commands", title: "Custom Commands", description: "Server-defined prefix and slash commands", defaultEnabled: false },
+  { key: "autoresponder", title: "AutoResponder", description: "Keyword-triggered automatic responses", defaultEnabled: false },
   { key: "automod", title: "AutoMod", description: "Automated content and anti-spam controls", defaultEnabled: false },
   { key: "security", title: "Security", description: "Anti-raid, lockdown and anti-nuke controls", defaultEnabled: false },
   { key: "temporary-voice", title: "Temporary Voice", description: "Temporary voice rooms", defaultEnabled: false },
   { key: "welcome", title: "Welcome", description: "Welcome and goodbye messages", defaultEnabled: false },
   { key: "verification", title: "Verification", description: "Member verification and verified role", defaultEnabled: false },
+  { key: "onboarding", title: "Onboarding", description: "Configurable post-join and post-verification member flow", defaultEnabled: false },
   { key: "roles", title: "Roles", description: "Role panels and self-assignment", defaultEnabled: false },
   { key: "leveling", title: "Leveling", description: "XP, ranks and leaderboards", defaultEnabled: false },
   { key: "tickets", title: "Tickets", description: "Support tickets and transcripts", defaultEnabled: false },
@@ -38,8 +49,13 @@ export const MODULE_CATALOG: readonly {
   { key: "economy", title: "Economy", description: "Server economy and shop", defaultEnabled: false },
   { key: "reminders", title: "Reminders", description: "Reminders, AFK and utilities", defaultEnabled: false },
   { key: "notifications", title: "Notifications", description: "External feed notifications", defaultEnabled: false },
-  { key: "stream-alerts", title: "Stream Alerts", description: "Twitch, YouTube and VK Video Live start notifications", defaultEnabled: false },
+  { key: "stream-alerts", title: "Stream Alerts", description: "Twitch, YouTube, VK Video Live and Kick start notifications", defaultEnabled: false },
   { key: "automation", title: "Automation", description: "Event / condition / action workflows", defaultEnabled: false },
   { key: "music", title: "Music", description: "Lavalink music platform", defaultEnabled: false },
-  { key: "analytics", title: "Analytics", description: "Server and module analytics", defaultEnabled: false }
+  { key: "analytics", title: "Analytics", description: "Server and module analytics", defaultEnabled: false },
+  { key: "polls", title: "Polls & Suggestions", description: "Interactive polls and community suggestions", defaultEnabled: false },
+  { key: "reputation", title: "Reputation", description: "Community reputation and social profiles", defaultEnabled: false },
+  { key: "birthdays", title: "Birthdays", description: "Birthday storage and scheduled announcements", defaultEnabled: false },
+  { key: "invite-tracking", title: "Invite Tracking", description: "Invite attribution and inviter statistics", defaultEnabled: false },
+  { key: "forms", title: "Forms", description: "Reusable server forms with Discord modals", defaultEnabled: false }
 ];

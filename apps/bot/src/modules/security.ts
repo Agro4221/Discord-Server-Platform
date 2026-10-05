@@ -10,7 +10,7 @@ import type { ModuleContext, PlatformModule } from "../module.js";
 import { logger } from "../logger.js";
 import { moduleEnabled } from "../module-utils.js";
 
-type SecurityConfig = {
+export type SecurityConfig = {
   enabled: boolean;
   maxJoins: number;
   windowSeconds: number;
@@ -18,6 +18,9 @@ type SecurityConfig = {
   destructiveWindowSeconds: number;
   quarantineRoleId: string | null;
   logChannelId: string | null;
+  raidQuarantineEnabled: boolean;
+  destructiveRoleRemoval: boolean;
+  destructiveQuarantineEnabled: boolean;
 };
 
 export class Security implements PlatformModule {
@@ -58,8 +61,41 @@ export class Security implements PlatformModule {
   }
 
   private async config(guildId: string): Promise<SecurityConfig> {
-    const result = await this.db.query<{ enabled: boolean; max_joins: number; window_seconds: number; max_destructive_actions: number; destructive_window_seconds: number; quarantine_role_id: string | null; log_channel_id: string | null }>(
-      "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id FROM security_settings WHERE guild_id=$1",
+    const result = await this.db.query<{
+      enabled: boolean;
+      max_joins: number;
+      window_seconds: number;
+      max_destructive_actions: number;
+      destructive_window_seconds: number;
+      quarantine_role_id: string | null;
+      log_channel_id: string | null;
+      raid_quarantine_enabled: boolean;
+      destructive_role_removal: boolean;
+      destructive_quarantine_enabled: boolean;
+    }>(
+      "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id,raid_quarantine_enabled,destructive_role_removal,destructive_quarantine_enabled FROM security_settings WHERE guild_id=$1",
+      [guildId]
+    );
+    const row = result.rows[0];
+    return {
+      enabled: row?.enabled ?? true,
+      maxJoins: row?.max_joins ?? 8,
+      windowSeconds: row?.window_seconds ?? 20,
+      maxDestructiveActions: row?.max_destructive_actions ?? 3,
+      destructiveWindowSeconds: row?.destructive_window_seconds ?? 30,
+      quarantineRoleId: row?.quarantine_role_id ?? null,
+      logChannelId: row?.log_channel_id ?? null,
+      ...securityResponsePolicy({
+        raidQuarantineEnabled: row?.raid_quarantine_enabled,
+        destructiveRoleRemoval: row?.destructive_role_removal,
+        destructiveQuarantineEnabled: row?.destructive_quarantine_enabled
+      })
+    };
+  }
+
+  async getConfig(guildId: string): Promise<SecurityConfig> {
+    const result = await this.db.query<{ enabled: boolean; max_joins: number; window_seconds: number; max_destructive_actions: number; destructive_window_seconds: number; quarantine_role_id: string | null; log_channel_id: string | null; raid_quarantine_enabled: boolean; destructive_role_removal: boolean; destructive_quarantine_enabled: boolean }>(
+      "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id,raid_quarantine_enabled,destructive_role_removal,destructive_quarantine_enabled FROM security_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -70,7 +106,12 @@ export class Security implements PlatformModule {
       maxDestructiveActions: row?.max_destructive_actions ?? 5,
       destructiveWindowSeconds: row?.destructive_window_seconds ?? 20,
       quarantineRoleId: row?.quarantine_role_id ?? null,
-      logChannelId: row?.log_channel_id ?? null
+      logChannelId: row?.log_channel_id ?? null,
+      ...securityResponsePolicy({
+        raidQuarantineEnabled: row?.raid_quarantine_enabled,
+        destructiveRoleRemoval: row?.destructive_role_removal,
+        destructiveQuarantineEnabled: row?.destructive_quarantine_enabled
+      })
     };
   }
 
@@ -78,15 +119,17 @@ export class Security implements PlatformModule {
     const current = await this.config(guildId);
     const next = { ...current, ...patch };
     await this.db.query(
-      `INSERT INTO security_settings(guild_id,enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+      `INSERT INTO security_settings(guild_id,enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id,raid_quarantine_enabled,destructive_role_removal,destructive_quarantine_enabled)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        ON CONFLICT(guild_id) DO UPDATE SET
        enabled=EXCLUDED.enabled,max_joins=EXCLUDED.max_joins,window_seconds=EXCLUDED.window_seconds,
        max_destructive_actions=EXCLUDED.max_destructive_actions,destructive_window_seconds=EXCLUDED.destructive_window_seconds,
-       quarantine_role_id=EXCLUDED.quarantine_role_id,log_channel_id=EXCLUDED.log_channel_id,updated_at=now()`,
+       quarantine_role_id=EXCLUDED.quarantine_role_id,log_channel_id=EXCLUDED.log_channel_id,
+       raid_quarantine_enabled=EXCLUDED.raid_quarantine_enabled,destructive_role_removal=EXCLUDED.destructive_role_removal,
+       destructive_quarantine_enabled=EXCLUDED.destructive_quarantine_enabled,updated_at=now()`,
       [guildId,next.enabled,Math.min(Math.max(next.maxJoins,2),200),Math.min(Math.max(next.windowSeconds,5),300),
        Math.min(Math.max(next.maxDestructiveActions,2),100),Math.min(Math.max(next.destructiveWindowSeconds,5),300),
-       next.quarantineRoleId,next.logChannelId]
+       next.quarantineRoleId,next.logChannelId,next.raidQuarantineEnabled,next.destructiveRoleRemoval,next.destructiveQuarantineEnabled]
     );
     await this.db.query(
       `INSERT INTO guild_modules(guild_id,module_key,enabled)
@@ -134,7 +177,31 @@ export class Security implements PlatformModule {
       await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
       return;
     }
-    if (interaction.options.getSubcommand() !== "setup") return;
+
+    const sub = interaction.options.getSubcommand();
+    if (sub === "status") {
+      const config = await this.config(interaction.guild!.id);
+      const now = Date.now();
+      const raidUntil = this.raidActiveUntil.get(interaction.guild!.id) ?? 0;
+      const destructiveUntil = this.destructiveActiveUntil.get(interaction.guild!.id) ?? 0;
+      const joins = this.joins.get(interaction.guild!.id) ?? [];
+      const destructive = this.destructive.get(interaction.guild!.id) ?? [];
+      await interaction.reply({
+        content: [
+          "🛡️ **Security status**",
+          `Модуль: **${config.enabled ? "включён" : "выключен"}**`,
+          `Anti-Raid: **${joins.length}/${config.maxJoins}** за ${config.windowSeconds} сек. · ${raidUntil > now ? "🚨 активен" : "✅ не активен"}`,
+          `Destructive: **${destructive.length}/${config.maxDestructiveActions}** за ${config.destructiveWindowSeconds} сек. · ${destructiveUntil > now ? "🚨 активен" : "✅ не активен"}`,
+          `Quarantine role: ${config.quarantineRoleId ? "<@&" + config.quarantineRoleId + ">" : "не настроена"}`,
+          `Log channel: ${config.logChannelId ? "<#" + config.logChannelId + ">" : "не настроен"}`,
+          `Responses: Anti-Raid quarantine=${config.raidQuarantineEnabled ? "on" : "off"} · destructive roles=${config.destructiveRoleRemoval ? "on" : "off"} · destructive quarantine=${config.destructiveQuarantineEnabled ? "on" : "off"}`
+        ].join("\n"),
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (sub !== "setup") return;
     const logChannelOption = interaction.options.getChannel("log-channel");
     const logChannel = logChannelOption ? interaction.guild!.channels.cache.get(logChannelOption.id) : null;
     if (logChannelOption && (!logChannel || logChannel.type !== 0)) {
@@ -148,7 +215,10 @@ export class Security implements PlatformModule {
       maxDestructiveActions: interaction.options.getInteger("max-destructive") ?? 5,
       destructiveWindowSeconds: interaction.options.getInteger("destructive-window") ?? 20,
       quarantineRoleId: interaction.options.getRole("quarantine-role")?.id ?? null,
-      logChannelId: logChannel?.id ?? null
+      logChannelId: logChannel?.id ?? null,
+      raidQuarantineEnabled: interaction.options.getBoolean("raid-quarantine") ?? true,
+      destructiveRoleRemoval: interaction.options.getBoolean("destructive-role-removal") ?? true,
+      destructiveQuarantineEnabled: interaction.options.getBoolean("destructive-quarantine") ?? true
     });
     await interaction.reply({ content: "Security настроен и включён.", ephemeral: true });
   }
@@ -166,7 +236,7 @@ export class Security implements PlatformModule {
     const activeUntil = this.raidActiveUntil.get(member.guild.id) ?? 0;
     const raidTriggered = bucket.length >= config.maxJoins;
     if (now < activeUntil) {
-      await this.quarantine(member, config);
+      if (config.raidQuarantineEnabled) await this.quarantine(member, config);
       return;
     }
     if (!raidTriggered) return;
@@ -184,14 +254,14 @@ export class Security implements PlatformModule {
     );
     for (const entry of bucket) {
       const target = member.guild.members.cache.get(entry.userId) ?? await member.guild.members.fetch(entry.userId).catch(() => null);
-      if (target) await this.quarantine(target, config);
+      if (target && config.raidQuarantineEnabled) await this.quarantine(target, config);
     }
     await this.alert(member.guild.id, config, `Anti-Raid: ${bucket.length} входов за ${config.windowSeconds} сек.`);
   }
 
   private async onDestructive(guildId: string | null, type: string, targetUserId?: string): Promise<void> {
     if (!guildId || !await moduleEnabled(this.db, guildId, "security", false)) return;
-    const config = await this.config(guildId);
+    const config = await this.getConfig(guildId);
     if (!config.enabled) return;
     const now = Date.now();
     const cutoff = now - config.destructiveWindowSeconds * 1000;
@@ -405,7 +475,7 @@ export class Security implements PlatformModule {
     if (!botMember) return;
 
     const responseThreshold = securityResponseThreshold(config.maxDestructiveActions);
-    const removable = executorCount >= responseThreshold &&
+    const removable = config.destructiveRoleRemoval && executorCount >= responseThreshold &&
       !member.permissions.has(PermissionFlagsBits.Administrator)
       ? member.roles.cache.filter(
           (role) => !role.managed && role.id !== guild.id && role.position < botMember.roles.highest.position
@@ -422,14 +492,14 @@ export class Security implements PlatformModule {
       });
     }
 
-    await this.quarantine(member, config);
+    if (config.destructiveQuarantineEnabled) await this.quarantine(member, config);
 
     const responseMetadata = {
       userId,
       trigger: type,
       executorCount,
       removedRoles: removable.size,
-      quarantine: Boolean(config.quarantineRoleId)
+      quarantine: config.destructiveQuarantineEnabled && Boolean(config.quarantineRoleId)
     };
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'response-applied',$2::jsonb)",
@@ -456,6 +526,14 @@ export function shouldTriggerSecurityIncident(
 
 export function securityIncidentCooldownUntil(createdAt: number, windowSeconds: number): number {
   return createdAt + Math.max(windowSeconds * 1000, 60_000);
+}
+
+export function securityResponsePolicy(input: Partial<{ raidQuarantineEnabled: boolean; destructiveRoleRemoval: boolean; destructiveQuarantineEnabled: boolean }>): { raidQuarantineEnabled: boolean; destructiveRoleRemoval: boolean; destructiveQuarantineEnabled: boolean } {
+  return {
+    raidQuarantineEnabled: input.raidQuarantineEnabled ?? true,
+    destructiveRoleRemoval: input.destructiveRoleRemoval ?? true,
+    destructiveQuarantineEnabled: input.destructiveQuarantineEnabled ?? true
+  };
 }
 
 export function securityResponseThreshold(maxDestructiveActions: number): number {

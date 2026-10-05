@@ -200,3 +200,1006 @@ Never write credentials, tokens or private user data here.
 - Docker local launcher now avoids image rebuilds on normal starts; -Rebuild performs an explicit no-cache image rebuild.
 - Recommended single-PC gaming/streaming path: native mode, one Lavalink, Dashboard off except during administration.
 - Live Windows runtime and actual Sea of Thieves + OBS + multi-RTMP load still require validation on the user's PC.
+
+
+## 2026-10-03 — Kick stream alerts
+- Added Kick as a stream-alert provider on `feature/music-v2`.
+- Added optional `KICK_CLIENT_ID` / `KICK_CLIENT_SECRET` configuration and cached OAuth 2.1 App Access Tokens.
+- Added Kick channel/live polling through the public API, including slug or broadcaster-user-ID targets and stream-start deduplication.
+- Added `/streamalert create` and Dashboard support for Kick alongside the existing Twitch/YouTube/VK alert flow.
+- Migration 62 extends the persistent stream-alert platform constraint to include Kick.
+- Added deterministic tests for Kick target normalization; live provider behavior still requires real Kick developer credentials and a live channel.
+
+
+## 2026-10-03 — Security response policy controls
+- Added persistent Security response policy flags for Anti-Raid quarantine, destructive role removal and destructive quarantine.
+- Exposed the same controls in Dashboard module settings and optional `/security setup` flags.
+- Existing defaults preserve the previous behavior (all three response actions enabled).
+- Added pure helper coverage for policy defaults; full live Discord response and lockdown behavior remain release-gate validation.
+
+
+## 2026-10-03 — Music node failover
+- Kept lavalink-client's built-in `autoMove` enabled and added an explicit fallback on node disconnect/destroy.
+- Players still bound to a failed node are moved to another connected node with an active session; player state is persisted afterwards.
+- Added a pure failover availability predicate test.
+- Live two-node outage/recovery remains a release-gate drill because it requires real Lavalink + Discord voice traffic.
+
+
+## 2026-10-03 — Product backlog reset: Music-first advanced feature roadmap
+- Product direction clarified: Kick stream alerts are not a current priority. Existing Twitch, YouTube and VK Live notifications already cover the stream-alert use case used by the project; Kick remains optional/deferred rather than a reason to divert development effort.
+- The persistent backlog in `docs/FEATURE-MATRIX.md` now explicitly captures the requested advanced Discord/music functionality and is the source of truth for the next implementation passes.
+- Mandatory Music controller requirements recorded: persistent player message, compact emoji-based player controls/labels, clear state refresh after actions, and a **separate Loop One / зацикливание одного трека button** distinct from queue repeat.
+- Advanced Music search/queue roadmap recorded: multi-result search picker, remove/range removal, reorder/move, insert-to-front, skip-to-track, queue clear, history/recent tracks, requester display, queue export/share, save queue as playlist and playlist shuffle loading.
+- Advanced Music permissions/anti-abuse roadmap recorded: per-action DJ permissions, queue add/remove/move permissions, vote-skip, request cooldowns, per-user queue limits, fair requester rotation, max queue size and optional request approval/moderation mode.
+- Advanced playlist/state roadmap recorded: shared/server playlists, individual track management, imports where supported, save queue, playlist/favorites shortcuts and richer pagination/management UI.
+- Advanced audio roadmap recorded: Karaoke, pitch/speed, tremolo/other Lavalink effects, custom EQ editor, named effect profiles and persistence/restoration of effect state.
+- Advanced autoplay/radio roadmap recorded: recent-track avoidance, artist/similarity-aware autoplay, radio mode, playlist continuation, and richer Dashboard controls.
+- Advanced lyrics roadmap recorded: pagination, navigation buttons, synced lyrics where timing data exists and provider/status diagnostics.
+- Provider expansion is explicitly a product requirement: Spotify, Apple Music, Deezer, **Yandex Music**, VK Music, Tidal, Qobuz, yt-dlp and JioSaavn are tracked as Music work, with the existing YouTube/SoundCloud path preserved. Provider readiness must be based on actual source-adapter/credential validation, not merely configuration presence.
+- Product principle recorded: bring premium-like Music capabilities into the common self-hosted product without an artificial Premium wall; do not divert the roadmap into provider-count vanity work or unrelated integrations.
+- Documentation update commit: `7dd1faaa3cb5b9c812a77acfe29e931f0f451c6b`.
+
+
+## 2026-10-03 — Product scope correction: all-in-one Discord platform, not music-first
+- Corrected the roadmap direction: Music is a major module, but it is **not** the product's center of gravity.
+- The actual product target is a self-hosted all-in-one Discord platform intended to cover the practical capabilities of premium/mature multipurpose bots across administration, moderation, AutoMod/Security, logging, custom commands/autoresponders, roles/onboarding, tickets/forms, automation, community/engagement, notifications/integrations, analytics and Music.
+- Current public Dyno/Carl-bot materials confirm the benchmark is broader than Music: AutoMod, action logging, autoroles, custom commands/autoresponders, automessages/autopurge, forms, tickets, embeds, reaction roles, feeds, leveling and related server-management tooling are part of the mature all-in-one feature set, with some features/limits placed behind commercial tiers. 
+- Updated `docs/FEATURE-MATRIX.md` with a master all-in-one backlog spanning Administration, Moderation/AutoMod/Security, Server utilities, Roles/Onboarding, Tickets/Forms, Community, Automation, Notifications/Integrations and Analytics, while retaining the detailed Music roadmap as one module.
+- Release order is now platform-wide: core/admin -> moderation/security -> utilities/roles/onboarding -> tickets/automation -> community -> notifications/analytics -> advanced Music -> Music providers/saved state -> whole-platform E2E/chaos/soak -> stable release.
+- Product principle: reproduce useful premium-grade functionality as common self-hosted features without an artificial Premium wall; do not optimize for provider count or turn the project into a music-only bot.
+- This correction is based on the current project direction and public competitor feature documentation, not on copying proprietary code or closed implementation details.
+- Commits for this correction: `b2770f1c`, `d2ff12a7`.
+
+
+## 2026-10-03 — Premium benchmark broadened across the Discord bot ecosystem
+- Corrected the benchmark methodology: the project must not optimize against Carl-bot alone or treat one bot's Premium catalog as the definition of parity.
+- `docs/FEATURE-MATRIX.md` now records a multi-bot benchmark set spanning MEE6, JuniperBot, ProBot, Dyno and Jockie Music, plus specialized bots where a focused module has deeper capabilities.
+- MEE6 is used as a reference for broad plugin coverage including automations, moderator, custom commands, welcome/goodbye, levels, economy, giveaways, polls, invite tracking, reaction roles, social alerts, AI and Bot Maker. citeturn368099search1turn368099search17turn368099search11
+- JuniperBot is used as a reference for deep AutoMod filters/exemptions/templates, custom commands/message templates, ranking, subscriptions, audit/logging, welcome/role restore and forms/components. citeturn510043search0turn510043search2turn510043search5
+- ProBot is used as a reference for protection/anti-raid, logging, variables, autoroles/self-roles, starboard, server statistics, Twitch/YouTube notifications and custom-bot capabilities. citeturn410738search3turn410738search6
+- Dyno is used as a reference for configurable AutoMod, custom commands, autoresponders, automessages, autodelete, forms, tickets, giveaways, reaction roles, embedder, feeds, AFK and larger/expanded module limits. citeturn410738search0turn410738search4turn410738search1
+- Jockie Music is used specifically for advanced music architecture: multiple dedicated music bots, deep queue/collection handling, permission/session ownership, Spotify/Apple Music support, large collections and 24/7 behavior. citeturn410738search2turn410738search7
+- Product principle: combine the strongest useful capabilities across these ecosystems while keeping one coherent permission/persistence/audit/Dashboard architecture. Premium parity means broad and deep functionality, not reproducing any single vendor's monetization model or copying proprietary code.
+- Documentation commit for the broadened benchmark: `3569375679263c235be134696174146dec0e32e8`.
+
+
+## 2026-10-03 — Canonical cross-chat handoff added
+- Added **docs/PROJECT-HANDOFF.md** as the canonical continuity document for future chats.
+- The handoff records: product goal, all-in-one scope, multi-bot benchmark methodology, implemented baseline across modules, complete high-level backlog, detailed Music backlog, provider requirements, priorities, explicit anti-drift rules, current branch/PR state, validation status and the exact procedure for continuing in a new chat.
+- New chats must read `docs/PROJECT-HANDOFF.md` first, then `docs/PROJECT-STATE.md`, recent `docs/WORK-LOG.md` entries and `docs/TEST-MATRIX.md` before proposing new work.
+- This is intended to prevent repeated re-explanation of the product goal and previously accepted decisions, especially the distinction between the all-in-one platform goal and the Music module.
+- Handoff creation commit: `cee66211`; wording fix commit: `c9c5dbe4`.
+## 2026-10-03 — AFK / away lifecycle
+- Implemented persistent AFK state in migration 64 (`afk_users`) inside the existing Reminders module.
+- Added `/afk [reason]` and prefix `!afk [reason]`; `off`, `clear`, `remove` and `unset` clear the current status.
+- Setting AFK persists a reason and start time; a message mentioning an AFK user produces a relative-time notice.
+- The first non-bot message sent after setting AFK atomically clears the sender's state and posts a short return notice.
+- Added command-policy registration so AFK is visible/configurable in the existing Dashboard command policy editor without introducing a second permissions model.
+- Added deterministic helper/command-schema regressions.
+- Live Discord and restart validation remain release-gate checks.
+## 2026-10-03 — AutoMod rule editor
+- Exposed the existing `automod_rules` backend through a dedicated Dashboard editor instead of creating a parallel configuration model.
+- Added CRUD UI for detector, action, threshold, window, timeout, role/channel scopes, moderator exemption and response template.
+- Hardened per-rule validation for supported actions and numeric ranges; Dashboard deletions now write audit events.
+- AutoMod `warn` now creates a real moderation warning through the existing warning/escalation pipeline.
+- Activated the `emotes` detector alias so it behaves consistently with emoji-count detection.
+- Added per-user/per-detector cooldown enforcement using the rule window so repeated matches do not spam sanctions.
+- CI is the release gate for this increment; live Discord/resource hierarchy remains environment-dependent.
+
+## 2026-10-03 — Custom Commands first-class module
+- Promoted Custom Commands into the shared Module Catalog with a persistent module toggle.
+- Existing execution now respects module state; creating a command enables the module for the guild.
+- Added dedicated Dashboard CRUD for Prefix/Slash mode, aliases, response/alias/role actions and cooldowns.
+- Reused the existing Management API and durable audit events instead of creating a parallel backend.
+
+
+## 2026-10-03 — Continue platform expansion after Custom Commands CI regression
+- Rechecked branch feature/music-v2 and PR #3.
+- Current CI run 37141114378 has bot typecheck/tests and domain/bot builds green; only Dashboard build fails.
+- Refactored the new Custom Commands Dashboard panel toward the established panel implementation pattern: optional async audit callback, no redundant client-side memoization, and hierarchy-safe role display.
+- Added Custom Commands metadata to the Control Center catalog and included it in panel-aware rendering.
+- Updated Feature Matrix / Handoff / State / Test Matrix so the current UI contract is documented and resumable from a fresh chat.
+- Next engineering pass remains focused on platform breadth (not music-only), after restoring Dashboard CI.
+
+
+## 2026-10-03 — AutoResponder / keyword triggers
+- Implemented a dedicated `autoresponder` platform module on the shared PlatformEventBus.
+- Added migration 65 with persistent rules, scopes, priority, cooldown and delete-source policy.
+- Added Management API CRUD with audit events and Dashboard editor.
+- Added exact/contains/starts-with/regex matching plus `{user}`, `{mention}`, `{server}`, `{channel}` templates.
+- Added per-user cooldown and guild module lifecycle integration.
+- Updated migration integration checks and canonical project logs.
+
+
+## 2026-10-03 — AutoResponder performance hardening
+- Added a short per-guild rule cache so message processing does not query PostgreSQL for the full rule list on every message.
+- Cache entries are invalidated by create/update/delete and cleared on module shutdown.
+- Added deterministic test coverage for cache reuse.
+
+## 2026-10-03 — Ticket Intake Forms
+- Added migration 66 for persistent ticket form definitions and per-ticket form data.
+- Added TicketFormField normalization and dynamic Discord Modal generation with a maximum of five fields.
+- Added Management API GET/PUT /api/guilds/:guildId/tickets/form with durable audit events.
+- Added Dashboard Ticket Intake Form editor.
+- Kept automatic legacy fallback to subject + description when no custom form exists.
+
+## 2026-10-03 — Utility info suite
+- Added `serverinfo`, `userinfo`, `roleinfo` and `channelinfo` to the shared command policy.
+- Added Slash and Prefix implementations using Discord-native member, role and channel resolution.
+- Added command-schema coverage and updated the product matrix.
+
+
+## 2026-10-04 — Function-level command permission editor
+- Expanded apps/dashboard/app/command-policy-panel.tsx from partial policy controls to the complete persisted command-policy surface.
+- Added allowed-role, denied-role, allowed-channel and denied-channel editors plus help visibility; retained Prefix/Slash, enabled and cooldown controls.
+- Kept the existing command_policies backend and shared guard; no duplicate permission architecture or migration added.
+- Updated Feature Matrix / Project State / Test Matrix / Handoff for cross-chat continuity.
+
+
+## 2026-10-04 — AutoMod ban action
+- Extended the existing AutoMod rule builder with a first-class `ban` action.
+- Routed AutoMod bans through `Moderation.applyAutomodBan()` for shared hierarchy validation, `moderation.ban.applied` audit and moderation-case persistence.
+- Added migration 67 for the `automod_rules.action` constraint and Dashboard action selection.
+- Added deterministic unit coverage and updated the canonical project logs.
+
+
+## 2026-10-04 — Help policy defaults
+- Fixed `/help` to merge persisted command policies over the shared `COMMAND_DEFINITIONS` defaults instead of showing only commands with existing DB rows.
+- This makes newly introduced commands visible by default and keeps function-level help visibility consistent with the policy editor.
+
+
+## 2026-10-04 — Ticket customization
+- Extended Ticket settings with persistent panel title/description and create/claim/close button labels.
+- Reused the existing Ticket module, form editor and Management API surface; no second ticket subsystem was introduced.
+- Applied customization to prefix quick-panel plus create/reopen ticket controls.
+- Added migration 68, Dashboard editor, API audit event and deterministic normalization tests.
+
+
+## 2026-10-04 — Automation moderation depth
+- Added warn/kick/ban Automation actions through the shared Moderation service with `automation` as actor.
+- Fixed Management API validation mismatch for Dashboard-supported delay/webhook/branch actions; validation is now recursive.
+- Added regression tests for moderation action validation.
+
+
+## 2026-10-04 — Automation event context
+- Expanded runtime event context so moderation/role/ticket workflows expose useful fields to conditions and templates.
+- Added action/reason/moderator/role/case/ticket context without introducing a second event system.
+- Kept existing event names and persistence contracts stable.
+
+
+## 2026-10-04 — Automation dry-run
+- Added `AutomationEngine.dryRun()` and Management API `/automation/dry-run` for safe preflight testing.
+- Dashboard can test the current unsaved rule against synthetic event fields and inspect rendered action previews.
+- No Discord mutation, webhook call or database write is performed by dry-run.
+
+
+## 2026-10-04 — Music history / skip-to
+- Persistent music_history stores the latest 200 played tracks per guild/bot identity.
+- Added /music history and prefix !history.
+- Added /music skip-to position and prefix !skip-to position, preserving the selected queued track at the front before skipping the current track.
+- Migration/test gate advanced to schema version 79.
+
+## 2026-10-04 — Automation richer conditions/actions
+- Expanded Automation condition catalog with not-has-role, user-is-bot, channel-type-is and has-permission.
+- Expanded action catalog with set-nickname and react-message.
+- Kept dry-run, API validation, Dashboard builder and runtime execution on the same contract.
+## 2026-10-04 — Automation workflow presets
+- Added migration 70 with durable per-guild workflow presets storing event, ALL/ANY conditions, actions and cooldown.
+- Added AutomationEngine preset CRUD with normalized names and the same validation contract as live rules.
+- Added Management API CRUD with audit events and Dashboard save/load/delete controls.
+- Included workflow presets in the existing Config Export/Import path with validation and safe ordering.
+- Loading a preset only populates the Builder; it does not execute or publish the workflow automatically.
+
+## 2026-10-04 — Automation retries and dead-letter
+- Added migration 69 with durable dead-letter state for automation_delayed_jobs.
+- Delayed jobs now execute in fail-fast mode so actual action exceptions leave the job eligible for retry instead of being marked completed.
+- Retry policy uses bounded exponential backoff (5s, 10s, 20s, 40s, then dead-letter on the fifth failed attempt).
+- Delayed jobs preserve originating rule_id across delay chaining for diagnostics.
+- Invalid queued payloads are quarantined directly into dead-letter state.
+- Dashboard diagnostics now surface dead-letter counts/status alongside pending, processing and error counts.
+- Existing immediate Automation execution remains tolerant of individual action failures; retry behavior is scoped to durable delayed jobs.
+
+## 2026-10-04 — Automation operational diagnostics
+- Added AutomationEngine.diagnostics(guildId) over the existing automation_delayed_jobs and rule/template persistence.
+- Diagnostics expose rule totals/event distribution, delayed-job pending/processing/error/completed-24h counts, oldest pending timestamp, recent job metadata and in-memory runtime counters.
+- Management API exposes GET /api/guilds/:guildId/automation/diagnostics; route ordering keeps it distinct from rule item routes.
+- Dashboard Automation Builder now shows a compact diagnostics section with manual refresh and recent delayed-job status/attempts/errors.
+- Event payloads and action definitions are intentionally not returned by diagnostics to avoid exposing message/request content in an operational view.
+- Added regression coverage for diagnostics aggregation and safe job metadata.
+- This increment does not alter Automation execution semantics or introduce a second queue/logging system.
+
+
+### 2026-10-04 — Welcome/goodbye embed images
+- Welcome now supports optional persistent HTTPS image URLs for both welcome and goodbye embeds.
+- The Dashboard exposes both image URLs with bounded length and HTTPS-only validation; slash `/welcome setup` accepts the same two options.
+- Config export/import carries the new fields, and migration 80 adds the persistent columns.
+- Added regression coverage for accepted, empty, malformed, non-HTTPS and oversized image URLs.
+
+
+### 2026-10-04 — Welcome/Verification operational preview
+- Welcome now exposes a Dashboard-safe preview action that renders the current configured welcome message/embed without assigning roles or touching a real member.
+- Verification panel copy (title, description and both button labels) is now persisted and configurable from the generic Dashboard settings and `/verify setup`.
+\n\n### 2026-10-04 — Universal Forms
+- Added a first-class `forms` module for server owners: persistent form definitions with up to five short/paragraph fields, required/min/max validation and bounded labels/placeholders.
+- Dashboard now provides form CRUD, channel selection, enable/disable, field editing and panel publishing.
+- Discord exposes `/form publish`; public users launch the saved form through a button and submit answers through a Discord Modal.
+- Answers are persisted separately and can be delivered to a configured response channel; configuration participates in export/import.
+- Generic select-menu tooling remains outside this increment.
+
+
+### 2026-10-04 — Role Panel select menus
+- Role Panels now support both button and Discord select-menu components using the same persistent role definitions and selection modes.
+- Select menus preserve toggle-style multi-selection, exclusive one-role selection and bounded max-selection behavior; timed role assignments continue to use the existing expiration worker.
+- Dashboard editor and `/roles panel` expose the component choice, while config export/import preserves it.
+- Legacy role panels default to buttons through migration compatibility.
+
+
+### 2026-10-04 — Forms audit hardening
+- Forms CRUD/publish operations keep one audit record per administrative path; Dashboard actions are logged by Management API, while Discord `/form publish` is actor-aware.
+- Successful form submissions are audited without storing answer contents; processing and staff-channel delivery failures are logged and audited separately.
+- Failed panel publication rolls the Discord message back if persistence fails.
+- Corrected Discord snowflake validation and added regression coverage for form-field bounds, duplicate IDs, required/min/max validation and the five-field limit.
+
+
+## 2026-10-04 — Local Control Center / bot registration
+- Removed the local Dashboard user-login surface: login page and login/logout API routes are deleted, and the home page no longer redirects through a user session.
+- Kept same-origin validation for mutating Dashboard requests; the bot Management API remains loopback-oriented for local-first operation.
+- Added primary bot registration to Control Center/Fleet: Discord Application/Client ID, Bot Token, enabled state and presence text can be stored and updated from the local admin.
+- Bot tokens are encrypted at rest with AES-256-GCM and are never returned by the Dashboard GET endpoint or written to audit metadata.
+- Added reconnect-on-save and explicit audit logging for credential updates and connection failures.
+- Bootstrap can now start the local Control Center without Discord credentials; environment credentials remain supported as a migration/bootstrap path.
+- Added migration 84 for encrypted bot credentials and regression coverage for credential round-trip/encryption plus credential-less bootstrap.
+- Known validation status at the end of this increment: CI run for the latest test-fix commit is in progress; the preceding run passed Typecheck but failed three stale/regression tests, which were corrected in this increment.
+- Architecture decision: the first registered identity is the existing `primary` bot identity; secondary identities remain fleet infrastructure and are not exposed as a new registration flow in this increment.
+
+
+## 2026-10-04 — Audit activity center
+- Restored the missing Dashboard proxy for the existing Management API audit endpoint.
+- Added filtered audit queries by source, action substring, actor user ID and cursor timestamp without changing the durable `audit_events` schema.
+- Dashboard Audit page now shows source/actor/target context, filter controls, refresh/reset and cursor-based "load more" pagination.
+- Added regression coverage for the filtered audit query and legacy bounded `recent()` behavior.
+- Audit remains DB-backed source of truth; Discord channel delivery is still best-effort and separately observable.
+- Current increment is limited to Administration/Audit; no other module feature work was introduced.
+
+
+## 2026-10-05 — Onboarding Flow Builder
+- Branch: `feature/music-v2`.
+- Added first-class Onboarding module without duplicating Welcome, Verification or Role Panel responsibilities.
+- Triggers: `member.join`, `verification.passed`.
+- Steps: role assignment, channel message, DM; maximum 10 ordered steps.
+- Added migration 85 and atomic durable flow/module configuration.
+- Verification emits `verification.passed`; Onboarding handles the event via the shared Event Bus.
+- Added hierarchy checks, per-step failure isolation, template rendering and aggregated audit events without storing message contents.
+- Added Management API and Control Center builder.
+- Added deterministic tests and PostgreSQL persistence coverage.
+- Source implementation checkpoint: `f772b0503f3f5e5b9f9abb5f30625bacf5801068`.
+- CI #1854 is the verification gate for this slice; no adjacent feature work was added.
+
+    
+## 2026-10-05 — Onboarding Flow Builder CI verification
+- Final source HEAD: `de06195a8d70c18a01536231f3b587008f1309ba`.
+- CI `#1857` completed successfully.
+- Automated result: 123 tests passed; bot typecheck, domain build, bot build and Dashboard production build passed.
+- The only CI correction after feature implementation was the pre-existing Audit Center `buttonStyle` function misuse exposed by the PR merge build; fixed with a one-line style-factory call.
+- Onboarding slice is closed. Next work must start from exactly one next backlog module.
+
+
+## 2026-10-05 — Dashboard previews / test actions
+- Added Onboarding dry-run validation as a real read-only Dashboard test action.
+- Validation checks flow enabled state, trigger dependencies, role existence/manageability/hierarchy, text-channel existence and bot ViewChannel + SendMessages permissions.
+- DM steps are rendered as previews but explicitly reported as runtime-dependent because Discord user privacy/settings can block delivery.
+- Dashboard displays structured issues and a rendered step preview.
+- CI `#1862` passed: 123 tests, bot typecheck, domain build, bot build and Dashboard production build.
+- Dashboard preview/test-actions backlog item is now considered implemented; future modules may add their own test surfaces using the same Management API/action conventions.
+
+
+## 2026-10-05 — Per-module activity/error history
+- Extended the existing AuditLog query contract with action-prefix and target filters.
+- Added a whitelisted module-to-action-prefix mapping so module pages can retrieve their operational history without accepting arbitrary prefix queries from the browser.
+- Added Management API module activity endpoint with bounded cursor pagination.
+- Added a reusable Dashboard Module Activity panel to every module page.
+- Error-like actions are highlighted when audit actions contain fail/error/denied/blocked; this is an audit-derived operational signal, not a replacement for internal structured error telemetry.
+- Added regression coverage for prefix query construction and wildcard escaping.
+- CI `#1873` passed.
+
+
+## 2026-10-05 — Server configuration presets
+- Implemented `ServerConfigPresetService` on top of the existing `ConfigTransferService`.
+- Migration 86 added `server_config_presets` with per-guild unique names and indexed update time.
+- Added Management API CRUD/apply endpoints and Control Center panel.
+- Added preset name validation and database migration coverage.
+- CI #1883 passed.
+
+
+## 2026-10-05 — Configurable bot identity/profile
+- Extended existing Fleet bot registration rather than introducing another identity system.
+- Bot profile controls now include optional username and local avatar/banner file selection plus existing presence.
+- Management API validates profile payloads, keeps the general JSON request limit at 64 KiB, and raises it to 8 MiB only for the bot profile endpoint.
+- Discord profile changes are applied through the current logged-in bot user; avatar/banner payloads are transient and not persisted in the database.
+- CI #1889 passed completely.
+
+
+## 2026-10-05 — Docker / VPS foundation
+- Removed obsolete VPS Dashboard admin-password handling from scripts/install-vps.sh.
+- Added docker-compose.vps.yml with Caddy public reverse proxy and persistent Caddy data/config volumes.
+- Updated infrastructure/caddy/Caddyfile.example to require hashed Basic Auth before reverse-proxying the Dashboard.
+- VPS installer now prompts for domain + Basic Auth credentials, generates an Argon2id Caddy hash, writes literal quoted Compose env values, creates the local Caddyfile and starts the secure overlay.
+- VPS upgrades automatically reuse the overlay when the generated Caddyfile exists.
+- Generated Caddyfile is ignored by git.
+- Strengthened scripts/check-deployment-contract.mjs with shell syntax and Docker Compose overlay validation.
+- CI #1899 passed completely.
+
+
+## 2026-10-05 — RU/EN localization foundation
+- Added apps/bot/src/localization.ts with Locale, normalized locale selection and typed message keys.
+- Migrated core /help and /embed responses plus the Discord command error boundary to the configured guild locale.
+- Added deterministic localization tests covering RU/EN values and Russian fallback.
+- CI #1904 passed completely.
+
+
+## 2026-10-05 — Per-guild integration credentials
+- Completed the per-guild credentials slice for Stream Alerts.
+- Added encrypted PostgreSQL storage for Twitch, YouTube and Kick credentials with metadata-only GET responses.
+- Added Management API CRUD, credential selection on Stream Alerts and foreign-key cleanup when credentials are deleted.
+- Stream Alerts now resolves provider secrets per alert and caches Twitch/Kick OAuth tokens per credential instead of sharing one global token.
+- Added Dashboard credential management and per-alert credential selection.
+- CI #1917 is the final complete automated gate for this slice.
+- Final code checkpoint before diagnostics work: `81dcc01269d34c90af9091d59d32c521d56dec98`.
+
+
+## 2026-10-05 — Integration diagnostics
+- Completed the Notifications/Integrations credential diagnostics slice.
+- Added provider health-checks for stored Twitch, YouTube and Kick credentials without exposing secret values in API responses or audit metadata.
+- Management API exposes `POST /api/guilds/:guildId/integration-credentials/:id/test` with safe status/latency output.
+- Stream Alerts Dashboard lists credentials, supports test action, shows bounded diagnostic result and lets each alert select its own credential.
+- Added deterministic diagnostics test with injected fetcher.
+- CI #1923 passed completely.
+- Final source checkpoint: `22f8e4856ef83120a5ebd2f678b826cad712c869`.
+- Next single backlog slice: **Configurable analytics counters**.
+
+
+## 2026-10-05 — Configurable Analytics counters
+- Completed Analytics configurability on top of the existing persistent analytics system.
+- Existing Dashboard settings now remain the source of truth for visible counters and retention; Discord `/analytics` now honors the same `visibleCounters` selection.
+- Added exported normalization contract with whitelist/deduplication, bounded retention (1–3650 days) and safe fallback when an empty counter set is supplied.
+- Added dedicated regression tests for counter normalization, retention bounds and custom visibility selections.
+- CI #1926 passed completely.
+- Final source checkpoint: `efd8eeef4505e5cf2d21d50c79e792ba83eb4637`.
+- Analytics counters and retention/history settings are now considered implemented; live browser/Discord rendering remains a release-gate check.
+- Next single backlog area: **Tickets / linked-related panels**.
+
+
+## 2026-10-05 — Ticket Panels / linked entry points
+- Completed the `Linked/related panels` ticket slice as persistent multi-panel Ticket entry points.
+- Added migration 88 with durable `ticket_panels` and nullable `tickets.panel_id`.
+- Panels support create/update/delete, enable/disable, channel move and Discord message refresh through Management API and Control Center.
+- Panel buttons open the existing Ticket form/lifecycle; the source panel is persisted on created tickets.
+- Config Export/Import preserves panel IDs and ticket-to-panel links.
+- Added schema, normalization and config round-trip regression coverage.
+- CI #1949 passed completely.
+- Final source checkpoint: `879b684c418fda2d2e2ceaebd38852e9341feaa0`.
+- Next single backlog slice: **Custom member rewards / milestones**.
+
+
+## 2026-10-05 — Custom member rewards / milestones
+- Verified the existing Leveling reward runtime and completed its missing administrative surface.
+- Control Center now exposes a dedicated Level Rewards & Milestones builder using the existing persistent `leveling_rewards` table and Leveling runtime.
+- Builder supports level, manageable role, previous-reward removal, optional DM and milestone message with `{level}`.
+- Existing server-side hierarchy and bounds validation remain authoritative.
+- CI #1955 passed completely.
+- Final source checkpoint: `856e11e84539ed8c66a899bc792e9dc8bf45b832`.
+- Next single backlog slice: **Community social widgets / engagement depth**.
+
+
+## 2026-10-05 — Community social engagement hub
+- Added a read-only Community Hub to the server Overview.
+- Aggregates existing Reputation leaderboard, Leveling leaderboard, active Giveaways and open Polls; no parallel social data store was introduced.
+- Added Management API `GET /api/guilds/:guildId/community/overview`.
+- Added snapshot methods to Reputation and Polls and a Dashboard Community Hub panel with manual refresh.
+- CI #1964 passed completely.
+- Final source checkpoint: `2c1502e441097c40bbde9d431d1059b8d5a1855a`.
+- Next single backlog slice: **Additional social feeds**.
+
+
+## 2026-10-05 — Documentation reconciliation
+- Reconciled stale Matrix rows for per-guild provider credentials and Additional social feeds; both were already implemented and CI-verified.
+- Current code checkpoint before the next Music slice: `0056f930327f06c23f567ac81229617b4b79dd40`.
+
+
+## 2026-10-05 — Music queue parity reconciliation
+- CI #1982 verified the multi-result music search picker.
+- CI #1986 verified Queue Export/Share and the current queue-control path.
+- Reconciled Feature Matrix rows that were stale versus the actual Music implementation: search picker, queue remove/range/move/front/clear, skip-to, history, requester display, export/share, compact controls, Loop One, progress and controller refresh.
+- Final source checkpoint: cd08f1b967030663d735da3b8f9d7c41cd5bbd17.
+- Next single Music slice: Filters / FX quick-access button.
+
+
+## 2026-10-05 — Music Filters / FX quick-access
+- Added a dedicated Filters button to the Music controller.
+- Quick palette reuses the existing filter manager: Clear, Bassboost presets, Rock, Classic, Pop, Electronic, Full Sound, Gaming, Nightcore and 8D.
+- Filter actions enforce the same Music control permissions, persist state and refresh the controller.
+- Added a whitelist contract test for filter actions.
+- CI #1990 passed completely.
+- Final source checkpoint: 6952f255a82af69702fe11e2ce11535052776192.
+- Next single Music slice: Save queue button.
+
+
+## 2026-10-05 — Music Save Queue
+- Added a Save Queue button to the persistent Music controller.
+- Button opens a Discord modal for playlist name and stores the current track plus pending queue using the existing music_playlists persistence.
+- Playlist names are normalized and existing names are never overwritten silently.
+- Added regression coverage for playlist-name normalization and unresolved queue-track serialization.
+- CI #1997 passed completely.
+- Final source checkpoint: 6f2d6b57ec49336eb96a6ba24975476e4bc413f3.
+- Next single Music slice: Load playlist with optional shuffle.
+
+
+## 2026-10-05 — Music playlist shuffle
+- Added optional shuffle to saved playlist loading.
+- Shuffle operates on a copy of stored playlist tracks, so persisted playlist order remains unchanged.
+- Added regression coverage for non-mutating shuffle behavior.
+- CI #2004 passed completely.
+- Final source checkpoint: 7ff06bf24613e8efc9d24fd95bcd214138c24e79.
+- Next single Music slice: Vote skip.
+
+
+## 2026-10-05 — Music Vote Skip
+- Added Vote Skip as a separate Music action while preserving DJ/Manage Server direct skip.
+- Votes are short-lived, bound to the current track identifier and de-duplicated by user.
+- Threshold is 60% of active human listeners in the current voice channel, with a minimum of one vote.
+- Added /vote-skip and /music vote-skip plus regression coverage for the threshold contract.
+- CI #2012 passed completely.
+- Final source checkpoint: a87bc7803d200b371332b136e7bfe732b03bbdfe.
+- Next single Music slice: Per-user request cooldown.
+
+
+## 2026-10-05 — Music per-user request cooldown
+- Added a five-second per-user/server cooldown after successful queue additions.
+- Applied consistently to slash /play and the configured text request channel.
+- Cooldown is in-memory, cleared on module shutdown and does not punish empty/failed searches.
+- Added a deterministic remaining-time helper test.
+- CI #2020 passed completely.
+- Final source checkpoint: 04cb2828e9b112ec1212c09972582992b1dd9d4f.
+- Next single Music slice: Per-user queued-track limit.
+
+
+## 2026-10-05 — Music per-user queued-track limit
+- Added migration 89 with max_queued_per_user on music_settings; default 10, range 0–100.
+- Added /queue-limit and /music queue-limit management command.
+- Enforced pending-track limits on play/request channel, search picker and saved playlist load; system autoplay remains exempt.
+- Added pure helper tests for limit normalization, requester counting and remaining slots.
+- CI #2034 passed completely.
+- Final source checkpoint: c18f1de1a0a404531f1686e363cfa060c6232293.
+- Next single Music slice: Max guild queue size.
+
+
+## 2026-10-05 — Music controller permissions + autoplay
+- Completed the Music controller permission parity slice and autoplay controller quick action.
+- Persistent controller now has an Autoplay On/Off button; state is read from the existing guild autoplay setting.
+- Controller actions map to the existing CommandPolicyService, so configured per-command role/channel restrictions apply to buttons as well as Slash/Prefix execution.
+- Added shared member-action policy API and regression coverage for default allow, role/channel denies and disabled commands.
+- CI #2056 passed completely.
+- Reconciled stale matrix state for Max guild queue size, which was already implemented before this slice.
+- Final source checkpoint: `af87eaa40211d33f2b49879c3ee210c9f6b266ac`.
+- Next single Music slice: **separate queue add/remove/move permissions**.
+
+
+## 2026-10-05 — Music queue permissions
+- Completed separate Music queue mutation permissions.
+- Added synthetic Command Policy keys: `queue-add`, `queue-remove`, `queue-move`.
+- Queue-add policy is enforced on play/request-channel/saved-playlist/search-picker insertion paths.
+- Queue-remove and queue-move policies are enforced on queue mutations; when no special policy is stored, existing DJ/Manage Server behavior remains the fallback.
+- Control Center Command Policy can configure these scopes without a second permission store.
+- CI #2063 passed completely.
+- Source checkpoint for this slice: `cb859ef8abd6f44c8e34510f4c2db6ebcf77f512`.
+
+## 2026-10-05 — Music Fair Queue / requester rotation
+- Completed Fair Queue requester rotation for Music v2.
+- Added deterministic round-robin balancing that preserves each requester's own FIFO order and groups unknown requesters together.
+- Fair Queue is applied after manual queue additions, search-picker selection and saved-playlist loading when the persisted guild setting is enabled.
+- Dashboard already exposes the persisted `fairQueueEnabled` setting; no second configuration store was introduced.
+- Added regression coverage for multiple requesters, a single requester and unknown requesters.
+- Repaired the migration tail while closing this slice: guild queue size is migration 90, Fair Queue is migration 91, and the previously missing vote-skip settings schema is migration 92.
+- CI #2081 passed completely: deployment contract, typecheck, 155 tests, domain build, bot build and Dashboard build.
+- Final source checkpoint: `c83d17491ce47aea11cabf214d4383032f5c3404`.
+- Next single Music slice: **Optional approval/moderation mode for requests**.
+
+## 2026-10-05 — Music Request Approval / moderation mode
+- Completed the optional Music request approval mode for user requests.
+- Added persisted `requestApprovalMode` setting with `off` (legacy immediate queueing) and `approval` modes; Dashboard and Config Export/Import expose the same setting.
+- Added durable `music_request_approvals` storage with expiry, processing claim, resolver and result metadata so pending requests survive bot restarts.
+- In approval mode, manual `play`, request-channel submissions and search-picker selections create moderation requests instead of directly mutating the queue.
+- DJ-role or Manage Server members can Approve/Reject directly from the Discord request card; approval preserves the original requester identity.
+- Approval rechecks voice ownership and current per-user/server queue limits before insertion, then applies Fair Queue when enabled.
+- Added audit events for request creation, approval, rejection and processing failure without exposing secrets or full track payloads.
+- Added regression coverage for approval-mode normalization and PostgreSQL request persistence.
+- CI #2093 passed completely: deployment contract, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final code checkpoint: `9b412a48945a1c24693aa4bb60dfce5384ad6368`.
+- Next single Music slice: **Server/shared playlists**.
+
+## 2026-10-05 — Music Server / shared playlists
+- Completed server-shared Music playlists on top of the existing `music_playlists` storage.
+- Added persisted `visibility` with `personal` and `shared` modes plus a guild-wide unique name constraint for shared playlists.
+- Shared playlists are visible to all members of the guild; personal playlists remain visible only to their owner.
+- Creating a shared playlist and editing/deleting a shared playlist created by another user require DJ or Manage Server; loading shared playlists remains available to regular queue users under the existing Music queue policy.
+- Existing personal playlist behavior was preserved, including current-track additions, 500-track cap and optional shuffle on load.
+- Added command support through the existing `/music playlist` flow with a `shared` creation option.
+- Added deterministic visibility normalization, migration smoke coverage and PostgreSQL scope regression tests.
+- CI #2098 passed completely: deployment contract, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `e512c4f57fd23df31934cefd192cd46fe7ffbe5d`.
+- Next single Music slice: **Playlist add/remove/reorder individual tracks**.
+
+## 2026-10-05 — Music playlist track management
+- Completed individual track management for Music playlists.
+- Extended the existing `/music playlist` command with `view`, `remove` and `move` actions; track positions are 1-based and bounded to the existing 500-track playlist limit.
+- `view` shows numbered track entries and safely bounds output for Discord message limits, making later remove/reorder actions practical from Discord itself.
+- Personal and shared playlist permissions remain consistent with the previous slice: owners can edit their own playlists, while DJ or Manage Server can edit shared playlists owned by others.
+- Removal and reordering use immutable helper functions with regression coverage, preserving the original array and rejecting invalid positions.
+- CI #2103 passed completely: deployment/observability contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `ba9114b24b5c759237623a8a4d028402fc0b8a62`.
+- Next single Music slice: **Playlist search/filtering**.
+
+## 2026-10-05 — Music playlist search / filtering
+- Completed Music playlist search and filtering.
+- Added `Search` to the existing `/music playlist` command with normalized text search, up to 25 displayed matches and a `shared-only` filter.
+- Search respects the existing personal/shared visibility rules, so personal playlists remain private and shared playlists remain guild-visible.
+- Playlist capacity remains `MAX_PLAYLIST_TRACKS = 500`; the 25-result limit only bounds Discord's displayed search/view output.
+- Added unit coverage for search normalization and PostgreSQL coverage for personal/shared search scope.
+- CI #2110 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `0244df329476e9ed9f0922d9b6ec98473d8dff57`.
+- Next single Music slice: **Import playlists from supported URLs**.
+
+## 2026-10-05 — Music playlist URL import
+- Completed importing Music playlists from supported HTTP(S) URLs through the existing `/music playlist` command.
+- Added `Import URL` action with a destination playlist name; imported tracks are stored in their source order and capped at the existing 500-track playlist capacity.
+- Duplicate track identifiers are removed during import while preserving the first occurrence.
+- Personal imports remain private; shared imports use the existing DJ / Manage Server permission gate for shared playlists.
+- URL input is validated as HTTP(S) before it reaches the Music resolver. The current Lavalink-backed resolver supplies the track list; this slice does not add a second provider-specific importer.
+- Added regression coverage for import URL validation.
+- CI #2114 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `a7a2bb3a9325ebe0fb7c04feed9558f66cad2330`.
+- Next single Music slice: **Save queue as playlist improvements**.
+
+## 2026-10-05 — Music save queue as playlist improvements
+- Completed the broader Save Queue → Playlist flow for Music.
+- Added `Save current queue` to the `/music playlist` command, alongside the existing controller `💾` action.
+- Queue saving can now target either a personal playlist or a server-shared playlist; shared creation uses the existing DJ / Manage Server permission gate.
+- Both slash-command and controller queue saving use the same queue snapshot helper, preserving the current track first and capping the stored playlist at the existing 500-track capacity.
+- Added regression coverage proving the snapshot keeps order, does not mutate the source queue and caps oversized queues at 500 tracks.
+- CI #2119 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `383453f3d99a4417a57f0a0a9ff3885f66cad2330`.
+- Next single Music slice: **Play favorites / play playlist shortcuts**.
+
+## 2026-10-05 — Music play favorites / playlist shortcuts
+- Completed quick playback shortcuts for saved Music state.
+- Added `Play` to `/music favorite`, using a 1-based favorite position (1–25) and the existing Music queue path so request cooldowns, queue policy and optional approval mode continue to apply.
+- Added explicit `Play` to `/music playlist`; it reuses the existing saved-playlist loading path and therefore supports personal/shared visibility, shuffle and queue limits without duplicating playback logic.
+- Added runtime validation for favorite positions and regression coverage for the visible 25-item favorite range.
+- CI #2125 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `81a484619fd88aea937d85b7c2fe04db82c26da1`.
+- Next single Music slice: **Playlist pagination and richer management UI**.
+
+## 2026-10-05 — Music playlist pagination / richer management UI
+- Completed paginated Music playlist management UI.
+- `List`, `Search` and `View tracks` now use temporary user-scoped Discord sessions with Previous / page / Next buttons instead of a hard 25-item display ceiling.
+- Personal/shared visibility is rechecked from PostgreSQL on every page change, so deleted, moved or newly updated playlists/tracks are not served from a stale snapshot.
+- A 500-track playlist can be viewed across 20 pages of 25 tracks; the 500-track storage capacity is unchanged.
+- Pagination controls are handled before the active-player guard, so browsing saved playlists does not require Music playback to be running.
+- Added pagination helper regression coverage and fixed the CI-discovered handler restoration issue before the final green run.
+- CI #2135 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `0403a96d5d67acc1a603b58048ff8476e4cceb6c`.
+- Next single Music slice: **Playlist continuation after queue end**.
+
+## 2026-10-05 — Music playlist continuation after queue end
+- Completed automatic continuation for saved Music playlists when the initially loaded batch does not fit into the current queue limits.
+- Added migration 95 with durable continuation state on `music_players`: playlist ID, next source index, optional saved shuffle order and original requester ID.
+- Loading a playlist now stores continuation state when tracks remain beyond the first batch; when the queue reaches its end, the next batch is restored automatically from the same playlist.
+- Saved shuffle order is reused for later batches instead of generating a new random order on every continuation.
+- Continuation preserves the original requester identity and rechecks the current per-user/server queue limits plus Fair Queue before adding the next batch.
+- Continuation state is restored after player recovery/restart and is cleared by explicit queue clearing, Stop, playlist completion or player destruction.
+- Saved-playlist continuation takes priority over Autoplay so a partially loaded playlist finishes before radio-style Autoplay begins.
+- Added unit coverage for continuation batching and PostgreSQL coverage for durable continuation state.
+- CI #2147 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `92ad5ef802a3a89cd7aac7831959228c77947add`.
+- Next single Music slice: **Playlists — duplicate handling / merge**.
+
+
+## 2026-10-05 — Music playlist duplicate handling / merge
+- Completed the saved-playlist merge slice.
+- Added /music playlist → Merge with name as the target playlist and source as the source playlist.
+- Merge appends source tracks to the target in source order, preserves the existing target order and skips duplicate track identifiers already present in either playlist.
+- Source playlist access follows the existing visibility rules: personal playlists are owner-only and shared playlists are guild-visible.
+- The target playlist keeps the existing edit permissions; the source playlist is never deleted or modified by merge.
+- Merge respects the existing 500-track playlist capacity and reports added, duplicate and truncated counts back to the user.
+- Added regression coverage for order preservation, duplicate handling, source duplicates and the 500-track cap.
+- CI #2152 validated the merge slice on the documentation-inclusive checkpoint ae94c38a050d2bff444104429acdc5779b3dcd34.
+- Final source checkpoint for the merge slice: ae94c38a050d2bff444104429acdc5779b3dcd34.
+- Next single Music slice: Playlist continuation after edits / stale continuation safety.
+
+
+## 2026-10-05 — Music playlist continuation stale-state safety
+- Completed stale-state protection for saved playlist continuation.
+- Editing a playlist with an active continuation (add current, remove, move or merge into that playlist) now invalidates the in-memory continuation before the next queue-end cycle.
+- Deleting a playlist with an active continuation also clears it; the persistent music_players continuation columns are cleared together, preventing the stale state from returning after a bot restart.
+- Continuation state for an unrelated playlist is left untouched.
+- Added a focused unit contract for playlist-id matching plus PostgreSQL coverage for clearing the persisted continuation state.
+- CI #2156 passed completely: observability/deployment contracts, Typecheck, 171 tests, domain build, bot build and Dashboard build.
+- Final source checkpoint: 36ba498f2446abf5e144bc88ba0d1f296374656c.
+- Next single Music slice: **Autoplay duplicate/recent-track avoidance**.
+
+
+## 2026-10-05 — Music Autoplay duplicate / recent-track avoidance
+- Completed duplicate and recent-track protection for Music Autoplay.
+- Added a persistent identifier field to music_history so Autoplay can reliably recognize tracks across bot restarts instead of relying only on in-memory state.
+- Autoplay now excludes the track that just finished, tracks already waiting in the queue, and the last 20 historical plays for the same guild/bot identity.
+- URL fallback is also checked for compatibility with older history rows that predate the identifier migration.
+- Search results are filtered before insertion, so recent/duplicate candidates are never added merely because they were the first Lavalink result.
+- Added unit coverage for identifier/URL exclusion and PostgreSQL migration coverage for the new history identifier column.
+- CI #2161 passed completely: source/deployment/observability contracts, Typecheck, 171 tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: 6194b069485b84f7e1d3ebd81118a96a07e4e6aa.
+- Next single Music slice: **Artist-aware / similar-track Autoplay**.
+
+
+## 2026-10-05 — Music Autoplay artist-aware selection
+- Completed the artist-aware Autoplay slice on top of duplicate/recent-track protection.
+- When the last track has an artist, Autoplay first searches that artist and prefers an allowed different track by the same artist.
+- The existing current-track, queued-track and recent-history exclusions remain authoritative for the artist-aware path as well.
+- When no suitable same-artist result is available, Autoplay falls back to the existing title + artist search and keeps the same exclusion rules.
+- Added deterministic helper coverage for normalized artist matching and safe fallback selection.
+- CI #2166 passed completely: source/deployment/observability contracts, Typecheck, 171 tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: 36560ac76566f8eb6bc230feb684a81c9c1b3ed0.
+- Next single Music slice: **Radio mode by artist/genre/search seed**.
+
+
+## 2026-10-05 — Music Radio mode by artist / genre / search seed
+- Completed the persistent Music Radio mode.
+- Added /radio with Start, Stop and Status actions; the mode can be artist, genre or search, with a persistent seed.
+- Artist radio can use the currently playing artist when no explicit seed is supplied; genre and search radio require a seed.
+- Radio adds one next track when the queue ends, using the same current/queued/recent-track exclusion rules as Autoplay.
+- While Radio is enabled it takes priority over generic Autoplay at queue end, preventing the two modes from fighting over the next track.
+- Persistent radio settings were added to music_settings through migration 97: enabled flag, mode and seed.
+- Added unit coverage for radio mode normalization and query construction plus PostgreSQL coverage for persistent radio settings.
+- CI #2174 passed completely after fixing the Discord /music 25-subcommand limit by exposing Radio as a separate /radio command, and after normalizing the queue-end track type.
+- Final source checkpoint for this slice: e5e1596fae8aca47e7751d6e302c5752c35b45b3.
+- Next single Music slice: **Autoplay profile/settings in Dashboard**.
+
+
+## 2026-10-05 — Dashboard Autoplay / Radio profile
+- Completed the Music Autoplay / Radio settings slice in Dashboard.
+- Extended the existing Music settings schema with persistent Radio enabled/mode/seed fields.
+- The Music Dashboard now exposes Autoplay and Radio in one profile block, including artist/genre/search mode and a 200-character seed.
+- Artist mode may keep the seed empty so runtime Radio can derive the artist from the currently playing track.
+- Added schema-level test coverage for the Dashboard Music Autoplay / Radio profile.
+- CI #2179 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: a291fc5159c41601c80cd140019578a1b4461c50.
+- Next single Music slice: **Karaoke audio effect**.
+
+
+## 2026-10-05 — Music Karaoke audio effect
+- Completed the Karaoke audio effect on top of the existing Lavalink filter subsystem.
+- Added `karaoke` to the Music filter command and quick-filter palette.
+- Karaoke toggles through the existing filter manager and therefore follows the same controller resync, persistence and Lavalink error handling as the other effects.
+- Added unit coverage confirming Karaoke is accepted as a valid quick-filter action.
+- Current Lavalink documentation exposes Karaoke as a native filter with vocal-reduction parameters; the implementation uses the client filter manager rather than inventing a custom DSP path. citeturn910755search0turn905425search0
+- CI #2184 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: 3560b4fdbcdabe787c8fd74068e3ddac76537121.
+- Next single Music slice: **Pitch control**.
+
+
+## 2026-10-05 — Music Pitch control
+- Completed independent pitch control for the Music player.
+- Added top-level `/pitch` because `/music` is already at Discord's 25-subcommand limit; Prefix supports `!pitch` as well.
+- Pitch uses the existing Lavalink timescale filter, changing only pitch while preserving the other timescale values.
+- Supported range is 0.5×–2.0×; 1.0× restores normal pitch. DJ / Manage Server permission is required for changes.
+- Added shared pitch normalization and deterministic unit coverage.
+- CI #2190 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: 66106e46cda3e63221922435516613f13fa2f6f7.
+- Next single Music slice: **Speed control**.
+
+
+## 2026-10-05 — Music Speed control
+- Completed independent playback speed control for the Music player.
+- Added top-level `/speed` because `/music` remains at Discord's 25-subcommand limit; Prefix supports `!speed` as well.
+- Speed uses the existing Lavalink timescale filter, changing only playback speed while preserving the other timescale values.
+- Supported range is 0.5×–2.0×; 1.0× restores normal speed. DJ / Manage Server permission is required for changes.
+- Added shared speed normalization and deterministic unit coverage.
+- CI #2195 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: 60b4115acc25d945bfbd31f1b0bbb6bebae73378.
+- Next single Music slice: **Tremolo / additional Lavalink effects**.
+
+
+## 2026-10-05 — Music Tremolo audio effect
+- Completed the independent Tremolo audio effect slice.
+- Added `tremolo` to the Music filter command and quick-filter palette; it uses the existing Lavalink `toggleTremolo()` filter manager API.
+- Kept the same controller resync, persistence and Lavalink error handling path as the other Music effects.
+- Added unit coverage confirming Tremolo is accepted as a valid quick-filter action.
+- CI #2200 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: f2e90f7d758eaf41c8c1d8f6069824efe8f1e5ea.
+- Next single Music slice: **Vibrato audio effect**.
+
+
+## 2026-10-05 — Music Vibrato audio effect
+- Completed the independent Vibrato audio effect slice.
+- Added `vibrato` to the Music filter command and quick-filter palette; it uses the native Lavalink client `toggleVibrato()` API with the existing filter manager path.
+- Kept the same controller resync, persistence and Lavalink error handling path as the existing Music effects.
+- Added unit coverage confirming Vibrato is accepted as a valid quick-filter action.
+- Current Lavalink REST documentation defines Vibrato as a native player filter with frequency and depth parameters, and the project's lavalink-client exposes `toggleVibrato()` for it. citeturn845892search6
+- CI #2204 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: 970cbbc7348b7f2f981375d037907adcb1f9035a.
+- Next single Music slice: **additional Lavalink audio effects**.
+
+
+## 2026-10-05 — Music Distortion audio effect
+- Completed the independent Distortion audio effect slice.
+- Added `distortion` to the Music filter command and quick-filter palette.
+- Because `lavalink-client 2.11.0` exposes Distortion as a typed filter payload but does not provide a dedicated toggle helper, the implementation toggles `filterManager.data.distortion` and reuses `applyPlayerFilters()`, keeping the effect on the native Lavalink filter path.
+- The effect uses the existing controller resync, player persistence and Lavalink error handling path.
+- Added deterministic unit coverage for the distortion payload toggle and valid filter action.
+- Current Lavalink documentation exposes Distortion as a native player filter. citeturn177581search0turn177581search1
+- CI #2208 passed completely after fixing the optional-field TypeScript contract caught by CI #2207.
+- Fixed the Music filter button palette so Discord Action Rows are chunked at five buttons maximum; added a regression test for the row-size contract.
+- CI #2211 passed completely with the palette fix.
+- Final source checkpoint for this slice: `7c4ad1e17d27b20e67c6129d2f1ace5b1de65ee0`.
+- Next single Music slice: **Low Pass audio effect**.
+
+
+## 2026-10-05 — Music Low Pass audio effect
+- Completed the independent Low Pass audio effect slice.
+- Added `lowpass` to the Music filter command and quick-filter palette.
+- Uses the native Lavalink client `toggleLowPass()` API with the existing filter manager path and default smoothing value.
+- Kept the same controller resync, player persistence and Lavalink error handling path as the other Music effects.
+- Added regression coverage for the Low Pass action and preserved the palette five-button-per-row contract.
+- Current `lavalink-client` exposes Low Pass as a native filter and its `toggleLowPass()` helper applies the filter through the standard player filter update path.
+- CI #2213 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: `ec7ba9c027b7ce581a47f9875d5c5374efbdc920`.
+- Next single Music slice: **Channel Mix audio effect**.
+
+
+## 2026-10-05 — Music Channel Mix audio effect
+- Completed the independent Channel Mix audio effect slice.
+- Added `channelmix` to the Music filter command and quick-filter palette.
+- Uses the native `lavalink-client` Channel Mix path through `setAudioOutput()`, toggling between stereo and mono.
+- The toggle derives its current state from the persisted `data.channelMix` payload, so restored players do not depend on transient in-memory filter state.
+- Added deterministic unit coverage for the persisted stereo/mono payload transition and the five-buttons-per-Discord-Action-Row palette contract.
+- CI #2215 initially caught a test-fixture omission for the new action; the fixture was corrected and CI #2216 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: `722a8866d30753a77bbe51fbe72ccd687eb19e49`.
+- Next single Music slice: **Custom EQ editor**.
+
+
+## 2026-10-05 — Moderation full action logging
+- Closed the real Moderation backlog gap instead of extending the Music filter surface.
+- Moderation runtime audit now records successful warning completion with the resulting Case ID and explicitly records case-persistence failure.
+- Private moderation notes emit an audit event without storing note contents in audit metadata.
+- Scheduled AutoPurge failures and timed ban/timeout expiry failures are audit-visible, so operational failures no longer exist only in the application logger.
+- Channel-targeted moderation events now use targetType=channel instead of being mislabeled as user targets.
+- This closes the Feature Matrix item Moderation → Full action logging.
+- CI verification for this source/test increment is pending connector visibility; the PR head is the feature branch commit below.
+- Source checkpoint: 8b3fc2964b910d2de8196ad56e0062ea4593f96a.
+- The previous Named effect profiles Music backlog item is removed: it is not a target parity feature and will not drive the next increment.
+- Next single parity slice: Music provider parity — Spotify.
+
+## 2026-10-05 — Music Custom EQ editor
+- Completed the independent Custom EQ editor slice.
+- Added a top-level `/eq` command because the `/music` command remains constrained by Discord's subcommand limit.
+- `/eq show` renders all 15 EQ bands; `/eq set` edits one band with gain validation; `/eq reset` clears the custom EQ.
+- Added prefix support: `!eq show`, `!eq set <band 0-14> <gain -0.25..1.00>`, `!eq reset`.
+- EQ changes require DJ / Manage Server; read-only show remains available.
+- The editor uses the native Lavalink client `setEQ()` / `clearEQ()` path and reuses existing player persistence and controller resync.
+- Added deterministic unit coverage for the 15-band boundary and Lavalink EQ gain range.
+- CI #2218 caught a misplaced prefix handler during Typecheck; the handler was moved into the correct `handlePrefixCommand` scope and CI #2219 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: `7ee7f9cc7477497c49d416f90f6352c433aa34e1`.
+- Next completed provider after this checkpoint: Yandex Music; subsequent provider slices are tracked below.
+
+## 2026-10-05 — Music Yandex Music provider parity
+- Added an explicit Yandex Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as Yandex use LavaSrc ymsearch; users can also use the explicit ymsearch: prefix from prefix/request-channel flows.
+- Direct Yandex Music HTTP(S) URLs continue through Lavalink URL resolution unchanged.
+- Approval-mode requests preserve the selected Yandex source across the moderation step.
+- Provider status now treats Yandex as configured only when both the LavaSrc switch and access token are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Official LavaSrc documents Yandex Music via ymsearch: and yandexmusic.accessToken; see current source documentation.
+- Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Yandex playback still requires the user's Lavalink credentials/runtime.
+- Source checkpoint: 5514371977eb7a13f5696ebabf34a159a40d7094.
+
+## 2026-10-05 — Music Qobuz provider parity
+- Added an explicit Qobuz Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as Qobuz use LavaSrc qbsearch; users can also use the explicit qbsearch: prefix from prefix/request-channel flows.
+- Direct Qobuz URLs continue through Lavalink/LavaSrc URL resolution for supported track, album, playlist and artist forms.
+- Approval-mode requests preserve the selected Qobuz source across the moderation step.
+- Provider status now treats Qobuz as configured only when the LavaSrc switch and Qobuz user OAuth token are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Current LavaSrc documentation identifies Qobuz as direct playback and documents qbsearch plus supported Qobuz URLs; Qobuz requires a suitable authenticated account/token.
+- Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Qobuz playback remains a release-gate validation item.
+- Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
+
+## 2026-10-05 — Local Bot Setup / registration panel
+## 2026-10-05 — CI #2360 typecheck fix
+- CI #2360 reached bot typecheck and failed on three concrete TypeScript errors.
+- Fixed missing Notifications service methods in `main.ts` wiring.
+- Fixed invalid object spread of the TikTok OAuth exchange result in Management API by assigning the result first.
+- Fixed the generic notification-feed create route to normalize/declare `embedConfig` before passing it to the service.
+- Follow-up CI #2362 was queued from the corrective HEAD.
+- Source checkpoint: 7cbcf9c2243f23b3fd9a7c5ecb0ac160e5656dfc.
+## 2026-10-05 — Bot Setup avatar/banner controls
+- Added PNG/JPEG/GIF avatar and banner file inputs to the local Bot Setup panel.
+- Client-side validation limits each image to 3 MB and converts it to the data URL format already accepted by the existing Management API profile validation.
+- Uploading a file applies the profile through the existing Discord user edit path; the repository intentionally does not persist these large profile blobs.
+- Added explicit Сбросить controls for avatar and banner, with a three-state UI contract: no change, set new image, or clear current image.
+- Successful saves clear the staged file data so a later save does not resend an old image unintentionally.
+- Source checkpoint: 359f260943f1cbf815238432adbafe0da4cf4483.
+## 2026-10-05 — Bot Setup credential verification
+- Added a non-destructive Test action beside the Bot Token field.
+- Verification calls Discord API /users/@me with the supplied Bot token and requires the returned account to be a bot whose id matches the configured Client ID.
+- A successful test never saves the token or reconnects the bot; it only records a safe audit event and returns the bot username.
+- Added a reusable credential-verification helper with mocked regression coverage.
+- Source checkpoint: 0640410404b50117dc887aa41f23ee3b019a84f7.
+
+- Reconciled the existing bot registration backend with the local Dashboard.
+- Added a dedicated **Bot Setup** system section to DiscordAdmin.
+- Panel supports Discord Application/Client ID, write-only bot token, enable/disable, username and presence.
+- Saving uses the existing bot management contract, so enabling a changed token reconnects the bot through the current Connection Supervisor path.
+- The saved token is never returned to the Dashboard after load/save; an empty token field means keep current token.
+- Existing Dashboard authentication is already intentionally disabled for this self-hosted local panel; no login layer was reintroduced.
+- The Management API continues to require its server-side API key, and Dashboard mutations use same-origin protection.
+- Source checkpoint: b229c0680f753d5295716a63686bff501a17977b.
+## 2026-10-05 — TikTok creator feed + OAuth
+- Completed the TikTok notification adapter on top of the official Display API.
+- Added migration 99 for dedicated TikTok creator feed storage and migration 100 for include/exclude filters.
+- Added feed create/list, ON/OFF, delete and Test delivery APIs plus Dashboard proxies/UI.
+- Added official OAuth start and authorization-code exchange flow; state is generated server-side and expires after ten minutes.
+- OAuth tokens are stored only as encrypted integration credentials; access tokens are refreshable and newly issued token pairs are persisted.
+- TikTok polling is scoped to guild bot assignments, supports message templates, keyword filters and optional embeds, and does not interfere with the existing RSS/Atom poller.
+- Added Dashboard integration-credential proxy routes so TikTok and existing provider credentials are reachable through the authenticated UI.
+- Database provider CHECK constraint was updated to allow the new TikTok credential provider.
+- Current official TikTok docs require Login Kit authorization and video.list for public video access; live operation still depends on TikTok developer-app approval/configuration and valid creator consent. citeturn588211search0turn679457search2
+- Source checkpoints: 4661790bc12083c6ec8783e403f4de5ad3925d44, 5d4b9d6b38cd78a2f37652f1cdf511691c84fc12.
+
+## 2026-10-05 — TikTok Display integration foundation
+- Added TikTok as an encrypted integration-credential provider with client key/secret, access token, refresh token, open_id, scopes and token expiration metadata.
+- Management API accepts and validates TikTok OAuth credentials without exposing secret values in list responses.
+- Added a reusable TikTok Display API client for /v2/user/info/ and /v2/video/list/.
+- The client refreshes an expiring access token through the official refresh-token flow and can persist the newly issued token pair through a callback.
+- Added deterministic tests for TikTok metadata normalization, token refresh and credential validation.
+- TikTok Display API requires user authorization with the video.list scope; therefore the adapter remains 🟡 until the self-hosted OAuth flow, creator-feed storage and Dashboard configuration are wired.
+- Source checkpoint: afce6977835b949cf33ac14807fdc96bdedf4591.
+
+## 2026-10-05 — Music effect backlog reconciliation
+- Reconciled the final remaining Music yellow row against the product principle.
+- All effects explicitly targeted by the product scope are already implemented and exposed through the Music controller/filter UI.
+- Arbitrary non-core Lavalink or plugin-specific effects are deliberately not treated as missing parity features; the product target is competitor feature parity, not exhaustive Lavalink capability exposure.
+- No source change was required for this reconciliation.
+
+## 2026-10-05 — Notifications feed Test delivery
+- Added a Dashboard Test action for individual notification feeds.
+- Test delivery fetches the latest feed entry, renders the saved message template and optional embed, and sends it immediately to the configured channel.
+- Test delivery does not advance lastItemKey or lastPolledAt, so it does not interfere with normal polling.
+- Management API records the test action in the audit trail and returns a useful failure reason when the feed/source/channel is invalid.
+- Fixed feed route regex escaping while adding the /feeds/:id/test endpoint.
+- Added regression coverage remains on embed rendering/normalization; live Discord delivery still requires the running self-hosted stack.
+- Source checkpoint: 92b19a7ca85eca2af048b809a29288ca0195896e.
+
+## 2026-10-05 — Notifications rich feed embeds
+- Added persisted optional embed configuration to notification feeds via migration 98.
+- Feed notifications can now send a normal message template plus a Discord embed with title, description, URL, color, footer, image and thumbnail.
+- Embed fields support the same {title}, {url} and {timestamp} template variables.
+- Management API accepts and normalizes embed configuration for both generic and social feeds.
+- Dashboard Notifications editor exposes the embed fields for creation and existing-feed editing.
+- Empty embed fields stay truly optional; saving an ordinary feed does not create a blank embed.
+- Added regression coverage for embed normalization and rendered Discord embed payloads.
+- Source checkpoints: 2bd5787b8bc9b208bf3645f902050cf4b8009b5f and b39328fe6dcca47ebfd8d9761b2106cfa47d3d43.
+
+## 2026-10-05 — Notifications Kick alert parity reconciliation
+- Reconciled the stale Kick stream-alert Matrix row against the existing implementation.
+- Kick support includes per-guild credentials, OAuth client-credentials token acquisition with caching, channel lookup and live-state polling.
+- Target parsing accepts Kick URLs, slugs and broadcaster IDs and has dedicated regression coverage.
+- No source change was required for this reconciliation.
+- TikTok remains the real unfinished social-adapter gap; it is not being marked complete without a reliable implementation.
+
+## 2026-10-05 — Music yt-dlp source parity reconciliation
+- Reconciled the remaining yt-dlp Matrix gap against the actual LavaSrc integration.
+- LavaSrc exposes yt-dlp as a Direct source manager, but its documented search query is still ytsearch; therefore no duplicate/fake provider choice was added beside YouTube.
+- The project already exposes LAVASRC_YTDLP_ENABLED and YTDLP_PATH and includes yt-dlp in /music providers diagnostics.
+- Direct URL loading remains untouched so Lavalink can select the appropriate source manager.
+- Matrix is now ✅ for source integration; actual availability of the yt-dlp executable and third-party site support remains a runtime/release-gate check.
+- Verified against the current LavaSrc documentation. citeturn436740view0turn992557view0
+
+## 2026-10-05 — Music JioSaavn provider parity
+- Added an explicit JioSaavn Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as JioSaavn use LavaSrc jssearch; users can also use the explicit jssearch: prefix from prefix/request-channel flows.
+- Direct JioSaavn URLs continue through Lavalink/LavaSrc URL resolution for supported song, album, artist and featured forms.
+- Approval-mode requests preserve the selected JioSaavn source across the moderation step.
+- Provider status now treats JioSaavn as configured only when the LavaSrc switch and required secret key are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Source checkpoint: 0115c72233b355695ed166f6d535edbc26c4b8a3.
+
+## 2026-10-05 — Music live synced lyrics
+- Added /music lyrics action=sync for tracks that provide timestamped lyrics lines.
+- The view highlights the current line and refreshes the ephemeral response every two seconds using the player's live position.
+- Sync stops automatically when the track changes, the final lyric line is reached, or the message can no longer be edited.
+- The sync session is cleaned up on player destruction and module shutdown.
+- Added deterministic tests for timestamp normalization, active-line selection and focused rendering.
+- LavaLyrics documents timestamped Lyrics Line objects and live LyricsLineEvent support.
+- Source checkpoint: 49776f17679971187a451c90787c9bd8d28fddea.
+
+## 2026-10-05 — Music lyrics source diagnostics
+- Extended /music lyrics with a status action for the configured LavaLyrics sources.
+- Status reports whether the Music/Lavalink node is currently available and lists the configured YouTube, Spotify, Deezer and Yandex Music lyrics sources.
+- A missing lyric for one track is explicitly distinguished from a lyrics-module/node outage.
+- Added regression coverage for the command schema.
+- Source checkpoint: 59dba7dd1f0e5756158ef6b10ded573dddefc7dc.
+
+## 2026-10-05 — Music paginated lyrics navigation
+- Reworked the Music lyrics response into a paginated Discord UI.
+- Lyrics are chunked to a safe message size, preferring line boundaries and falling back to word boundaries.
+- Added previous/next navigation buttons with disabled edge states.
+- Pagination sessions are bound to guild, user and track and expire after five minutes.
+- Stale or cross-user navigation is rejected without exposing another user's lyrics session.
+- Added deterministic tests for chunking, page counts and page validation.
+- Source checkpoint: 32ebba6d2ef325dc9801bdaec01f02ebdbc9239e.
+
+## 2026-10-05 — Music Tidal provider parity
+- Added an explicit Tidal Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as Tidal use LavaSrc tdsearch; users can also use the explicit tdsearch: prefix from prefix/request-channel flows.
+- Direct tidal.com/browse URLs continue through Lavalink/LavaSrc URL resolution.
+- Approval-mode requests preserve the selected Tidal source across the moderation step.
+- Provider status now treats Tidal as configured only when the LavaSrc switch and Tidal token are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Current LavaSrc documentation identifies Tidal playback as mirror-based and documents tdsearch plus track/album/playlist/artist URLs.
+- Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Tidal playback remains a release-gate validation item.
+- Source checkpoint: 593061182db741fe3da9c3f27f51418efcdaaee6.
+- Next single parity slice: Music provider parity — Qobuz.
+
+
+## 2026-10-05 — Music VK Music provider parity
+- Added an explicit VK Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as VK Music use LavaSrc vksearch; users can also use the explicit vksearch: prefix from prefix/request-channel flows.
+- Direct VK Music URLs continue through Lavalink/LavaSrc URL resolution.
+- Approval-mode requests preserve the selected VK Music source across the moderation step.
+- Provider status now treats VK Music as configured only when the LavaSrc switch and VK user token are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Current LavaSrc documentation identifies VK Music as direct playback and documents vksearch plus VK track/album/playlist/artist URLs; it also warns about RU-region availability and the sensitivity of the user token.
+- Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live VK Music playback remains a release-gate validation item.
+- Source checkpoint: 6835e397e4bc0a26a817921b5fd8bb27116143da.
+
+## 2026-10-05 — Music Deezer provider parity
+- Added an explicit Deezer Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as Deezer use LavaSrc dzsearch; users can also use the explicit dzsearch: prefix from prefix/request-channel flows.
+- Direct Deezer URLs continue through Lavalink/LavaSrc URL resolution.
+- Approval-mode requests preserve the selected Deezer source across the moderation step.
+- Provider status now treats Deezer as configured only when the LavaSrc switch and required Deezer credentials are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Current LavaSrc documentation identifies Deezer as direct playback and documents dzsearch plus Deezer playlist/album/track/artist URLs.
+- Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Deezer playback remains a release-gate validation item.
+- Source checkpoint: 1506f05970543b980f1005d6beb49e8da107fa1a.
+
+## 2026-10-05 — Music effect-state persistence reconciliation
+- Audited the existing Music resume path instead of adding duplicate state machinery.
+- Player persistence already stores Lavalink player JSON, including the filter state.
+- Resumed players restore data.filters into the Lavalink filter manager before queue synchronization and repeat-state restoration.
+- Feature Matrix row “Persist and restore effect state” is therefore reconciled from 🟡 to ✅.
+- No source change was needed for this increment.
+- Current source checkpoint: 6835e397e4bc0a26a817921b5fd8bb27116143da.
+
+
+## 2026-10-05 — Music Apple Music provider parity
+- Added an explicit Apple Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as Apple Music use LavaSrc amsearch; users can also use the explicit amsearch: prefix from prefix/request-channel flows.
+- Direct music.apple.com URLs continue through Lavalink/LavaSrc URL resolution, including track, album, playlist and artist URLs.
+- Approval-mode requests preserve the selected Apple Music source across the moderation step.
+- Provider status now treats Apple Music as configured only when the LavaSrc switch and Apple Music API token are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Current LavaSrc documentation identifies Apple Music playback as mirror-based and documents amsearch plus Apple Music URLs/playlists.
+- Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Apple Music playback remains a release-gate validation item.
+- Source checkpoint: a1b3d6c050e4200af2283e3d0e9135dbb5f9d255.
+
+## 2026-10-05 — Music Spotify provider parity
+- Added an explicit Spotify Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as Spotify use LavaSrc spsearch; users can also use the explicit spsearch: prefix from prefix/request-channel flows.
+- Direct open.spotify.com URLs continue through Lavalink/LavaSrc URL resolution, including track, album, playlist and artist URLs.
+- Approval-mode requests preserve the selected Spotify source across the moderation step.
+- Provider status now treats Spotify as configured only when the LavaSrc switch and Spotify client ID/secret are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Current LavaSrc documentation identifies Spotify playback as mirror-based and documents spsearch plus Spotify URLs/playlists.
+- Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Spotify playback remains a release-gate validation item.
+- Source checkpoint: fec5532f3b6679f439f610947c76318b1beed97e.
+

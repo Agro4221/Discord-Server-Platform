@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AutoMod, detectAutoModViolation, parseAutoModIdList } from "../src/modules/automod.js";
+import { AutoMod, detectAutoModViolation, isAutoModRuleCooldownActive, parseAutoModIdList } from "../src/modules/automod.js";
+
+test("AutoMod rule cooldown helper blocks only while the window is active", () => {
+  const now = 1_000;
+  assert.equal(isAutoModRuleCooldownActive(now, 999), false);
+  assert.equal(isAutoModRuleCooldownActive(now, 1_000), false);
+  assert.equal(isAutoModRuleCooldownActive(now, 1_001), true);
+  assert.equal(isAutoModRuleCooldownActive(now, Number.NaN), false);
+  assert.equal(isAutoModRuleCooldownActive(now, Number.POSITIVE_INFINITY), false);
+});
 
 test("AutoMod configure sends every extended setting to PostgreSQL", async () => {
   const queries: Array<{ text: string; values: readonly unknown[] }> = [];
@@ -133,6 +142,7 @@ test("AutoMod records a durable audit event for a handled violation", async () =
           }]
         } as { rows: T[] };
       }
+      if (text.startsWith("SELECT detector,enabled,threshold,window_seconds")) return { rows: [] } as { rows: T[] };
       if (text.startsWith("INSERT INTO automod_events")) return { rows: [], rowCount: 1 } as { rows: T[] };
       throw new Error("unexpected query: " + text);
     }
@@ -187,4 +197,25 @@ test("AutoMod exemption parser accepts whitespace- and comma-separated IDs", () 
     [...parseAutoModIdList("channel-1, channel-2\nchannel-3\tchannel-4")],
     ["channel-1", "channel-2", "channel-3", "channel-4"]
   );
+});
+
+
+test("AutoMod rule builder accepts the ban action", async () => {
+  const queries: Array<{ text: string; values: readonly unknown[] }> = [];
+  const db = {
+    async query<T>(text: string, values: readonly unknown[] = []) {
+      queries.push({ text, values });
+      return { rows: [] as T[], rowCount: 1 };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const automod = new AutoMod(db);
+  await automod.upsertRule("guild-1", {
+    detector: "scam",
+    action: "ban"
+  });
+
+  const insert = queries.find((entry) => entry.text.startsWith("INSERT INTO automod_rules"));
+  assert.ok(insert);
+  assert.equal(insert.values[5], "ban");
 });

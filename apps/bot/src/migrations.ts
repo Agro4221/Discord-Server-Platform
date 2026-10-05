@@ -658,6 +658,872 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_stream_alerts_due ON stream_alerts(enabled,last_checked_at,interval_seconds);"
     ])
   }
+,
+  {
+    version: 40,
+    name: "music_request_channel",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS request_channel_id text;"
+    ])
+  },
+,
+  {
+    version: 41,
+    name: "role_panel_selection_modes",
+    sql: q([
+      "ALTER TABLE role_panels ADD COLUMN IF NOT EXISTS selection_mode text NOT NULL DEFAULT 'toggle' CHECK(selection_mode IN ('toggle','exclusive','max'));",
+      "ALTER TABLE role_panels ADD COLUMN IF NOT EXISTS max_selections integer NOT NULL DEFAULT 1 CHECK(max_selections BETWEEN 1 AND 5);"
+    ])
+  },
+  {
+    version: 42,
+    name: "ticket_limits_and_activity",
+    sql: q([
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS max_open_per_user integer NOT NULL DEFAULT 1 CHECK(max_open_per_user BETWEEN 1 AND 10);",
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS auto_close_minutes integer NOT NULL DEFAULT 0 CHECK(auto_close_minutes BETWEEN 0 AND 43200);",
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS last_activity_at timestamptz NOT NULL DEFAULT now();",
+      "DROP INDEX IF EXISTS uq_open_ticket_per_creator;",
+      "CREATE INDEX IF NOT EXISTS idx_tickets_open_creator ON tickets(guild_id,creator_id,status);",
+      "CREATE INDEX IF NOT EXISTS idx_tickets_auto_close ON tickets(status,last_activity_at);"
+    ])
+  },
+  {
+    version: 43,
+    name: "moderation_notes_and_timed_timeout_resolution",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS moderation_notes (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  target_user_id text NOT NULL,",
+      "  moderator_user_id text NOT NULL,",
+      "  note text NOT NULL,",
+      "  created_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_moderation_notes_guild_target ON moderation_notes(guild_id,target_user_id,created_at DESC);"
+    ])
+  }
+ ,
+  {
+    version: 44,
+    name: "polls",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS polls (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  message_id text,",
+      "  creator_id text NOT NULL,",
+      "  question text NOT NULL,",
+      "  options jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  votes jsonb NOT NULL DEFAULT '{}'::jsonb,",
+      "  multiple boolean NOT NULL DEFAULT false,",
+      "  ends_at timestamptz,",
+      "  status text NOT NULL DEFAULT 'open' CHECK(status IN ('open','closed')),",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  closed_at timestamptz",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_polls_guild_status ON polls(guild_id,status);",
+      "CREATE INDEX IF NOT EXISTS idx_polls_open_end ON polls(status,ends_at);"
+    ])
+  } ,
+  {
+    version: 45,
+    name: "suggestions",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS suggestions (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  message_id text,",
+      "  creator_id text NOT NULL,",
+      "  content text NOT NULL,",
+      "  upvotes jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  downvotes jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  status text NOT NULL DEFAULT 'open' CHECK(status IN ('open','approved','rejected')),",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  review_reason text",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_suggestions_guild_status ON suggestions(guild_id,status);"
+    ])
+  } ,
+  {
+    version: 46,
+    name: "music_saved_state",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS music_favorites (",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  identifier text NOT NULL,",
+      "  track jsonb NOT NULL,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,user_id,identifier)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_music_favorites_user ON music_favorites(guild_id,user_id,created_at DESC);",
+      "CREATE TABLE IF NOT EXISTS music_playlists (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  name text NOT NULL,",
+      "  tracks jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  UNIQUE(guild_id,user_id,name)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_music_playlists_user ON music_playlists(guild_id,user_id,updated_at DESC);"
+    ])
+  } ,
+  {
+    version: 47,
+    name: "community_reputation_profiles",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS reputation_points (",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  points integer NOT NULL DEFAULT 0 CHECK(points >= 0),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,user_id)",
+      ");",
+      "CREATE TABLE IF NOT EXISTS reputation_gifts (",
+      "  guild_id text NOT NULL,",
+      "  from_user_id text NOT NULL,",
+      "  to_user_id text NOT NULL,",
+      "  day date NOT NULL DEFAULT CURRENT_DATE,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,from_user_id,to_user_id,day)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_reputation_points_guild ON reputation_points(guild_id,points DESC);",
+      "CREATE TABLE IF NOT EXISTS social_profiles (",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  bio text NOT NULL DEFAULT '',",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,user_id)",
+      ");"
+    ])
+  } ,
+  {
+    version: 48,
+    name: "music_twenty_four_seven",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS twenty_four_seven boolean NOT NULL DEFAULT false;"
+    ])
+  },
+  {
+    version: 49,
+    name: "timed_role_panel_assignments",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS role_panel_assignments (",
+      "  guild_id text NOT NULL,",
+      "  panel_id bigint NOT NULL REFERENCES role_panels(id) ON DELETE CASCADE,",
+      "  user_id text NOT NULL,",
+      "  role_id text NOT NULL,",
+      "  expires_at timestamptz NOT NULL,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(panel_id,user_id,role_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_role_panel_assignments_expiry ON role_panel_assignments(expires_at);"
+    ])
+  } ,
+  {
+    version: 50,
+    name: "timed_role_panels",
+    sql: q([
+      "ALTER TABLE role_panels ADD COLUMN IF NOT EXISTS duration_minutes integer NOT NULL DEFAULT 0 CHECK(duration_minutes BETWEEN 0 AND 43200);"
+    ])
+  } ,
+  {
+    version: 51,
+    name: "stream_alert_templates",
+    sql: q([
+      "ALTER TABLE stream_alerts ADD COLUMN IF NOT EXISTS message_template text NOT NULL DEFAULT '{mention} 🔴 {platform}: **{title}** — {author} {url}';"
+    ])
+  } ,
+  {
+    version: 52,
+    name: "birthdays",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS birthday_settings (",
+      "  guild_id text PRIMARY KEY,",
+      "  channel_id text,",
+      "  announcement_template text NOT NULL DEFAULT '🎂 С днём рождения, {user}!',",
+      "  last_run_date date,",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE TABLE IF NOT EXISTS birthdays (",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  month smallint NOT NULL CHECK(month BETWEEN 1 AND 12),",
+      "  day smallint NOT NULL CHECK(day BETWEEN 1 AND 31),",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,user_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_birthdays_date ON birthdays(guild_id,month,day);"
+    ])
+  } ,
+  {
+    version: 53,
+    name: "invite_tracking",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS invite_stats (",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  joins integer NOT NULL DEFAULT 0 CHECK(joins >= 0),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,user_id)",
+      ");",
+      "CREATE TABLE IF NOT EXISTS invite_events (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  inviter_id text,",
+      "  invite_code text,",
+      "  created_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_invite_events_guild_created ON invite_events(guild_id,created_at DESC);",
+      "CREATE INDEX IF NOT EXISTS idx_invite_events_inviter ON invite_events(guild_id,inviter_id,created_at DESC);"
+    ])
+  } ,
+  {
+    version: 54,
+    name: "music_queue_access_policy",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS queue_access text NOT NULL DEFAULT 'everyone' CHECK(queue_access IN ('everyone','dj'));"
+    ])
+  },
+  {
+    version: 55,
+    name: "giveaway_requirements_and_templates",
+    sql: q([
+      "ALTER TABLE giveaways ADD COLUMN IF NOT EXISTS requirements jsonb NOT NULL DEFAULT '{}'::jsonb;",
+      "ALTER TABLE giveaways ADD COLUMN IF NOT EXISTS message_template text NOT NULL DEFAULT '🎉 **{prize}**\\n\\nПобедителей: **{winners}**\\nЗавершение: <t:{endsAt}:R>'"
+    ])
+  },
+  {
+    version: 56,
+    name: "scheduled_channel_messages",
+    sql: q([
+      "ALTER TABLE reminders ADD COLUMN IF NOT EXISTS target_channel_id text;"
+    ])
+  },
+  {
+    version: 57,
+    name: "sticky_messages",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS sticky_messages (",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  content text NOT NULL,",
+      "  message_id text,",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,channel_id)",
+      ");"
+    ])
+  },
+  {
+    version: 58,
+    name: "persistent_server_counters",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS server_counters (",
+      "  guild_id text PRIMARY KEY,",
+      "  message_count bigint NOT NULL DEFAULT 0 CHECK(message_count >= 0),",
+      "  member_joins bigint NOT NULL DEFAULT 0 CHECK(member_joins >= 0),",
+      "  member_leaves bigint NOT NULL DEFAULT 0 CHECK(member_leaves >= 0),",
+      "  voice_joins bigint NOT NULL DEFAULT 0 CHECK(voice_joins >= 0),",
+      "  voice_leaves bigint NOT NULL DEFAULT 0 CHECK(voice_leaves >= 0),",
+      "  voice_moves bigint NOT NULL DEFAULT 0 CHECK(voice_moves >= 0),",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");"
+    ])
+  },
+  {
+    version: 59,
+    name: "moderation_escalations",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS moderation_escalations (",
+      "  guild_id text NOT NULL,",
+      "  warn_count integer NOT NULL CHECK(warn_count BETWEEN 1 AND 100),",
+      "  action text NOT NULL CHECK(action IN ('timeout','ban')),",
+      "  duration_minutes integer NOT NULL DEFAULT 0 CHECK(duration_minutes BETWEEN 0 AND 40320),",
+      "  reason text NOT NULL DEFAULT 'Automatic moderation escalation',",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,warn_count)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_moderation_escalations_guild_enabled ON moderation_escalations(guild_id,enabled);"
+    ])
+  },
+  {
+    version: 60,
+    name: "automation_templates",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS automation_templates (",
+      "  guild_id text NOT NULL,",
+      "  name text NOT NULL,",
+      "  content text NOT NULL,",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,name)",
+      ");"
+    ])
+  },
+  {
+    version: 61,
+    name: "automation_delayed_jobs",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS automation_delayed_jobs (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  rule_id text,",
+      "  event jsonb NOT NULL,",
+      "  actions jsonb NOT NULL,",
+      "  available_at timestamptz NOT NULL,",
+      "  processing_until timestamptz,",
+      "  attempts integer NOT NULL DEFAULT 0 CHECK(attempts >= 0),",
+      "  last_error text,",
+      "  completed_at timestamptz,",
+      "  created_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_automation_delayed_available ON automation_delayed_jobs(completed_at,available_at);"
+    ])
+  },
+  {
+    version: 62,
+    name: "kick_stream_alerts",
+    sql: q([
+      "ALTER TABLE stream_alerts DROP CONSTRAINT IF EXISTS stream_alerts_platform_check;",
+      "ALTER TABLE stream_alerts ADD CONSTRAINT stream_alerts_platform_check CHECK(platform IN ('twitch','youtube','vk','kick')); "
+    ])
+  },
+  {
+    version: 63,
+    name: "security_response_policies",
+    sql: q([
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS raid_quarantine_enabled boolean NOT NULL DEFAULT true;",
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS destructive_role_removal boolean NOT NULL DEFAULT true;",
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS destructive_quarantine_enabled boolean NOT NULL DEFAULT true;"
+    ])
+  },
+  {
+    version: 64,
+    name: "afk_users",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS afk_users (",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  reason text NOT NULL,",
+      "  since_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,user_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_afk_users_guild ON afk_users(guild_id);"
+    ])
+  },
+  {
+    version: 65,
+    name: "autoresponder_rules",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS autoresponder_rules (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  trigger text NOT NULL CHECK(length(trigger) BETWEEN 1 AND 300),",
+      "  match_type text NOT NULL CHECK(match_type IN ('exact','contains','starts-with','regex')),",
+      "  response text NOT NULL CHECK(length(response) BETWEEN 1 AND 2000),",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  delete_trigger boolean NOT NULL DEFAULT false,",
+      "  cooldown_seconds integer NOT NULL DEFAULT 0 CHECK(cooldown_seconds BETWEEN 0 AND 86400),",
+      "  priority integer NOT NULL DEFAULT 0 CHECK(priority BETWEEN -1000 AND 1000),",
+      "  allowed_role_ids text[] NOT NULL DEFAULT '{}',",
+      "  ignored_role_ids text[] NOT NULL DEFAULT '{}',",
+      "  allowed_channel_ids text[] NOT NULL DEFAULT '{}',",
+      "  ignored_channel_ids text[] NOT NULL DEFAULT '{}',",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_autoresponder_rules_guild_priority ON autoresponder_rules(guild_id,enabled,priority DESC,id ASC);"
+    ])
+  },
+  {
+    version: 66,
+    name: "ticket_intake_forms",
+    sql: q([
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS form_fields jsonb NOT NULL DEFAULT '[]'::jsonb;",
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS form_data jsonb NOT NULL DEFAULT '{}'::jsonb;"
+    ])
+  },
+  {
+    version: 67,
+    name: "automod_ban_action",
+    sql: q([
+      "ALTER TABLE automod_rules DROP CONSTRAINT IF EXISTS automod_rules_action_check;",
+      "ALTER TABLE automod_rules ADD CONSTRAINT automod_rules_action_check CHECK(action IN ('delete','timeout','warn','ban','log'));"
+    ])
+  },
+  {
+    version: 68,
+    name: "ticket_customization",
+    sql: q([
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS panel_title text NOT NULL DEFAULT '🎫 Поддержка';",
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS panel_description text NOT NULL DEFAULT 'Нажми кнопку ниже — Vexa откроет форму тикета.';",
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS create_button_label text NOT NULL DEFAULT 'Создать тикет';",
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS claim_button_label text NOT NULL DEFAULT 'Забрать';",
+      "ALTER TABLE ticket_settings ADD COLUMN IF NOT EXISTS close_button_label text NOT NULL DEFAULT 'Закрыть';"
+    ])
+  },
+  {
+    version: 69,
+    name: "automation_delayed_retry_dead_letter",
+    sql: q([
+      "ALTER TABLE automation_delayed_jobs ADD COLUMN IF NOT EXISTS dead_lettered_at timestamptz;",
+      "CREATE INDEX IF NOT EXISTS idx_automation_delayed_retry_state ON automation_delayed_jobs(guild_id,completed_at,dead_lettered_at,available_at);"
+    ])
+  },
+  {
+    version: 70,
+    name: "automation_workflow_presets",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS automation_workflow_presets (",
+      "  guild_id text NOT NULL,",
+      "  name text NOT NULL,",
+      "  event text NOT NULL,",
+      "  conditions jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  any_conditions jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  actions jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  cooldown_seconds integer NOT NULL DEFAULT 0 CHECK(cooldown_seconds BETWEEN 0 AND 86400),",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,name)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_automation_workflow_presets_guild_updated ON automation_workflow_presets(guild_id,updated_at DESC);"
+    ])
+  },
+  {
+    version: 71,
+    name: "moderation_scheduled_cleanup",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS moderation_cleanup_rules (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  interval_seconds integer NOT NULL DEFAULT 3600 CHECK(interval_seconds BETWEEN 60 AND 604800),",
+      "  max_messages integer NOT NULL DEFAULT 100 CHECK(max_messages BETWEEN 1 AND 100),",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  last_run_at timestamptz,",
+      "  processing_until timestamptz,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  UNIQUE(guild_id,channel_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_moderation_cleanup_due ON moderation_cleanup_rules(guild_id,enabled,last_run_at,processing_until);"
+    ])
+  },
+  {
+    version: 72,
+    name: "notification_feed_filters_and_templates",
+    sql: q([
+      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS message_template text NOT NULL DEFAULT '📡 **Новая запись из feed**\\n**{title}**\\n{url}';",
+      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS include_keywords text[] NOT NULL DEFAULT '{}';",
+      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS exclude_keywords text[] NOT NULL DEFAULT '{}';"
+    ])
+  },
+  {
+    version: 73,
+    name: "ticket_priority_and_tags",
+    sql: q([
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS priority text NOT NULL DEFAULT 'normal' CHECK(priority IN ('low','normal','high','urgent'));",
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tags text[] NOT NULL DEFAULT '{}';",
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();",
+      "CREATE INDEX IF NOT EXISTS idx_tickets_guild_priority ON tickets(guild_id,status,priority,created_at DESC);"
+    ])
+  },
+  {
+    version: 74,
+    name: "role_automation_rules_and_jobs",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS role_automation_rules (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  trigger text NOT NULL CHECK(trigger IN ('member.join','voice.join','voice.leave')),",
+      "  channel_id text NOT NULL DEFAULT '',",
+      "  role_id text NOT NULL,",
+      "  delay_seconds integer NOT NULL DEFAULT 0 CHECK(delay_seconds BETWEEN 0 AND 604800),",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  UNIQUE(guild_id,trigger,channel_id,role_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_role_automation_rules_guild ON role_automation_rules(guild_id,enabled,trigger,channel_id);",
+      "CREATE TABLE IF NOT EXISTS role_automation_jobs (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  role_id text NOT NULL,",
+      "  add_role boolean NOT NULL DEFAULT true,",
+      "  available_at timestamptz NOT NULL,",
+      "  processing_until timestamptz,",
+      "  attempts integer NOT NULL DEFAULT 0,",
+      "  last_error text,",
+      "  completed_at timestamptz,",
+      "  dead_lettered_at timestamptz,",
+      "  created_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_role_automation_jobs_due ON role_automation_jobs(guild_id,completed_at,dead_lettered_at,available_at);"
+    ])
+  },
+  {
+    version: 75,
+    name: "moderation_presets",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS moderation_presets (",
+      "  guild_id text NOT NULL,",
+      "  name text NOT NULL,",
+      "  payload jsonb NOT NULL,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,name)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_moderation_presets_guild_updated ON moderation_presets(guild_id,updated_at DESC);"
+    ])
+  },
+  {
+    version: 76,
+    name: "ticket_sla",
+    sql: q([
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS sla_reminded_at timestamptz;",
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS sla_escalated_at timestamptz;",
+      "CREATE TABLE IF NOT EXISTS ticket_sla_settings (",
+      "  guild_id text PRIMARY KEY,",
+      "  enabled boolean NOT NULL DEFAULT false,",
+      "  first_response_minutes integer NOT NULL DEFAULT 30 CHECK(first_response_minutes BETWEEN 1 AND 10080),",
+      "  reminder_minutes integer NOT NULL DEFAULT 120 CHECK(reminder_minutes BETWEEN 1 AND 10080),",
+      "  escalation_minutes integer NOT NULL DEFAULT 240 CHECK(escalation_minutes BETWEEN 1 AND 20160),",
+      "  escalation_role_id text,",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_ticket_sla_open_activity ON tickets(guild_id,status,last_activity_at,created_at) WHERE status='open';"
+    ])
+  },
+  {
+    version: 77,
+    name: "help_pages",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS help_pages (",
+      "  guild_id text NOT NULL,",
+      "  slug text NOT NULL,",
+      "  title text NOT NULL,",
+      "  content text NOT NULL,",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,slug)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_help_pages_guild_updated ON help_pages(guild_id,updated_at DESC);"
+    ])
+  },
+  {
+    version: 78,
+    name: "analytics_settings",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS analytics_settings (",
+      "  guild_id text PRIMARY KEY,",
+      "  retention_days integer NOT NULL DEFAULT 30 CHECK(retention_days BETWEEN 1 AND 3650),",
+      "  visible_counters jsonb NOT NULL DEFAULT '[\"message\",\"member_join\",\"member_leave\",\"voice_join\",\"voice_leave\",\"voice_move\"]'::jsonb,",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");"
+    ])
+  },
+  {
+    version: 79,
+    name: "music_history",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS music_history (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  bot_identity_id text NOT NULL,",
+      "  requester_id text,",
+      "  title text NOT NULL,",
+      "  author text NOT NULL DEFAULT '',",
+      "  url text,",
+      "  duration_ms bigint NOT NULL DEFAULT 0,",
+      "  played_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_music_history_guild_recent ON music_history(guild_id,bot_identity_id,played_at DESC,id DESC);"
+    ])
+  },
+  {
+    version: 80,
+    name: "welcome_embed_images",
+    sql: q([
+      "ALTER TABLE welcome_settings ADD COLUMN IF NOT EXISTS image_url text;",
+      "ALTER TABLE welcome_settings ADD COLUMN IF NOT EXISTS goodbye_image_url text;"
+    ])
+  },
+  {
+    version: 81,
+    name: "verification_panel_customization",
+    sql: q([
+      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS panel_title text NOT NULL DEFAULT '✅ Проверка участника';",
+      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS panel_description text NOT NULL DEFAULT 'Нажми кнопку, получи одноразовый код и подтверди его через кнопку ниже.';",
+      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS issue_button_label text NOT NULL DEFAULT 'Получить код';",
+      "ALTER TABLE verification_settings ADD COLUMN IF NOT EXISTS confirm_button_label text NOT NULL DEFAULT 'Подтвердить';"
+    ])
+  },
+  {
+    version: 82,
+    name: "custom_forms",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS custom_forms (",
+      "  guild_id text NOT NULL,",
+      "  name text NOT NULL,",
+      "  title text NOT NULL,",
+      "  description text NOT NULL,",
+      "  panel_channel_id text,",
+      "  panel_message_id text,",
+      "  response_channel_id text,",
+      "  button_label text NOT NULL DEFAULT 'Заполнить форму',",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  fields jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,name)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_custom_forms_guild_updated ON custom_forms(guild_id,updated_at DESC);",
+      "CREATE TABLE IF NOT EXISTS custom_form_submissions (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  form_name text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  answers jsonb NOT NULL DEFAULT '{}'::jsonb,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  FOREIGN KEY(guild_id,form_name) REFERENCES custom_forms(guild_id,name) ON DELETE CASCADE",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_custom_form_submissions_form_created ON custom_form_submissions(guild_id,form_name,created_at DESC);"
+    ])
+  },
+  {
+    version: 83,
+    name: "role_panel_select_components",
+    sql: q([
+      "ALTER TABLE role_panels ADD COLUMN IF NOT EXISTS component_type text NOT NULL DEFAULT 'buttons';",
+      "ALTER TABLE role_panels DROP CONSTRAINT IF EXISTS role_panels_component_type_check;",
+      "ALTER TABLE role_panels ADD CONSTRAINT role_panels_component_type_check CHECK(component_type IN ('buttons','select'));"
+    ])
+  },
+  {
+    version: 84,
+    name: "bot_identity_credentials",
+    sql: q([
+      "ALTER TABLE bot_identities ADD COLUMN IF NOT EXISTS token_ciphertext text;"
+    ])
+  },
+  {
+    version: 85,
+    name: "onboarding_flows",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS onboarding_flows (",
+      "  guild_id text PRIMARY KEY,",
+      "  enabled boolean NOT NULL DEFAULT false,",
+      "  trigger text NOT NULL DEFAULT 'member.join' CHECK(trigger IN ('member.join','verification.passed')),",
+      "  steps jsonb NOT NULL DEFAULT '[]'::jsonb,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_onboarding_flows_updated ON onboarding_flows(updated_at DESC);"
+    ])
+  },
+  {
+    version: 86,
+    name: "server_config_presets",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS server_config_presets (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  name text NOT NULL,",
+      "  payload jsonb NOT NULL,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  UNIQUE(guild_id,name)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_server_config_presets_guild_updated ON server_config_presets(guild_id,updated_at DESC);"
+    ])
+  },
+  {
+    version: 87,
+    name: "integration_credentials",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS integration_credentials (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  provider text NOT NULL CHECK(provider IN ('twitch','youtube','kick')),",
+      "  label text NOT NULL,",
+      "  secret_ciphertext text NOT NULL,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  UNIQUE(guild_id,provider,label)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_integration_credentials_guild_provider ON integration_credentials(guild_id,provider);",
+      "ALTER TABLE stream_alerts ADD COLUMN IF NOT EXISTS credential_id bigint REFERENCES integration_credentials(id) ON DELETE SET NULL;",
+      "CREATE INDEX IF NOT EXISTS idx_stream_alerts_credential_id ON stream_alerts(credential_id);"
+    ])
+  },
+  {
+    version: 88,
+    name: "ticket_panels",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS ticket_panels (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  message_id text,",
+      "  title text NOT NULL,",
+      "  description text NOT NULL,",
+      "  button_label text NOT NULL,",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_ticket_panels_guild_updated ON ticket_panels(guild_id,updated_at DESC);",
+      "ALTER TABLE tickets ADD COLUMN IF NOT EXISTS panel_id bigint REFERENCES ticket_panels(id) ON DELETE SET NULL;",
+      "CREATE INDEX IF NOT EXISTS idx_tickets_panel_id ON tickets(panel_id);"
+    ])
+  },
+  {
+    version: 89,
+    name: "music_queue_limits",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS max_queued_per_user integer NOT NULL DEFAULT 10 CHECK(max_queued_per_user BETWEEN 0 AND 100);"
+    ])
+  },
+  {
+    version: 90,
+    name: "music_guild_queue_limit",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS max_queue_size integer NOT NULL DEFAULT 100 CHECK(max_queue_size BETWEEN 0 AND 500);"
+    ])
+  },
+  {
+    version: 91,
+    name: "music_fair_queue_setting",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS fair_queue_enabled boolean NOT NULL DEFAULT false;"
+    ])
+  },
+  {
+    version: 92,
+    name: "music_vote_skip_settings",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS vote_skip_enabled boolean NOT NULL DEFAULT true;",
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS vote_skip_percent real NOT NULL DEFAULT 0.6 CHECK(vote_skip_percent BETWEEN 0.1 AND 1);",
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS vote_skip_minimum integer NOT NULL DEFAULT 1 CHECK(vote_skip_minimum BETWEEN 1 AND 99);"
+    ])
+  },
+  {
+    version: 93,
+    name: "music_request_approvals",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS request_approval_mode text NOT NULL DEFAULT 'off' CHECK(request_approval_mode IN ('off','approval'));",
+      "CREATE TABLE IF NOT EXISTS music_request_approvals (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  requester_user_id text NOT NULL,",
+      "  requester_voice_channel_id text NOT NULL,",
+      "  source_channel_id text NOT NULL,",
+      "  approval_message_channel_id text,",
+      "  approval_message_id text,",
+      "  query text NOT NULL,",
+      "  track jsonb,",
+      "  status text NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','processing','approved','rejected','expired','failed')),",
+      "  expires_at timestamptz NOT NULL,",
+      "  resolved_by text,",
+      "  resolved_at timestamptz,",
+      "  result_title text,",
+      "  created_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_music_request_approvals_guild_status_created ON music_request_approvals(guild_id,status,created_at DESC);",
+      "CREATE INDEX IF NOT EXISTS idx_music_request_approvals_guild_requester ON music_request_approvals(guild_id,requester_user_id,created_at DESC);"
+    ])
+  },
+  {
+    version: 94,
+    name: "music_shared_playlists",
+    sql: q([
+      "ALTER TABLE music_playlists ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'personal' CHECK(visibility IN ('personal','shared'));",
+      "CREATE INDEX IF NOT EXISTS idx_music_playlists_shared ON music_playlists(guild_id,visibility,updated_at DESC);",
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_music_playlists_shared_name ON music_playlists(guild_id,name) WHERE visibility='shared';"
+    ])
+  },
+  {
+    version: 95,
+    name: "music_playlist_continuation",
+    sql: q([
+      "ALTER TABLE music_players ADD COLUMN IF NOT EXISTS playlist_id bigint REFERENCES music_playlists(id) ON DELETE SET NULL;",
+      "ALTER TABLE music_players ADD COLUMN IF NOT EXISTS playlist_next_index integer NOT NULL DEFAULT 0 CHECK(playlist_next_index >= 0);",
+      "ALTER TABLE music_players ADD COLUMN IF NOT EXISTS playlist_order jsonb;",
+      "ALTER TABLE music_players ADD COLUMN IF NOT EXISTS playlist_requester_user_id text;",
+      "CREATE INDEX IF NOT EXISTS idx_music_players_playlist_id ON music_players(playlist_id);"
+    ])
+  },
+  {
+    version: 96,
+    name: "music_history_identifier",
+    sql: q([
+      "ALTER TABLE music_history ADD COLUMN IF NOT EXISTS identifier text;",
+      "CREATE INDEX IF NOT EXISTS idx_music_history_guild_identifier_recent ON music_history(guild_id,bot_identity_id,identifier,played_at DESC,id DESC) WHERE identifier IS NOT NULL;"
+    ])
+  },
+  {
+    version: 97,
+    name: "music_radio_mode",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS radio_enabled boolean NOT NULL DEFAULT false;",
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS radio_mode text NOT NULL DEFAULT 'artist' CHECK(radio_mode IN ('artist','genre','search'));",
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS radio_seed text;",
+      "CREATE INDEX IF NOT EXISTS idx_music_settings_radio_enabled ON music_settings(radio_enabled) WHERE radio_enabled=true;"
+    ])
+  },
+  {
+    version: 99,
+    name: "notification_tiktok_feeds",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS notification_tiktok_feeds (",
+      "  id bigserial PRIMARY KEY, guild_id text NOT NULL, channel_id text NOT NULL,",
+      "  credential_id bigint NOT NULL REFERENCES integration_credentials(id) ON DELETE CASCADE,",
+      "  target_open_id text NOT NULL, target_label text NOT NULL DEFAULT '',",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  interval_seconds integer NOT NULL DEFAULT 300 CHECK(interval_seconds BETWEEN 60 AND 86400),",
+      "  last_video_id text, last_polled_at timestamptz, processing_until timestamptz,",
+      "  message_template text NOT NULL DEFAULT '🎵 **Новый TikTok**\\n**{title}**\\n{url}',",
+      "  embed_config jsonb,",
+      "  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_notification_tiktok_feeds_polling ON notification_tiktok_feeds(enabled,processing_until,last_polled_at);",
+      "CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_tiktok_feed_guild_credential_target ON notification_tiktok_feeds(guild_id,credential_id,target_open_id);"
+    ])
+  },
+  {
+    version: 100,
+    name: "notification_tiktok_feed_filters",
+    sql: q([
+      "ALTER TABLE notification_tiktok_feeds ADD COLUMN IF NOT EXISTS message_template text NOT NULL DEFAULT '🎵 **Новый TikTok**\\n**{title}**\\n{url}';",
+      "ALTER TABLE notification_tiktok_feeds ADD COLUMN IF NOT EXISTS include_keywords text[] NOT NULL DEFAULT '{}';",
+      "ALTER TABLE notification_tiktok_feeds ADD COLUMN IF NOT EXISTS exclude_keywords text[] NOT NULL DEFAULT '{}';"
+    ])
+  },
+  {
+    version: 101,
+    name: "integration_credentials_tiktok",
+    sql: q([
+      "ALTER TABLE integration_credentials DROP CONSTRAINT IF EXISTS integration_credentials_provider_check;",
+      "ALTER TABLE integration_credentials ADD CONSTRAINT integration_credentials_provider_check CHECK(provider IN ('twitch','youtube','kick','tiktok'));"
+    ])
+  },
+  {
+    version: 98,
+    name: "notification_feed_embeds",
+    sql: q([
+      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS embed_config jsonb;"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
@@ -678,7 +1544,7 @@ export async function migrate(db: Database): Promise<void> {
     const applied = new Set(result.rows.map((row) => row.version));
 
     for (const migration of migrations) {
-      if (applied.has(migration.version)) continue;
+      if (!migration || applied.has(migration.version)) continue;
 
       await db.transaction(async (client) => {
         await client.query(migration.sql);

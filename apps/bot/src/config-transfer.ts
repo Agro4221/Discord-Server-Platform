@@ -1,6 +1,8 @@
 import type { Database } from "./database.js";
 import { MODULE_CATALOG } from "./modules/catalog.js";
 import { validateAutomationRule } from "./modules/automation-engine.js";
+import { normalizeFormFields } from "./modules/forms.js";
+import { normalizeOnboardingSteps, normalizeOnboardingTrigger } from "./modules/onboarding.js";
 import type { AutomationAction, AutomationCondition, AutomationEvent } from "@dsp/domain";
 import type { ServerConfigExport, ServerModuleConfig } from "@dsp/domain";
 
@@ -21,21 +23,34 @@ const CONFIG_TABLES: ExportTable[] = [
     "max_links","max_emojis","max_line_length","exempt_channel_ids","exempt_role_ids",
     "delete_message","timeout_minutes"
   ]},
-  { table: "welcome_settings", fields: ["enabled","channel_id","message","dm","embed"] },
-  { table: "ticket_settings", fields: ["enabled","category_id","staff_role_id","transcript_channel_id"] },
+  { table: "welcome_settings", fields: ["enabled","channel_id","message","dm","embed","image_url","goodbye_enabled","goodbye_channel_id","goodbye_message","goodbye_embed","goodbye_image_url","starter_role_ids","restore_roles"] },
+  { table: "ticket_settings", fields: ["enabled","category_id","staff_role_id","transcript_channel_id","max_open_per_user","auto_close_minutes"] },
+  { table: "ticket_sla_settings", fields: ["enabled","first_response_minutes","reminder_minutes","escalation_minutes","escalation_role_id"] },
   { table: "security_settings", fields: [
     "enabled","max_joins","window_seconds","max_destructive_actions",
-    "destructive_window_seconds","quarantine_role_id","log_channel_id"
+    "destructive_window_seconds","quarantine_role_id","log_channel_id",
+    "raid_quarantine_enabled","destructive_role_removal","destructive_quarantine_enabled"
   ] },
-  { table: "verification_settings", fields: ["enabled","channel_id","verified_role_id","quarantine_role_id","log_channel_id","code_ttl_minutes"] },
+  { table: "verification_settings", fields: ["enabled","channel_id","verified_role_id","quarantine_role_id","log_channel_id","code_ttl_minutes","panel_title","panel_description","issue_button_label","confirm_button_label"] },
   { table: "leveling_settings", fields: ["enabled","xp_per_message","cooldown_seconds","announce_level_up"] },
   { table: "starboard_settings", fields: ["channel_id","threshold","ignore_self_reaction","ignore_bots"] },
-  { table: "music_settings", fields: ["enabled","preferred_text_channel_id","default_volume","announce_track_start","autoplay"] }
+  { table: "music_settings", fields: ["enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven","queue_access","vote_skip_enabled","vote_skip_percent","vote_skip_minimum","fair_queue_enabled","request_approval_mode"] },
+  { table: "birthday_settings", fields: ["channel_id","announcement_template"] },
+  { table: "analytics_settings", fields: ["retention_days","visible_counters"] },
+  { table: "onboarding_flows", fields: ["enabled","trigger","steps"] },
 ];
 
 const JSON_TABLES: Array<{ table: string; fields: string[] }> = [
   { table: "automation_rules", fields: ["name","enabled","event","conditions","any_conditions","actions","cooldown_seconds"] },
-  { table: "role_panels", fields: ["channel_id","message_id","title","roles"] }
+  { table: "automation_workflow_presets", fields: ["name","event","conditions","any_conditions","actions","cooldown_seconds"] },
+  { table: "help_pages", fields: ["slug","title","content","enabled"] },
+  { table: "role_panels", fields: ["channel_id","message_id","title","roles","selection_mode","max_selections","duration_minutes","component_type"] },
+  { table: "stream_alerts", fields: ["platform","target","channel_id","mention_role_id","enabled","interval_seconds","message_template"] },
+  { table: "tickets", fields: ["channel_id","creator_id","claimed_by","status","priority","tags","created_at","closed_at","last_activity_at","panel_id"] },
+  { table: "ticket_panels", fields: ["id","channel_id","message_id","title","description","button_label","enabled"] },
+  { table: "notification_feeds", fields: ["channel_id","url","enabled","interval_seconds","last_item_key","last_polled_at","message_template","include_keywords","exclude_keywords"] },
+  { table: "role_automation_rules", fields: ["trigger","channel_id","role_id","delay_seconds","enabled"] },
+  { table: "custom_forms", fields: ["name","title","description","panel_channel_id","response_channel_id","button_label","enabled","fields"] }
 ];
 
 export class ConfigTransferService {
@@ -82,10 +97,17 @@ export class ConfigTransferService {
 
     for (const table of JSON_TABLES) {
       const result = await this.db.query(
-        `SELECT ${table.fields.join(",")} FROM ${quoteIdentifier(table.table)} WHERE guild_id=$1 ORDER BY id`,
+        `SELECT ${table.fields.join(",")} FROM ${quoteIdentifier(table.table)} WHERE guild_id=$1 ORDER BY ${table.table === "automation_workflow_presets" ? "updated_at DESC,name" : table.table === "help_pages" ? "updated_at DESC,slug" : table.table === "custom_forms" ? "name" : "id"}`,
         [guildId]
       );
-      const moduleKey = table.table === "automation_rules" ? "automation" : "roles";
+      const moduleKey =
+        table.table === "automation_rules" || table.table === "automation_workflow_presets" ? "automation" :
+        table.table === "role_panels" || table.table === "role_automation_rules" ? "roles" :
+        table.table === "notification_feeds" ? "notifications" :
+        table.table === "custom_forms" ? "forms" :
+        table.table === "tickets" || table.table === "ticket_panels" ? "tickets" :
+        table.table === "help_pages" ? "automation" :
+        "stream-alerts";
       const target = modules.find((module) => module.key === moduleKey);
       if (target) {
         target.settings[table.table] = result.rows.map((row) => sanitizeJson(row));
@@ -131,6 +153,31 @@ export class ConfigTransferService {
         throw new Error("invalid_automation_rules");
       }
 
+      const automationPresets = automation?.settings.automation_workflow_presets;
+      if (automationPresets !== undefined && !Array.isArray(automationPresets)) {
+        throw new Error("invalid_automation_workflow_presets");
+      }
+
+      if (Array.isArray(automationPresets)) {
+        const normalizedPresets = automationPresets.map((preset) => normalizeImportedAutomationPreset(preset));
+
+        await client.query("DELETE FROM automation_workflow_presets WHERE guild_id=$1", [targetGuildId]);
+        for (const preset of normalizedPresets) {
+          await client.query(
+            "INSERT INTO automation_workflow_presets(guild_id,name,event,conditions,any_conditions,actions,cooldown_seconds) VALUES($1,$2,$3,$4::jsonb,$5::jsonb,$6::jsonb,$7)",
+            [
+              targetGuildId,
+              preset.name,
+              preset.event,
+              JSON.stringify(preset.conditions),
+              JSON.stringify(preset.anyConditions),
+              JSON.stringify(preset.actions),
+              preset.cooldownSeconds
+            ]
+          );
+        }
+      }
+
       if (Array.isArray(automationRules)) {
         const normalizedRules = automationRules.map((rule) => normalizeImportedAutomationRule(rule));
 
@@ -154,6 +201,180 @@ export class ConfigTransferService {
         }
       }
 
+      const ticketsModule = data.modules.find((module) => module.key === "tickets");
+
+      const ticketPanels = ticketsModule?.settings.ticket_panels;
+      if (ticketPanels !== undefined && !Array.isArray(ticketPanels)) {
+        throw new Error("invalid_ticket_panels");
+      }
+      if (Array.isArray(ticketPanels)) {
+        const normalizedPanels = ticketPanels.map((panel) => normalizeImportedTicketPanel(panel));
+        await client.query("DELETE FROM ticket_panels WHERE guild_id=$1", [targetGuildId]);
+        for (const panel of normalizedPanels) {
+          await client.query(
+            "INSERT INTO ticket_panels(id,guild_id,channel_id,message_id,title,description,button_label,enabled) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
+            [
+              panel.id,
+              targetGuildId,
+              panel.channelId,
+              panel.messageId,
+              panel.title,
+              panel.description,
+              panel.buttonLabel,
+              panel.enabled
+            ]
+          );
+        }
+        await client.query(
+          "SELECT setval(pg_get_serial_sequence('ticket_panels','id'), COALESCE((SELECT max(id) FROM ticket_panels WHERE guild_id=$1), 1), true)",
+          [targetGuildId]
+        );
+      }
+
+      const exportedTickets = ticketsModule?.settings.tickets;
+      if (exportedTickets !== undefined && !Array.isArray(exportedTickets)) {
+        throw new Error("invalid_tickets");
+      }
+      if (Array.isArray(exportedTickets)) {
+        const normalizedTickets = exportedTickets.map((ticket) => normalizeImportedTicket(ticket));
+        await client.query("DELETE FROM tickets WHERE guild_id=$1", [targetGuildId]);
+        for (const ticket of normalizedTickets) {
+          await client.query(
+            "INSERT INTO tickets(guild_id,channel_id,creator_id,claimed_by,status,priority,tags,created_at,closed_at,last_activity_at,panel_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+            [
+              targetGuildId,
+              ticket.channelId,
+              ticket.creatorId,
+              ticket.claimedBy,
+              ticket.status,
+              ticket.priority,
+              ticket.tags,
+              ticket.createdAt,
+              ticket.closedAt,
+              ticket.lastActivityAt,
+              ticket.panelId
+            ]
+          );
+        }
+      }
+
+      const notificationsModule = data.modules.find((module) => module.key === "notifications");
+      const notificationFeeds = notificationsModule?.settings.notification_feeds;
+      if (notificationFeeds !== undefined && !Array.isArray(notificationFeeds)) {
+        throw new Error("invalid_notification_feeds");
+      }
+      if (Array.isArray(notificationFeeds)) {
+        const normalizedFeeds = notificationFeeds.map((feed) => normalizeImportedNotificationFeed(feed));
+        await client.query("DELETE FROM notification_feeds WHERE guild_id=$1", [targetGuildId]);
+        for (const feed of normalizedFeeds) {
+          await client.query(
+            "INSERT INTO notification_feeds(guild_id,channel_id,url,enabled,interval_seconds,last_item_key,last_polled_at,message_template,include_keywords,exclude_keywords) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+            [
+              targetGuildId,
+              feed.channelId,
+              feed.url,
+              feed.enabled,
+              feed.intervalSeconds,
+              feed.lastItemKey,
+              feed.lastPolledAt,
+              feed.messageTemplate,
+              feed.includeKeywords,
+              feed.excludeKeywords
+            ]
+          );
+        }
+      }
+
+      const rolesAutomationModule = data.modules.find((module) => module.key === "roles");
+      const roleAutomationRules = rolesAutomationModule?.settings.role_automation_rules;
+      if (roleAutomationRules !== undefined && !Array.isArray(roleAutomationRules)) {
+        throw new Error("invalid_role_automation_rules");
+      }
+      if (Array.isArray(roleAutomationRules)) {
+        const normalizedRoleRules = roleAutomationRules.map((rule) => normalizeImportedRoleAutomationRule(rule));
+        await client.query("DELETE FROM role_automation_rules WHERE guild_id=$1",[targetGuildId]);
+        for (const rule of normalizedRoleRules) {
+          await client.query(
+            "INSERT INTO role_automation_rules(guild_id,trigger,channel_id,role_id,delay_seconds,enabled) VALUES($1,$2,$3,$4,$5,$6)",
+            [targetGuildId,rule.trigger,rule.channelId,rule.roleId,rule.delaySeconds,rule.enabled]
+          );
+        }
+      }
+
+      const helpModule = data.modules.find((module) => module.key === "automation");
+      const helpPages = helpModule?.settings.help_pages;
+      if (helpPages !== undefined && !Array.isArray(helpPages)) {
+        throw new Error("invalid_help_pages");
+      }
+      if (Array.isArray(helpPages)) {
+        const normalizedPages = helpPages.map((page) => normalizeImportedHelpPage(page));
+        await client.query("DELETE FROM help_pages WHERE guild_id=$1", [targetGuildId]);
+        for (const page of normalizedPages) {
+          await client.query(
+            "INSERT INTO help_pages(guild_id,slug,title,content,enabled) VALUES($1,$2,$3,$4,$5)",
+            [targetGuildId,page.slug,page.title,page.content,page.enabled]
+          );
+        }
+      }
+
+      const streamModule = data.modules.find((module) => module.key === "stream-alerts");
+      const streamAlerts = streamModule?.settings.stream_alerts;
+      if (streamAlerts !== undefined && !Array.isArray(streamAlerts)) {
+        throw new Error("invalid_stream_alerts");
+      }
+      if (Array.isArray(streamAlerts)) {
+        const normalizedAlerts = streamAlerts.map((alert) => normalizeImportedStreamAlert(alert));
+        await client.query("DELETE FROM stream_alerts WHERE guild_id=$1", [targetGuildId]);
+        for (const alert of normalizedAlerts) {
+          await client.query(
+            "INSERT INTO stream_alerts(guild_id,platform,target,channel_id,mention_role_id,enabled,interval_seconds,message_template) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
+            [
+              targetGuildId,
+              alert.platform,
+              alert.target,
+              alert.channelId,
+              alert.mentionRoleId,
+              alert.enabled,
+              alert.intervalSeconds,
+              alert.messageTemplate
+            ]
+          );
+        }
+      }
+
+      const formsModule = data.modules.find((module) => module.key === "forms");
+      const customForms = formsModule?.settings.custom_forms;
+      if (customForms !== undefined && !Array.isArray(customForms)) {
+        throw new Error("invalid_custom_forms");
+      }
+      if (Array.isArray(customForms)) {
+        await client.query("DELETE FROM custom_forms WHERE guild_id=$1", [targetGuildId]);
+        for (const form of customForms) {
+          if (!form || typeof form !== "object" || Array.isArray(form)) throw new Error("invalid_custom_form");
+          const value = form as Record<string, unknown>;
+          if (
+            typeof value.name !== "string" || !/^[a-z0-9_-]{1,40}$/i.test(value.name) ||
+            typeof value.title !== "string" || typeof value.description !== "string" ||
+            typeof value.button_label !== "string" || !Array.isArray(value.fields)
+          ) throw new Error("invalid_custom_form");
+          const normalizedFields = normalizeFormFields(value.fields);
+          await client.query(
+            "INSERT INTO custom_forms(guild_id,name,title,description,panel_channel_id,response_channel_id,button_label,enabled,fields) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)",
+            [
+              targetGuildId,
+              value.name.toLowerCase(),
+              value.title.slice(0,256),
+              value.description.slice(0,4096),
+              typeof value.panel_channel_id === "string" ? value.panel_channel_id : null,
+              typeof value.response_channel_id === "string" ? value.response_channel_id : null,
+              value.button_label.slice(0,80),
+              value.enabled !== false,
+              JSON.stringify(normalizedFields)
+            ]
+          );
+        }
+      }
+
       const rolesModule = data.modules.find((module) => module.key === "roles");
       const rolePanels = rolesModule?.settings.role_panels;
       if (rolePanels !== undefined && !Array.isArray(rolePanels)) {
@@ -165,13 +386,17 @@ export class ConfigTransferService {
         await client.query("DELETE FROM role_panels WHERE guild_id=$1", [targetGuildId]);
         for (const panel of normalizedPanels) {
           await client.query(
-            "INSERT INTO role_panels(guild_id,channel_id,message_id,title,roles) VALUES($1,$2,$3,$4,$5::jsonb)",
+            "INSERT INTO role_panels(guild_id,channel_id,message_id,title,roles,selection_mode,max_selections,duration_minutes,component_type) VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9)",
             [
               targetGuildId,
               panel.channelId,
               panel.messageId,
               panel.title,
-              JSON.stringify(panel.roles)
+              JSON.stringify(panel.roles),
+              panel.selectionMode,
+              panel.maxSelections,
+              panel.durationMinutes,
+              panel.componentType
             ]
           );
         }
@@ -195,7 +420,20 @@ export class ConfigTransferService {
       const settings = byKey.get(moduleKey);
       if (!settings) return;
 
-      const values = fields.map((field) => settings[field] ?? defaults[field]);
+      const values = fields.map((field) => {
+        const value = settings[field] ?? defaults[field];
+        if (table === "onboarding_flows" && field === "trigger") {
+          return normalizeOnboardingTrigger(value);
+        }
+        if (table === "onboarding_flows" && field === "steps") {
+          return JSON.stringify(normalizeOnboardingSteps(value));
+        }
+        if ((table === "analytics_settings" && field === "visible_counters") ||
+            (table === "starboard_settings" && (field === "ignored_channel_ids" || field === "ignored_role_ids"))) {
+          return JSON.stringify(value ?? []);
+        }
+        return value;
+      });
       const columns = ["guild_id", ...fields];
       const placeholders = columns.map((_, index) => `$${index + 1}`);
       const updates = fields.map((field) => `${field}=EXCLUDED.${field}`);
@@ -252,18 +490,31 @@ export class ConfigTransferService {
       embed: true
     });
 
+    await execute("ticket_sla_settings", "tickets", [
+      "enabled","first_response_minutes","reminder_minutes","escalation_minutes","escalation_role_id"
+    ], {
+      enabled: false,
+      first_response_minutes: 30,
+      reminder_minutes: 120,
+      escalation_minutes: 240,
+      escalation_role_id: null
+    });
+
     await execute("ticket_settings", "tickets", [
-      "enabled","category_id","staff_role_id","transcript_channel_id"
+      "enabled","category_id","staff_role_id","transcript_channel_id","max_open_per_user","auto_close_minutes"
     ], {
       enabled: false,
       category_id: null,
       staff_role_id: null,
-      transcript_channel_id: null
+      transcript_channel_id: null,
+      max_open_per_user: 1,
+      auto_close_minutes: 0
     });
 
     await execute("security_settings", "security", [
       "enabled","max_joins","window_seconds","max_destructive_actions",
-      "destructive_window_seconds","quarantine_role_id","log_channel_id"
+      "destructive_window_seconds","quarantine_role_id","log_channel_id",
+      "raid_quarantine_enabled","destructive_role_removal","destructive_quarantine_enabled"
     ], {
       enabled: false,
       max_joins: 10,
@@ -271,7 +522,10 @@ export class ConfigTransferService {
       max_destructive_actions: 5,
       destructive_window_seconds: 20,
       quarantine_role_id: null,
-      log_channel_id: null
+      log_channel_id: null,
+      raid_quarantine_enabled: true,
+      destructive_role_removal: true,
+      destructive_quarantine_enabled: true
     });
 
     await execute("verification_settings", "verification", [
@@ -304,13 +558,42 @@ export class ConfigTransferService {
     });
 
     await execute("music_settings", "music", [
-      "enabled","preferred_text_channel_id","default_volume","announce_track_start","autoplay"
+      "enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven","queue_access","vote_skip_enabled","vote_skip_percent","vote_skip_minimum","fair_queue_enabled"
     ], {
       enabled: false,
       preferred_text_channel_id: null,
+      request_channel_id: null,
       default_volume: 100,
       announce_track_start: true,
-      autoplay: false
+      autoplay: false,
+      twenty_four_seven: false,
+      queue_access: "everyone",
+      vote_skip_enabled: false,
+      vote_skip_percent: 0.5,
+      vote_skip_minimum: 2,
+      fair_queue_enabled: false
+    });
+
+    await execute("birthday_settings", "birthdays", [
+      "channel_id","announcement_template"
+    ], {
+      channel_id: null,
+      announcement_template: "🎂 С днём рождения, {user}!"
+    });
+
+    await execute("analytics_settings", "analytics", [
+      "retention_days","visible_counters"
+    ], {
+      retention_days: 30,
+      visible_counters: ["message","member_join","member_leave","voice_join","voice_leave","voice_move"]
+    });
+
+    await execute("onboarding_flows", "onboarding", [
+      "enabled","trigger","steps"
+    ], {
+      enabled: false,
+      trigger: "member.join",
+      steps: []
     });
   }
 }
@@ -321,11 +604,16 @@ function tableToModule(table: string): ServerModuleConfig["key"] | null {
     case "automod_settings": return "automod";
     case "welcome_settings": return "welcome";
     case "ticket_settings": return "tickets";
+    case "ticket_sla_settings": return "tickets";
+    case "analytics_settings": return "analytics";
+    case "onboarding_flows": return "onboarding";
     case "security_settings": return "security";
     case "verification_settings": return "verification";
     case "leveling_settings": return "leveling";
     case "starboard_settings": return "starboard";
     case "music_settings": return "music";
+    case "birthday_settings": return "birthdays";
+    case "analytics_settings": return "analytics";
     default: return null;
   }
 }
@@ -374,6 +662,21 @@ function validateExport(payload: unknown): asserts payload is ServerConfigExport
 }
 
 
+type NormalizedHelpPage = {
+  slug: string;
+  title: string;
+  content: string;
+  enabled: boolean;
+};
+
+type NormalizedAutomationPreset = {
+  name: string;
+  event: AutomationEvent;
+  conditions: AutomationCondition[];
+  anyConditions: AutomationCondition[];
+  actions: AutomationAction[];
+  cooldownSeconds: number;
+};
 type NormalizedAutomationRule = {
   name: string;
   enabled: boolean;
@@ -384,6 +687,75 @@ type NormalizedAutomationRule = {
   cooldownSeconds: number;
 };
 
+function normalizeImportedHelpPage(value: unknown): NormalizedHelpPage {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("invalid_help_page");
+  }
+  const object = value as Record<string, unknown>;
+  if (
+    typeof object.slug !== "string" ||
+    !/^[a-z0-9_-]{1,40}$/.test(object.slug) ||
+    typeof object.title !== "string" ||
+    !object.title.trim() ||
+    object.title.length > 100 ||
+    typeof object.content !== "string" ||
+    !object.content.trim() ||
+    object.content.length > 3900 ||
+    typeof object.enabled !== "boolean"
+  ) {
+    throw new Error("invalid_help_page");
+  }
+  return {
+    slug: object.slug.toLowerCase(),
+    title: object.title.trim(),
+    content: object.content.trim(),
+    enabled: object.enabled
+  };
+}
+
+function normalizeImportedAutomationPreset(value: unknown): NormalizedAutomationPreset {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("invalid_automation_workflow_preset");
+  }
+
+  const object = value as Record<string, unknown>;
+  if (
+    typeof object.name !== "string" ||
+    object.name.trim().length === 0 ||
+    object.name.length > 40 ||
+    typeof object.event !== "string" ||
+    !Array.isArray(object.conditions) ||
+    !Array.isArray(object.any_conditions) ||
+    !Array.isArray(object.actions)
+  ) {
+    throw new Error("invalid_automation_workflow_preset");
+  }
+
+  const cooldownSeconds = Number(object.cooldown_seconds ?? 0);
+  if (!Number.isInteger(cooldownSeconds) || cooldownSeconds < 0 || cooldownSeconds > 86400) {
+    throw new Error("invalid_automation_workflow_preset");
+  }
+
+  validateAutomationRule(
+    object.event as AutomationEvent,
+    [...(object.conditions as AutomationCondition[]), ...(object.any_conditions as AutomationCondition[])],
+    object.actions as AutomationAction[]
+  );
+
+  const normalizedName = object.name.trim().toLowerCase();
+  if (!/^[a-z0-9_-]{1,40}$/.test(normalizedName)) {
+    throw new Error("invalid_automation_workflow_preset_name");
+  }
+
+  return {
+    name: normalizedName,
+    event: object.event as AutomationEvent,
+    conditions: object.conditions as AutomationCondition[],
+    anyConditions: object.any_conditions as AutomationCondition[],
+    actions: object.actions as AutomationAction[],
+    cooldownSeconds
+  };
+}
 function normalizeImportedAutomationRule(value: unknown): NormalizedAutomationRule {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("invalid_automation_rule");
@@ -433,6 +805,10 @@ type ImportedRolePanel = {
   messageId: string | null;
   title: string;
   roles: Array<{ roleId: string; label: string }>;
+  selectionMode: "toggle" | "exclusive" | "max";
+  maxSelections: number;
+  durationMinutes: number;
+  componentType: "buttons" | "select";
 };
 
 function normalizeImportedRolePanel(value: unknown): ImportedRolePanel {
@@ -450,7 +826,11 @@ function normalizeImportedRolePanel(value: unknown): ImportedRolePanel {
     object.title.length > 100 ||
     !Array.isArray(object.roles) ||
     object.roles.length < 1 ||
-    object.roles.length > 5
+    object.roles.length > 5 ||
+    (object.selection_mode !== undefined && !["toggle","exclusive","max"].includes(String(object.selection_mode))) ||
+    (object.max_selections !== undefined && (typeof object.max_selections !== "number" || !Number.isInteger(object.max_selections) || object.max_selections < 1 || object.max_selections > 5)) ||
+    (object.duration_minutes !== undefined && (typeof object.duration_minutes !== "number" || !Number.isInteger(object.duration_minutes) || object.duration_minutes < 0 || object.duration_minutes > 43200)) ||
+    (object.component_type !== undefined && !["buttons","select"].includes(String(object.component_type)))
   ) {
     throw new Error("invalid_role_panel");
   }
@@ -476,6 +856,221 @@ function normalizeImportedRolePanel(value: unknown): ImportedRolePanel {
     channelId: object.channel_id,
     messageId: typeof object.message_id === "string" ? object.message_id : null,
     title: object.title.trim().slice(0, 100) || "Выберите роли",
-    roles
+    roles,
+    selectionMode: (typeof object.selection_mode === "string" && ["toggle","exclusive","max"].includes(object.selection_mode)
+      ? object.selection_mode
+      : "toggle") as "toggle" | "exclusive" | "max",
+    maxSelections: typeof object.max_selections === "number" ? Math.min(Math.max(Math.trunc(object.max_selections),1),5) : 1,
+    durationMinutes: typeof object.duration_minutes === "number" ? Math.min(Math.max(Math.trunc(object.duration_minutes),0),43200) : 0,
+    componentType: object.component_type === "select" ? "select" : "buttons"
+  };
+}
+
+type ImportedStreamAlert = {
+  platform: "twitch" | "youtube" | "vk" | "kick";
+  target: string;
+  channelId: string;
+  mentionRoleId: string | null;
+  enabled: boolean;
+  intervalSeconds: number;
+  messageTemplate: string;
+};
+
+type NormalizedNotificationFeed = {
+  channelId: string;
+  url: string;
+  enabled: boolean;
+  intervalSeconds: number;
+  lastItemKey: string | null;
+  lastPolledAt: string | null;
+  messageTemplate: string;
+  includeKeywords: string[];
+  excludeKeywords: string[];
+};
+
+type NormalizedTicket = {
+  channelId: string;
+  creatorId: string;
+  claimedBy: string | null;
+  status: "open" | "closed" | "closing";
+  priority: "low" | "normal" | "high" | "urgent";
+  tags: string[];
+  createdAt: string;
+  closedAt: string | null;
+  lastActivityAt: string | null;
+  panelId: number | null;
+};
+
+function normalizeImportedTicket(value: unknown): NormalizedTicket {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_ticket");
+  const object = value as Record<string, unknown>;
+  if (
+    typeof object.channel_id !== "string" || !/^\d{17,20}$/.test(object.channel_id) ||
+    typeof object.creator_id !== "string" || !/^\d{17,20}$/.test(object.creator_id) ||
+    (object.claimed_by !== null && object.claimed_by !== undefined && (typeof object.claimed_by !== "string" || !/^\d{17,20}$/.test(object.claimed_by))) ||
+    typeof object.status !== "string" || !["open","closed","closing"].includes(object.status) ||
+    typeof object.priority !== "string" || !["low","normal","high","urgent"].includes(object.priority) ||
+    !Array.isArray(object.tags) ||
+    typeof object.created_at !== "string"
+  ) throw new Error("invalid_ticket");
+
+  const tags = [...new Set(
+    object.tags.filter((tag): tag is string => typeof tag === "string")
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+      .slice(0,10)
+      .map((tag) => tag.slice(0,40))
+  )];
+
+  return {
+    channelId: object.channel_id,
+    creatorId: object.creator_id,
+    claimedBy: object.claimed_by === null || object.claimed_by === undefined ? null : object.claimed_by,
+    status: object.status as NormalizedTicket["status"],
+    priority: object.priority as NormalizedTicket["priority"],
+    tags,
+    createdAt: object.created_at,
+    closedAt: typeof object.closed_at === "string" ? object.closed_at : null,
+    lastActivityAt: typeof object.last_activity_at === "string" ? object.last_activity_at : null,
+    panelId: typeof object.panel_id === "number" && Number.isSafeInteger(object.panel_id) && object.panel_id > 0
+      ? object.panel_id
+      : typeof object.panel_id === "string" && /^\d+$/.test(object.panel_id) && Number(object.panel_id) > 0
+        ? Number(object.panel_id)
+        : null
+  };
+}
+
+type ImportedTicketPanel = {
+  id: number;
+  channelId: string;
+  messageId: string | null;
+  title: string;
+  description: string;
+  buttonLabel: string;
+  enabled: boolean;
+};
+
+function normalizeImportedTicketPanel(value: unknown): ImportedTicketPanel {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_ticket_panel");
+  const object = value as Record<string, unknown>;
+  if (
+    !(
+      (typeof object.id === "number" && Number.isSafeInteger(object.id) && object.id > 0) ||
+      (typeof object.id === "string" && /^\d+$/.test(object.id) && Number(object.id) > 0)
+    ) ||
+    typeof object.channel_id !== "string" || !/^\d{17,20}$/.test(object.channel_id) ||
+    (object.message_id !== null && object.message_id !== undefined &&
+      (typeof object.message_id !== "string" || !/^\d{17,20}$/.test(object.message_id))) ||
+    typeof object.title !== "string" || !object.title.trim() || object.title.length > 256 ||
+    typeof object.description !== "string" || !object.description.trim() || object.description.length > 4096 ||
+    typeof object.button_label !== "string" || !object.button_label.trim() || object.button_label.length > 80 ||
+    typeof object.enabled !== "boolean"
+  ) {
+    throw new Error("invalid_ticket_panel");
+  }
+  return {
+    id: typeof object.id === "number" ? object.id : Number(object.id),
+    channelId: object.channel_id,
+    messageId: typeof object.message_id === "string" ? object.message_id : null,
+    title: object.title.trim(),
+    description: object.description.trim(),
+    buttonLabel: object.button_label.trim(),
+    enabled: object.enabled
+  };
+}
+
+type NormalizedRoleAutomationRule = {
+  trigger: "member.join" | "voice.join" | "voice.leave";
+  channelId: string;
+  roleId: string;
+  delaySeconds: number;
+  enabled: boolean;
+};
+
+function normalizeImportedRoleAutomationRule(value: unknown): NormalizedRoleAutomationRule {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_role_automation_rule");
+  const object = value as Record<string, unknown>;
+  if (
+    typeof object.trigger !== "string" || !["member.join","voice.join","voice.leave"].includes(object.trigger) ||
+    typeof object.channel_id !== "string" || (object.channel_id && !/^\d{17,20}$/.test(object.channel_id)) ||
+    typeof object.role_id !== "string" || !/^\d{17,20}$/.test(object.role_id) ||
+    typeof object.delay_seconds !== "number" || !Number.isInteger(object.delay_seconds) ||
+    object.delay_seconds < 0 || object.delay_seconds > 604800 ||
+    typeof object.enabled !== "boolean"
+  ) throw new Error("invalid_role_automation_rule");
+  if (object.trigger !== "member.join" && !object.channel_id) throw new Error("invalid_role_automation_channel");
+  return {
+    trigger: object.trigger as NormalizedRoleAutomationRule["trigger"],
+    channelId: object.channel_id,
+    roleId: object.role_id,
+    delaySeconds: object.delay_seconds,
+    enabled: object.enabled
+  };
+}
+
+function normalizeImportedNotificationFeed(value: unknown): NormalizedNotificationFeed {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_notification_feed");
+  const object = value as Record<string, unknown>;
+  if (
+    typeof object.channel_id !== "string" || !/^\d{17,20}$/.test(object.channel_id) ||
+    typeof object.url !== "string" || object.url.length > 2000 ||
+    typeof object.enabled !== "boolean" ||
+    typeof object.interval_seconds !== "number" || !Number.isInteger(object.interval_seconds) ||
+    object.interval_seconds < 60 || object.interval_seconds > 86400 ||
+    (object.last_item_key !== null && object.last_item_key !== undefined && typeof object.last_item_key !== "string") ||
+    (object.last_polled_at !== null && object.last_polled_at !== undefined && typeof object.last_polled_at !== "string") ||
+    typeof object.message_template !== "string" || object.message_template.length > 1800 ||
+    !Array.isArray(object.include_keywords) || !Array.isArray(object.exclude_keywords)
+  ) throw new Error("invalid_notification_feed");
+
+  const normalize = (items: unknown[]) => [...new Set(
+    items.filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim().toLocaleLowerCase())
+      .filter(Boolean)
+      .slice(0,20)
+      .map((item) => item.slice(0,80))
+  )];
+
+  return {
+    channelId: object.channel_id,
+    url: object.url,
+    enabled: object.enabled,
+    intervalSeconds: object.interval_seconds,
+    lastItemKey: object.last_item_key === null || object.last_item_key === undefined ? null : object.last_item_key,
+    lastPolledAt: object.last_polled_at === null || object.last_polled_at === undefined ? null : object.last_polled_at,
+    messageTemplate: object.message_template.trim().slice(0,1800),
+    includeKeywords: normalize(object.include_keywords),
+    excludeKeywords: normalize(object.exclude_keywords)
+  };
+}
+
+function normalizeImportedStreamAlert(value: unknown): ImportedStreamAlert {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_stream_alert");
+  const object = value as Record<string, unknown>;
+  if (
+    !["twitch","youtube","vk","kick"].includes(String(object.platform)) ||
+    typeof object.target !== "string" ||
+    !object.target.trim() ||
+    object.target.length > 200 ||
+    typeof object.channel_id !== "string" ||
+    !/^\d{17,20}$/.test(object.channel_id) ||
+    (object.mention_role_id !== null && object.mention_role_id !== undefined &&
+      (typeof object.mention_role_id !== "string" || !/^\d{17,20}$/.test(object.mention_role_id))) ||
+    typeof object.enabled !== "boolean" ||
+    typeof object.interval_seconds !== "number" ||
+    !Number.isInteger(object.interval_seconds) ||
+    object.interval_seconds < 15 ||
+    object.interval_seconds > 3600 ||
+    typeof object.message_template !== "string" ||
+    object.message_template.length > 1000
+  ) throw new Error("invalid_stream_alert");
+  return {
+    platform: String(object.platform) as ImportedStreamAlert["platform"],
+    target: object.target.trim().slice(0,200),
+    channelId: object.channel_id,
+    mentionRoleId: typeof object.mention_role_id === "string" ? object.mention_role_id : null,
+    enabled: object.enabled,
+    intervalSeconds: object.interval_seconds,
+    messageTemplate: object.message_template
   };
 }

@@ -1,11 +1,40 @@
 import dns from "node:dns/promises";
 import net from "node:net";
 import { XMLParser } from "fast-xml-parser";
-import { ChannelType, type ChatInputCommandInteraction, type Client } from "discord.js";
+import { EmbedBuilder, ChannelType, type ChatInputCommandInteraction, type Client } from "discord.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
+import type { IntegrationCredentialRepository, ProviderCredentialSecret } from "../integration-credentials.js";
+import { TikTokDisplayClient, type TikTokCredentialStore } from "../tiktok-display.js";
+
+export type NotificationEmbedConfig = {
+  title?: string;
+  description?: string;
+  url?: string;
+  color?: string;
+  footer?: string;
+  image?: string;
+  thumbnail?: string;
+};
+
+export type TikTokNotificationFeedRecord = {
+  id: number;
+  guildId: string;
+  channelId: string;
+  credentialId: number;
+  targetOpenId: string;
+  targetLabel: string;
+  enabled: boolean;
+  intervalSeconds: number;
+  lastVideoId: string | null;
+  lastPolledAt: string | null;
+  messageTemplate: string;
+  includeKeywords: string[];
+  excludeKeywords: string[];
+  embedConfig: NotificationEmbedConfig | null;
+};
 
 export type NotificationFeedRecord = {
   id: number;
@@ -16,6 +45,10 @@ export type NotificationFeedRecord = {
   intervalSeconds: number;
   lastItemKey: string | null;
   lastPolledAt: string | null;
+  messageTemplate: string;
+  includeKeywords: string[];
+  excludeKeywords: string[];
+  embedConfig: NotificationEmbedConfig | null;
 };
 
 type Feed = {
@@ -25,6 +58,10 @@ type Feed = {
   url: string;
   intervalSeconds: number;
   lastItemKey: string | null;
+  messageTemplate: string;
+  includeKeywords: string[];
+  excludeKeywords: string[];
+  embedConfig: NotificationEmbedConfig | null;
 };
 
 export class Notifications implements PlatformModule {
@@ -34,8 +71,14 @@ export class Notifications implements PlatformModule {
   private client?: Client;
   private running = false;
   private identityId = "primary";
+  private readonly tiktok: TikTokDisplayClient;
 
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    private readonly integrationCredentials: IntegrationCredentialRepository
+  ) {
+    this.tiktok = new TikTokDisplayClient();
+  }
 
   async listFeeds(guildId: string): Promise<NotificationFeedRecord[]> {
     const result = await this.db.query<{
@@ -47,8 +90,12 @@ export class Notifications implements PlatformModule {
       interval_seconds: number;
       last_item_key: string | null;
       last_polled_at: string | null;
+      message_template: string;
+      include_keywords: string[];
+      exclude_keywords: string[];
+      embed_config: NotificationEmbedConfig | null;
     }>(
-      "SELECT id,guild_id,channel_id,url,enabled,interval_seconds,last_item_key,last_polled_at FROM notification_feeds WHERE guild_id=$1 ORDER BY id DESC",
+      "SELECT id,guild_id,channel_id,url,enabled,interval_seconds,last_item_key,last_polled_at,message_template,include_keywords,exclude_keywords,embed_config FROM notification_feeds WHERE guild_id=$1 ORDER BY id DESC",
       [guildId]
     );
     return result.rows.map((row) => ({
@@ -59,16 +106,35 @@ export class Notifications implements PlatformModule {
       enabled: row.enabled,
       intervalSeconds: row.interval_seconds,
       lastItemKey: row.last_item_key,
-      lastPolledAt: row.last_polled_at
+      lastPolledAt: row.last_polled_at,
+      messageTemplate: row.message_template,
+      includeKeywords: Array.isArray(row.include_keywords) ? row.include_keywords : [],
+      excludeKeywords: Array.isArray(row.exclude_keywords) ? row.exclude_keywords : [],
+      embedConfig: normalizeNotificationEmbedConfig(row.embed_config)
     }));
   }
 
-  async addFeed(guildId: string, channelId: string, url: string, intervalSeconds: number): Promise<NotificationFeedRecord> {
+  async addFeed(
+    guildId: string,
+    channelId: string,
+    url: string,
+    intervalSeconds: number,
+    options: {
+      messageTemplate?: string;
+      includeKeywords?: string[];
+      excludeKeywords?: string[];
+      embedConfig?: NotificationEmbedConfig | null;
+    } = {}
+  ): Promise<NotificationFeedRecord> {
     await assertSafeFeedUrl(url);
     const safeInterval = Math.min(Math.max(Math.trunc(intervalSeconds), 60), 86_400);
+    const messageTemplate = normalizeFeedTemplate(options.messageTemplate);
+    const includeKeywords = normalizeKeywords(options.includeKeywords);
+    const excludeKeywords = normalizeKeywords(options.excludeKeywords);
+    const embedConfig = options.embedConfig ? await normalizeNotificationEmbedConfig(options.embedConfig) : null;
     const result = await this.db.query<{ id: string }>(
-      "INSERT INTO notification_feeds(guild_id,channel_id,url,interval_seconds,enabled) VALUES($1,$2,$3,$4,true) RETURNING id",
-      [guildId, channelId, url, safeInterval]
+      "INSERT INTO notification_feeds(guild_id,channel_id,url,interval_seconds,enabled,message_template,include_keywords,exclude_keywords,embed_config) VALUES($1,$2,$3,$4,true,$5,$6,$7,$8::jsonb) RETURNING id",
+      [guildId, channelId, url, safeInterval, messageTemplate, includeKeywords, excludeKeywords, embedConfig ? JSON.stringify(embedConfig) : null]
     );
     const id = result.rows[0]?.id;
     if (!id) throw new Error("feed_create_failed");
@@ -83,24 +149,326 @@ export class Notifications implements PlatformModule {
     return feed;
   }
 
-  async updateFeed(guildId: string, id: number, patch: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean }): Promise<boolean> {
+  async addSocialFeed(
+    guildId: string,
+    provider: "reddit" | "youtube" | "mastodon",
+    target: string,
+    channelId: string,
+    intervalSeconds: number,
+    options: {
+      messageTemplate?: string;
+      includeKeywords?: string[];
+      excludeKeywords?: string[];
+      embedConfig?: NotificationEmbedConfig | null;
+    } = {}
+  ): Promise<NotificationFeedRecord> {
+    const url = buildSocialFeedUrl(provider, target);
+    return this.addFeed(guildId, channelId, url, intervalSeconds, options);
+  }
+
+  async updateFeed(guildId: string, id: number, patch: {
+    channelId?: string;
+    url?: string;
+    intervalSeconds?: number;
+    enabled?: boolean;
+    messageTemplate?: string;
+    includeKeywords?: string[];
+    excludeKeywords?: string[];
+    embedConfig?: NotificationEmbedConfig | null;
+  }): Promise<boolean> {
     if (patch.url !== undefined) await assertSafeFeedUrl(patch.url);
     const current = (await this.listFeeds(guildId)).find((item) => item.id === id);
     if (!current) return false;
+    const embedConfig = patch.embedConfig !== undefined
+      ? (patch.embedConfig ? await normalizeNotificationEmbedConfig(patch.embedConfig) : null)
+      : current.embedConfig;
     await this.db.query(
       `UPDATE notification_feeds
-       SET channel_id=$1,url=$2,interval_seconds=$3,enabled=$4,updated_at=now()
-       WHERE id=$5 AND guild_id=$6`,
+       SET channel_id=$1,url=$2,interval_seconds=$3,enabled=$4,
+           message_template=$5,include_keywords=$6,exclude_keywords=$7,embed_config=$8::jsonb,updated_at=now()
+       WHERE id=$9 AND guild_id=$10`,
       [
         patch.channelId ?? current.channelId,
         patch.url ?? current.url,
         Math.min(Math.max(Math.trunc(patch.intervalSeconds ?? current.intervalSeconds), 60), 86_400),
         patch.enabled ?? current.enabled,
+        patch.messageTemplate !== undefined ? normalizeFeedTemplate(patch.messageTemplate) : current.messageTemplate,
+        patch.includeKeywords !== undefined ? normalizeKeywords(patch.includeKeywords) : current.includeKeywords,
+        patch.excludeKeywords !== undefined ? normalizeKeywords(patch.excludeKeywords) : current.excludeKeywords,
+        embedConfig ? JSON.stringify(embedConfig) : null,
         id,
         guildId
       ]
     );
     return true;
+  }
+
+  async setFeedEnabled(guildId: string, id: number, enabled: boolean): Promise<boolean> {
+    const current = (await this.listFeeds(guildId)).find((feed) => feed.id === id);
+    if (!current) return false;
+    await this.db.query(
+      "UPDATE notification_feeds SET enabled=$1,updated_at=now() WHERE id=$2 AND guild_id=$3",
+      [enabled,id,guildId]
+    );
+    return true;
+  }
+
+  async testFeed(guildId: string, id: number): Promise<{ title: string; url: string }> {
+    const feed = (await this.listFeeds(guildId)).find((item) => item.id === id);
+    if (!feed) throw new Error("feed_not_found");
+    await assertSafeFeedUrl(feed.url);
+
+    const response = await fetch(feed.url, {
+      headers: { "user-agent": "DiscordServerPlatform/0.1 (+self-hosted feed tester)" },
+      redirect: "error",
+      signal: AbortSignal.timeout(10_000)
+    });
+    if (!response.ok) throw new Error("feed_http_" + response.status);
+
+    const size = Number(response.headers.get("content-length") ?? 0);
+    if (size > 2_000_000) throw new Error("feed_response_too_large");
+
+    const xml = await response.text();
+    if (xml.length > 2_000_000) throw new Error("feed_response_too_large");
+
+    const parser = new XMLParser({
+      ignoreAttributes: true,
+      processEntities: false,
+      removeNSPrefix: true,
+      parseTagValue: true,
+      trimValues: true
+    });
+    const document = parser.parse(xml) as Record<string, any>;
+    const first = normalizeFeedEntries(document)[0];
+    if (!first) throw new Error("feed_no_entries");
+
+    const channel = this.client?.channels.cache.get(feed.channelId);
+    if (!channel?.isTextBased() || !("send" in channel)) throw new Error("destination_unavailable");
+
+    const content = renderFeedTemplate(feed.messageTemplate, first);
+    const embed = buildNotificationEmbed(feed.embedConfig, first);
+    await channel.send({
+      content: content || undefined,
+      embeds: embed ? [embed] : undefined
+    });
+
+    return { title: first.title, url: first.url };
+  }
+
+  async listTikTokFeeds(guildId: string): Promise<TikTokNotificationFeedRecord[]> {
+    const result = await this.db.query<{
+      id: string; guild_id: string; channel_id: string; credential_id: string;
+      target_open_id: string; target_label: string; enabled: boolean; interval_seconds: number;
+      last_video_id: string | null; last_polled_at: string | null; message_template: string;
+      include_keywords: string[]; exclude_keywords: string[]; embed_config: NotificationEmbedConfig | null;
+    }>(
+      "SELECT id,guild_id,channel_id,credential_id,target_open_id,target_label,enabled,interval_seconds,last_video_id,last_polled_at,message_template,include_keywords,exclude_keywords,embed_config FROM notification_tiktok_feeds WHERE guild_id=$1 ORDER BY id DESC",
+      [guildId]
+    );
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      guildId: row.guild_id,
+      channelId: row.channel_id,
+      credentialId: Number(row.credential_id),
+      targetOpenId: row.target_open_id,
+      targetLabel: row.target_label,
+      enabled: row.enabled,
+      intervalSeconds: row.interval_seconds,
+      lastVideoId: row.last_video_id,
+      lastPolledAt: row.last_polled_at,
+      messageTemplate: row.message_template,
+      includeKeywords: Array.isArray(row.include_keywords) ? row.include_keywords : [],
+      excludeKeywords: Array.isArray(row.exclude_keywords) ? row.exclude_keywords : [],
+      embedConfig: normalizeNotificationEmbedConfig(row.embed_config)
+    }));
+  }
+
+  async addTikTokFeed(
+    guildId: string,
+    channelId: string,
+    credentialId: number,
+    intervalSeconds: number,
+    options: {
+      messageTemplate?: string;
+      includeKeywords?: string[];
+      excludeKeywords?: string[];
+      embedConfig?: NotificationEmbedConfig | null;
+    } = {}
+  ): Promise<TikTokNotificationFeedRecord> {
+    const credential = await this.integrationCredentials.getSecret(guildId, credentialId, "tiktok");
+    if (!credential) throw new Error("tiktok_credential_not_found");
+
+    const tiktokCredential = toTikTokCredential(credential);
+    const profile = await this.tiktok.getProfile(tiktokCredential, async (refreshed) => {
+      await this.integrationCredentials.updateSecret(guildId, credentialId, "tiktok", refreshed);
+    });
+
+    const safeInterval = Math.min(Math.max(Math.trunc(intervalSeconds), 60), 86_400);
+    const messageTemplate = normalizeFeedTemplate(options.messageTemplate ?? "🎵 **Новый TikTok**\n**{title}**\n{url}");
+    const includeKeywords = normalizeKeywords(options.includeKeywords);
+    const excludeKeywords = normalizeKeywords(options.excludeKeywords);
+    const embedConfig = options.embedConfig ? normalizeNotificationEmbedConfig(options.embedConfig) : null;
+
+    const result = await this.db.query<{ id: string }>(
+      "INSERT INTO notification_tiktok_feeds(guild_id,channel_id,credential_id,target_open_id,target_label,interval_seconds,message_template,include_keywords,exclude_keywords,embed_config) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) RETURNING id",
+      [
+        guildId, channelId, credentialId, profile.openId, profile.displayName || profile.openId,
+        safeInterval, messageTemplate, includeKeywords, excludeKeywords,
+        embedConfig ? JSON.stringify(embedConfig) : null
+      ]
+    );
+    const id = Number(result.rows[0]?.id);
+    if (!id) throw new Error("tiktok_feed_create_failed");
+    const feed = (await this.listTikTokFeeds(guildId)).find((item) => item.id === id);
+    if (!feed) throw new Error("tiktok_feed_create_failed");
+    return feed;
+  }
+
+  async setTikTokFeedEnabled(guildId: string, id: number, enabled: boolean): Promise<boolean> {
+    const result = await this.db.query(
+      "UPDATE notification_tiktok_feeds SET enabled=$1,updated_at=now() WHERE id=$2 AND guild_id=$3",
+      [enabled, id, guildId]
+    );
+    return result.rowCount === 1;
+  }
+
+  async deleteTikTokFeed(guildId: string, id: number): Promise<boolean> {
+    const result = await this.db.query(
+      "DELETE FROM notification_tiktok_feeds WHERE id=$1 AND guild_id=$2",
+      [id, guildId]
+    );
+    return result.rowCount === 1;
+  }
+
+  async testTikTokFeed(guildId: string, id: number): Promise<{ id: string; title: string; url: string }> {
+    const feed = (await this.listTikTokFeeds(guildId)).find((item) => item.id === id);
+    if (!feed) throw new Error("tiktok_feed_not_found");
+
+    const credential = await this.integrationCredentials.getSecret(guildId, feed.credentialId, "tiktok");
+    if (!credential) throw new Error("tiktok_credential_not_found");
+    const tiktokCredential = toTikTokCredential(credential);
+    const result = await this.tiktok.listRecentVideos(tiktokCredential, {
+      maxCount: 1,
+      persist: async (refreshed) => {
+        await this.integrationCredentials.updateSecret(guildId, feed.credentialId, "tiktok", refreshed);
+      }
+    });
+    const video = result.videos[0];
+    if (!video) throw new Error("tiktok_no_videos");
+
+    const channel = this.client?.channels.cache.get(feed.channelId);
+    if (!channel?.isTextBased() || !("send" in channel)) throw new Error("destination_unavailable");
+
+    const entry = {
+      title: video.title || video.description || "TikTok video",
+      url: video.shareUrl || video.embedLink || "https://www.tiktok.com/"
+    };
+    const content = renderFeedTemplate(feed.messageTemplate, entry);
+    const embed = buildNotificationEmbed(feed.embedConfig, entry);
+    await channel.send({ content: content || undefined, embeds: embed ? [embed] : undefined });
+    return { id: video.id, title: entry.title, url: entry.url };
+  }
+
+  private async pollTikTokFeeds(): Promise<void> {
+    if (!this.client) return;
+
+    const feeds = await this.db.query<{
+      id: string; guild_id: string; channel_id: string; credential_id: string;
+      target_open_id: string; last_video_id: string | null; message_template: string;
+      include_keywords: string[]; exclude_keywords: string[]; embed_config: NotificationEmbedConfig | null;
+    }>(
+      `UPDATE notification_tiktok_feeds nf
+       SET processing_until=now()+interval '2 minutes'
+       WHERE nf.id IN (
+         SELECT nf2.id
+         FROM notification_tiktok_feeds nf2
+         INNER JOIN guild_bot_assignments ga ON ga.guild_id=nf2.guild_id
+         WHERE nf2.enabled=true
+           AND (
+             ga.bot_identity_id=$1
+             OR (
+               $1='primary'
+               AND ga.bot_identity_id <> 'primary'
+               AND NOT EXISTS (
+                 SELECT 1 FROM bot_heartbeats bh
+                 WHERE bh.bot_identity_id=ga.bot_identity_id
+                   AND bh.last_seen_at >= now()-interval '90 seconds'
+               )
+             )
+           )
+           AND (nf2.processing_until IS NULL OR nf2.processing_until < now())
+           AND (nf2.last_polled_at IS NULL OR nf2.last_polled_at <= now() - make_interval(secs => nf2.interval_seconds))
+         ORDER BY nf2.last_polled_at NULLS FIRST
+         LIMIT 20
+         FOR UPDATE SKIP LOCKED
+       )
+       RETURNING nf.id,nf.guild_id,nf.channel_id,nf.credential_id,nf.target_open_id,nf.last_video_id,
+                 nf.message_template,nf.include_keywords,nf.exclude_keywords,nf.embed_config`,
+      [this.identityId]
+    );
+
+    for (const feed of feeds.rows) await this.pollTikTokFeed(feed);
+  }
+
+  private async pollTikTokFeed(feed: {
+    id: string; guild_id: string; channel_id: string; credential_id: string;
+    target_open_id: string; last_video_id: string | null; message_template: string;
+    include_keywords: string[]; exclude_keywords: string[]; embed_config: NotificationEmbedConfig | null;
+  }): Promise<void> {
+    try {
+      const credential = await this.integrationCredentials.getSecret(feed.guild_id, Number(feed.credential_id), "tiktok");
+      if (!credential) throw new Error("tiktok_credential_not_found");
+      const result = await this.tiktok.listRecentVideos(toTikTokCredential(credential), {
+        maxCount: 20,
+        persist: async (refreshed) => {
+          await this.integrationCredentials.updateSecret(feed.guild_id, Number(feed.credential_id), "tiktok", refreshed);
+        }
+      });
+      const first = result.videos.find((video) => video.id !== feed.last_video_id) ?? result.videos[0];
+      if (!first || first.id === feed.last_video_id) {
+        await this.markTikTokPolled(feed.id);
+        return;
+      }
+
+      const entry = {
+        title: first.title || first.description || "TikTok video",
+        url: first.shareUrl || first.embedLink || "https://www.tiktok.com/"
+      };
+      const title = entry.title.toLocaleLowerCase();
+      const include = feed.include_keywords.length === 0 ||
+        feed.include_keywords.some((keyword) => title.includes(String(keyword).toLocaleLowerCase()));
+      const exclude = feed.exclude_keywords.some((keyword) => title.includes(String(keyword).toLocaleLowerCase()));
+
+      if (include && !exclude) {
+        const channel = this.client?.channels.cache.get(feed.channel_id);
+        if (!channel?.isTextBased() || !("send" in channel)) throw new Error("destination_unavailable");
+        const content = renderFeedTemplate(feed.message_template, entry);
+        const embed = buildNotificationEmbed(feed.embed_config, entry);
+        await channel.send({ content: content || undefined, embeds: embed ? [embed] : undefined });
+      }
+
+      await this.db.query(
+        "UPDATE notification_tiktok_feeds SET last_video_id=$1,last_polled_at=now(),processing_until=NULL WHERE id=$2",
+        [first.id, feed.id]
+      );
+    } catch (error) {
+      logger.warn("TikTok feed poll failed", {
+        feedId: feed.id,
+        guildId: feed.guild_id,
+        error: String(error)
+      });
+      await this.db.query(
+        "UPDATE notification_tiktok_feeds SET last_polled_at=now(),processing_until=NULL WHERE id=$1",
+        [feed.id]
+      );
+    }
+  }
+
+  private async markTikTokPolled(id: string): Promise<void> {
+    await this.db.query(
+      "UPDATE notification_tiktok_feeds SET last_polled_at=now(),processing_until=NULL WHERE id=$1",
+      [id]
+    );
   }
 
   async deleteFeed(guildId: string, id: number): Promise<boolean> {
@@ -137,6 +505,27 @@ export class Notifications implements PlatformModule {
     }
 
     const sub = interaction.options.getSubcommand();
+    if (sub === "github") {
+      const repo = interaction.options.getString("repo", true).trim();
+      const type = interaction.options.getString("type", true);
+      const channelOption = interaction.options.getChannel("channel", true);
+      const channel = interaction.guild!.channels.cache.get(channelOption.id);
+      const minutes = interaction.options.getInteger("minutes") ?? 5;
+      if (!channel || channel.type !== ChannelType.GuildText) {
+        await interaction.reply({ content: "Channel должен быть текстовым.", ephemeral: true });
+        return;
+      }
+      if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) {
+        await interaction.reply({ content: "Repo должен быть в формате owner/repository.", ephemeral: true });
+        return;
+      }
+      const feedPath = type === "releases" ? "releases.atom" : "commits.atom";
+      const url = "https://github.com/" + repo + "/" + feedPath;
+      await this.addFeed(interaction.guild!.id, channel.id, url, minutes * 60);
+      await interaction.reply({ content: "GitHub feed добавлен: " + repo + " (" + type + ").", ephemeral: true });
+      return;
+    }
+
     if (sub === "add") {
       const url = interaction.options.getString("url", true);
       const channelOption = interaction.options.getChannel("channel", true);
@@ -188,13 +577,18 @@ export class Notifications implements PlatformModule {
          ) claim
          WHERE nf.id=claim.id
          RETURNING nf.id,nf.guild_id AS "guildId",nf.channel_id AS "channelId",nf.url,
-                   nf.interval_seconds AS "intervalSeconds",nf.last_item_key AS "lastItemKey"`,
+                   nf.interval_seconds AS "intervalSeconds",nf.last_item_key AS "lastItemKey",
+                   nf.message_template AS "messageTemplate",
+                   nf.include_keywords AS "includeKeywords",
+                   nf.exclude_keywords AS "excludeKeywords",
+                   nf.embed_config AS "embedConfig"`,
         [this.identityId]
       );
 
       for (const feed of feeds.rows) {
         await this.poll(feed);
       }
+      await this.pollTikTokFeeds();
     } finally {
       this.running = false;
     }
@@ -249,6 +643,18 @@ export class Notifications implements PlatformModule {
       return;
     }
 
+    const title = first.title.toLocaleLowerCase();
+    const matchesInclude = feed.includeKeywords.length === 0 ||
+      feed.includeKeywords.some((keyword) => title.includes(keyword.toLocaleLowerCase()));
+    const matchesExclude = feed.excludeKeywords.some((keyword) => title.includes(keyword.toLocaleLowerCase()));
+    if (!matchesInclude || matchesExclude) {
+      await this.db.query(
+        "UPDATE notification_feeds SET last_item_key=$1,last_polled_at=now(),processing_until=NULL WHERE id=$2",
+        [first.key, feed.id]
+      );
+      return;
+    }
+
     const channel = this.client?.channels.cache.get(feed.channelId);
     if (!channel?.isTextBased() || !("send" in channel)) {
       await this.markPolled(feed.id, "destination unavailable");
@@ -256,11 +662,12 @@ export class Notifications implements PlatformModule {
     }
 
     try {
-      await channel.send(
-        `📡 **Новая запись из feed**
-**${first.title.slice(0, 250)}**
-${first.url}`
-      );
+      const content = renderFeedTemplate(feed.messageTemplate, first);
+      const embed = buildNotificationEmbed(feed.embedConfig, first);
+      await channel.send({
+        content: content || undefined,
+        embeds: embed ? [embed] : undefined
+      });
     } catch (error) {
       logger.warn("Feed message failed", { feedId: feed.id, error: String(error) });
       await this.markPolled(feed.id, "destination send failed");
@@ -279,6 +686,115 @@ ${first.url}`
       [id]
     );
   }
+}
+
+export function normalizeNotificationEmbedConfig(value?: NotificationEmbedConfig | null): NotificationEmbedConfig | null {
+  if (!value || typeof value !== "object") return null;
+  const input = value as Record<string, unknown>;
+  const result: NotificationEmbedConfig = {};
+  const copy = (key: keyof NotificationEmbedConfig, max: number) => {
+    const raw = input[key];
+    if (typeof raw !== "string") return;
+    const normalized = raw.trim().slice(0, max);
+    if (normalized) result[key] = normalized;
+  };
+
+  copy("title", 256);
+  copy("description", 4096);
+  copy("footer", 2048);
+  copy("url", 2000);
+  copy("image", 2000);
+  copy("thumbnail", 2000);
+  copy("color", 7);
+
+  if (result.color && !/^#[0-9a-fA-F]{6}$/.test(result.color)) delete result.color;
+  return Object.keys(result).length ? result : null;
+}
+
+export function buildNotificationEmbed(
+  config: NotificationEmbedConfig | null,
+  entry: { title: string; url: string }
+): EmbedBuilder | null {
+  if (!config) return null;
+  const replace = (value: string) =>
+    value
+      .replaceAll("{title}", entry.title.slice(0, 250))
+      .replaceAll("{url}", entry.url.slice(0, 1800))
+      .replaceAll("{timestamp}", new Date().toISOString());
+
+  const embed = new EmbedBuilder();
+  if (config.title) embed.setTitle(replace(config.title));
+  if (config.description) embed.setDescription(replace(config.description));
+  if (config.url) embed.setURL(config.url);
+  if (config.color) embed.setColor(config.color as import("discord.js").HexColorString);
+  if (config.footer) embed.setFooter({ text: replace(config.footer) });
+  if (config.image) embed.setImage(config.image);
+  if (config.thumbnail) embed.setThumbnail(config.thumbnail);
+
+  return Object.keys(embed.data).length ? embed : null;
+}
+
+function toTikTokCredential(secret: ProviderCredentialSecret): TikTokCredentialStore {
+  if (!secret.clientId || !secret.clientSecret || !secret.accessToken || !secret.refreshToken) {
+    throw new Error("invalid_tiktok_credential");
+  }
+  return {
+    ...secret,
+    clientId: secret.clientId,
+    clientSecret: secret.clientSecret,
+    accessToken: secret.accessToken,
+    refreshToken: secret.refreshToken
+  };
+}
+
+function normalizeFeedTemplate(value?: string): string {
+  const template = String(value ?? "📡 **Новая запись из feed**\n**{title}**\n{url}").trim().slice(0, 1800);
+  return template || "📡 **Новая запись из feed**\n**{title}**\n{url}";
+}
+
+export function buildSocialFeedUrl(
+  provider: "reddit" | "youtube" | "mastodon",
+  target: string
+): string {
+  const value = target.trim();
+  if (provider === "reddit") {
+    const subreddit = value.replace(/^r\//i, "").replace(/^https?:\/\/www\.reddit\.com\/r\//i, "").replace(/\/$/, "");
+    if (!/^[A-Za-z0-9_]{2,21}$/.test(subreddit)) throw new Error("invalid_reddit_target");
+    return "https://www.reddit.com/r/" + subreddit + "/new/.rss";
+  }
+
+  if (provider === "youtube") {
+    const match = value.match(/(?:youtube\.com\/channel\/|^)(UC[\w-]{20,40})$/i);
+    if (!match) throw new Error("invalid_youtube_channel");
+    return "https://www.youtube.com/feeds/videos.xml?channel_id=" + match[1];
+  }
+
+  let url: URL;
+  try {
+    url = new URL(/^https?:\/\//i.test(value) ? value : "https://" + value);
+  } catch {
+    throw new Error("invalid_mastodon_target");
+  }
+  if (url.protocol !== "https:" || !/^\/\@[A-Za-z0-9_\-\.]+$/.test(url.pathname.replace(/\.rss$/, ""))) {
+    throw new Error("invalid_mastodon_target");
+  }
+  return url.origin + url.pathname.replace(/\.rss$/, "") + ".rss";
+}
+
+export function normalizeKeywords(values?: string[]): string[] {
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map((value) => String(value).trim().toLocaleLowerCase())
+    .filter(Boolean)
+    .slice(0, 20)
+    .map((value) => value.slice(0, 80)))];
+}
+
+export function renderFeedTemplate(template: string, entry: { title: string; url: string }): string {
+  return template
+    .replaceAll("{title}", entry.title.slice(0, 250))
+    .replaceAll("{url}", entry.url.slice(0, 1800))
+    .replaceAll("{timestamp}", new Date().toISOString())
+    .slice(0, 2000);
 }
 
 function normalizeFeedEntries(document: Record<string, any>): { key: string; title: string; url: string }[] {
@@ -304,7 +820,7 @@ function normalizeFeedEntries(document: Record<string, any>): { key: string; tit
   });
 }
 
-async function assertSafeFeedUrl(raw: string): Promise<void> {
+export async function assertSafeFeedUrl(raw: string): Promise<void> {
   let url: URL;
   try {
     url = new URL(raw);

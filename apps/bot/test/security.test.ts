@@ -4,7 +4,8 @@ import {
   securityAuditLookbackCutoff,
   shouldTriggerSecurityIncident,
   securityIncidentCooldownUntil,
-  securityResponseThreshold
+  securityResponseThreshold,
+  securityResponsePolicy
 } from "../src/modules/security.js";
 
 test("Security burst incident is opened only at threshold and outside active window", () => {
@@ -33,4 +34,25 @@ test("Security executor audit lookback honors configured destructive window", ()
   assert.equal(securityAuditLookbackCutoff(100_000, 120), -20_000);
   assert.equal(securityAuditLookbackCutoff(100_000, 1), 95_000);
   assert.equal(securityAuditLookbackCutoff(100_000, 999), -200_000);
+});
+
+
+test("Security response policy defaults preserve quarantine and role removal", () => {
+  assert.deepEqual(securityResponsePolicy({}), {
+    raidQuarantineEnabled: true,
+    destructiveRoleRemoval: true,
+    destructiveQuarantineEnabled: true
+  });
+});
+
+test("Security response policy preserves explicit disabled actions", () => {
+  assert.deepEqual(securityResponsePolicy({
+    raidQuarantineEnabled: false,
+    destructiveRoleRemoval: false,
+    destructiveQuarantineEnabled: false
+  }), {
+    raidQuarantineEnabled: false,
+    destructiveRoleRemoval: false,
+    destructiveQuarantineEnabled: false
+  });
 });

@@ -64,3 +64,32 @@ test("Role panel same-channel DB failure restores the previous Discord message",
   assert.deepEqual(edited, ["🎭 **New**", "🎭 **Old**"]);
   assert.ok(calls.some((query) => query.startsWith("UPDATE role_panels SET title=")));
 });
+
+test("Role panel list returns stored component type", async () => {
+  const db = {
+    async query<T>(text: string) {
+      if (text.startsWith("SELECT id,guild_id,channel_id")) {
+        return {
+          rows: [{
+            id: "8",
+            guild_id: "123",
+            channel_id: "456",
+            message_id: "789",
+            title: "Select roles",
+            roles: [{ roleId: "999", label: "Blue" }],
+            selection_mode: "max",
+            max_selections: 1,
+            duration_minutes: 60,
+            component_type: "select"
+          }] as T[]
+        };
+      }
+      throw new Error("unexpected query");
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const module = new RolePanels(db);
+  const panels = await module.list("123");
+  assert.equal(panels[0]?.componentType, "select");
+  assert.equal(panels[0]?.selectionMode, "max");
+});

@@ -96,3 +96,190 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Added slash-command shape coverage for /moderate unban.
 - Added service-level regression coverage for the Discord unban action and moderation-case persistence.
 - Live banned-user/unban behavior remains part of the Discord smoke test.
+### 2026-10-03 — AFK/away snapshot
+- Added deterministic coverage for AFK reason normalization, clear keywords and Discord relative-time notice formatting.
+- AFK persistence, mention notifications and automatic return clearing are wired through the Reminders module.
+- Live Discord behavior (message-volume interaction, permission/resource edge cases and restart persistence against a live PostgreSQL instance) remains part of the release-gate suite.
+### 2026-10-03 — AutoMod rule editor snapshot
+- Dashboard CRUD now exposes the existing persistent AutoMod detector-rule contract with resource pickers for roles/channels.
+- Rule actions support delete, timeout, warn and log; warn is routed through the existing Moderation case/escalation path.
+- Deterministic coverage confirms per-rule cooldown activation boundaries.
+- Backend validation rejects unsupported actions and non-finite/out-of-range per-rule numeric values.
+- Live Discord behavior, role hierarchy and provider/resource failure paths remain release-gate validation.
+
+### 2026-10-03 — Custom Commands module snapshot
+- Custom Commands now participates in the shared module toggle contract.
+- Dashboard CRUD covers response, alias and role actions, Prefix/Slash flags and cooldowns.
+- Existing API audit events remain the durable change trail.
+- Live Discord registration/execution and role hierarchy remain release-gate validation.
+
+
+### 2026-10-03 — Custom Commands / Dashboard builder
+- Verified backend/shared-module work remains covered by existing bot typecheck/test gates.
+- Dashboard-specific builder follows existing functional-panel patterns; live browser CRUD and Discord registration remain release-gate validation.
+
+
+### 2026-10-03 — AutoResponder / keyword triggers
+- Pure matcher coverage added for exact/contains/starts-with/regex semantics and template rendering.
+- PostgreSQL migration coverage now includes autoresponder_rules.
+- Live Discord trigger delivery, permissions and role/channel scoping remain release-gate validation.
+
+- AutoResponder cache reuse is covered by deterministic bot tests; live message throughput remains a runtime validation target.
+
+### 2026-10-03 — Ticket Intake Forms
+- Migration coverage now checks the ticket form/data schema additions.
+- Ticket unit coverage verifies form-field normalization and Discord limits.
+- Live modal submission, permissions and transcript delivery remain release-gate validation.
+
+### 2026-10-03 — Utility info suite
+- Command schema coverage verifies all four utility commands.
+- Live Discord rendering/resource resolution remains release-gate validation.
+
+
+### 2026-10-04 — Function-level command permission editor
+- Dashboard now exposes all persisted command-policy scope fields: allowed/denied roles and channels, cooldown, Prefix/Slash, enabled and help visibility.
+- Backend already persists and enforces these fields through the shared command-policy guard and Management API.
+- CI remains the static/build gate; live browser edits plus real Discord permission/scope behavior remain release-gate validation.
+
+
+### 2026-10-04 — AutoMod ban action
+- Added deterministic unit coverage that the rule builder persists `ban` as a valid action.
+- Migration 67 updates the database check constraint for persisted AutoMod actions.
+- Live ban execution, role hierarchy and notification/resource behavior remain release-gate validation.
+
+
+### 2026-10-04 — Help policy defaults
+- Help command now honors persisted `enabled`, `slash_enabled` and `help_visible` overrides while using command-definition defaults for commands without a stored row.
+- Live Discord rendering remains release-gate validation.
+
+
+### 2026-10-04 — Ticket customization
+- Added unit coverage for Ticket customization normalization and a migration gate for version 68.
+- Dashboard/API contract covers panel text and create/claim/close button labels; live Discord component rendering remains release-gate validation.
+
+
+### 2026-10-04 — Automation moderation actions
+- Added regression coverage for warn/kick/ban action validation and invalid ban duration.
+- Management API validation is aligned with delay/webhook/branch actions and nested branch depth.
+
+
+### 2026-10-04 — Automation event context
+- Added regression coverage for moderation event conditions using `action` and `caseId` fields.
+- Expanded field catalog alignment between engine, Management API and Dashboard.
+
+
+### 2026-10-04 — Automation dry-run
+- Added unit coverage for matching + rendered previews and non-matching rules.
+- Dry-run remains intentionally side-effect-free; live execution is covered by existing runtime pathways and remains part of release-gate validation.
+
+
+## 2026-10-04 — Music history / skip-to gate
+- Migration 79 must create music_history and remain idempotent.
+- Unit test verifies one-based skip-to semantics and leaves the queue unchanged for invalid positions.
+- Live Discord/Lavalink gate must verify skip-to and history against a real playback session.
+
+## 2026-10-04 — Automation richer conditions/actions gate
+- Unit test must validate all new condition/action variants.
+- Dry-run must evaluate user/bot and channel-type context and render new action previews without side effects.
+- Browser release gate: Dashboard Builder can create/save the new condition/action variants.
+## 2026-10-04 — Automation workflow preset gate
+- Migration 70 must create the preset table/index.
+- Unit/API contract: preset names and workflow definitions use the same validation limits as Automation rules.
+- Integration: Config Export/Import round-trip preserves a workflow preset.
+- Dashboard: save/load/delete behavior remains a browser release-gate check.
+
+## 2026-10-04 — Automation retry/dead-letter gate
+- Migration 69 must create durable dead-letter state and retry-state indexing.
+- Unit: bounded exponential backoff and dead-letter threshold; diagnostics status mapping includes dead-lettered jobs.
+- Runtime: delayed action failures must retry with backoff and move to dead letter on the fifth failed attempt; successful delayed jobs must still complete normally.
+- Live Discord failure injection remains a release-gate validation case because retrying a partially completed action sequence has at-least-once semantics.
+
+## 2026-10-04 — Automation diagnostics gate
+- Unit: rule/event aggregation and delayed-job status mapping.
+- API contract: diagnostics endpoint returns bounded operational metadata without event/action payloads.
+- Dashboard: diagnostics section loads beside Automation rules/templates and supports refresh.
+- Release gate still requires live Discord execution checks for Automation actions and delayed-job behavior; CI does not replace that validation.
+
+
+## 2026-10-05 — Onboarding Flow Builder gate
+- Deterministic coverage: trigger validation, ordered step normalization, duplicate-role rejection and ten-step limit.
+- Database integration: migration 85 and flow persistence round-trip.
+- Verification emits `verification.passed`; Onboarding consumes it through the shared Event Bus.
+- Management API exposes GET/PUT `/api/guilds/:guildId/onboarding`; Control Center exposes the Flow Builder.
+- Live release gate remains for Discord role hierarchy, channel permissions, DM failures, lifecycle ordering and restart behavior.
+
+    
+## 2026-10-05 — Onboarding automated gate passed
+- CI `#1857`: 123 bot tests passed; bot typecheck, domain build, bot build and Dashboard production build passed.
+- Migration 85 and onboarding persistence coverage are part of the passing suite.
+- Remaining unchecked items are intentionally live Discord validation: permissions/hierarchy, DM failure handling, lifecycle timing and restart behavior.
+
+
+## 2026-10-05 — Dashboard previews / test actions verified
+- CI `#1862` passed after adding the Onboarding dry-run surface.
+- The current platform now has multiple read-only/testable Dashboard operations: Automation dry-run, Onboarding flow validation/dry-run, plus existing Welcome preview and Security hierarchy diagnostics.
+- The Onboarding dry-run checks live guild resources, role hierarchy, channel send permissions and Verification dependency without performing member changes or message delivery.
+- Remaining module-specific preview UX can be extended later without changing the shared action/API contract.
+
+
+## 2026-10-05 — Per-module activity/error history verified
+- CI `#1873` passed: bot typecheck and tests, domain/bot/dashboard builds all green.
+- Audit Log now supports bounded action-prefix queries plus target filters and a module activity helper.
+- Management API exposes `GET /api/guilds/:guildId/modules/:moduleKey/activity`.
+- Control Center shows module-scoped activity with pagination and error-like action highlighting.
+- This intentionally reuses the durable Audit Log rather than introducing another event store.
+
+
+## 2026-10-05 — Server configuration presets verified
+- CI `#1883` passed: migration, tests, typecheck and all builds.
+- Named per-guild presets persist the full existing ConfigTransfer payload and can be repeatedly applied to the same guild.
+- Dashboard provides save/apply/delete operations; no second configuration model was introduced.
+
+
+## 2026-10-05 — Configurable bot identity/profile verified
+- CI `#1889` passed: typecheck, 123 bot tests, domain build, bot build and Dashboard production build.
+- Fleet registration now accepts optional bot username plus local PNG/JPEG/GIF avatar and banner data.
+- Management API applies the profile through the current Discord ClientUser after credential reconnect; secrets remain hidden and avatar/banner files are not stored in PostgreSQL.
+- Username changes remain subject to Discord's external rate limits.
+- Live validation remains necessary for real Discord profile editing and permission/account-specific restrictions.
+
+
+## 2026-10-05 — Docker / VPS foundation verified
+- CI #1899 passed the strengthened deployment gate.
+- VPS installer now follows the current Control Center model: Discord bot credentials are registered from Bot Fleet instead of being collected by the installer.
+- Public VPS Dashboard access is protected at the Caddy edge with Basic Auth; the application and Management API remain private.
+- bash -n validation covers VPS install/upgrade scripts and deployment contract validates the VPS Compose overlay.
+- Local Windows Docker flow remains unchanged.
+- Live VPS DNS, TLS issuance, firewall policy and full clean-host deployment remain environment-dependent release-gate checks.
+
+
+## 2026-10-05 — RU/EN localization foundation verified
+- CI #1904 passed: source/deployment/observability contracts, bot typecheck/tests and all builds.
+- Added shared LocalizationService-style dictionary with ru/en normalization and guild locale lookup from existing guild_settings.locale.
+- Core Help/Embed responses and the global command error boundary now honor the configured guild locale.
+- The locale architecture is intentionally incremental: module-specific responses can migrate to the same keys without another translation framework.
+
+## 2026-10-05 — Ticket Panels automated gate
+- CI #1949 passed: typecheck, tests, domain build, bot build and Dashboard production build.
+- Migration 88 and ticket panel config round-trip coverage are included in the passing suite.
+- Remaining live validation is Discord-side panel permissions, message refresh/deletion behavior and real ticket creation from multiple panels.
+
+
+## 2026-10-05 — Custom rewards automated gate
+- CI #1955 passed: typecheck, tests, domain build, bot build and Dashboard production build.
+- Leveling reward builder uses the existing reward application path; live Discord role hierarchy and DM delivery remain environment-dependent.
+
+
+## 2026-10-05 — Community Hub automated gate
+- CI #1964 passed: typecheck, tests, domain build, bot build and Dashboard production build.
+- Live browser freshness and live Discord-backed community data remain environment-dependent validation items.
+
+
+## 2026-10-05 — Music controller permission gate
+- CI #2056 passed: typecheck, tests, domain build, bot build and Dashboard build.
+- Live validation remains for real Discord role/channel policy behavior on controller buttons.
+
+
+## 2026-10-05 — Music queue permission gate
+- CI #2063 passed: typecheck, tests, domain build, bot build and Dashboard production build.
+- Live Discord validation remains for actual role/channel policy behavior on queue mutations.

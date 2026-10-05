@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { AnalyticsPanel } from "./analytics-panel";
 import { AutomationPanel } from "./automation-panel";
+import { BotSetupPanel } from "./bot-setup-panel";
 import { BackupPanel } from "./backup-panel";
 import { FleetPanel } from "./fleet-panel";
 import { GiveawaysPanel } from "./giveaways-panel";
@@ -158,6 +159,7 @@ const NAV_GROUPS = [
 ] as const;
 
 const SYSTEM_ITEMS = [
+  ["bot-setup", "Bot Setup", "◇"],
   ["settings", "Общие настройки", "⚙"],
   ["commands", "Команды", "⌘"],
   ["fleet", "Bot Fleet", "◈"],
@@ -604,6 +606,8 @@ export function DiscordAdmin() {
                 />
               </ModuleShell>
             )}
+
+            {view === "bot-setup" && <BotSetupPanel />}
 
             {view === "settings" && (
               <GeneralSettingsPanel
@@ -1750,6 +1754,43 @@ function MusicPanel(props: {
       </section>
 
       <section style={{ ...panelStyle, padding: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10 }}>Autoplay / Radio profile</div>
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "180px 180px minmax(220px,1fr)", gap: 9, alignItems: "end" }}>
+            <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: 42, padding: "0 10px", border: "1px solid #303946", borderRadius: 9 }}>
+              <span style={labelStyle}>Autoplay</span>
+              <input type="checkbox" checked={Boolean(props.values.autoplay)} onChange={(event) => props.onChange("autoplay", event.target.checked)} />
+            </label>
+            <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: 42, padding: "0 10px", border: "1px solid #303946", borderRadius: 9 }}>
+              <span style={labelStyle}>Radio</span>
+              <input type="checkbox" checked={Boolean(props.values.radioEnabled)} onChange={(event) => props.onChange("radioEnabled", event.target.checked)} />
+            </label>
+            <label style={{ display: "grid", gap: 6 }}>
+              <span style={labelStyle}>Radio mode</span>
+              <select value={String(props.values.radioMode ?? "artist")} onChange={(event) => props.onChange("radioMode", event.target.value)} style={inputStyle}>
+                <option value="artist">Artist</option>
+                <option value="genre">Genre</option>
+                <option value="search">Search seed</option>
+              </select>
+            </label>
+          </div>
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={labelStyle}>Radio seed</span>
+            <input
+              value={String(props.values.radioSeed ?? "")}
+              onChange={(event) => props.onChange("radioSeed", event.target.value)}
+              placeholder="Например: Daft Punk / liquid drum and bass / summer night drive"
+              maxLength={200}
+              style={inputStyle}
+            />
+            <span style={{ color: "#687486", fontSize: 9 }}>
+              Для Artist можно оставить пустым: при запуске радио будет использован исполнитель текущего трека.
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <section style={{ ...panelStyle, padding: 16 }}>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(260px,1fr) 220px auto", gap: 9, alignItems: "end" }}>
           <label style={{ display: "grid", gap: 6 }}>
             <span style={labelStyle}>Песня / URL / playlist</span>
@@ -1786,10 +1827,6 @@ function MusicPanel(props: {
           </label>
           <label style={{ display: "grid", gap: 6 }}><span style={labelStyle}>Volume</span>
             <input type="number" min={0} max={200} value={volume} onChange={(event) => setVolume(event.target.value)} onBlur={() => void control("volume", { value: Number(volume) })} style={inputStyle} />
-          </label>
-          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "0 10px", border: "1px solid #303946", borderRadius: 9 }}>
-            <span style={labelStyle}>Autoplay</span>
-            <input type="checkbox" checked={Boolean(state?.autoplay)} onChange={(event) => void control("autoplay", { enabled: event.target.checked })} />
           </label>
         </div>
       </section>

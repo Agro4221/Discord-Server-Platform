@@ -1,10 +1,10 @@
 # Project State
 
 ## Target
-Self-hosted Discord Server Platform: local-first, resilient, modular, no artificial premium wall, simple UX, optional VPS deployment, optional multi-bot scaling for multiple voice channels.
+Self-hosted Discord bot platform for Discord servers: local-first, resilient, modular, no artificial premium wall, simple UX, optional VPS deployment, optional multi-bot scaling for multiple voice channels.
 
 ## Current branch
-development
+feature/music-v2
 
 ## Current phase
 Release candidate — code/CI verified, ready for live Discord validation.
@@ -15,19 +15,20 @@ Release candidate — code/CI verified, ready for live Discord validation.
 - Health/readiness endpoint and Discord connection supervision.
 - Durable audit log.
 - Local protected Management API.
-- Schema-driven Next.js Control Center with session auth, functional-area navigation, capability/function index, module toggles, Discord channel/role selectors, grouped settings forms, import/export, backup management, module actions and specialized admin panels.
+- Schema-driven Next.js Control Center with session auth, functional-area navigation, capability/function index, module toggles, Discord channel/role selectors, grouped settings forms, import/export, backup management, module actions and specialized admin panels. Custom Commands and AutoMod have dedicated CRUD editors.
 - Moderation with case history.
 - Temporary Voice with idempotency, ownership and reconciliation.
-- AutoMod, Welcome, Verification, Leveling.
+- AutoMod with persistent baseline settings plus Dashboard-managed detector rules, per-rule actions/scopes and audit logging. Per-rule cooldown windows and warning escalation are included.
 - Tickets with modal intake, staff claim, close and transcript.
 - Role Panels with role hierarchy/tamper checks and Dashboard CRUD/publishing editor.
 - Giveaways with durable entries, scheduled finishing, Dashboard history/end/reroll operations.
 - Economy with daily/pay/leaderboard, shop and transaction ledger.
-- Reminders with retry/lease semantics.
+- Reminders with retry/lease semantics, sticky messages and persistent AFK/away state.
 - Starboard.
 - Automation engine with persisted rules/cooldowns and a constrained Dashboard builder.
 - Security/Anti-Raid and destructive burst detection.
 - Notifications with HTTPS feed validation and SSRF protections.
+- Stream alerts for Twitch, YouTube, VK Видео Live and Kick with persistent schedules and templates.
 - Analytics minute buckets with Dashboard reporting.
 - Music/Lavalink foundation with persistent queue store and bot identity namespace.
 - Multi-bot identity persistence for separate-process fleet deployment, per-voice Music routing and identity-scoped background workers.
@@ -37,7 +38,7 @@ Release candidate — code/CI verified, ready for live Discord validation.
 
 ## Still under development
 - Full AutoMod rule editor and richer response policies beyond the current persisted rule set.
-- Full Security response workflow beyond the current anti-raid/quarantine/destructive-burst response.
+- Full Security response workflow beyond the current anti-raid/quarantine/destructive-burst response; core response actions are now individually configurable and persisted.
 - Full Automation condition/action catalog beyond the currently supported safe builder.
 - Music provider breadth and multi-node failover validation beyond the current Lavalink foundation.
 - Full multi-bot fleet orchestration/failover automation beyond persisted assignments and health UI.
@@ -52,8 +53,8 @@ Release candidate — code/CI verified, ready for live Discord validation.
 - Discord live E2E requires user-owned Discord test credentials and has not been run here.
 
 ## Continuity
-Read docs/WORK-LOG.md before continuing work in a new chat.
-Read docs/TEST-MATRIX.md before declaring a subsystem complete.
+**First read `docs/PROJECT-HANDOFF.md` in full.** It is the canonical cross-chat project context and records the product goal, benchmark, implemented baseline, backlog, priorities and anti-drift rules.
+Then read `docs/PROJECT-STATE.md`, recent `docs/WORK-LOG.md` entries and `docs/TEST-MATRIX.md` before declaring a subsystem complete.
 Never commit credentials, bot tokens, provider secrets or private user data.
 
 
@@ -166,3 +167,290 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Windows launcher `start-local.bat` closes automatically after a successful dashboard launch; failed startup still pauses to preserve diagnostics.
 - CI run #603 on this code state passed all stages: dependency install/audit, source/deployment/observability checks, bot typecheck/tests/build, domain build and Dashboard production build.
 - Live Windows launcher behavior (real browser open + terminal close) still requires validation on Windows; automated CI cannot validate desktop UX.
+
+
+## 2026-10-03 — Product direction: Music-first advanced backlog
+- Next product work is explicitly Music-first rather than expanding low-priority stream providers.
+- Mandatory controller UX: emoji-centric compact controls/labels, persistent player state, and a dedicated Loop One button for repeating exactly the current track.
+- Planned advanced Music capabilities include search result selection, full queue editing/history/export, granular DJ permissions, vote-skip, request fairness/anti-spam, shared playlists, save-queue, richer effects/custom EQ, improved autoplay/radio and richer lyrics UX.
+- Planned provider breadth includes Spotify, Apple Music, Deezer, Yandex Music, VK Music, Tidal, Qobuz, yt-dlp and JioSaavn in addition to the already working YouTube/SoundCloud path. Provider readiness requires real adapter/credential validation.
+- Kick stream alerts are implemented but explicitly de-prioritized; the existing Twitch/YouTube/VK stream-alert functionality remains the practical baseline.
+- See `docs/FEATURE-MATRIX.md` for the complete persistent roadmap and `docs/WORK-LOG.md` for the decision record.
+
+
+## 2026-10-03 — Product scope correction
+- Product target is a **full all-in-one Discord platform**, not a music-first bot. Music is a major subsystem alongside Administration, Moderation, AutoMod/Security, Logging, Server utilities, Roles/Onboarding, Tickets/Forms, Automation, Community/Engagement, Notifications/Integrations and Analytics.
+- Premium/mature multipurpose bot capabilities are the broad product benchmark; no artificial Premium wall is planned for the self-hosted product.
+- Music advanced work remains on the roadmap, including emoji controller controls, dedicated Loop One, queue/DJ/fairness features and broad provider support, but Music work must not displace unfinished high-value Discord platform capabilities.
+- Updated release order in docs/FEATURE-MATRIX.md to enforce platform-wide parity before the final advanced Music passes and whole-platform release validation.
+- Recent scope-correction commits: b2770f1c, d2ff12a7, cf2877e0.
+
+## 2026-10-03 — Benchmark methodology broadened
+- Premium parity is benchmarked against a **set of mature Discord bots**, not Carl-bot alone: MEE6, JuniperBot, ProBot, Dyno, Jockie Music and relevant specialized bots.
+- Functional coverage is evaluated across administration, moderation/AutoMod/security, logging, custom commands and templates, roles/onboarding, tickets/forms, automation, community/engagement, notifications/integrations, analytics and Music.
+- The benchmark also considers feature depth, configurable limits, permissions, UX, persistence, integrations and cross-module automation hooks rather than a simple checkbox list.
+- Official/current references used for this benchmark include MEE6 Support, JuniperBot Documentation, ProBot Premium, Dyno Documentation/Premium and Jockie Music FAQ/site. This is an external product benchmark; no proprietary implementation or closed code is being copied.
+
+
+## 2026-10-03 — Canonical handoff protocol
+- `docs/PROJECT-HANDOFF.md` is now the first-read continuity source for new chats.
+- It exists specifically so development can continue without repeatedly re-explaining the project's all-in-one goal, benchmark set, completed capabilities, backlog, Music requirements, priorities and accepted architectural/product decisions.
+- `docs/WORK-LOG.md` remains the chronological engineering record; `docs/PROJECT-STATE.md` remains the current-state summary; `docs/TEST-MATRIX.md` remains the validation gate reference.
+
+
+- Control Center catalog now includes a dedicated Custom Commands module entry alongside its CRUD panel.
+
+
+- AutoResponder is now a first-class module with persistent rules, scoped matching, cooldown, template rendering and dedicated Dashboard CRUD.
+
+- AutoResponder rule cache limits PostgreSQL reads to a short per-guild TTL and is invalidated on rule mutations.
+
+- Tickets now have a dedicated Dashboard Intake Form editor with persistent form fields and ticket answer storage.
+
+- Utility info suite (`serverinfo/userinfo/roleinfo/channelinfo`) is available through Prefix/Slash and the shared command policy.
+
+
+## 2026-10-04 — Function-level command permissions
+- Expanded the existing Command Policy Dashboard editor to expose the full persisted policy scope: enable/Prefix/Slash, cooldown, allowed/denied roles, allowed/denied channels and help visibility.
+- Reused the existing command_policies API and policy guard; no new permission model or migration was introduced.
+- Browser editing and live Discord authorization remain release-gate validation; CI validates TypeScript/build contracts.
+
+
+## 2026-10-04 — AutoMod ban action
+- Added `ban` as a rule action for the existing AutoMod rule builder.
+- AutoMod bans are routed through Moderation so the action receives the common Discord role-hierarchy check, audit event and moderation case persistence.
+- Migration 67 widens the persistent AutoMod action constraint to include `ban`.
+- Dashboard exposes the ban action; unit coverage verifies rule persistence. Live Discord hierarchy/ban behavior remains release-gate validation.
+
+
+## 2026-10-04 — Help policy defaults
+- `/help` now derives its built-in command list from `COMMAND_DEFINITIONS` and overlays any persisted per-guild policy.
+- Commands without a stored policy therefore retain their declared defaults, while explicit enabled/slash/help visibility overrides are respected.
+
+
+## 2026-10-04 — Ticket customization
+- Added persistent Ticket customization for panel title/description and create/claim/close button labels.
+- Configuration is normalized to Discord-safe lengths and applied consistently to the prefix quick-panel and ticket create/reopen controls.
+- Management API and Dashboard now expose the customization contract beside intake-form editing.
+- Migration 68 adds the five ticket customization columns; live Discord rendering remains release-gate validation.
+
+
+## 2026-10-04 — Automation moderation actions and API contract
+- Automation now supports warn/kick/ban through the existing Moderation service, preserving case history, hierarchy checks and audit behavior.
+- Management API validation now accepts and recursively validates the existing Dashboard delay, webhook and branch action catalog.
+- Added `@event` user references and bounded ban durations.
+
+
+## 2026-10-04 — Automation event context
+- Expanded Automation runtime context with moderation action/reason/caseId, moderator user, roleId and ticketId fields.
+- Dashboard/API condition field catalog now exposes the additional string/numeric fields.
+- Template rendering supports expanded moderation, role, ticket and giveaway variables.
+
+
+## 2026-10-04 — Automation dry-run
+- Added a side-effect-free Automation dry-run API and Dashboard test surface for current unsaved rule definitions.
+- Dry-run validates conditions/actions, simulates ALL/ANY/branch matching and renders action previews without Discord sends, role changes, moderation calls, or webhooks.
+- Supports synthetic content/channel/user/role and bounded numeric event context for reproducible testing.
+
+
+## 2026-10-04 — Automation retries and dead-letter
+- Durable delayed Automation jobs now have bounded exponential retry with a five-attempt limit and a persistent dead-letter state.
+- Delayed execution propagates action errors instead of swallowing them, while non-delayed event execution retains its existing per-action best-effort behavior.
+- Rule IDs are preserved on delayed jobs and diagnostics distinguish pending, processing, completed and dead-lettered jobs.
+
+## 2026-10-04 — Music history / skip-to
+- Queue editing, Loop One/Queue Loop, progress display, persistent recent history and skip-to are now implemented in Music v2.
+- Recent history is bounded to 200 entries per guild/bot identity and is operational telemetry, not configuration.
+
+## 2026-10-04 — Automation richer conditions/actions
+- Automation conditions now cover role absence, bot identity, channel type and Discord permission checks.
+- Actions now include managed nickname updates and message reactions, with dry-run previews and Dashboard controls.
+- Runtime uses live GuildMember/permissions data when a dry-run context is not provided.
+## 2026-10-04 — Automation workflow presets
+- Automation now supports reusable per-guild workflow presets alongside text templates.
+- Presets persist full workflow definitions and can be saved, loaded into the Dashboard Builder, deleted and transferred through Config Export/Import.
+- Preset persistence reuses the existing Automation validation and audit contracts; no second workflow engine was introduced.
+
+## 2026-10-04 — Automation diagnostics
+- Automation now has an operational diagnostics surface backed by the existing delayed-job queue and rule/template state.
+- Management API: GET /api/guilds/:guildId/automation/diagnostics.
+- Dashboard shows rules/templates, delayed pending/processing/error/completed-24h counts, oldest pending job and recent job attempts/errors.
+- Diagnostics deliberately omit event payloads and action bodies; runtime execution remains unchanged.
+- Regression coverage was added for aggregation/status mapping.
+
+
+### 2026-10-04 — Welcome/goodbye image customization
+- Extended the existing Welcome module with optional HTTPS embed images for welcome and goodbye messages.
+- The same settings are available through Dashboard generic module settings and `/welcome setup`; configuration transfer preserves them.
+- URL normalization rejects malformed, non-HTTPS and oversized values; empty values disable the image.
+- Added migration 80 and regression tests; live Discord embed rendering remains part of the live release gate.
+
+
+### 2026-10-04 — Welcome preview + Verification panel customization
+- Added a Dashboard action for sending a clearly labeled Welcome preview to the configured channel; it exercises the same message/embed rendering path while using a fake preview identity.
+- Verification panel presentation is now persistent/configurable: title, description, issue-code button and confirmation button labels.
+- Both additions reuse the existing generic settings/action/audit architecture; no second configuration model was introduced.
+\n\n### 2026-10-04 — Universal Forms module
+- The bot now has a reusable Forms module separate from Tickets.
+- Form definitions and submissions are durable in PostgreSQL; Dashboard and Discord share the same runtime contract.
+- Form panels use a Discord button to open a Modal; answers are validated server-side, persisted and optionally forwarded to a response channel.
+- The module is included in the catalog, shared config domain, command-policy definitions, Management API and Dashboard routes.
+
+
+### 2026-10-04 — Role Panels select-menu expansion
+- Self-service role panels now support Discord select menus in addition to the original buttons.
+- Component type, selection mode, max selections and timed assignments share the same durable role-panel model and Dashboard editor.
+- The feature remains backward-compatible: existing panels use buttons by default.
+
+
+## 2026-10-04 — Local bot registration architecture
+- Control Center is intentionally a local self-hosted admin surface without end-user login.
+- Discord bot registration is now part of Fleet rather than a separate auth/account system.
+- Stored bot tokens are encrypted at rest; Dashboard reads only `tokenConfigured`, never the secret value.
+- The bot process may start in a database/Control Center-only state and can connect after credentials are registered.
+- Existing environment credentials are retained for backward compatibility and initial bootstrap.
+
+
+## 2026-10-05 — Onboarding Flow Builder
+- Onboarding is implemented as a first-class server module on `feature/music-v2`.
+- Welcome, Verification and Role Panels retain their existing responsibilities; Onboarding only orchestrates additional ordered actions.
+- Supported triggers: `member.join`, `verification.passed`.
+- Supported steps: role, channel message, DM; max 10.
+- Control Center has the Flow Builder; Management API exposes GET/PUT.
+- Config export/import carries `onboarding_flows`.
+- Source checkpoint: `f772b0503f3f5e5b9f9abb5f30625bacf5801068`; live Discord behavior is still release-gate validation.
+
+    
+## 2026-10-05 — Onboarding Flow Builder verified
+- Final source HEAD: `de06195a8d70c18a01536231f3b587008f1309ba`.
+- CI `#1857` is green: 123/123 bot tests passed; typecheck, domain build, bot build and Dashboard production build passed.
+- Onboarding Flow Builder is complete for the automated gate; live Discord behavior remains an environment-dependent release-gate item.
+
+
+## 2026-10-05 — Dashboard previews / test actions verified
+- Current HEAD before documentation close: `35660b0f5291104c4d66bc80463dfa768f2f2174`.
+- CI #1862 passed.
+- Dashboard now includes a true side-effect-free Onboarding dry-run in addition to existing Welcome preview, Automation dry-run and Security hierarchy diagnostics.
+
+
+## 2026-10-05 — Per-module activity/error history verified
+- Code checkpoint: `2bdd9e7f092da349b8caed846459dc95fb9ffdd7`.
+- CI #1873 passed completely.
+- The next unfinished high-priority Administration item is reusable server configuration presets.
+
+
+## 2026-10-05 — Administration foundation completion pass
+- Reusable server configuration presets: implemented and CI-verified (#1883).
+- Configurable bot identity/profile: implemented and CI-verified (#1889), using the existing Fleet registration path.
+- Administration backlog now moves to deployment foundation: Docker/VPS.
+
+
+## 2026-10-05 — Docker / VPS foundation verified
+- Final deployment source checkpoint: f466eddb5749c0044c7f1b9fce68b7dd4f9b412c.
+- CI #1899 passed.
+- Administration foundation is now followed by localization work; live VPS clean-host deployment is still a release-gate task.
+
+
+## 2026-10-05 — RU/EN localization verified
+- Source checkpoint: d871b56f36a91d15c07038ebf3122956d8d4e66a.
+- CI #1904 passed.
+- Localization foundation is complete; remaining work is incremental migration of module-specific Discord copy.
+
+
+## 2026-10-05 — Per-guild integration credentials verified
+- Final automated gate for the credential slice: CI #1917 completed successfully with typecheck, tests and builds green.
+- Multiple encrypted credentials per guild are now implemented; integration diagnostics remains the next unfinished item in Notifications / Integrations.
+
+
+## 2026-10-05 — Integration diagnostics verified
+- Final checkpoint: `22f8e4856ef83120a5ebd2f678b826cad712c869`.
+- CI #1923 is green.
+- Notifications/Integrations now has encrypted per-guild credentials plus a safe credential diagnostics surface.
+- Next high-value slice: configurable Analytics counters.
+
+
+## 2026-10-05 — Analytics configuration verified
+- Source checkpoint: `efd8eeef4505e5cf2d21d50c79e792ba83eb4637`.
+- CI #1926 passed completely.
+- Configurable visible counters and retention are now implemented across Dashboard and Discord analytics reporting.
+- Next single backlog slice: **Tickets / linked-related panels**.
+
+## 2026-10-05 — Ticket Panels verified
+- Source checkpoint: `879b684c418fda2d2e2ceaebd38852e9341feaa0`.
+- CI #1949 is green.
+- Tickets now supports multiple persistent entry panels with per-panel channel/appearance and ticket source tracking.
+- Next high-value slice: **Custom member rewards / milestones**.
+
+
+## 2026-10-05 — Leveling rewards verified
+- Source checkpoint: `856e11e84539ed8c66a899bc792e9dc8bf45b832`.
+- CI #1955 is green.
+- Custom member rewards / milestones are now surfaced in Control Center on top of the existing Leveling reward runtime.
+- Next high-value slice: **Community social widgets / engagement depth**.
+
+
+## 2026-10-05 — Community Hub verified
+- Source checkpoint: `2c1502e441097c40bbde9d431d1059b8d5a1855a`.
+- CI #1964 is green.
+- Social/community engagement widgets are now implemented in Control Center using existing community modules.
+- Next high-value slice: **Additional social feeds**.
+
+
+## 2026-10-05 — Matrix reconciliation
+- Per-guild provider credentials and Additional social feeds are now marked complete in the Feature Matrix.
+- Remaining yellow items are predominantly advanced Music functionality.
+
+
+## 2026-10-05 — Music Filters verified
+- Source checkpoint: 6952f255a82af69702fe11e2ce11535052776192.
+- CI #1990 is green.
+- Filters / FX quick-access is complete and CI-verified.
+- Next high-value slice: Save queue button.
+
+
+## 2026-10-05 — Music Save Queue verified
+- Source checkpoint: 6f2d6b57ec49336eb96a6ba24975476e4bc413f3.
+- CI #1997 is green.
+- Save Queue and Save current queue as playlist are implemented on top of existing playlist persistence.
+- Next high-value slice: Load playlist with optional shuffle.
+
+
+## 2026-10-05 — Playlist shuffle verified
+- Source checkpoint: 7ff06bf24613e8efc9d24fd95bcd214138c24e79.
+- CI #2004 is green.
+- Load playlist with optional shuffle is complete.
+- Next high-value Music slice: Vote skip.
+
+
+## 2026-10-05 — Music Vote Skip verified
+- Source checkpoint: a87bc7803d200b371332b136e7bfe732b03bbdfe.
+- CI #2012 is green.
+- Vote Skip is complete and CI-verified.
+- Next high-value slice: Per-user request cooldown.
+
+
+## 2026-10-05 — Request cooldown verified
+- Source checkpoint: 04cb2828e9b112ec1212c09972582992b1dd9d4f.
+- CI #2020 is green.
+- Per-user request cooldown is complete and CI-verified.
+- Next high-value slice: Per-user queued-track limit.
+
+
+## 2026-10-05 — Per-user queue limit verified
+- Source checkpoint: c18f1de1a0a404531f1686e363cfa060c6232293.
+- CI #2034 is green.
+- Per-user pending queue limit is complete and CI-verified.
+- Next high-value slice: Max guild queue size.
+
+
+## 2026-10-05 — Music controller permissions verified
+- Source checkpoint: `af87eaa40211d33f2b49879c3ee210c9f6b266ac`.
+- CI #2056 is green.
+- Controller permission parity and Autoplay quick toggle are complete; Max guild queue size is confirmed implemented.
+- Next high-value slice: **separate queue add/remove/move permissions**.
+
+
+## 2026-10-05 — Music queue permissions verified
+- Source checkpoint: `cb859ef8abd6f44c8e34510f4c2db6ebcf77f512`.
+- CI #2063 is green.
+- Queue add/remove/move permissions are now configurable through shared Command Policy with backwards-compatible fallback behavior.

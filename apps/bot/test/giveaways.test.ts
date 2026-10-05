@@ -14,6 +14,7 @@ test("giveaway participation buttons are wired to the platform interaction bus",
       if (sql.startsWith("SELECT enabled FROM guild_modules")) {
         return { rows: [{ enabled: true }] };
       }
+      if (sql.startsWith("SELECT requirements FROM giveaways")) return { rows: [{ requirements: {} }] };
       if (sql.startsWith("INSERT INTO giveaway_entries")) {
         return { rows: [{ giveaway_id: "42" }] };
       }
@@ -58,6 +59,7 @@ test("giveaway participation is rejected atomically after the giveaway stops run
       if (sql.startsWith("SELECT enabled FROM guild_modules")) {
         return { rows: [{ enabled: true }] };
       }
+      if (sql.startsWith("SELECT requirements FROM giveaways")) return { rows: [{ requirements: {} }] };
       if (sql.startsWith("INSERT INTO giveaway_entries")) {
         return { rows: [] };
       }

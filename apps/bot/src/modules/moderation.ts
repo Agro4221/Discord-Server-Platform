@@ -31,6 +31,7 @@ export class Moderation implements PlatformModule {
   private client?: ModuleContext["client"];
   private identityId = "primary";
   private expiryTimer?: NodeJS.Timeout;
+  private cleanupTimer?: NodeJS.Timeout;
 
   constructor(private readonly db: Database) {}
 
@@ -41,14 +42,20 @@ export class Moderation implements PlatformModule {
     this.identityId = context.identityId;
 
     this.expiryTimer = setInterval(() => {
-      void this.processExpiredBans();
+      void this.processExpiredTimedPunishments();
     }, 30_000);
     this.expiryTimer.unref();
+    this.cleanupTimer = setInterval(() => {
+      void this.processScheduledCleanup();
+    }, 60_000);
+    this.cleanupTimer.unref();
   }
 
   async shutdown(): Promise<void> {
     if (this.expiryTimer) clearInterval(this.expiryTimer);
     this.expiryTimer = undefined;
+    if (this.cleanupTimer) clearInterval(this.cleanupTimer);
+    this.cleanupTimer = undefined;
     this.events = undefined;
     this.auditLog = undefined;
     this.client = undefined;
@@ -75,7 +82,9 @@ export class Moderation implements PlatformModule {
         guildId,
         userId: targetUserId,
         action,
-        caseId
+        caseId,
+        moderatorUserId,
+        reason: reason ?? undefined
       });
     }
     return caseId;
@@ -113,6 +122,51 @@ export class Moderation implements PlatformModule {
     }));
   }
 
+  async addNote(guildId: string, targetUserId: string, moderatorUserId: string, note: string): Promise<number> {
+    const clean = note.trim().slice(0, 1000);
+    if (!clean) throw new Error("moderation_note_empty");
+    const result = await this.db.query<{ id: string }>(
+      "INSERT INTO moderation_notes(guild_id,target_user_id,moderator_user_id,note) VALUES($1,$2,$3,$4) RETURNING id",
+      [guildId,targetUserId,moderatorUserId,clean]
+    );
+    const noteId = Number(result.rows[0]?.id ?? 0);
+    if (noteId > 0) {
+      await this.audit("moderation.note.added", guildId, moderatorUserId, targetUserId, { noteId });
+    }
+    return noteId;
+  }
+
+  async notes(guildId: string, targetUserId: string, limit = 10): Promise<Array<{
+    id: number;
+    targetUserId: string;
+    moderatorUserId: string;
+    note: string;
+    createdAt: Date;
+  }>> {
+    const safeLimit = Math.min(Math.max(limit, 1), 50);
+    const result = await this.db.query<{
+      id: string;
+      target_user_id: string;
+      moderator_user_id: string;
+      note: string;
+      created_at: Date;
+    }>(
+      `SELECT id,target_user_id,moderator_user_id,note,created_at
+       FROM moderation_notes
+       WHERE guild_id=$1 AND target_user_id=$2
+       ORDER BY created_at DESC
+       LIMIT $3`,
+      [guildId,targetUserId,safeLimit]
+    );
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      targetUserId: row.target_user_id,
+      moderatorUserId: row.moderator_user_id,
+      note: row.note,
+      createdAt: row.created_at
+    }));
+  }
+
   private async enabled(guildId: string): Promise<boolean> {
     const result = await this.db.query<{ enabled: boolean }>(
       "SELECT enabled FROM guild_modules WHERE guild_id=$1 AND module_key='moderation'",
@@ -126,7 +180,8 @@ export class Moderation implements PlatformModule {
     targetUserId: string,
     action: ModerationAction,
     reason: string,
-    durationMinutes?: number
+    durationMinutes?: number,
+    actorUserId = "dashboard"
   ): Promise<{ caseId: number | null; action: ModerationAction; targetUserId: string }> {
     if (!await this.enabled(guildId)) throw new Error("moderation_disabled");
 
@@ -140,14 +195,14 @@ export class Moderation implements PlatformModule {
       : await guild.members.fetch(targetUserId).catch(() => null);
 
     if (action === "warn") {
-      await this.applyWarn(guildId, "dashboard", targetUser, reason || "Без причины");
+      await this.applyWarn(guildId, actorUserId, targetUser, reason || "Без причины");
       return { caseId: await this.latestCaseId(guildId, targetUserId, "warn"), action, targetUserId };
     }
 
     if (action === "unban") {
       await guild.members.unban(targetUserId, reason || "Без причины");
-      const caseId = await this.recordBestEffort(guildId, targetUserId, "dashboard", "unban", reason || "Без причины");
-      await this.audit("moderation.unban.applied", guildId, "dashboard", targetUserId, { reason: reason || "Без причины" });
+      const caseId = await this.recordBestEffort(guildId, targetUserId, actorUserId, "unban", reason || "Без причины");
+      await this.audit("moderation.unban.applied", guildId, actorUserId, targetUserId, { reason: reason || "Без причины" });
       return { caseId, action, targetUserId };
     }
 
@@ -156,8 +211,8 @@ export class Moderation implements PlatformModule {
     if (action === "kick") {
       if (!member.kickable) throw new Error("member_not_kickable");
       await member.kick(reason || "Без причины");
-      await this.audit("moderation.kick.applied", guildId, "dashboard", targetUserId, { reason: reason || "Без причины" });
-      const caseId = await this.recordBestEffort(guildId, targetUserId, "dashboard", "kick", reason || "Без причины");
+      await this.audit("moderation.kick.applied", guildId, actorUserId, targetUserId, { reason: reason || "Без причины" });
+      const caseId = await this.recordBestEffort(guildId, targetUserId, actorUserId, "kick", reason || "Без причины");
       return { caseId, action, targetUserId };
     }
 
@@ -166,8 +221,8 @@ export class Moderation implements PlatformModule {
       if (!durationMinutes || durationMinutes < 1 || durationMinutes > 40320) throw new Error("invalid_timeout_duration");
       const expiresAt = new Date(Date.now() + durationMinutes * 60_000);
       await member.timeout(durationMinutes * 60_000, reason || "Без причины");
-      await this.audit("moderation.timeout.applied", guildId, "dashboard", targetUserId, { durationMinutes, reason: reason || "Без причины" });
-      const caseId = await this.recordBestEffort(guildId, targetUserId, "dashboard", "timeout", reason || "Без причины", expiresAt);
+      await this.audit("moderation.timeout.applied", guildId, actorUserId, targetUserId, { durationMinutes, reason: reason || "Без причины" });
+      const caseId = await this.recordBestEffort(guildId, targetUserId, actorUserId, "timeout", reason || "Без причины", expiresAt);
       return { caseId, action, targetUserId };
     }
 
@@ -179,11 +234,11 @@ export class Moderation implements PlatformModule {
       throw new Error("invalid_ban_duration");
     }
     await member.ban({ reason: reason || "Без причины" });
-    await this.audit("moderation.ban.applied", guildId, "dashboard", targetUserId, {
+    await this.audit("moderation.ban.applied", guildId, actorUserId, targetUserId, {
       reason: reason || "Без причины",
       ...(expiresAt ? { durationMinutes } : {})
     });
-    const caseId = await this.recordBestEffort(guildId, targetUserId, "dashboard", "ban", reason || "Без причины", expiresAt);
+    const caseId = await this.recordBestEffort(guildId, targetUserId, actorUserId, "ban", reason || "Без причины", expiresAt);
     return { caseId, action, targetUserId };
   }
 
@@ -195,6 +250,104 @@ export class Moderation implements PlatformModule {
     return result.rows[0] ? Number(result.rows[0].id) : null;
   }
 
+  async lockdownStatus(guildId: string): Promise<{ active: boolean; lockedChannels: number }> {
+    const result = await this.db.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM moderation_channel_locks WHERE guild_id=$1",
+      [guildId]
+    );
+    const lockedChannels = Number(result.rows[0]?.count ?? 0);
+    return { active: lockedChannels > 0, lockedChannels };
+  }
+
+  async applyLockdown(guildId: string, actorUserId: string): Promise<{ locked: number; failed: number }> {
+    if (!await this.enabled(guildId)) throw new Error("moderation_disabled");
+    const guild = this.client?.guilds.cache.get(guildId);
+    if (!guild) throw new Error("guild_not_found");
+    let locked = 0;
+    let failed = 0;
+    for (const channel of guild.channels.cache.values()) {
+      if (!channel.isTextBased() || !("permissionOverwrites" in channel)) continue;
+      try {
+        const everyone = guild.roles.everyone;
+        const current = channel.permissionsFor(everyone)?.has(PermissionFlagsBits.SendMessages) ?? null;
+        await this.db.query("INSERT INTO moderation_channel_locks(guild_id,channel_id,previous_send_messages) VALUES($1,$2,$3) ON CONFLICT(guild_id,channel_id) DO NOTHING",[guildId,channel.id,current]);
+        await channel.permissionOverwrites.edit(everyone,{ SendMessages: false },{ reason: "Vexa lockdown" });
+        locked += 1;
+      } catch (error) {
+        failed += 1;
+        logger.warn("Moderation lockdown channel failed",{guildId,channelId:channel.id,error:String(error)});
+      }
+    }
+    await this.audit("moderation.lockdown.applied",guildId,actorUserId,guildId,{locked,failed,preset:"all-text"});
+    return { locked, failed };
+  }
+
+  async releaseLockdown(guildId: string, actorUserId: string): Promise<{ restored: number; failed: number }> {
+    const guild = this.client?.guilds.cache.get(guildId);
+    if (!guild) throw new Error("guild_not_found");
+    const rows = await this.db.query<{ channel_id: string; previous_send_messages: boolean | null }>("SELECT channel_id,previous_send_messages FROM moderation_channel_locks WHERE guild_id=$1",[guildId]);
+    let restored = 0;
+    let failed = 0;
+    for (const row of rows.rows) {
+      const channel = guild.channels.cache.get(row.channel_id);
+      if (!channel || !("permissionOverwrites" in channel)) {
+        await this.db.query("DELETE FROM moderation_channel_locks WHERE guild_id=$1 AND channel_id=$2",[guildId,row.channel_id]);
+        continue;
+      }
+      try {
+        const everyone = guild.roles.everyone;
+        await channel.permissionOverwrites.edit(everyone,{ SendMessages: row.previous_send_messages },{ reason: "Vexa lockdown release" });
+        await this.db.query("DELETE FROM moderation_channel_locks WHERE guild_id=$1 AND channel_id=$2",[guildId,row.channel_id]);
+        restored += 1;
+      } catch (error) {
+        failed += 1;
+        logger.warn("Moderation lockdown release channel failed",{guildId,channelId:row.channel_id,error:String(error)});
+      }
+    }
+    await this.audit("moderation.lockdown.released",guildId,actorUserId,guildId,{restored,failed,preset:"all-text"});
+    return { restored, failed };
+  }
+  async listCleanupRules(guildId: string): Promise<Array<{
+    id: number;
+    channelId: string;
+    intervalSeconds: number;
+    maxMessages: number;
+    enabled: boolean;
+    lastRunAt: string | null;
+  }>> {
+    const result = await this.db.query<{
+      id: string;
+      channel_id: string;
+      interval_seconds: number;
+      max_messages: number;
+      enabled: boolean;
+      last_run_at: string | null;
+    }>("SELECT id,channel_id,interval_seconds,max_messages,enabled,last_run_at FROM moderation_cleanup_rules WHERE guild_id=$1 ORDER BY id DESC",[guildId]);
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      channelId: row.channel_id,
+      intervalSeconds: row.interval_seconds,
+      maxMessages: row.max_messages,
+      enabled: row.enabled,
+      lastRunAt: row.last_run_at
+    }));
+  }
+
+  async saveCleanupRule(guildId: string, channelId: string, intervalSeconds: number, maxMessages: number, enabled = true): Promise<void> {
+    if (!/^\d{17,20}$/.test(channelId)) throw new Error("invalid_cleanup_channel");
+    if (!Number.isInteger(intervalSeconds) || intervalSeconds < 60 || intervalSeconds > 604800) throw new Error("invalid_cleanup_interval");
+    if (!Number.isInteger(maxMessages) || maxMessages < 1 || maxMessages > 100) throw new Error("invalid_cleanup_amount");
+    if (!await this.enabled(guildId)) throw new Error("moderation_disabled");
+    const guild = this.client?.guilds.cache.get(guildId);
+    const channel = guild?.channels.cache.get(channelId);
+    if (!channel || !channel.isTextBased() || !("bulkDelete" in channel)) throw new Error("invalid_cleanup_channel");
+    await this.db.query("INSERT INTO moderation_cleanup_rules(guild_id,channel_id,interval_seconds,max_messages,enabled) VALUES($1,$2,$3,$4,$5) ON CONFLICT(guild_id,channel_id) DO UPDATE SET interval_seconds=EXCLUDED.interval_seconds,max_messages=EXCLUDED.max_messages,enabled=EXCLUDED.enabled,updated_at=now()",[guildId,channelId,intervalSeconds,maxMessages,enabled]);
+  }
+
+  async deleteCleanupRule(guildId: string, id: number): Promise<boolean> {
+    const result = await this.db.query("DELETE FROM moderation_cleanup_rules WHERE id=$1 AND guild_id=$2",[id,guildId]);
+    return result.rowCount === 1;
+  }
   async purge(interaction: ChatInputCommandInteraction, amount: number): Promise<void> {
     if (!interaction.guild || !interaction.channel || !("bulkDelete" in interaction.channel)) {
       await interaction.reply({ content: "Эта команда доступна только в текстовом канале.", ephemeral: true });
@@ -210,7 +363,7 @@ export class Moderation implements PlatformModule {
     }
 
     const result = await interaction.channel.bulkDelete(amount, true);
-    await this.audit("moderation.purge", interaction.guild.id, interaction.user.id, interaction.channelId, { requested: amount, deleted: result.size });
+    await this.audit("moderation.purge", interaction.guild.id, interaction.user.id, interaction.channelId, { requested: amount, deleted: result.size }, "channel");
     await interaction.reply({ content: `🧹 Удалено сообщений: **${result.size}**.`, ephemeral: true });
   }
 
@@ -229,7 +382,7 @@ export class Moderation implements PlatformModule {
     }
 
     await interaction.channel.setRateLimitPerUser(seconds, "Configured by Vexa");
-    await this.audit("moderation.slowmode", interaction.guild.id, interaction.user.id, interaction.channelId, { seconds });
+    await this.audit("moderation.slowmode", interaction.guild.id, interaction.user.id, interaction.channelId, { seconds }, "channel");
     await interaction.reply({ content: seconds === 0 ? "🐢 Slowmode отключён." : `🐢 Slowmode: **${seconds} сек.**`, ephemeral: true });
   }
 
@@ -251,7 +404,7 @@ export class Moderation implements PlatformModule {
       [interaction.guild.id,channel.id,current]
     );
     await channel.permissionOverwrites.edit(everyone,{ SendMessages: false },{ reason: "Vexa channel lock" });
-    await this.audit("moderation.channel.lock", interaction.guild.id, interaction.user.id, channel.id, {});
+    await this.audit("moderation.channel.lock", interaction.guild.id, interaction.user.id, channel.id, {}, "channel");
     await interaction.reply({ content: "🔒 Канал заблокирован для @everyone.", ephemeral: true });
   }
 
@@ -277,7 +430,7 @@ export class Moderation implements PlatformModule {
       { reason: "Vexa channel unlock" }
     );
     await this.db.query("DELETE FROM moderation_channel_locks WHERE guild_id=$1 AND channel_id=$2",[interaction.guild.id,channel.id]);
-    await this.audit("moderation.channel.unlock", interaction.guild.id, interaction.user.id, channel.id, {});
+    await this.audit("moderation.channel.unlock", interaction.guild.id, interaction.user.id, channel.id, {}, "channel");
     await interaction.reply({ content: "🔓 Канал разблокирован.", ephemeral: true });
   }
 
@@ -292,7 +445,7 @@ export class Moderation implements PlatformModule {
       return;
     }
     const result = await message.channel.bulkDelete(Math.min(100,amount + 1), true);
-    await this.audit("moderation.purge", message.guild.id, message.author.id, message.channelId, { requested: amount, deleted: result.size });
+    await this.audit("moderation.purge", message.guild.id, message.author.id, message.channelId, { requested: amount, deleted: result.size }, "channel");
   }
 
   async slowmodeFromMessage(message: Message, seconds: number): Promise<void> {
@@ -306,7 +459,7 @@ export class Moderation implements PlatformModule {
       return;
     }
     await message.channel.setRateLimitPerUser(seconds,"Configured by Vexa");
-    await this.audit("moderation.slowmode", message.guild.id, message.author.id, message.channelId, { seconds });
+    await this.audit("moderation.slowmode", message.guild.id, message.author.id, message.channelId, { seconds }, "channel");
     await message.reply(seconds === 0 ? "🐢 Slowmode отключён." : `🐢 Slowmode: ${seconds} сек.`);
   }
 
@@ -323,7 +476,7 @@ export class Moderation implements PlatformModule {
       [message.guild.id,message.channelId,current]
     );
     await message.channel.permissionOverwrites.edit(everyone,{ SendMessages: false },{ reason: "Vexa channel lock" });
-    await this.audit("moderation.channel.lock",message.guild.id,message.author.id,message.channelId,{});
+    await this.audit("moderation.channel.lock",message.guild.id,message.author.id,message.channelId,{},"channel");
     await message.reply("🔒 Канал заблокирован для @everyone.");
   }
 
@@ -340,7 +493,7 @@ export class Moderation implements PlatformModule {
     const previous = stored.rows[0]?.previous_send_messages ?? null;
     await message.channel.permissionOverwrites.edit(message.guild.roles.everyone,{ SendMessages: previous },{ reason: "Vexa channel unlock" });
     await this.db.query("DELETE FROM moderation_channel_locks WHERE guild_id=$1 AND channel_id=$2",[message.guild.id,message.channelId]);
-    await this.audit("moderation.channel.unlock",message.guild.id,message.author.id,message.channelId,{});
+    await this.audit("moderation.channel.unlock",message.guild.id,message.author.id,message.channelId,{},"channel");
     await message.reply("🔓 Канал разблокирован.");
   }
 
@@ -365,7 +518,8 @@ export class Moderation implements PlatformModule {
     interaction: ChatInputCommandInteraction,
     member: GuildMember,
     durationMinutes: number,
-    reason: string
+    reason: string,
+    enabled = true
   ): Promise<void> {
     if (!interaction.guild || !await this.enabled(interaction.guild.id)) {
       await interaction.reply({ content: "Модуль Moderation выключен для этого сервера.", ephemeral: true });
@@ -592,10 +746,173 @@ export class Moderation implements PlatformModule {
     await message.reply(`✅ Пользователь <@${userId}> разблокирован.`);
   }
 
+  async applyAutomodBan(guildId: string, targetUserId: string, reason: string): Promise<boolean> {
+    const guild = this.client?.guilds.cache.get(guildId);
+    if (!guild) return false;
+    const member = await guild.members.fetch(targetUserId).catch(() => null);
+    if (!member?.bannable) return false;
+
+    await member.ban({ reason });
+    await this.audit("moderation.ban.applied", guildId, "automod", targetUserId, {
+      reason,
+      source: "automod"
+    });
+    await this.recordBestEffort(guildId, targetUserId, "automod", "ban", reason);
+    return true;
+  }
+
+  async applyAutomodWarn(guildId: string, target: User, reason: string): Promise<void> {
+    await this.applyWarn(guildId, "automod", target, reason);
+  }
+
   private async applyWarn(guildId: string, moderatorUserId: string, target: User, reason: string): Promise<void> {
-    await this.audit("moderation.warn.attempted", guildId, moderatorUserId, target.id, { reason });
-    await this.recordBestEffort(guildId, target.id, moderatorUserId, "warn", reason);
+    const caseId = await this.recordBestEffort(guildId, target.id, moderatorUserId, "warn", reason);
+    if (caseId) {
+      await this.audit("moderation.warn.applied", guildId, moderatorUserId, target.id, { reason, caseId });
+    } else {
+      await this.audit("moderation.warn.case_persistence_failed", guildId, moderatorUserId, target.id, { reason });
+    }
     await this.safeDm(target, `На сервере тебе выдано предупреждение. Причина: ${reason}`);
+    if (caseId) await this.applyEscalationIfNeeded(guildId, target.id, caseId);
+  }
+
+  private async applyEscalationIfNeeded(guildId: string, targetUserId: string, warnCaseId: number): Promise<void> {
+    try {
+      const countResult = await this.db.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM moderation_cases WHERE guild_id=$1 AND target_user_id=$2 AND action='warn'",
+        [guildId, targetUserId]
+      );
+      const warnCount = Number(countResult.rows[0]?.count ?? 0);
+      if (!Number.isInteger(warnCount) || warnCount < 1) return;
+
+      const ruleResult = await this.db.query<{
+        warn_count: number;
+        action: "timeout" | "ban";
+        duration_minutes: number;
+        reason: string;
+      }>(
+        "SELECT warn_count,action,duration_minutes,reason FROM moderation_escalations WHERE guild_id=$1 AND warn_count=$2 AND enabled=true",
+        [guildId, warnCount]
+      );
+      const rule = ruleResult.rows[0];
+      if (!rule) return;
+
+      const guild = this.client?.guilds.cache.get(guildId);
+      if (!guild) return;
+
+      if (rule.action === "timeout") {
+        const member = await guild.members.fetch(targetUserId).catch(() => null);
+        if (!member?.moderatable || rule.duration_minutes < 1) return;
+        const expiresAt = new Date(Date.now() + rule.duration_minutes * 60_000);
+        await member.timeout(rule.duration_minutes * 60_000, rule.reason);
+        const caseId = await this.recordBestEffort(
+          guildId,
+          targetUserId,
+          "system",
+          "timeout",
+          rule.reason,
+          expiresAt
+        );
+        await this.audit("moderation.escalation.timeout", guildId, "system", targetUserId, {
+          warnCount,
+          warnCaseId,
+          durationMinutes: rule.duration_minutes,
+          escalationCaseId: caseId
+        });
+        const targetUser = await this.client?.users.fetch(targetUserId).catch(() => null);
+        if (targetUser) await this.safeDm(targetUser, `Автоматическая эскалация после ${warnCount} предупреждений: timeout на ${rule.duration_minutes} мин. Причина: ${rule.reason}`);
+        return;
+      }
+
+      const member = await guild.members.fetch(targetUserId).catch(() => null);
+      if (member && !member.bannable) return;
+      const durationMinutes = rule.duration_minutes > 0 ? rule.duration_minutes : undefined;
+      const expiresAt = durationMinutes ? new Date(Date.now() + durationMinutes * 60_000) : null;
+      if (member) {
+        await member.ban({ reason: rule.reason });
+      } else {
+        await guild.members.ban(targetUserId, { reason: rule.reason });
+      }
+      const caseId = await this.recordBestEffort(
+        guildId,
+        targetUserId,
+        "system",
+        "ban",
+        rule.reason,
+        expiresAt
+      );
+      await this.audit("moderation.escalation.ban", guildId, "system", targetUserId, {
+        warnCount,
+        warnCaseId,
+        durationMinutes: durationMinutes ?? null,
+        escalationCaseId: caseId
+      });
+      const targetUser = await this.client?.users.fetch(targetUserId).catch(() => null);
+      if (targetUser) await this.safeDm(targetUser, `Автоматическая эскалация после ${warnCount} предупреждений: бан. Причина: ${rule.reason}`);
+    } catch (error) {
+      logger.warn("Moderation escalation failed", { guildId, targetUserId, warnCaseId, error: String(error) });
+    }
+  }
+
+  async setEscalation(
+    guildId: string,
+    warnCount: number,
+    action: "timeout" | "ban",
+    durationMinutes: number,
+    reason: string,
+    enabled = true
+  ): Promise<void> {
+    if (!Number.isInteger(warnCount) || warnCount < 1 || warnCount > 100) throw new Error("invalid_escalation_warn_count");
+    if (action === "timeout" && (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 40320)) {
+      throw new Error("invalid_escalation_duration");
+    }
+    if (action === "ban" && (!Number.isInteger(durationMinutes) || durationMinutes < 0 || durationMinutes > 40320)) {
+      throw new Error("invalid_escalation_duration");
+    }
+    const cleanReason = reason.trim().slice(0, 500);
+    if (!cleanReason) throw new Error("invalid_escalation_reason");
+
+    await this.db.query(
+      `INSERT INTO moderation_escalations(guild_id,warn_count,action,duration_minutes,reason,enabled)
+       VALUES($1,$2,$3,$4,$5,$6)
+       ON CONFLICT(guild_id,warn_count)
+       DO UPDATE SET action=EXCLUDED.action,duration_minutes=EXCLUDED.duration_minutes,reason=EXCLUDED.reason,enabled=EXCLUDED.enabled,updated_at=now()`,
+      [guildId,warnCount,action,durationMinutes,cleanReason,enabled]
+    );
+  }
+
+  async listEscalations(guildId: string): Promise<Array<{
+    warnCount: number;
+    action: "timeout" | "ban";
+    durationMinutes: number;
+    reason: string;
+    enabled: boolean;
+  }>> {
+    const result = await this.db.query<{
+      warn_count: number;
+      action: "timeout" | "ban";
+      duration_minutes: number;
+      reason: string;
+      enabled: boolean;
+    }>(
+      "SELECT warn_count,action,duration_minutes,reason,enabled FROM moderation_escalations WHERE guild_id=$1 ORDER BY warn_count",
+      [guildId]
+    );
+    return result.rows.map((row) => ({
+      warnCount: row.warn_count,
+      action: row.action,
+      durationMinutes: row.duration_minutes,
+      reason: row.reason,
+      enabled: row.enabled
+    }));
+  }
+
+  async removeEscalation(guildId: string, warnCount: number): Promise<boolean> {
+    const result = await this.db.query(
+      "DELETE FROM moderation_escalations WHERE guild_id=$1 AND warn_count=$2",
+      [guildId,warnCount]
+    );
+    return result.rowCount === 1;
   }
 
   private async recordBestEffort(
@@ -620,7 +937,37 @@ export class Moderation implements PlatformModule {
     });
   }
 
-  private async processExpiredBans(): Promise<void> {
+  private async processScheduledCleanup(): Promise<void> {
+    if (!this.client || this.client.readyAt === null) return;
+    try {
+      const claimed = await this.db.query<{ id: string; guild_id: string; channel_id: string; max_messages: number }>(
+        "UPDATE moderation_cleanup_rules mcr SET processing_until=now()+interval '2 minutes',last_run_at=now() FROM (SELECT m.id FROM moderation_cleanup_rules m INNER JOIN guild_bot_assignments ga ON ga.guild_id=m.guild_id LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id WHERE m.enabled=true AND (m.last_run_at IS NULL OR m.last_run_at <= now()-make_interval(secs => m.interval_seconds)) AND (m.processing_until IS NULL OR m.processing_until < now()) AND (ga.bot_identity_id=$1 OR ($1='primary' AND ga.bot_identity_id <> 'primary' AND (bh.last_seen_at IS NULL OR bh.last_seen_at < now()-interval '90 seconds'))) ORDER BY m.last_run_at NULLS FIRST LIMIT 20 FOR UPDATE SKIP LOCKED) claim WHERE mcr.id=claim.id RETURNING mcr.id,mcr.guild_id,mcr.channel_id,mcr.max_messages",
+        [this.identityId]
+      );
+
+      for (const rule of claimed.rows) {
+        try {
+          if (!await this.enabled(rule.guild_id)) {
+            await this.db.query("UPDATE moderation_cleanup_rules SET processing_until=NULL WHERE id=$1",[rule.id]);
+            continue;
+          }
+          const guild = this.client.guilds.cache.get(rule.guild_id);
+          const channel = guild?.channels.cache.get(rule.channel_id);
+          if (!channel || !channel.isTextBased() || !("bulkDelete" in channel)) throw new Error("cleanup_channel_unavailable");
+          const deleted = await channel.bulkDelete(rule.max_messages, true);
+          await this.audit("moderation.autopurge",rule.guild_id,"system",rule.channel_id,{cleanupRuleId:Number(rule.id),requested:rule.max_messages,deleted:deleted.size},"channel");
+          await this.db.query("UPDATE moderation_cleanup_rules SET processing_until=NULL WHERE id=$1",[rule.id]);
+        } catch (error) {
+          await this.db.query("UPDATE moderation_cleanup_rules SET processing_until=NULL WHERE id=$1",[rule.id]).catch(() => undefined);
+          await this.audit("moderation.autopurge.failed",rule.guild_id,"system",rule.channel_id,{cleanupRuleId:Number(rule.id),error:String(error).slice(0,500)},"channel");
+          logger.warn("Scheduled moderation cleanup failed",{cleanupRuleId:rule.id,guildId:rule.guild_id,channelId:rule.channel_id,error:String(error)});
+        }
+      }
+    } catch (error) {
+      logger.warn("Scheduled moderation cleanup worker failed",{identityId:this.identityId,error:String(error)});
+    }
+  }
+  private async processExpiredTimedPunishments(): Promise<void> {
     if (!this.client) return;
 
     try {
@@ -628,12 +975,13 @@ export class Moderation implements PlatformModule {
         id: string;
         guild_id: string;
         target_user_id: string;
+        action: "ban" | "timeout";
       }>(
-        `SELECT mc.id,mc.guild_id,mc.target_user_id
+        `SELECT mc.id,mc.guild_id,mc.target_user_id,mc.action
          FROM moderation_cases mc
          INNER JOIN guild_bot_assignments ga ON ga.guild_id=mc.guild_id
          LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id
-         WHERE mc.action='ban'
+         WHERE mc.action IN ('ban','timeout')
            AND mc.expires_at IS NOT NULL
            AND mc.expires_at <= now()
            AND mc.resolved_at IS NULL
@@ -660,24 +1008,51 @@ export class Moderation implements PlatformModule {
         try {
           const guild = this.client.guilds.cache.get(row.guild_id);
           if (!guild) throw new Error("guild_not_cached");
-          await guild.members.unban(row.target_user_id, "Timed ban expired");
-          await this.audit("moderation.ban.expired", row.guild_id, "system", row.target_user_id, { caseId: Number(row.id) });
+
+          if (row.action === "ban") {
+            await guild.members.unban(row.target_user_id, "Timed ban expired");
+          } else {
+            const member = await guild.members.fetch(row.target_user_id).catch(() => null);
+            if (member) await member.timeout(null, "Timed timeout expired");
+          }
+
+          await this.audit(
+            row.action === "ban" ? "moderation.ban.expired" : "moderation.timeout.expired",
+            row.guild_id,
+            "system",
+            row.target_user_id,
+            { caseId: Number(row.id) }
+          );
         } catch (error) {
           await this.db.query("UPDATE moderation_cases SET resolved_at=NULL WHERE id=$1", [row.id]);
-          logger.warn("Timed ban expiry failed", { guildId: row.guild_id, userId: row.target_user_id, caseId: row.id, error: String(error) });
+          await this.audit(
+            row.action === "ban" ? "moderation.ban.expired.failed" : "moderation.timeout.expired.failed",
+            row.guild_id,
+            "system",
+            row.target_user_id,
+            { caseId: Number(row.id), error: String(error).slice(0,500) }
+          );
+          logger.warn("Timed punishment expiry failed", {
+            guildId: row.guild_id,
+            userId: row.target_user_id,
+            action: row.action,
+            caseId: row.id,
+            error: String(error)
+          });
         }
       }
     } catch (error) {
-      logger.warn("Timed ban worker cycle failed", { identityId: this.identityId, error: String(error) });
+      logger.warn("Timed punishment worker cycle failed", { identityId: this.identityId, error: String(error) });
     }
   }
 
-  private async audit(
+  async audit(
     action: string,
     guildId: string,
     actorUserId: string,
     targetId: string,
-    metadata: Record<string, unknown>
+    metadata: Record<string, unknown>,
+    targetType: string = "user"
   ): Promise<void> {
     try {
       await this.auditLog?.record({
@@ -685,7 +1060,7 @@ export class Moderation implements PlatformModule {
         actorUserId,
         source: actorUserId === "system" ? "system" : "discord",
         action,
-        targetType: "user",
+        targetType,
         targetId,
         metadata
       });

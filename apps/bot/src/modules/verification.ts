@@ -12,16 +12,32 @@ type VerificationConfig = {
   quarantineRoleId: string | null;
   logChannelId: string | null;
   codeTtlMinutes: number;
+  panelTitle: string;
+  panelDescription: string;
+  issueButtonLabel: string;
+  confirmButtonLabel: string;
+};
+
+export const DEFAULT_VERIFICATION_CONFIG: Pick<VerificationConfig, "panelTitle" | "panelDescription" | "issueButtonLabel" | "confirmButtonLabel"> = {
+  panelTitle: "✅ Проверка участника",
+  panelDescription: "Нажми кнопку, получи одноразовый код и подтверди его через кнопку ниже.",
+  issueButtonLabel: "Получить код",
+  confirmButtonLabel: "Подтвердить"
 };
 
 export class Verification implements PlatformModule {
   readonly name = "verification";
   private unsubscribe?: () => void;
+  private events?: ModuleContext["events"];
   private readonly codes = new Map<string, { hash: string; expiresAt: number; attempts: number }>();
+  private guildResolver?: (guildId: string) => import("discord.js").Guild | undefined;
 
-  constructor(private readonly db: Database) {}
+  constructor(private readonly db: Database, guildResolver?: (guildId: string) => import("discord.js").Guild | undefined) {
+    this.guildResolver = guildResolver;
+  }
 
   async init(context: ModuleContext): Promise<void> {
+    this.events = context.events;
     const a = context.events.on("member.add", (member) => this.onJoin(member));
     const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
     const c = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
@@ -31,6 +47,7 @@ export class Verification implements PlatformModule {
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    this.events = undefined;
     this.codes.clear();
   }
 
@@ -42,8 +59,12 @@ export class Verification implements PlatformModule {
       quarantine_role_id: string | null;
       log_channel_id: string | null;
       code_ttl_minutes: number;
+      panel_title: string | null;
+      panel_description: string | null;
+      issue_button_label: string | null;
+      confirm_button_label: string | null;
     }>(
-      "SELECT enabled,channel_id,verified_role_id,quarantine_role_id,log_channel_id,code_ttl_minutes FROM verification_settings WHERE guild_id=$1",
+      "SELECT enabled,channel_id,verified_role_id,quarantine_role_id,log_channel_id,code_ttl_minutes,panel_title,panel_description,issue_button_label,confirm_button_label FROM verification_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -53,21 +74,37 @@ export class Verification implements PlatformModule {
       verifiedRoleId: row?.verified_role_id ?? null,
       quarantineRoleId: row?.quarantine_role_id ?? null,
       logChannelId: row?.log_channel_id ?? null,
-      codeTtlMinutes: row?.code_ttl_minutes ?? 10
+      codeTtlMinutes: row?.code_ttl_minutes ?? 10,
+      panelTitle: row?.panel_title || DEFAULT_VERIFICATION_CONFIG.panelTitle,
+      panelDescription: row?.panel_description || DEFAULT_VERIFICATION_CONFIG.panelDescription,
+      issueButtonLabel: row?.issue_button_label || DEFAULT_VERIFICATION_CONFIG.issueButtonLabel,
+      confirmButtonLabel: row?.confirm_button_label || DEFAULT_VERIFICATION_CONFIG.confirmButtonLabel
     };
   }
 
   async configure(guildId: string, patch: Partial<VerificationConfig>): Promise<void> {
     const current = await this.config(guildId);
     const next = { ...current, ...patch };
+    const panelTitle = normalizeVerificationText(next.panelTitle, 256);
+    const panelDescription = normalizeVerificationText(next.panelDescription, 4096);
+    const issueButtonLabel = normalizeVerificationText(next.issueButtonLabel, 80);
+    const confirmButtonLabel = normalizeVerificationText(next.confirmButtonLabel, 80);
     await this.db.query(
-      `INSERT INTO verification_settings(guild_id,enabled,channel_id,verified_role_id,quarantine_role_id,log_channel_id,code_ttl_minutes)
-       VALUES($1,$2,$3,$4,$5,$6,$7)
+      `INSERT INTO verification_settings(
+         guild_id,enabled,channel_id,verified_role_id,quarantine_role_id,log_channel_id,code_ttl_minutes,
+         panel_title,panel_description,issue_button_label,confirm_button_label
+       )
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        ON CONFLICT(guild_id) DO UPDATE SET
          enabled=EXCLUDED.enabled,channel_id=EXCLUDED.channel_id,verified_role_id=EXCLUDED.verified_role_id,
          quarantine_role_id=EXCLUDED.quarantine_role_id,log_channel_id=EXCLUDED.log_channel_id,
-         code_ttl_minutes=EXCLUDED.code_ttl_minutes,updated_at=now()`,
-      [guildId,next.enabled,next.channelId,next.verifiedRoleId,next.quarantineRoleId,next.logChannelId,Math.min(Math.max(next.codeTtlMinutes,2),60)]
+         code_ttl_minutes=EXCLUDED.code_ttl_minutes,panel_title=EXCLUDED.panel_title,
+         panel_description=EXCLUDED.panel_description,issue_button_label=EXCLUDED.issue_button_label,
+         confirm_button_label=EXCLUDED.confirm_button_label,updated_at=now()`,
+      [
+        guildId,next.enabled,next.channelId,next.verifiedRoleId,next.quarantineRoleId,next.logChannelId,
+        Math.min(Math.max(next.codeTtlMinutes,2),60),panelTitle,panelDescription,issueButtonLabel,confirmButtonLabel
+      ]
     );
     await this.db.query(
       `INSERT INTO guild_modules(guild_id,module_key,enabled)
@@ -75,6 +112,38 @@ export class Verification implements PlatformModule {
        ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=now()`,
       [guildId,next.enabled]
     );
+  }
+
+  async publishPanel(guildId: string, channelId?: string): Promise<{ channelId: string; messageId: string }> {
+    const config = await this.config(guildId);
+    if (!config.enabled) throw new Error("verification_disabled");
+    const guild = this.clientGuild(guildId);
+    const targetChannelId = channelId ?? config.channelId;
+    if (!targetChannelId) throw new Error("verification_panel_channel_required");
+    const channel = guild.channels.cache.get(targetChannelId);
+    if (!channel || channel.type !== 0) throw new Error("verification_panel_channel_required");
+    const message = await channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(config.panelTitle)
+          .setDescription(config.panelDescription)
+      ],
+      components: [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId("dsp:verify:issue")
+            .setLabel(config.issueButtonLabel)
+            .setStyle(ButtonStyle.Primary)
+        )
+      ]
+    });
+    return { channelId: channel.id, messageId: message.id };
+  }
+
+  private clientGuild(guildId: string): import("discord.js").Guild {
+    const guild = this.guildResolver?.(guildId);
+    if (!guild) throw new Error("guild_not_available");
+    return guild;
   }
 
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -112,31 +181,23 @@ export class Verification implements PlatformModule {
         verifiedRoleId: role?.id ?? null,
         quarantineRoleId: quarantineRole?.id ?? null,
         logChannelId: logChannel?.id ?? null,
-        codeTtlMinutes: interaction.options.getInteger("ttl") ?? 10
+        codeTtlMinutes: interaction.options.getInteger("ttl") ?? 10,
+        panelTitle: interaction.options.getString("panel-title") ?? undefined,
+        panelDescription: interaction.options.getString("panel-description") ?? undefined,
+        issueButtonLabel: interaction.options.getString("issue-button") ?? undefined,
+        confirmButtonLabel: interaction.options.getString("confirm-button") ?? undefined
       });
       await interaction.reply({ content: "Verification настроен.", ephemeral: true });
       return;
     }
     if (sub === "panel") {
-      const channelOption = interaction.options.getChannel("channel", true);
-      const channel = interaction.guild!.channels.cache.get(channelOption.id);
-      if (!channel || channel.type !== 0) {
-        await interaction.reply({ content: "Panel channel должен быть текстовым.", ephemeral: true });
-        return;
+      const channelId = interaction.options.getChannel("channel", true).id;
+      try {
+        await this.publishPanel(interaction.guild!.id, channelId);
+        await interaction.reply({ content: "Панель Verification опубликована.", ephemeral: true });
+      } catch (error) {
+        await interaction.reply({ content: "Не удалось опубликовать панель: " + String(error instanceof Error ? error.message : error), ephemeral: true });
       }
-      await channel.send({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle("✅ Проверка участника")
-            .setDescription("Нажми кнопку, получи одноразовый код и подтверди его через кнопку ниже.")
-        ],
-        components: [
-          new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder().setCustomId("dsp:verify:issue").setLabel("Получить код").setStyle(ButtonStyle.Primary)
-          )
-        ]
-      });
-      await interaction.reply({ content: "Панель Verification опубликована.", ephemeral: true });
     }
   }
 
@@ -210,7 +271,7 @@ export class Verification implements PlatformModule {
       content: `Твой одноразовый код: **${code}**`,
       ephemeral: true,
       components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId(`dsp:verify:confirm:${code}`).setLabel("Подтвердить").setStyle(ButtonStyle.Success)
+        new ButtonBuilder().setCustomId(`dsp:verify:confirm:${code}`).setLabel(config.confirmButtonLabel).setStyle(ButtonStyle.Success)
       )]
       });
     } catch (error) {
@@ -289,6 +350,10 @@ export class Verification implements PlatformModule {
       }
     }
     this.codes.delete(key);
+    await this.events?.emit("verification.passed", {
+      guildId: interaction.guild!.id,
+      userId: interaction.user.id
+    });
     await interaction.reply({ content: "✅ Проверка пройдена.", ephemeral: true });
     if (config.logChannelId) {
       const channel = interaction.guild!.channels.cache.get(config.logChannelId);
@@ -304,4 +369,12 @@ export class Verification implements PlatformModule {
       }
     }
   }
+}
+
+
+export function normalizeVerificationText(value: unknown, maxLength: number): string {
+  if (typeof value !== "string") throw new Error("invalid_verification_text");
+  const normalized = value.trim();
+  if (!normalized || normalized.length > maxLength) throw new Error("invalid_verification_text");
+  return normalized;
 }

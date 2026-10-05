@@ -21,12 +21,13 @@ export type PlatformEventMap = {
   "message.delete": Message;
   "message.update": { oldMessage: Message; newMessage: Message };
   "reaction.add": { reaction: MessageReaction; user: User };
+  "reaction.remove": { reaction: MessageReaction; user: User };
   "member.add": GuildMember;
   "member.remove": GuildMember;
   "member.update": { oldMember: GuildMember; newMember: GuildMember };
   "member.role.add": { guildId: string; userId: string; roleId: string };
   "member.role.remove": { guildId: string; userId: string; roleId: string };
-  "moderation.case": { guildId: string; userId: string; action: string; caseId: number };
+  "moderation.case": { guildId: string; userId: string; action: string; caseId: number; moderatorUserId?: string; reason?: string };
   "ticket.create": { guildId: string; userId: string; ticketId: number; channelId: string };
   "ticket.close": { guildId: string; userId: string; ticketId: number; channelId: string };
   "giveaway.end": { guildId: string; giveawayId: number; winners: string[] };
@@ -34,6 +35,7 @@ export type PlatformEventMap = {
   "channel.delete": import("discord.js").NonThreadGuildBasedChannel | import("discord.js").ThreadChannel;
   "role.delete": import("discord.js").Role;
   "member.ban": { guildId: string; userId: string };
+  "verification.passed": { guildId: string; userId: string };
 };
 
 type Listener<K extends keyof PlatformEventMap> = (
@@ -117,7 +119,7 @@ function extractGuildId<K extends keyof PlatformEventMap>(
   if (event === "message.update") {
     return (payload as { newMessage: Message }).newMessage.guildId;
   }
-  if (event === "reaction.add") {
+  if (event === "reaction.add" || event === "reaction.remove") {
     return (payload as { reaction: MessageReaction }).reaction.message.guildId;
   }
   if (event === "member.add" || event === "member.remove" || event === "member.update") {
@@ -127,7 +129,7 @@ function extractGuildId<K extends keyof PlatformEventMap>(
   }
   if (event === "member.role.add" || event === "member.role.remove" ||
       event === "moderation.case" || event === "ticket.create" || event === "ticket.close" ||
-      event === "giveaway.end" || event === "schedule") {
+      event === "giveaway.end" || event === "schedule" || event === "verification.passed") {
     return (payload as { guildId: string }).guildId;
   }
   if (event === "channel.delete") {

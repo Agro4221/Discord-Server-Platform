@@ -1,3 +1,4 @@
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import type { Client } from "discord.js";
 import type { Database } from "./database.js";
 
@@ -18,15 +19,118 @@ export type BotFleetRecord = BotIdentityRecord & {
 export class BotIdentityRepository {
   private readonly assignedGuilds = new Set<string>();
 
-  constructor(private readonly db: Database, private readonly identityId: string) {}
+  constructor(
+    private readonly db: Database,
+    private readonly identityId: string,
+    private readonly credentialSecret: string
+  ) {}
 
-  async ensureIdentity(id: string, clientId: string): Promise<void> {
+  async ensureIdentity(id: string, clientId: string, token?: string): Promise<void> {
     await this.db.query(
-      `INSERT INTO bot_identities(id,client_id,enabled,presence_name)
-       VALUES($1,$2,true,$3)
-       ON CONFLICT(id) DO UPDATE SET client_id=EXCLUDED.client_id,updated_at=now()`,
-      [id, clientId, id]
+      `INSERT INTO bot_identities(id,client_id,enabled,presence_name,token_ciphertext)
+       VALUES($1,$2,true,$3,$4)
+       ON CONFLICT(id) DO UPDATE SET client_id=EXCLUDED.client_id,
+         token_ciphertext=COALESCE(EXCLUDED.token_ciphertext,bot_identities.token_ciphertext),
+         updated_at=now()`,
+      [id, clientId, id, token ? this.encryptToken(token) : null]
     );
+  }
+
+  async credentials(): Promise<{
+    id: string;
+    clientId: string;
+    token: string | null;
+    enabled: boolean;
+    presenceName: string | null;
+  } | null> {
+    const result = await this.db.query<{
+      id: string;
+      client_id: string;
+      token_ciphertext: string | null;
+      enabled: boolean;
+      presence_name: string | null;
+    }>(
+      "SELECT id,client_id,token_ciphertext,enabled,presence_name FROM bot_identities WHERE id=$1",
+      [this.identityId]
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      id: row.id,
+      clientId: row.client_id,
+      token: row.token_ciphertext ? this.decryptToken(row.token_ciphertext) : null,
+      enabled: row.enabled,
+      presenceName: row.presence_name
+    };
+  }
+
+  async settings(): Promise<BotIdentityRecord & { tokenConfigured: boolean }> {
+    const result = await this.db.query<BotIdentityRecord & { tokenConfigured: boolean }>(
+      `SELECT id,client_id AS "clientId",enabled,presence_name AS "presenceName",
+              token_ciphertext IS NOT NULL AS "tokenConfigured"
+         FROM bot_identities WHERE id=$1`,
+      [this.identityId]
+    );
+    const row = result.rows[0];
+    if (row) return row;
+    return {
+      id: this.identityId,
+      clientId: "",
+      enabled: false,
+      presenceName: null,
+      tokenConfigured: false
+    };
+  }
+
+  async saveSettings(input: {
+    clientId: string;
+    token?: string;
+    enabled?: boolean;
+    presenceName?: string | null;
+  }): Promise<BotIdentityRecord & { tokenConfigured: boolean }> {
+    const current = await this.settings();
+    const enabled = input.enabled ?? current.enabled ?? true;
+    const presenceName = input.presenceName === undefined ? current.presenceName : input.presenceName;
+    const tokenCiphertext = input.token
+      ? this.encryptToken(input.token)
+      : null;
+
+    await this.db.query(
+      `INSERT INTO bot_identities(id,client_id,enabled,presence_name,token_ciphertext)
+       VALUES($1,$2,$3,$4,$5)
+       ON CONFLICT(id) DO UPDATE SET client_id=EXCLUDED.client_id,
+         enabled=EXCLUDED.enabled,
+         presence_name=EXCLUDED.presence_name,
+         token_ciphertext=COALESCE(EXCLUDED.token_ciphertext,bot_identities.token_ciphertext),
+         updated_at=now()`,
+      [this.identityId, input.clientId, enabled, presenceName, tokenCiphertext]
+    );
+    return this.settings();
+  }
+
+  private encryptionKey(): Buffer {
+    return createHash("sha256").update(this.credentialSecret, "utf8").digest();
+  }
+
+  private encryptToken(token: string): string {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv("aes-256-gcm", this.encryptionKey(), iv);
+    const ciphertext = Buffer.concat([cipher.update(token, "utf8"), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    return `v1.${iv.toString("base64url")}.${tag.toString("base64url")}.${ciphertext.toString("base64url")}`;
+  }
+
+  private decryptToken(value: string): string {
+    const [version, ivText, tagText, ciphertextText] = value.split(".");
+    if (version !== "v1" || !ivText || !tagText || !ciphertextText) {
+      throw new Error("invalid_bot_credential_ciphertext");
+    }
+    const decipher = createDecipheriv("aes-256-gcm", this.encryptionKey(), Buffer.from(ivText, "base64url"));
+    decipher.setAuthTag(Buffer.from(tagText, "base64url"));
+    return Buffer.concat([
+      decipher.update(Buffer.from(ciphertextText, "base64url")),
+      decipher.final()
+    ]).toString("utf8");
   }
 
   async list(): Promise<BotIdentityRecord[]> {
@@ -182,13 +286,13 @@ export class BotIdentityRepository {
   }
 }
 
-export function resolveIdentityEnv(identityId: string): { token: string; clientId: string } {
+export function resolveIdentityEnv(identityId: string): { token?: string; clientId?: string } {
   const prefix = identityId.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
   const tokenEnv = "DISCORD_TOKEN_" + prefix;
   const clientIdEnv = "DISCORD_CLIENT_ID_" + prefix;
   const token = process.env[tokenEnv] ?? (identityId === "primary" ? process.env.DISCORD_TOKEN : undefined);
   const clientId = process.env[clientIdEnv] ?? (identityId === "primary" ? process.env.DISCORD_CLIENT_ID : undefined);
-  if (!token || !clientId) {
+  if (identityId !== "primary" && (!token || !clientId)) {
     throw new Error("Missing Discord credentials for identity " + identityId);
   }
   return { token, clientId };

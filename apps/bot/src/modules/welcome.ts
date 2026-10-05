@@ -22,6 +22,8 @@ type WelcomeConfig = {
   goodbyeEmbed: boolean;
   starterRoleIds: string;
   restoreRoles: boolean;
+  imageUrl: string | null;
+  goodbyeImageUrl: string | null;
 };
 
 const defaultConfig: WelcomeConfig = {
@@ -35,14 +37,19 @@ const defaultConfig: WelcomeConfig = {
   goodbyeMessage: "{user} покинул {server}.",
   goodbyeEmbed: true,
   starterRoleIds: "",
-  restoreRoles: false
+  restoreRoles: false,
+  imageUrl: null,
+  goodbyeImageUrl: null
 };
 
 export class Welcome implements PlatformModule {
   readonly name = "welcome";
   private unsubscribe?: () => void;
+  private guildResolver?: (guildId: string) => import("discord.js").Guild | undefined;
 
-  constructor(private readonly db: Database) {}
+  constructor(private readonly db: Database, guildResolver?: (guildId: string) => import("discord.js").Guild | undefined) {
+    this.guildResolver = guildResolver;
+  }
 
   async init(context: ModuleContext): Promise<void> {
     const a = context.events.on("member.add", (member) => this.onJoin(member));
@@ -82,7 +89,9 @@ export class Welcome implements PlatformModule {
       goodbyeMessage: undefined,
       goodbyeEmbed: undefined,
       starterRoleIds: undefined,
-      restoreRoles: undefined
+      restoreRoles: undefined,
+      imageUrl: interaction.options.getString("image") ?? undefined,
+      goodbyeImageUrl: interaction.options.getString("goodbye-image") ?? undefined
     });
 
     await interaction.reply({ content: "Welcome настроен и включён.", ephemeral: true });
@@ -101,8 +110,10 @@ export class Welcome implements PlatformModule {
       goodbye_embed: boolean;
       starter_role_ids: string;
       restore_roles: boolean;
+      image_url: string | null;
+      goodbye_image_url: string | null;
     }>(
-      "SELECT enabled,channel_id,message,dm,embed,goodbye_enabled,goodbye_channel_id,goodbye_message,goodbye_embed,starter_role_ids,restore_roles FROM welcome_settings WHERE guild_id=$1",
+      "SELECT enabled,channel_id,message,dm,embed,goodbye_enabled,goodbye_channel_id,goodbye_message,goodbye_embed,starter_role_ids,restore_roles,image_url,goodbye_image_url FROM welcome_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -118,29 +129,35 @@ export class Welcome implements PlatformModule {
       goodbyeMessage: row.goodbye_message,
       goodbyeEmbed: row.goodbye_embed,
       starterRoleIds: row.starter_role_ids,
-      restoreRoles: row.restore_roles
+      restoreRoles: row.restore_roles,
+      imageUrl: row.image_url,
+      goodbyeImageUrl: row.goodbye_image_url
     };
   }
 
   async configure(guildId: string, patch: Partial<WelcomeConfig>): Promise<void> {
     const current = await this.getConfig(guildId);
     const next = { ...current, ...patch };
+    const imageUrl = normalizeWelcomeImageUrl(next.imageUrl);
+    const goodbyeImageUrl = normalizeWelcomeImageUrl(next.goodbyeImageUrl);
     await this.db.query(
       `INSERT INTO welcome_settings(
          guild_id,enabled,channel_id,message,dm,embed,
-         goodbye_enabled,goodbye_channel_id,goodbye_message,goodbye_embed,starter_role_ids,restore_roles
+         goodbye_enabled,goodbye_channel_id,goodbye_message,goodbye_embed,starter_role_ids,restore_roles,
+         image_url,goodbye_image_url
        )
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        ON CONFLICT(guild_id) DO UPDATE SET
          enabled=EXCLUDED.enabled,channel_id=EXCLUDED.channel_id,message=EXCLUDED.message,
          dm=EXCLUDED.dm,embed=EXCLUDED.embed,goodbye_enabled=EXCLUDED.goodbye_enabled,
          goodbye_channel_id=EXCLUDED.goodbye_channel_id,goodbye_message=EXCLUDED.goodbye_message,
          goodbye_embed=EXCLUDED.goodbye_embed,starter_role_ids=EXCLUDED.starter_role_ids,
-         restore_roles=EXCLUDED.restore_roles,updated_at=now()`,
+         restore_roles=EXCLUDED.restore_roles,image_url=EXCLUDED.image_url,
+         goodbye_image_url=EXCLUDED.goodbye_image_url,updated_at=now()`,
       [
         guildId,next.enabled,next.channelId,next.message,next.dm,next.embed,
         next.goodbyeEnabled,next.goodbyeChannelId,next.goodbyeMessage,next.goodbyeEmbed,
-        next.starterRoleIds,next.restoreRoles
+        next.starterRoleIds,next.restoreRoles,imageUrl,goodbyeImageUrl
       ]
     );
     await this.db.query(
@@ -149,6 +166,34 @@ export class Welcome implements PlatformModule {
        ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=now()`,
       [guildId, next.enabled]
     );
+  }
+
+  async sendPreview(guildId: string): Promise<{ channelId: string; messageId: string }> {
+    const guild = this.guildResolver?.(guildId);
+    if (!guild) throw new Error("guild_not_available");
+    const config = await this.getConfig(guildId);
+    if (!config.enabled || !config.channelId) throw new Error("welcome_preview_not_configured");
+    const channel = guild.channels.cache.get(config.channelId);
+    if (!channel?.isTextBased() || !("send" in channel)) throw new Error("welcome_preview_channel_unavailable");
+
+    const content = renderTemplate(config.message, {
+      mention: "@preview-user",
+      user: "preview-user",
+      server: guild.name
+    });
+
+    if (config.embed) {
+      const embed = new EmbedBuilder()
+        .setTitle("Добро пожаловать на " + guild.name)
+        .setDescription(content)
+        .setFooter({ text: "Vexa Welcome preview — реальный участник не затронут" });
+      if (config.imageUrl) embed.setImage(config.imageUrl);
+      const message = await channel.send({ embeds: [embed] });
+      return { channelId: channel.id, messageId: message.id };
+    }
+
+    const message = await channel.send("🔎 Welcome preview\n" + content);
+    return { channelId: channel.id, messageId: message.id };
   }
 
   private async onJoin(member: GuildMember): Promise<void> {
@@ -166,14 +211,12 @@ export class Welcome implements PlatformModule {
       const channel = member.guild.channels.cache.get(config.channelId);
       if (channel?.isTextBased() && "send" in channel) {
         if (config.embed) {
-          await (channel as TextChannel).send({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle(`Добро пожаловать на ${member.guild.name}`)
-                .setDescription(content)
-                .setThumbnail(member.displayAvatarURL({ size: 128 }))
-            ]
-          }).catch((error) => {
+          const embed = new EmbedBuilder()
+            .setTitle(`Добро пожаловать на ${member.guild.name}`)
+            .setDescription(content)
+            .setThumbnail(member.displayAvatarURL({ size: 128 }));
+          if (config.imageUrl) embed.setImage(config.imageUrl);
+          await (channel as TextChannel).send({ embeds: [embed] }).catch((error) => {
             logger.warn("Welcome embed delivery failed", {
               guildId: member.guild.id,
               channelId: channel.id,
@@ -263,14 +306,12 @@ export class Welcome implements PlatformModule {
     if (!channel?.isTextBased() || !("send" in channel)) return;
 
     if (config.goodbyeEmbed) {
-      await channel.send({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle(`До встречи, ${member.user.username}`)
-            .setDescription(content)
-            .setThumbnail(member.displayAvatarURL({ size: 128 }))
-        ]
-      }).catch((error) => logger.warn("Goodbye embed delivery failed", {
+      const embed = new EmbedBuilder()
+        .setTitle(`До встречи, ${member.user.username}`)
+        .setDescription(content)
+        .setThumbnail(member.displayAvatarURL({ size: 128 }));
+      if (config.goodbyeImageUrl) embed.setImage(config.goodbyeImageUrl);
+      await channel.send({ embeds: [embed] }).catch((error) => logger.warn("Goodbye embed delivery failed", {
         guildId: member.guild.id,channelId,userId: member.id,error: String(error)
       }));
     } else {
@@ -279,4 +320,21 @@ export class Welcome implements PlatformModule {
       }));
     }
   }
+}
+
+
+export function normalizeWelcomeImageUrl(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value !== "string") throw new Error("invalid_welcome_image_url");
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > 2048) throw new Error("invalid_welcome_image_url");
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error("invalid_welcome_image_url");
+  }
+  if (parsed.protocol !== "https:") throw new Error("invalid_welcome_image_url");
+  return parsed.toString();
 }

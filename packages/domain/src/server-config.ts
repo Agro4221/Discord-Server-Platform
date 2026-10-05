@@ -5,6 +5,7 @@ export type ServerModuleKey =
   | "temporary-voice"
   | "welcome"
   | "verification"
+  | "onboarding"
   | "roles"
   | "leveling"
   | "tickets"
@@ -15,7 +16,13 @@ export type ServerModuleKey =
   | "notifications"
   | "automation"
   | "music"
-  | "analytics";
+  | "analytics"
+  | "polls"
+  | "reputation"
+  | "birthdays"
+  | "invite-tracking"
+  | "stream-alerts"
+  | "forms";
 
 export type ServerModuleConfig = {
   key: ServerModuleKey;
