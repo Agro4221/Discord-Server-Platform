@@ -56,6 +56,13 @@ export function normalizeMusicSearchProvider(value: string | null | undefined): 
   return null;
 }
 
+export function isMusicAppleMusicConfigured(
+  enabledValue = process.env.LAVASRC_APPLEMUSIC_ENABLED,
+  apiTokenValue = process.env.APPLE_MUSIC_API_TOKEN
+): boolean {
+  return enabledValue === "true" && Boolean(apiTokenValue?.trim());
+}
+
 export function resolveMusicSearchRequest(
   query: string,
   provider?: MusicSearchProvider | null
@@ -1036,8 +1043,7 @@ export class Music implements PlatformModule {
         { name: "YouTube", enabled: true, mode: "direct" },
         { name: "SoundCloud", enabled: true, mode: "direct" },
         { name: "Spotify", enabled: process.env.LAVASRC_SPOTIFY_ENABLED === "true" && Boolean(process.env.SPOTIFY_CLIENT_ID?.trim()) && Boolean(process.env.SPOTIFY_CLIENT_SECRET?.trim()), mode: "mirror" },
-        { name: "Apple Music", enabled: process.env.LAVASRC_APPLEMUSIC_ENABLED === "true" && Boolean(process.env.APPLE_MUSIC_API_TOKEN?.trim()), mode: "mirror" },
-        { name: "Apple Music", enabled: process.env.LAVASRC_APPLEMUSIC_ENABLED === "true", mode: "mirror" },
+        { name: "Apple Music", enabled: isMusicAppleMusicConfigured(), mode: "mirror" },
         { name: "Deezer", enabled: process.env.LAVASRC_DEEZER_ENABLED === "true" && Boolean(process.env.DEEZER_ARL?.trim()) && Boolean(process.env.DEEZER_MASTER_DECRYPTION_KEY?.trim()), mode: "direct" },
         { name: "Yandex Music", enabled: process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true", mode: "direct" },
         { name: "VK Music", enabled: process.env.LAVASRC_VKMUSIC_ENABLED === "true" && Boolean(process.env.VK_MUSIC_USER_TOKEN?.trim()), mode: "direct" },
@@ -3215,7 +3221,7 @@ export class Music implements PlatformModule {
       ["YouTube","yt",true],
       ["SoundCloud","Lavalink",true],
       ["Spotify","LavaSrc",process.env.LAVASRC_SPOTIFY_ENABLED === "true" && Boolean(process.env.SPOTIFY_CLIENT_ID?.trim()) && Boolean(process.env.SPOTIFY_CLIENT_SECRET?.trim())],
-      ["Apple Music","LavaSrc",process.env.LAVASRC_APPLEMUSIC_ENABLED === "true"],
+      ["Apple Music","LavaSrc",isMusicAppleMusicConfigured()],
       ["Deezer","LavaSrc",process.env.LAVASRC_DEEZER_ENABLED === "true"],
       ["Yandex Music","LavaSrc",process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true" && Boolean(process.env.YANDEX_MUSIC_ACCESS_TOKEN?.trim())],
       ["VK Music","LavaSrc",process.env.LAVASRC_VKMUSIC_ENABLED === "true"],
