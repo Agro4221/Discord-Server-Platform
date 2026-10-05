@@ -25,21 +25,30 @@ Registered secondary Bot Identities are supervised natively by the launcher with
 
 For a single-PC gaming setup, the default one-node mode is the normal choice. The second node exists for redundancy/failover scenarios and is not required for ordinary music playback.
 
-## Native requirements
+## Native first-run bootstrap
 
-Install these on Windows:
-- Node.js 24.17+
-- PostgreSQL with psql.exe and pg_isready.exe available in PATH
-- Java runtime compatible with the Lavalink version used by the repository
-- A Lavalink JAR downloaded separately
+The normal native launcher is intentionally self-contained. On first run it:
+- reuses PostgreSQL portable binaries from .\tools\pgsql when present
+- downloads PostgreSQL portable binaries automatically when they are missing
+- initializes .postgres-data as UTF-8 when no local cluster exists
+- starts the local PostgreSQL server automatically when it is stopped
+- creates the discord_platform database automatically
+- installs Node.js 24.21.0 or Java 21 automatically through winget when the required runtime is missing
+- downloads the pinned Lavalink 4.2.2 JAR automatically when it is missing
 
-Set LAVALINK_JAR_PATH in .env to the Lavalink JAR location. The launcher defaults to:
+No Docker Desktop is involved.
+
+The launcher keeps runtime dependencies local to the machine/project where practical. PostgreSQL data lives under:
+
+    .\.postgres-data
+
+Lavalink is stored at:
 
     .\infrastructure\lavalink\lavalink.jar
 
-The repository does not commit a Lavalink JAR.
+A working internet connection is required on a first run that needs to bootstrap missing dependencies.
 
-The native launcher uses the existing .env DATABASE_URL. The database itself remains PostgreSQL; native mode does not replace it with a different database engine.
+The native launcher still uses the .env DATABASE_URL; the database engine remains PostgreSQL.
 
 ## Build behavior
 
