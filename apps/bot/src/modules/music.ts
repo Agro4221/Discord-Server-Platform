@@ -217,14 +217,14 @@ const MUSIC_FILTER_ACTIONS = [
 type MusicFilterAction = (typeof MUSIC_FILTER_ACTIONS)[number];
 
 type MusicDistortionSettings = {
-  sinOffset: number;
-  sinScale: number;
-  cosOffset: number;
-  cosScale: number;
-  tanOffset: number;
-  tanScale: number;
-  offset: number;
-  scale: number;
+  sinOffset?: number;
+  sinScale?: number;
+  cosOffset?: number;
+  cosScale?: number;
+  tanOffset?: number;
+  tanScale?: number;
+  offset?: number;
+  scale?: number;
 };
 
 const MUSIC_DISTORTION_PRESET: Readonly<MusicDistortionSettings> = Object.freeze({
