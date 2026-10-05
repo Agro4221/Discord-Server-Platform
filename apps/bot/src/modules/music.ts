@@ -37,6 +37,7 @@ declare module "lavalink-client" {
 type MusicRepeatMode = "off" | "track" | "queue";
 
 const MAX_PLAYLIST_TRACKS = 500;
+export const MUSIC_REQUEST_COOLDOWN_MS = 5_000;
 
 const MUSIC_FILTER_ACTIONS = [
   "clear", "bassboost-low", "bassboost-medium", "bassboost-high",
@@ -134,6 +135,10 @@ export function buildMusicQueueShare(tracks: MusicQueueTrackLike[]): string {
     "\n… и ещё **" + remaining + "**. Используй export для полной очереди.";
 }
 
+export function remainingMusicRequestCooldown(cooldownUntil: number, now = Date.now()): number {
+  return Math.max(0, cooldownUntil - now);
+}
+
 export function voteSkipThreshold(listenerCount: number): number {
   const safe = Math.max(1, Math.floor(listenerCount));
   return Math.max(1, Math.ceil(safe * 0.6));
@@ -216,6 +221,7 @@ export class Music implements PlatformModule {
   private readonly autoplayInFlight = new Set<string>();
   private readonly autoLeaveTimers = new Map<string, NodeJS.Timeout>();
   private readonly requestInFlight = new Set<string>();
+  private readonly requestCooldownUntil = new Map<string, number>();
   private readonly failoverInFlight = new Set<string>();
   private readonly voteSkipSessions = new Map<string, { trackIdentifier: string; voters: Set<string>; expiresAt: number }>();
   private readonly searchSessions = new Map<string, { guildId: string; userId: string; tracks: Track[]; expiresAt: number }>();
@@ -234,6 +240,7 @@ export class Music implements PlatformModule {
     this.lastPlayedTracks.clear();
     this.autoplayInFlight.clear();
     this.requestInFlight.clear();
+    this.requestCooldownUntil.clear();
     this.failoverInFlight.clear();
     this.voteSkipSessions.clear();
     for (const timer of this.autoLeaveTimers.values()) clearTimeout(timer);
