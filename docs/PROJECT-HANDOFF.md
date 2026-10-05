@@ -679,3 +679,6 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Do not restore strict Discord readiness semantics to the Docker healthcheck, because the supported first-run flow intentionally starts without Discord credentials.
 ## 2026-10-05 — Health gate contract
 - Keep deployment-contract coverage for the /health vs /ready split; first-run Dashboard registration depends on this distinction.
+## 2026-10-05 — Lavalink password follow-up
+- Do not reintroduce a default password into infrastructure/lavalink/application.yml; the server secret must come from LAVALINK_SERVER_PASSWORD.
+- Compose already injects the same secret into both Lavalink nodes.
