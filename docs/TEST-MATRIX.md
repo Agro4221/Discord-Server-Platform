@@ -333,3 +333,6 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Removed the unused BACKUP_ENCRYPTION_KEY example setting so deployment configuration matches implemented backup behavior.
 - Config export excludes bot/integration credential ciphertext; optional remote S3 uploads request AES256 server-side encryption.
 - Live release-gate case remains: verify local backup permissions and remote S3 recovery/retention on a disposable environment.
+## 2026-10-05 — Compose deployment snapshot
+- Static deployment validation now rejects change-me PostgreSQL/Lavalink secret fallbacks and supplies ephemeral secrets for Compose config checks.
+- Live release-gate case remains: start the platform from a fresh local/VPS .env, verify generated secrets are non-default, and confirm service startup/restart continuity.
