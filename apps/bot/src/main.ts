@@ -159,7 +159,7 @@ async function main(): Promise<void> {
   const reminders = new Reminders(database);
   const starboard = new Starboard(database);
   const security = new Security(database);
-  const notifications = new Notifications(database);
+  const notifications = new Notifications(database, integrationCredentials);
   const streamAlerts = new StreamAlerts(database, config.streamAlerts, integrationCredentials, auditLog);
   const verification = new Verification(database, (guildId) => client.guilds.cache.get(guildId));
   const onboarding = new Onboarding(database);
