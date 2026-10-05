@@ -145,3 +145,27 @@ test("music queue share truncates safely for long queues", async () => {
   assert.equal(shared.length <= 1900, true);
   assert.match(shared, /используй|export/i);
 });
+
+
+test("music quick filter actions allow only known presets", async () => {
+  const { isMusicFilterAction } = await import("../src/modules/music.js");
+  for (const action of [
+    "clear",
+    "bassboost-low",
+    "bassboost-medium",
+    "bassboost-high",
+    "rock",
+    "classic",
+    "pop",
+    "electronic",
+    "fullsound",
+    "gaming",
+    "nightcore",
+    "8d"
+  ]) {
+    assert.equal(isMusicFilterAction(action), true, action);
+  }
+  for (const action of ["unknown", "volume", "seek"]) {
+    assert.equal(isMusicFilterAction(action), false, action);
+  }
+});
