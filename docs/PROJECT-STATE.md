@@ -413,3 +413,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - CI #1997 is green.
 - Save Queue and Save current queue as playlist are implemented on top of existing playlist persistence.
 - Next high-value slice: Load playlist with optional shuffle.
+
+
+## 2026-10-05 — Playlist shuffle verified
+- Source checkpoint: 7ff06bf24613e8efc9d24fd95bcd214138c24e79.
+- CI #2004 is green.
+- Load playlist with optional shuffle is complete.
+- Next high-value Music slice: Vote skip.
