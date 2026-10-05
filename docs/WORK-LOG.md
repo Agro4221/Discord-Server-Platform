@@ -927,3 +927,15 @@ Never write credentials, tokens or private user data here.
 - CI #2204 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
 - Final source checkpoint for this slice: 970cbbc7348b7f2f981375d037907adcb1f9035a.
 - Next single Music slice: **additional Lavalink audio effects**.
+
+
+## 2026-10-05 — Music Distortion audio effect
+- Completed the independent Distortion audio effect slice.
+- Added `distortion` to the Music filter command and quick-filter palette.
+- Because `lavalink-client 2.11.0` exposes Distortion as a typed filter payload but does not provide a dedicated toggle helper, the implementation toggles `filterManager.data.distortion` and reuses `applyPlayerFilters()`, keeping the effect on the native Lavalink filter path.
+- The effect uses the existing controller resync, player persistence and Lavalink error handling path.
+- Added deterministic unit coverage for the distortion payload toggle and valid filter action.
+- Current Lavalink documentation exposes Distortion as a native player filter. citeturn177581search0turn177581search1
+- CI #2208 passed completely after fixing the optional-field TypeScript contract caught by CI #2207.
+- Final source checkpoint for this slice: `b542465c3d2f42be5f500b730a92edccdbae4f4c`.
+- Next single Music slice: **Low Pass audio effect**.
