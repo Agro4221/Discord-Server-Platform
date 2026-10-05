@@ -3,6 +3,7 @@ import { Database } from "./database.js";
 import { migrate } from "./migrations.js";
 import { HealthServer } from "./health.js";
 import { logger } from "./logger.js";
+import { verifyDiscordBotCredentials } from "./discord-bot-credentials.js";
 import { ModuleRegistry } from "./module-registry.js";
 import { TemporaryVoice } from "./modules/temporary-voice.js";
 import { Moderation } from "./modules/moderation.js";
@@ -346,6 +347,8 @@ async function main(): Promise<void> {
         : identities.ownsGuild(guildId),
     identities,
     botSetup: {
+      test: async (input: { clientId: string; token: string }) =>
+        verifyDiscordBotCredentials(input.clientId, input.token),
       get: async () => ({
         ...(await identities.settings()),
         username: client.user?.username ?? null,
