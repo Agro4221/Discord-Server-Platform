@@ -10,6 +10,9 @@ Self-hosted Discord Server Platform: local-first, resilient, modular, no artific
 ## Current branch
 development
 
+## Current HEAD
+`80ee35ae005d356142f47d08da6ab998367386a2`
+
 ## Current phase
 Release candidate — functional development frozen for live acceptance. Current development HEAD is CI-verified; remaining release-gate work is live Discord/runtime validation. Broader feature expansion is post-RC work, not a reason to keep extending the release indefinitely.
 
@@ -51,8 +54,9 @@ The deeper AutoMod, Security and Automation catalogs and additional Music provid
 
 ## Verification
 - GitHub Actions CI runs on Node.js 24.17.
-- Source secret hygiene check is active.
-- Unit regression tests exist for health, module registry, event bus and dashboard schema.
+- Current verified baseline before this cleanup: CI #2398 passed the full automated pipeline on `80ee35ae005d356142f47d08da6ab998367386a2`.
+- Source secret hygiene, deployment and observability checks are active.
+- Unit regression tests cover Core, module contracts and key Dashboard/runtime behaviour.
 - Full dependency compilation is delegated to CI because this execution environment has Node.js 22.16.
 - Discord live E2E requires user-owned Discord test credentials and has not been run here.
 
@@ -62,7 +66,7 @@ Read docs/TEST-MATRIX.md before declaring a subsystem complete.
 Never commit credentials, bot tokens, provider secrets or private user data.
 
 ## 2026-10-05 — Release-candidate gate checkpoint
-- Current development HEAD: 8daf1401258d9c94d72bac491948cce8a2b12555.
+- Previous release-candidate gate baseline: `8daf1401258d9c94d72bac491948cce8a2b12555`.
 - GitHub Actions CI run #1846 (37237396426) completed successfully on this exact HEAD.
 - The green CI job completed dependency installation/audit, source hygiene, deployment and observability checks, bot typecheck, bot tests, domain build, bot build and Dashboard production build.
 - Functional development is now treated as frozen for the release candidate. New work should be driven by a live failure, a concrete correctness/security defect, or an explicitly chosen post-RC feature.
@@ -604,3 +608,15 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Automation moderation actions now include verified `timeout`, `ban` and `kick`.
 - `set-nickname`, named cooldown controls and the recent Fleet failover work remain green on the current tree.
 - CI #1845 is green.
+
+
+## 2026-10-05 — Documentation and legacy cleanup
+- Removed obsolete unused Dashboard implementations: `apps/dashboard/app/dashboard-client.tsx` and `apps/dashboard/app/discord-admin.tsx`. The active entrypoint is `apps/dashboard/app/page.tsx` -> `control-center.tsx`.
+- Removed superseded `docs/VEXA-ADMIN-BLUEPRINT.md`; current Dashboard architecture is documented by the live Control Center, Master Plan, Admin Guide and project state.
+- Corrected stale Dashboard-auth wording: local Control Center has no end-user login/session UI and no Dashboard admin password.
+- Corrected Multi-Bot documentation so primary credentials are bootstrapped from `.env`, while registered secondary credentials are encrypted in PostgreSQL.
+- Removed obsolete secondary identity token placeholders from `.env.example`.
+- Removed stale Vexa branding from the native Windows documentation/runtime messages.
+- Replaced the outdated implementation-order document with a current RC/completion strategy.
+- Compressed `docs/CHAT-CONTEXT.md` into a current handoff snapshot and aligned `docs/TEST-STRATEGY.md` with the checks the repository actually runs.
+- This cleanup does not remove any implemented feature or administrative capability.

@@ -1,25 +1,25 @@
 # Native Windows mode
 
-For a gaming/streaming PC, Vexa can run without Docker Desktop. This keeps the bot, Dashboard and Lavalink as ordinary Windows processes instead of placing the application stack inside the Docker/WSL layer.
+For a gaming/streaming PC, Discord Server Platform can run without Docker Desktop. This keeps the bot, Dashboard and Lavalink as ordinary Windows processes instead of placing the application stack inside the Docker/WSL layer.
 
 ## Everyday gaming launch
 
 Use:
 
-    start-native.bat
+    .\start-native.bat
 
 This intentionally starts only:
 - PostgreSQL as the separately installed local database
 - one Lavalink process
-- the compiled Vexa bot
+- the compiled Discord Server Platform bot
 
 The Dashboard stays off to keep the background footprint low. When the Dashboard is needed:
 
-    start-native.bat -Dashboard
+    .\start-native.bat -Dashboard
 
 The second Lavalink node is optional:
 
-    start-native.bat -Lavalink2
+    .\start-native.bat -Lavalink2
 
 Registered secondary Bot Identities are supervised natively by the launcher without Docker. Each secondary process uses its own `BOT_IDENTITY_ID`, reads its encrypted Discord token from PostgreSQL and writes its PID/logs under `.native-runtime/`.
 
@@ -47,16 +47,16 @@ The first native start builds the domain package and bot. The Dashboard is built
 
 Use -Rebuild after source/dependency changes:
 
-    start-native.bat -Rebuild
-    start-native.bat -Dashboard -Rebuild
+    .\start-native.bat -Rebuild
+    .\start-native.bat -Dashboard -Rebuild
 
 This prevents the normal gaming launch from performing a large TypeScript/Next.js build every time.
 
 ## Stop
 
-Stop only the Vexa processes started by the native launcher:
+Stop only the Discord Server Platform processes started by the native launcher:
 
-    start-native.bat -Down
+    .\start-native.bat -Down
 
 The launcher stores temporary PIDs and logs under .native-runtime/, which is ignored by Git.
 

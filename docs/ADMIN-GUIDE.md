@@ -4,19 +4,30 @@
 
 ## 1. Первый запуск на Windows
 
-Из корня репозитория:
+Основной локальный путь — native Windows runtime:
 
-    powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1
+    .\start-native.bat
 
-На первом запуске launcher создаёт .env и попросит Discord Bot Token и Discord Client ID. Остальные локальные секреты генерируются автоматически.
+По умолчанию запускаются PostgreSQL (установленный отдельно), один Lavalink и Bot.
+Control Center запускается только с `-Dashboard`:
 
-После запуска автоматически открывается:
+    .\start-native.bat -Dashboard
+
+На первом запуске launcher просит только:
+- Discord Bot Token;
+- Discord Client ID.
+
+Автоматически генерируются локальные служебные секреты. **Пароля Dashboard и пользовательского login/session слоя больше нет.**
+
+Когда `-Dashboard` включён и сервисы готовы, Control Center открывается по адресу:
 
     http://127.0.0.1:3000/
 
-При успешном запуске `start-local.bat` закрывает окно launcher после открытия Control Center. При ошибке окно остаётся открытым, чтобы сообщение можно было прочитать.
+Второй Lavalink также необязателен:
 
-Пользовательского входа в локальный Control Center нет: Dashboard доступен только с локального компьютера, а серверная часть использует внутренний bearer-ключ Management API.
+    .\start-native.bat -Lavalink2
+
+Используй его только для сценариев с резервированием/failover.
 
 ## 2. Control Center
 

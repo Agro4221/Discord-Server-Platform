@@ -81,7 +81,7 @@ Never commit:
 - OAuth client secrets;
 - database passwords;
 - provider API keys;
-- dashboard passwords/session secrets;
+- Management API bearer keys;
 - backup credentials;
 - runtime databases or user data.
 

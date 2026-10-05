@@ -235,7 +235,7 @@ try {
     Stop-NativeProcess "lavalink"
     & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ".\scripts\reconcile-fleet-native.ps1" -Down
     if ($LASTEXITCODE -ne 0) { throw "Native Bot Fleet cleanup failed with exit code $LASTEXITCODE." }
-    Write-Host "Native Vexa processes stopped."
+    Write-Host "Native Discord Server Platform processes stopped."
     exit 0
   }
 
@@ -376,7 +376,7 @@ try {
   }
 
   Write-Host ""
-  Write-Host "Vexa is running in native Windows mode."
+  Write-Host "Discord Server Platform is running in native Windows mode."
   Write-Host "Docker Desktop is not required and is not started by this launcher."
   Write-Host "Lavalink nodes: $($nodes.Count)"
   Write-Host "Bot health: $healthUrl"

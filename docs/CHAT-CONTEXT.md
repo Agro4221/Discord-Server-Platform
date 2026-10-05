@@ -1,272 +1,127 @@
 # CHAT-CONTEXT.md
 
-> Живой контекст для переноса проекта в новый чат. Обновляй после существенных feature-slice.
-> Сюда нельзя записывать токены, ключи, пароли и приватные данные.
+> Живой контекст для продолжения проекта в новом чате. Не записывать сюда токены, ключи, пароли и приватные данные.
 
-## 1. ПРОЕКТ
+## Проект
 
-Репозиторий: `Agro4221/Discord-Server-Platform`
-Ветка: `development`
-Последний известный HEAD на момент обновления этого файла: `8e909adab460ae498c3258ec6cc59b2d55b7c820`
-Тип: self-hosted Discord Server Platform / единый Discord-бот.
-Основной локальный runtime: Native Windows.
-Docker: дополнительный путь для локального/VPS-развёртывания.
+Repository: `Agro4221/Discord-Server-Platform`  
+Branch: `development`  
+Current HEAD: `80ee35ae005d356142f47d08da6ab998367386a2`  
+Current phase: **Release candidate / live acceptance**  
+Primary local runtime: **native Windows**. Docker remains an optional deployment path.
 
-### NORTH STAR — НЕ ТЕРЯТЬ
+## NORTH STAR
 
-Мы делаем **своего Discord-бота/платформу**, чтобы сервер мог заменить набор сторонних ботов и их платные Premium-подписки.
+Мы делаем **своего Discord-бота/платформу**, чтобы серверу не требовался набор сторонних ботов и их Premium-подписки.
 
-Ориентир по функционалу:
-Carl-bot, Juniper, MEE6, ProBot, Jockie Music и похожие боты.
+Ориентиры: Carl-bot, Juniper, MEE6, ProBot, Jockie Music и аналогичные решения.
 
-Мы не копируем проприетарный код. Мы независимо реализуем лучшие полезные возможности и объединяем их в:
-- один бот/платформу;
-- единую модель конфигурации;
-- PostgreSQL persistence;
-- общие permissions/audit;
-- единый локальный Control Center;
-- общие automation/security/recovery-механизмы;
-- при необходимости — multi-bot Fleet.
+Ключевые принципы:
+- один интегрированный self-hosted стек;
+- собственная реализация без копирования закрытого кода;
+- единая конфигурация, PostgreSQL, permissions, audit и recovery;
+- локальный Control Center как основной административный интерфейс;
+- без искусственных Premium-wall;
+- при необходимости multi-bot Fleet для нескольких voice-каналов.
 
-Ключевое правило: **«модуль существует» != «задача завершена»**. Нужно закрывать реальные функциональные пробелы, пока платформа действительно не сможет заменить задуманный стек сторонних ботов в рамках нашего scope.
+## Что уже есть
 
-Не делать искусственные Premium-wall для возможностей self-hosted платформы.
+Core / infrastructure:
+- typed Discord Event Bus и module lifecycle;
+- PostgreSQL, versioned migrations, advisory migration lock;
+- Management API с внутренним bearer key;
+- health/readiness и Gateway supervision;
+- durable audit;
+- native Windows launcher, diagnostics и release gate;
+- Docker Compose/VPS topology.
 
-## 2. КАК ПРОДОЛЖАТЬ РАБОТУ
+Административные и серверные функции:
+- Moderation + cases;
+- AutoMod;
+- Security / Anti-Raid / Anti-Nuke;
+- Temporary Voice + reconciliation;
+- Welcome / Verification;
+- Role Panels;
+- Tickets + transcripts;
+- Leveling;
+- Giveaways;
+- Starboard;
+- Economy / shop / ledger;
+- Reminders / AFK / Utility;
+- Custom Commands;
+- Community Tools;
+- Automation;
+- Notifications / Stream Alerts;
+- Analytics;
+- Backup / restore / import / export.
 
-Пользователь ожидает:
-- реальное кодирование, а не бесконечные аудиты и документацию вместо разработки;
-- работу небольшими модулями/feature-slice, чтобы снижать ошибки, таймауты и расход токенов;
-- логирование всего важного: что сделано, что проверено, что не прошло, что осталось;
-- переносимость контекста между чатами без повторного объяснения проекта;
-- минимум лишних вопросов.
+Music / Fleet:
+- Lavalink;
+- persistent queue/player recovery;
+- search до 100 треков;
+- repeat/autoplay/shuffle/seek/filters;
+- provider fallback;
+- per-voice Music routing;
+- registered Bot Identities;
+- encrypted secondary credentials;
+- native/Docker fleet supervision.
 
-Старт нового чата:
-1. Прочитать этот файл.
-2. Прочитать `docs/WORK-LOG.md`.
-3. Прочитать `docs/PROJECT-STATE.md`.
-4. Перед объявлением подсистемы готовой сверить `docs/TEST-MATRIX.md`.
-5. Проверить текущий GitHub HEAD и актуальное состояние файлов.
-6. Сразу взять один конкретный feature-slice и кодить.
-7. Добавить regression tests.
-8. Обновить continuity-документы.
-9. Проверить GitHub Actions и сообщить фактический статус.
-10. Идти дальше, не переоткрывая уже подтверждённые контракты без причины.
+## Control Center
 
-## 3. АРХИТЕКТУРНЫЕ ПРАВИЛА
+Новая админка — не старая панель на три функции. Она объединяет:
+- Обзор;
+- Модерация и безопасность;
+- Настройку сервера;
+- Сообщество;
+- Автоматизацию;
+- Интеграции и медиа;
+- Систему.
 
-- Local-first, затем VPS без переписывания архитектуры.
-- PostgreSQL + versioned migrations + advisory migration lock.
-- Management API — защищённая внутренняя control plane.
-- Локальный Control Center **не имеет end-user login/session UI**. Не возвращать удалённые login/logout/OAuth/CSRF ожидания.
-- Discord commands — пользовательские/fallback entry points; Control Center — основной локальный админ-интерфейс.
-- Никогда не коммитить secrets.
-- Для pure logic/validator/helper — детерминированные regression tests.
-- Discord/Lavalink/Windows/VPS live-поведение считать отдельным environment-dependent acceptance.
-- Проверять не только happy path: permissions, invalid input, persistence failure, restart/recovery, dependency failure, concurrency, hierarchy, cross-module behavior.
+Есть настройки модулей, специализированные operational panels, guild/resource selectors, audit, backups, diagnostics и Bot Fleet.
 
-## 4. ЧТО УЖЕ ЕСТЬ
+**End-user login/session UI отсутствует.** Локальный доступ ограничен loopback/local-first режимом, а Management API защищён внутренним bearer key.
 
-Крупные функциональные области:
-- Discord Core, typed Event Bus, module lifecycle
-- PostgreSQL persistence/migrations
-- Control Center / Management API
-- Moderation + case history
-- Temporary Voice
-- Tickets + transcripts
-- Role Panels
-- Giveaways
-- Starboard
-- Economy / shop / ledger
-- Reminders / AFK / Utility
-- Leveling
-- Welcome / Verification
-- Notifications
-- Analytics
-- Backup / restore / import / export
-- Automation
-- AutoMod
-- Security / Anti-Raid / Anti-Nuke
-- Music / Lavalink
-- multi-bot Fleet + per-voice Music routing
-- Bot credential registration
-- Native Windows runtime / diagnostics / release gate
-- Docker Compose / VPS-oriented topology
+Bot Fleet позволяет зарегистрировать Discord-бота через Control Center; plaintext token не возвращается в UI.
 
-## 5. ПОСЛЕДНИЕ ВАЖНЫЕ FEATURE-SLICE
+## Текущий статус
 
-### Automation
-Последний срез добавил строгие числовые условия `number-gt` и `number-lt`, а также исправил Dashboard-рендеринг `number-eq` в ALL/ANY builder. Management API, Core и Dashboard остаются синхронизированы.
+CI baseline до cleanup: **#2398 — success** на `80ee35ae005d356142f47d08da6ab998367386a2`. Для cleanup-коммита нужен новый CI проход.
 
-Добавлены:
-- conditions: `starts-with`, `ends-with`, `number-eq`;
-- event-relative `@event` для `has-role` и `send-message`;
-- message actions: `add-reaction`, `remove-reaction`, `pin-message`, `unpin-message`;
-- channel actions: `set-slowmode`, `set-channel-topic`, `set-channel-name`;
-- events: `reaction.remove`, `channel.update`, `role.update`;
-- event fields: `previousChannelId`, `attachmentCount`, `embedCount`, `stickerCount`;
-- Core / Management API / Dashboard каталоги синхронизированы;
-- добавлены validator/runtime regression tests.
+Последний подтверждённый performance pass:
+- кэширование hot-path module/config checks;
+- batching Analytics;
+- event-index для Automation;
+- сниженная частота не критичных polling workers;
+- bounded AutoMod repeat history;
+- reduced Lavalink JVM defaults;
+- regression coverage для новых оптимизаций.
 
-### Security
-Security response policy теперь имеет опциональный `executorTimeoutMinutes` и `executorBanEnabled` для подтверждённого destructive executor; ban при включении имеет приоритет, а timeout используется как fallback. Успешное действие создаёт moderation case, неуспешное не создаёт ложную запись.
+## Что осталось
 
-Audit-log ingestion расширен для:
-- member kicks;
-- webhooks create/delete/update;
-- emojis create/delete/update;
-- stickers create/delete/update;
-- channel permission overwrites create/update/delete;
-- member prune;
-- integrations create/delete/update.
+Release-gate:
+- live Discord E2E на реальном тестовом сервере;
+- Lavalink restart/resume + multi-node failover;
+- multi-bot takeover на реальных identities;
+- native Windows runtime acceptance;
+- VPS clean-host acceptance;
+- controlled chaos/soak/security.
 
-Не дублировать уже отдельные high-level handlers для channel/role create-delete и member ban.
+Post-RC functional depth:
+- более глубокий AutoMod/Security;
+- более широкий Automation catalog;
+- Music provider/failover breadth;
+- Fleet orchestration depth.
 
-Текущая Security-основа:
-- durable incidents;
-- configurable destructive thresholds/windows;
-- incident duration;
-- auto-quarantine;
-- quarantine assignment tracking/restoration;
-- optional removal of manageable executor roles;
-- hierarchy/log diagnostics;
-- audit event ingestion.
+## Как продолжать
 
-### Music
-Есть:
-- multi-track search enqueue с лимитом 100;
-- auto fallback YouTube -> YouTube Music -> SoundCloud;
-- queue remove/move/clear;
-- filters: off, nightcore, vaporwave, karaoke, rotation/8D, tremolo, vibrato, lowpass;
-- repeat modes;
-- autoplay на queue-end;
-- persistent/resumable player/queue state;
-- shuffle/seek;
-- multi-bot/per-voice routing;
-- dynamic Lavalink health;
-- recovery concurrency gate.
+Работать маленькими самостоятельными feature-slice:
+**код → regression test → CI → лог → следующий slice.**
 
-Важно для lavalink-client 2.11:
-- использовать `queue.remove(index)`;
-- использовать `queue.splice(index, amount, ...)`;
-- **не добавлять** `queue.move` или `queue.clear`, пока API установленной версии не будет заново проверен.
+Не делать массовую перепись рабочего кода и не возвращать удалённую Dashboard-аутентификацию.
 
-### Fleet / Runtime
-Есть:
-- persistent bot identities;
-- secondary Bot Identity process model;
-- stale-heartbeat failover;
-- durable `restart_required`;
-- Management API restart request;
-- native Windows Fleet supervisor;
-- Docker reconciliation failure propagation;
-- ownership revalidation с short-lived cache;
-- release-gate/diagnostics scripts;
-- Native Windows как основной локальный путь, Docker как optional.
+После существенного slice обновлять:
+- `docs/WORK-LOG.md`;
+- `docs/PROJECT-STATE.md`;
+- `docs/TEST-MATRIX.md`, если изменились тестовые границы.
 
-## 6. ЧТО ЕЩЁ ДЕЛАТЬ
-
-Основной остаток — **не переписывание с нуля, а закрытие глубины/широты**:
-
-1. Security / Anti-Nuke / AutoMod response-policy depth.
-2. Более широкий Automation condition/action catalog.
-3. Music provider breadth + полноценный multi-node failover.
-4. Более глубокий Fleet orchestration/failover + failure injection.
-5. Полный VPS installer/upgrade/production drill.
-6. Финальные live E2E / chaos / soak / security / clean-host tests.
-
-Рекомендуемый следующий feature-slice: **Security/AutoMod response-policy depth**, если текущая проверка репозитория не покажет более срочный regression/blocker.
-
-## 7. CI / ВЕРИФИКАЦИЯ
-
-На момент создания контекста:
-- HEAD: `79dfbb13e33fe9b63c26fbf7bc84b744e6867f2b`
-- CI #1764 для предыдущего HEAD завершён успешно.
-- Для текущего дерева активен CI #1783; его нельзя считать green до завершения.
-
-Последний предыдущий подтверждённо зелёный baseline: CI #1757.
-
-В новом чате сначала перепроверить CI #1764 и текущий HEAD.
-
-## 8. ВАЖНЫЕ SECURITY-ДЕТАЛИ ДЛЯ СЛЕДУЮЩЕЙ ЗАДАЧИ
-
-`apps/bot/src/modules/security.ts` содержит:
-- `enabled`
-- `maxJoins`
-- `windowSeconds`
-- `maxDestructiveActions`
-- `destructiveWindowSeconds`
-- `quarantineRoleId`
-- `logChannelId`
-- `incidentDurationSeconds`
-- `autoQuarantine`
-- `removeExecutorRoles`
-- `executorTimeoutMinutes`
-- `executorBanEnabled`
-
-`respondToExecutor` сейчас:
-- загружает executor member;
-- не трогает owner/admin/non-manageable;
-- после response threshold может снять управляемые роли ниже highest role бота;
-- tracks quarantine assignments;
-- пишет response-applied events;
-- снятие ролей сейчас считается необратимым.
-
-Любое усиление наказаний должно строго учитывать Discord hierarchy и не создавать privilege escalation.
-
-## 9. CONTINUITY CONTRACT
-
-После каждого существенного slice обновлять:
-- `docs/WORK-LOG.md`
-- `docs/PROJECT-STATE.md`
-- `docs/TEST-MATRIX.md` при изменении test coverage/status
-
-Этот файл обновлять, когда меняются:
-- north star;
-- branch/HEAD;
-- current phase;
-- крупные implemented feature families;
-- remaining scope;
-- next recommended slice;
-- CI status;
-- architecture decisions.
-
-## 10. ГОТОВАЯ ФРАЗА ДЛЯ НОВОГО ЧАТА
-
-Продолжаем `Agro4221/Discord-Server-Platform`. Это живой контекст проекта. Сверь его с текущим GitHub HEAD и `docs/WORK-LOG.md` / `docs/PROJECT-STATE.md`, после чего сразу бери следующий конкретный модульный feature-slice: кодируй, тестируй и логируй. Не уходи в бесконечные аудиты и не останавливайся на планировании.
-
-## 11. ПОСЛЕДНИЙ NEXT STEP
-
-Перепроверить CI #1764, затем продолжить с конкретной Security/AutoMod response-policy задачей и последовательно закрывать оставшиеся функциональные breadth gaps.
-
-
-### 2026-10-04 — Latest development checkpoint
-- Security: optional `autoLockdown` for raid/destructive-burst incidents; durable channel ownership and restoration.
-- Security settings also include `executorTimeoutMinutes` and `executorBanEnabled`.
-- Automation: `number-eq`, `number-gt`, `number-lt`; Dashboard builder restored to full implementation after a truncated-file regression was corrected.
-- CI #1811: **success** on full pipeline.
-- Next concrete implementation target: Automation named cooldown action/control, followed by remaining Music/Fleet/VPS breadth.
-
-
-### 2026-10-04 — Latest verified checkpoint
-- AutoMod: rule-level `ban` is green under CI #1823.
-- Automation: `set-cooldown` + `clear-cooldown` runtime is green under CI #1819.
-- Fleet: stale Music voice assignment takeover is green under CI #1824.
-- Next target: deeper Fleet orchestration, then remaining Music/VPS production breadth.
-
-### 2026-10-05 — Latest verified checkpoint
-- CI #1837: **success**.
-- Automation: `set-nickname` and `ban` green.
-- Fleet failover detail/audit changes present.
-- Next work stays on functional breadth.
-
-### 2026-10-05 — Latest verified checkpoint
-- CI #1839: success on Automation moderation breadth.
-- Added and verified Automation `set-nickname` and `ban` actions.
-- Next implementation target remains functional breadth; documentation-only milestones do not replace feature work.
-
-
-### 2026-10-05 — Latest verified checkpoint
-- CI #1845: success.
-- Automation `kick` verified end-to-end.
-- Next target: continue functional breadth; avoid documentation-only checkpoints.
+Перед объявлением подсистемы законченной сверять `docs/TEST-MATRIX.md`.
