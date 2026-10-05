@@ -1274,3 +1274,9 @@ Never write credentials, tokens or private user data here.
 - Deployment contract now checks that the upgrade guard remains present.
 - Source checkpoint: `67ed79823ca844e1daa088b9631f7a41a45c26be`.
 - Fresh CI is not visible yet; actual upgrade/recovery execution remains a live gate.
+
+## 2026-10-05 — VPS upgrade domain guard
+- Hardened `upgrade.sh` so a missing or malformed `DOMAIN` in an existing `.env` stops the upgrade before HTTPS probing.
+- Deployment contract now requires the explicit domain validation guard.
+- Source checkpoint: `83f7e61bb7b9cfc25902effc011023ff8b5af288`.
+- Fresh CI is still not visible; live existing-install upgrade remains a release-gate check.
