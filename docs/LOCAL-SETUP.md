@@ -1,6 +1,6 @@
 # Local Setup
 
-This project is local-first. The supported everyday setup is Docker Compose on the user's PC; the same topology can later move to a VPS.
+This project is local-first. The supported everyday setup is native Windows; Docker is optional and intended mainly for reproducible deployments/VPS scenarios.
 
 ## Native Windows mode
 
@@ -14,13 +14,17 @@ Use -Lavalink2 only when you explicitly need a second Lavalink node for redundan
 
 ## Windows: one-command local start
 
-Install Docker Desktop, clone the repository, and from the repository directory run:
+Docker is not required for the everyday gaming setup. Clone the repository and use:
 
-    powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1
+    start.bat
+
+For the Control Center:
+
+    control-center.bat
 
 On the first launch the script creates `.env` and generates the local management/database/Lavalink secrets. Discord credentials and user login are not requested by the launcher; register the bot in Control Center → Bot Fleet.
 
-After the services become healthy it opens the local Control Center automatically:
+The default `start.bat` keeps Dashboard off to reduce background memory/CPU use. `control-center.bat` starts it and opens:
 
     http://127.0.0.1:3000/
 
@@ -42,7 +46,7 @@ Stop the local stack.
 
 ## What runs locally
 
-Docker Compose starts PostgreSQL, two Lavalink nodes, the bot and the Next.js Control Center. Persistent PostgreSQL data is stored in the `dsp-postgres` Docker volume.
+Native mode starts PostgreSQL as an existing Windows installation, one Lavalink node and the bot. Dashboard and the second Lavalink node are opt-in. Runtime logs/PIDs live under `.native-runtime/`.
 
 The bot exposes health and Management API ports only on `127.0.0.1`. The Dashboard is also loopback-only by default.
 
@@ -54,25 +58,15 @@ For command development, set `DISCORD_TEST_GUILD_ID` in `.env` so slash commands
 
 ## Troubleshooting
 
-See container state with:
+For native runtime status:
 
-    docker compose ps
+    native-status.bat
 
-See bot logs with:
+Logs are under `.native-runtime/logs/`. Stop native processes with:
 
-    docker compose logs -f bot
+    stop.bat
 
-See Dashboard logs with:
-
-    docker compose logs -f dashboard
-
-Restart the stack with:
-
-    docker compose restart
-
-Remove containers without deleting the PostgreSQL volume with:
-
-    docker compose down
+Docker troubleshooting remains available through `scripts/start-local.ps1` only when Docker mode is intentionally selected.
 
 Do not commit `.env`. Secrets stay in the local environment.
 
@@ -100,3 +94,8 @@ For upgrades:
 The upgrade script detects the generated infrastructure/caddy/Caddyfile and automatically uses docker-compose.vps.yml.
 
 Before deployment, make sure the DNS A/AAAA record for the chosen domain points to the VPS and that ports 80/443 are reachable so Caddy can obtain and renew TLS certificates.
+
+
+## Resource planning
+
+See `docs/RESOURCE-REQUIREMENTS.md` for minimum/recommended/heavy PC tiers and the measured-runtime procedure. The default gaming mode intentionally uses one Lavalink node and no Dashboard.
