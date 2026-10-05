@@ -1,17 +1,17 @@
 # Native Windows mode
 
-For a gaming/streaming PC, Vexa can run without Docker Desktop. This keeps the bot, Dashboard and Lavalink as ordinary Windows processes instead of placing the application stack inside the Docker/WSL layer.
+For a gaming/streaming PC, Discord Server Platform can run without Docker Desktop. This keeps the bot, Dashboard and Lavalink as ordinary Windows processes instead of placing the application stack inside the Docker/WSL layer.
 
 ## Everyday gaming launch
 
 Use:
 
-    start-native.bat
+    start.bat
 
 This intentionally starts only:
 - PostgreSQL as the separately installed local database
 - one Lavalink process
-- the compiled Vexa bot
+- the compiled Discord Server Platform bot
 
 The Dashboard stays off to keep the background footprint low. When the Dashboard is needed:
 
@@ -22,6 +22,14 @@ The second Lavalink node is optional:
     start-native.bat -Lavalink2
 
 For a single-PC gaming setup, the default one-node mode is the normal choice. The second node exists for redundancy/failover scenarios and is not required for ordinary music playback.
+
+## Native Windows mode
+
+For a gaming/streaming PC, Discord Server Platform runs without Docker Desktop. The normal entrypoint is `start.bat`; `control-center.bat` adds the Dashboard, and `stop.bat` stops only the native processes started by the launcher.
+
+The native launcher starts one Lavalink node by default and leaves the Dashboard and second Lavalink node off unless requested. This keeps the normal background footprint low.
+
+Discord credentials are optional at process startup. The Management API/Control Center can start first, then the bot can be registered in Control Center → Bot Fleet.
 
 ## Native requirements
 
@@ -52,7 +60,7 @@ This prevents the normal gaming launch from performing a large TypeScript/Next.j
 
 ## Stop
 
-Stop only the Vexa processes started by the native launcher:
+Stop only the Discord Server Platform processes started by the native launcher:
 
     start-native.bat -Down
 
