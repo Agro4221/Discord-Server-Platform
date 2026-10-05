@@ -1013,6 +1013,13 @@ Never write credentials, tokens or private user data here.
 - Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
 
 ## 2026-10-05 — Local Bot Setup / registration panel
+## 2026-10-05 — CI #2360 typecheck fix
+- CI #2360 reached bot typecheck and failed on three concrete TypeScript errors.
+- Fixed missing Notifications service methods in `main.ts` wiring.
+- Fixed invalid object spread of the TikTok OAuth exchange result in Management API by assigning the result first.
+- Fixed the generic notification-feed create route to normalize/declare `embedConfig` before passing it to the service.
+- Follow-up CI #2362 was queued from the corrective HEAD.
+- Source checkpoint: 7cbcf9c2243f23b3fd9a7c5ecb0ac160e5656dfc.
 ## 2026-10-05 — Bot Setup avatar/banner controls
 - Added PNG/JPEG/GIF avatar and banner file inputs to the local Bot Setup panel.
 - Client-side validation limits each image to 3 MB and converts it to the data URL format already accepted by the existing Management API profile validation.
