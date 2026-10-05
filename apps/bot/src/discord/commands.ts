@@ -101,7 +101,11 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
     new SlashCommandBuilder()
       .setName("play")
       .setDescription("Play a track or playlist")
-      .addStringOption((o) => o.setName("query").setDescription("Song, URL or playlist").setMaxLength(2000).setRequired(true)),
+      .addStringOption((o) => o.setName("query").setDescription("Song, URL or playlist").setMaxLength(2000).setRequired(true))
+      .addStringOption((o) => o.setName("provider").setDescription("Search provider").addChoices(
+        { name: "YouTube", value: "youtube" },
+        { name: "Yandex Music", value: "yandex" }
+      )),
     new SlashCommandBuilder().setName("pause").setDescription("Pause music"),
     new SlashCommandBuilder().setName("resume").setDescription("Resume music"),
     new SlashCommandBuilder().setName("skip").setDescription("Skip the current track"),
@@ -900,12 +904,20 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .setName("play")
           .setDescription("Play a song or search YouTube")
           .addStringOption((o) => o.setName("query").setDescription("Song, artist, URL or playlist").setMaxLength(2000).setRequired(true))
+           .addStringOption((o) => o.setName("provider").setDescription("Search provider").addChoices(
+             { name: "YouTube", value: "youtube" },
+             { name: "Yandex Music", value: "yandex" }
+           ))
       )
       .addSubcommand((sub) =>
         sub
           .setName("search")
           .setDescription("Search tracks and choose a result")
           .addStringOption((o) => o.setName("query").setDescription("Search query").setMaxLength(2000).setRequired(true))
+           .addStringOption((o) => o.setName("provider").setDescription("Search provider").addChoices(
+             { name: "YouTube", value: "youtube" },
+             { name: "Yandex Music", value: "yandex" }
+           ))
       )
       .addSubcommand((sub) => sub.setName("resume").setDescription("Resume playback"))
       .addSubcommand((sub) => sub.setName("previous").setDescription("Play previous track"))
