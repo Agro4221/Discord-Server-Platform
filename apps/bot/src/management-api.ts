@@ -1023,7 +1023,8 @@ export class ManagementApiServer {
               throw new RequestInputError("invalid_tiktok_oauth_exchange", 400);
             }
             try {
-              this.json(res, 200, { ok: true, ...(await this.exchangeTikTokOauthCode(body.code, body.state)) });
+              const result = await this.exchangeTikTokOauthCode(body.code, body.state);
+              this.json(res, 200, { ok: true, result });
             } catch (error) {
               this.json(res, 400, { error: String(error).replace(/^Error:\s*/, "") });
             }
@@ -1204,6 +1205,11 @@ export class ManagementApiServer {
                 ? body.excludeKeywords.filter((value: unknown): value is string => typeof value === "string").slice(0,20)
                 : [];
               const messageTemplate = typeof body.messageTemplate === "string" ? body.messageTemplate.slice(0,1800) : undefined;
+              const embedConfig = await normalizeNotificationEmbedConfig(
+                body.embedConfig && typeof body.embedConfig === "object" && !Array.isArray(body.embedConfig)
+                  ? body.embedConfig as Record<string, unknown>
+                  : null
+              );
               const result = await this.options.notifications!.create(
                 guildId,
                 body.channelId,
