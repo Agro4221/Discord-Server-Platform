@@ -1012,6 +1012,13 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Qobuz playback remains a release-gate validation item.
 - Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
 
+## 2026-10-05 — Music lyrics source diagnostics
+- Extended /music lyrics with a status action for the configured LavaLyrics sources.
+- Status reports whether the Music/Lavalink node is currently available and lists the configured YouTube, Spotify, Deezer and Yandex Music lyrics sources.
+- A missing lyric for one track is explicitly distinguished from a lyrics-module/node outage.
+- Added regression coverage for the command schema.
+- Source checkpoint: 59dba7dd1f0e5756158ef6b10ded573dddefc7dc.
+
 ## 2026-10-05 — Music paginated lyrics navigation
 - Reworked the Music lyrics response into a paginated Discord UI.
 - Lyrics are chunked to a safe message size, preferring line boundaries and falling back to word boundaries.
