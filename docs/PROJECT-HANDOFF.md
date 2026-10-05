@@ -563,3 +563,8 @@ Live validation, требующая пользовательского окру�
 ### 2026-10-05 — Current checkpoint after playlist shuffle
 - Load playlist with optional shuffle is complete and CI-verified (#2004).
 - Next single module: Vote skip.
+
+
+### 2026-10-05 — Current checkpoint after Vote Skip
+- Vote Skip is complete and CI-verified (#2012).
+- Next single module: Per-user request cooldown.
