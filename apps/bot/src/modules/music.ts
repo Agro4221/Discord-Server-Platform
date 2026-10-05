@@ -2307,9 +2307,10 @@ export class Music implements PlatformModule {
   private async controllerPolicyAllowed(
     guildId: string,
     action: string,
-    member: import("discord.js").GuildMember,
+    member: import("discord.js").GuildMember | null,
     channelId: string
   ): Promise<boolean> {
+    if (!member) return false;
     if (!this.commandPolicy) return true;
     const commandName =
       action === "loop-one" ? "repeat" :
