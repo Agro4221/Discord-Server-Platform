@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type Resource = { id: string; name: string };
+type Resource = { id: string; name: string; type?: number };
 type Condition =
   | { type: "contains" | "equals" | "starts-with" | "ends-with"; left: string; right: string }
   | { type: "matches"; left: string; pattern: string }
@@ -65,6 +65,8 @@ export function AutomationPanel({
   roles: Resource[];
   onChanged?: () => void | Promise<void>;
 }) {
+  const textChannels = channels.filter((channel) => channel.type === 0 || channel.type === 5);
+  const categories = channels.filter((channel) => channel.type === 4);
   const [rules, setRules] = useState<Rule[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("Новое правило");
@@ -297,7 +299,7 @@ export function AutomationPanel({
             {condition.type === "channel-is" && (
               <select value={condition.channelId} onChange={(e) => updateCondition(index, { channelId: e.target.value })} style={inputStyle}>
                 <option value="">Канал</option>
-                {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                {textChannels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
               </select>
             )}
 
