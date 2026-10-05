@@ -56,7 +56,7 @@ plugins:
 
 lavalink:
   server:
-    password: "${LAVALINK_SERVER_PASSWORD:change-me-local}"
+    password: "${LAVALINK_SERVER_PASSWORD}"
     sources:
       soundcloud: true
       twitch: true
