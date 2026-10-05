@@ -223,7 +223,7 @@
 | 8D rotation | ✅ |
 | Karaoke | ✅ |
 | Pitch control | ✅ |
-| Speed control | 🟡 |
+| Speed control | ✅ |
 | Tremolo / rotation / other Lavalink effects | 🟡 |
 | Custom EQ editor | 🟡 |
 | Named effect profiles | 🟡 | e.g. Gaming / Anime / Chill / Party |
