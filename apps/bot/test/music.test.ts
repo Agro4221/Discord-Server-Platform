@@ -699,7 +699,7 @@ test("Music provider resolver routes Yandex and Spotify searches and preserves d
 
 test("Music lyrics pagination keeps readable page boundaries and safe page indexes", () => {
   const textValue = Array.from({ length: 80 }, (_, index) =>
-    "Verse line " + String(index + 1).padStart(2, "0") + " " + "word ".repeat(12)
+    "Verse line " + String(index + 1).padStart(2, "0") + " " + "word ".repeat(12).trim()
   ).join("\n");
 
   const chunks = chunkMusicLyrics(textValue, 500);
