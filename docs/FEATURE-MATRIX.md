@@ -167,7 +167,7 @@
 | Queue history / recently played | ✅ | Recent playback history is persisted/exposed by Music |
 | Show requester per queued track | ✅ | Queue pages display requester mention when available |
 | Queue export / share | ✅ | Queue supports copy-friendly Share output and full JSON Export attachment |
-| Save current queue as playlist | 🟡 |
+| Save current queue as playlist | ✅ | Current playback queue can be saved as a personal playlist through the controller |
 | Load playlist with optional shuffle | 🟡 |
 
 #### Player / controller
@@ -180,7 +180,7 @@
 | Previous / rewind / forward controls | ✅ |
 | Queue / lyrics / favorite controls | ✅ |
 | Filters / FX quick-access button | ✅ | Music controller exposes a quick filter palette reusing the existing Lavalink preset/FX actions |
-| Save queue button | 🟡 |
+| Save queue button | ✅ | Music controller opens a modal and saves the current track plus pending queue into a named personal playlist |
 | Radio/autoplay button | 🟡 |
 | Controller state refresh after every action | ✅ | Music actions persist state and resync the controller message |
 
