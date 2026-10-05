@@ -703,3 +703,16 @@ Never write credentials, tokens or private user data here.
 - CI #2081 passed completely: deployment contract, typecheck, 155 tests, domain build, bot build and Dashboard build.
 - Final source checkpoint: `c83d17491ce47aea11cabf214d4383032f5c3404`.
 - Next single Music slice: **Optional approval/moderation mode for requests**.
+
+## 2026-10-05 — Music Request Approval / moderation mode
+- Completed the optional Music request approval mode for user requests.
+- Added persisted `requestApprovalMode` setting with `off` (legacy immediate queueing) and `approval` modes; Dashboard and Config Export/Import expose the same setting.
+- Added durable `music_request_approvals` storage with expiry, processing claim, resolver and result metadata so pending requests survive bot restarts.
+- In approval mode, manual `play`, request-channel submissions and search-picker selections create moderation requests instead of directly mutating the queue.
+- DJ-role or Manage Server members can Approve/Reject directly from the Discord request card; approval preserves the original requester identity.
+- Approval rechecks voice ownership and current per-user/server queue limits before insertion, then applies Fair Queue when enabled.
+- Added audit events for request creation, approval, rejection and processing failure without exposing secrets or full track payloads.
+- Added regression coverage for approval-mode normalization and PostgreSQL request persistence.
+- CI #2093 passed completely: deployment contract, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final code checkpoint: `9b412a48945a1c24693aa4bb60dfce5384ad6368`.
+- Next single Music slice: **Server/shared playlists**.
