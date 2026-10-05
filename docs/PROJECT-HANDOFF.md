@@ -660,3 +660,8 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Direct Docker Compose startup no longer has predictable change-me fallbacks for PostgreSQL/Lavalink credentials.
 - The supported local path remains scripts/start-local.ps1, which generates persistent secrets before Compose startup; CI uses ephemeral values only for static Compose validation.
 - Treat this as release-gate hardening, not a new runtime feature.
+
+## 2026-10-05 — Source hygiene gate follow-up
+- Source hygiene was found to have a regex false-negative; keep the repaired patterns intact.
+- The scanner now covers the existing token/private-key forms plus github_pat and AWS access-key IDs.
+- Do not treat source hygiene as fully release-verified until CI runs against the current branch head.
