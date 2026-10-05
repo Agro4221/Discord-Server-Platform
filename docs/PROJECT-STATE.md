@@ -454,3 +454,13 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Source checkpoint: `cb859ef8abd6f44c8e34510f4c2db6ebcf77f512`.
 - CI #2063 is green.
 - Queue add/remove/move permissions are now configurable through shared Command Policy with backwards-compatible fallback behavior.
+
+## 2026-10-05 — Dashboard CI repair and release-hardening checkpoint
+- Working branch: `feature/music-v2`.
+- Functional Feature Matrix is fully reconciled to ✅; remaining acceptance work is primarily environment-dependent release validation rather than a missing feature row.
+- CI #2369 verified 196 bot tests, typecheck, domain build and bot build successfully, but Dashboard production build failed on the base-branch TikTok OAuth route's incorrect relative import to `apps/dashboard/lib/auth.ts`.
+- Fixed the route on the working branch and added a CI-local import contract (`scripts/check-dashboard-imports.mjs`) that scans Dashboard source imports before production build.
+- Source checkpoint for the repair/hardening slice: `35442a31c3161421576b96e89ebe3fd1b2d73e08`.
+- A fresh Actions run for this repaired checkpoint is still pending/unavailable in the current connector session; do not mark this slice CI-verified yet.
+- Next concrete engineering focus: release-gate hardening across recovery/failure paths and live environment validation, one bounded slice at a time.
+
