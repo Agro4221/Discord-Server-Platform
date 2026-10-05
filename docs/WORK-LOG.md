@@ -1012,6 +1012,15 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Qobuz playback remains a release-gate validation item.
 - Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
 
+## 2026-10-05 — TikTok Display integration foundation
+- Added TikTok as an encrypted integration-credential provider with client key/secret, access token, refresh token, open_id, scopes and token expiration metadata.
+- Management API accepts and validates TikTok OAuth credentials without exposing secret values in list responses.
+- Added a reusable TikTok Display API client for /v2/user/info/ and /v2/video/list/.
+- The client refreshes an expiring access token through the official refresh-token flow and can persist the newly issued token pair through a callback.
+- Added deterministic tests for TikTok metadata normalization, token refresh and credential validation.
+- TikTok Display API requires user authorization with the video.list scope; therefore the adapter remains 🟡 until the self-hosted OAuth flow, creator-feed storage and Dashboard configuration are wired.
+- Source checkpoint: afce6977835b949cf33ac14807fdc96bdedf4591.
+
 ## 2026-10-05 — Notifications feed Test delivery
 - Added a Dashboard Test action for individual notification feeds.
 - Test delivery fetches the latest feed entry, renders the saved message template and optional embed, and sends it immediately to the configured channel.
