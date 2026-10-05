@@ -274,6 +274,23 @@ export function isValidMusicSearchSelection(index: number, length: number): bool
   return Number.isInteger(index) && index >= 0 && index < length;
 }
 
+export const MUSIC_PLAYLIST_PAGE_SIZE = 25;
+
+export function normalizeMusicPlaylistPage(page: number, totalPages: number): number {
+  const maxPage = Math.max(0, Math.floor(totalPages) - 1);
+  if (!Number.isFinite(page)) return 0;
+  return Math.min(maxPage, Math.max(0, Math.floor(page)));
+}
+
+export function musicPlaylistPageCount(totalItems: number, pageSize = MUSIC_PLAYLIST_PAGE_SIZE): number {
+  const safeSize = Math.max(1, Math.floor(pageSize));
+  return Math.max(1, Math.ceil(Math.max(0, Math.floor(totalItems)) / safeSize));
+}
+
+export function isValidMusicPlaylistPage(page: number, totalPages: number): boolean {
+  return Number.isInteger(page) && page >= 0 && page < Math.max(1, Math.floor(totalPages));
+}
+
 export function trimMusicQueueToPosition<T>(queue: T[], position: number): T | null {
   if (!Number.isInteger(position) || position < 1 || position > queue.length) return null;
   const target = queue[position - 1] ?? null;
@@ -351,7 +368,17 @@ export class Music implements PlatformModule {
   private readonly failoverInFlight = new Set<string>();
   private readonly voteSkipSessions = new Map<string, { trackIdentifier: string; voters: Set<string>; expiresAt: number }>();
   private readonly searchSessions = new Map<string, { guildId: string; userId: string; tracks: Track[]; expiresAt: number }>();
+  private readonly playlistPaginationSessions = new Map<string, {
+    guildId: string;
+    userId: string;
+    action: "list" | "search" | "view";
+    name?: string;
+    query?: string;
+    sharedOnly?: boolean;
+    expiresAt: number;
+  }>();
   private searchSequence = 0;
+  private playlistPaginationSequence = 0;
   private commandPolicy?: CommandPolicyService;
   private auditLog?: ModuleContext["auditLog"];
 
@@ -375,6 +402,7 @@ export class Music implements PlatformModule {
     this.requestCooldownUntil.clear();
     this.failoverInFlight.clear();
     this.voteSkipSessions.clear();
+    this.playlistPaginationSessions.clear();
     for (const timer of this.autoLeaveTimers.values()) clearTimeout(timer);
     this.autoLeaveTimers.clear();
 
