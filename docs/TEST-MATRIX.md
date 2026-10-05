@@ -278,3 +278,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-05 — Music controller permission gate
 - CI #2056 passed: typecheck, tests, domain build, bot build and Dashboard build.
 - Live validation remains for real Discord role/channel policy behavior on controller buttons.
+
+
+## 2026-10-05 — Music queue permission gate
+- CI #2063 passed: typecheck, tests, domain build, bot build and Dashboard production build.
+- Live Discord validation remains for actual role/channel policy behavior on queue mutations.
