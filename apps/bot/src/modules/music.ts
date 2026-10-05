@@ -1,6 +1,7 @@
 import {
   ActionRowBuilder,
   AttachmentBuilder,
+  ChannelType,
   ButtonBuilder,
   ModalBuilder,
   TextInputBuilder,
@@ -1453,7 +1454,7 @@ export class Music implements PlatformModule {
     }
 
     const voice = interaction.guild!.channels.cache.get(player.voiceChannelId);
-    const listeners = voice && "members" in voice
+    const listeners = voice && (voice.type === ChannelType.GuildVoice || voice.type === ChannelType.GuildStageVoice)
       ? [...voice.members.values()].filter((candidate) => !candidate.user.bot && !candidate.voice.selfDeaf && !candidate.voice.serverDeaf)
       : [];
     const threshold = voteSkipThreshold(listeners.length);
