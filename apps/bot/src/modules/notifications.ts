@@ -154,11 +154,14 @@ export class Notifications implements PlatformModule {
     if (patch.url !== undefined) await assertSafeFeedUrl(patch.url);
     const current = (await this.listFeeds(guildId)).find((item) => item.id === id);
     if (!current) return false;
+    const embedConfig = patch.embedConfig !== undefined
+      ? (patch.embedConfig ? await normalizeNotificationEmbedConfig(patch.embedConfig) : null)
+      : current.embedConfig;
     await this.db.query(
       `UPDATE notification_feeds
        SET channel_id=$1,url=$2,interval_seconds=$3,enabled=$4,
-           message_template=$5,include_keywords=$6,exclude_keywords=$7,updated_at=now()
-       WHERE id=$8 AND guild_id=$9`,
+           message_template=$5,include_keywords=$6,exclude_keywords=$7,embed_config=$8::jsonb,updated_at=now()
+       WHERE id=$9 AND guild_id=$10`,
       [
         patch.channelId ?? current.channelId,
         patch.url ?? current.url,
@@ -167,6 +170,7 @@ export class Notifications implements PlatformModule {
         patch.messageTemplate !== undefined ? normalizeFeedTemplate(patch.messageTemplate) : current.messageTemplate,
         patch.includeKeywords !== undefined ? normalizeKeywords(patch.includeKeywords) : current.includeKeywords,
         patch.excludeKeywords !== undefined ? normalizeKeywords(patch.excludeKeywords) : current.excludeKeywords,
+        embedConfig ? JSON.stringify(embedConfig) : null,
         id,
         guildId
       ]
@@ -293,7 +297,8 @@ export class Notifications implements PlatformModule {
                    nf.interval_seconds AS "intervalSeconds",nf.last_item_key AS "lastItemKey",
                    nf.message_template AS "messageTemplate",
                    nf.include_keywords AS "includeKeywords",
-                   nf.exclude_keywords AS "excludeKeywords"`,
+                   nf.exclude_keywords AS "excludeKeywords",
+                   nf.embed_config AS "embedConfig"`,
         [this.identityId]
       );
 
@@ -374,7 +379,11 @@ export class Notifications implements PlatformModule {
 
     try {
       const content = renderFeedTemplate(feed.messageTemplate, first);
-      await channel.send(content);
+      const embed = buildNotificationEmbed(feed.embedConfig, first);
+      await channel.send({
+        content: content || undefined,
+        embeds: embed ? [embed] : undefined
+      });
     } catch (error) {
       logger.warn("Feed message failed", { feedId: feed.id, error: String(error) });
       await this.markPolled(feed.id, "destination send failed");
@@ -393,6 +402,52 @@ export class Notifications implements PlatformModule {
       [id]
     );
   }
+}
+
+export function normalizeNotificationEmbedConfig(value?: NotificationEmbedConfig | null): NotificationEmbedConfig | null {
+  if (!value || typeof value !== "object") return null;
+  const input = value as Record<string, unknown>;
+  const result: NotificationEmbedConfig = {};
+  const copy = (key: keyof NotificationEmbedConfig, max: number) => {
+    const raw = input[key];
+    if (typeof raw !== "string") return;
+    const normalized = raw.trim().slice(0, max);
+    if (normalized) result[key] = normalized;
+  };
+
+  copy("title", 256);
+  copy("description", 4096);
+  copy("footer", 2048);
+  copy("url", 2000);
+  copy("image", 2000);
+  copy("thumbnail", 2000);
+  copy("color", 7);
+
+  if (result.color && !/^#[0-9a-fA-F]{6}$/.test(result.color)) delete result.color;
+  return Object.keys(result).length ? result : null;
+}
+
+export function buildNotificationEmbed(
+  config: NotificationEmbedConfig | null,
+  entry: { title: string; url: string }
+): EmbedBuilder | null {
+  if (!config) return null;
+  const replace = (value: string) =>
+    value
+      .replaceAll("{title}", entry.title.slice(0, 250))
+      .replaceAll("{url}", entry.url.slice(0, 1800))
+      .replaceAll("{timestamp}", new Date().toISOString());
+
+  const embed = new EmbedBuilder();
+  if (config.title) embed.setTitle(replace(config.title));
+  if (config.description) embed.setDescription(replace(config.description));
+  if (config.url) embed.setURL(config.url);
+  if (config.color) embed.setColor(config.color);
+  if (config.footer) embed.setFooter({ text: replace(config.footer) });
+  if (config.image) embed.setImage(config.image);
+  if (config.thumbnail) embed.setThumbnail(config.thumbnail);
+
+  return Object.keys(embed.data).length ? embed : null;
 }
 
 function normalizeFeedTemplate(value?: string): string {
