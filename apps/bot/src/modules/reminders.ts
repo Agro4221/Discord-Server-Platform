@@ -18,7 +18,7 @@ export class Reminders implements PlatformModule {
     this.client = context.client;
     this.identityId = context.identityId;
     this.unsubscribe = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
-    this.timer = setInterval(() => void this.deliver(), 5_000);
+    this.timer = setInterval(() => void this.deliver(), 10_000);
     this.timer.unref();
   }
 
