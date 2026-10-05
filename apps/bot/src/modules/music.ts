@@ -915,7 +915,7 @@ export class Music implements PlatformModule {
   async dashboardControl(
     guildId: string,
     action: "play" | "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay",
-    input: { query?: string; voiceChannelId?: string; value?: number; mode?: string; enabled?: boolean }
+    input: { query?: string; voiceChannelId?: string; value?: number; mode?: string; provider?: string; enabled?: boolean }
   ): Promise<void> {
     if (!await moduleEnabled(this.db, guildId, "music", false)) throw new Error("music_disabled");
     if (!this.manager || !this.initialized) throw new Error("music_unavailable");
@@ -946,7 +946,7 @@ export class Music implements PlatformModule {
 
       const query = String(input.query ?? "").trim();
       if (!query) throw new Error("music_query_required");
-      const resolved = resolveMusicSearchRequest(query, normalizeMusicSearchProvider(String(input.mode ?? "")));
+      const resolved = resolveMusicSearchRequest(query, normalizeMusicSearchProvider(String(input.provider ?? "")));
       const result = await player.search(resolved.source ? { query: resolved.query, source: resolved.source } : { query: resolved.query }, this.client?.user);
       if (!result.tracks.length) throw new Error("music_track_not_found");
 
@@ -1258,8 +1258,11 @@ export class Music implements PlatformModule {
       interaction.guildId!,
       voiceChannelId,
       interaction.channelId,
-      provider === "yandex" ? resolveMusicSearchRequest(query, provider).source + ":" + resolveMusicSearchRequest(query, provider).query : query,
-      interaction.user
+      query,
+      interaction.user,
+      false,
+      false,
+      provider
     );
 
     if (queued.pending) {
@@ -2272,7 +2275,8 @@ export class Music implements PlatformModule {
     query: string,
     requester: import("discord.js").User,
     bypassApproval = false,
-    bypassPolicy = false
+    bypassPolicy = false,
+    provider?: MusicSearchProvider | null
   ): Promise<{ added: number; truncated: boolean; limited: boolean; pending: boolean; approvalId: string | null; firstTitle: string; firstAuthor: string }> {
     if (!this.manager) throw new Error("music_manager_unavailable");
 
@@ -2283,7 +2287,7 @@ export class Music implements PlatformModule {
         requesterUserId: requester.id,
         requesterVoiceChannelId: voiceChannelId,
         sourceChannelId: textChannelId,
-        query,
+        query: provider === "yandex" && !/^https?:\/\//i.test(query) ? "ymsearch:" + query : query,
         track: null,
         source: "query"
       });
@@ -2315,7 +2319,7 @@ export class Music implements PlatformModule {
     }
     if (!player.connected) await player.connect();
 
-    const resolved = resolveMusicSearchRequest(query);
+    const resolved = resolveMusicSearchRequest(query, provider);
     const result = await player.search(
       resolved.source ? { query: resolved.query, source: resolved.source } : { query: resolved.query },
       requester
