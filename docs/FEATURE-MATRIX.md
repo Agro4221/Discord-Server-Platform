@@ -168,7 +168,7 @@
 | Show requester per queued track | ✅ | Queue pages display requester mention when available |
 | Queue export / share | ✅ | Queue supports copy-friendly Share output and full JSON Export attachment |
 | Save current queue as playlist | ✅ | Current playback queue can be saved as a personal playlist through the controller |
-| Load playlist with optional shuffle | 🟡 |
+| Load playlist with optional shuffle | ✅ | Saved playlists can be loaded in original order or shuffled on load without mutating stored order |
 
 #### Player / controller
 
