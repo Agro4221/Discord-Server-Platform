@@ -366,3 +366,6 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Static deployment contract now protects the native first-run launcher, loopback Dashboard, configurable Management API port, resource caps and convenience entrypoints.
 - Live release-gate: clean Windows machine with Node.js, PostgreSQL and Java/Lavalink installed; run start.bat with no Discord credentials, then register through Control Center → Bot Fleet.
 - Live resource-gate: capture native-status.bat at idle, during music playback, Dashboard use, simultaneous guild/music activity and with game + OBS running.
+## 2026-10-05 — Native local acceptance gate
+- Static contract covers native launcher, loopback Dashboard, dynamic local API port, memory caps, log rotation and convenience entrypoints.
+- Live gate remains: clean Windows setup → start.bat → native Dashboard via control-center.bat → Bot Fleet registration → music/playback → native-status.bat measurements under game + OBS load.
