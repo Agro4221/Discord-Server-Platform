@@ -215,7 +215,7 @@ export class Giveaways implements PlatformModule {
     const commandUnsubscribe = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     const interactionUnsubscribe = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
     this.unsubscribe = () => { commandUnsubscribe(); interactionUnsubscribe(); };
-    this.timer = setInterval(() => void this.sweep(), 5_000);
+    this.timer = setInterval(() => void this.sweep(), 10_000);
     this.timer.unref();
   }
 
