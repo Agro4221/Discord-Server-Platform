@@ -1,7 +1,7 @@
 import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, chunkMusicFilterActions, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicSearchProvider, resolveMusicSearchRequest, chunkMusicLyrics, musicLyricsPageCount, normalizeMusicLyricsPage, isValidMusicLyricsPage, normalizeMusicTimedLyrics, findMusicTimedLyricIndex, formatMusicSyncedLyrics, normalizeMusicPitch, normalizeMusicSpeed, normalizeMusicEqBand, normalizeMusicEqGain, MUSIC_EQ_BAND_COUNT, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack, isMusicAppleMusicConfigured } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd, toggleMusicDistortion } from "../src/modules/music.js";
+import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd, toggleMusicDistortion, selectMusicFailoverNodeId } from "../src/modules/music.js";
 
 test("Apple Music diagnostics require both provider enablement and API token", () => {
   assert.equal(isMusicAppleMusicConfigured("false", "token"), false);
@@ -60,6 +60,33 @@ test("Music node health is degraded only when every Lavalink node is unavailable
   assert.equal(musicNodeHealth(0), "degraded");
   assert.equal(musicNodeHealth(1), "ready");
   assert.equal(musicNodeHealth(2), "ready");
+});
+
+test("Music failover picks the first healthy resumable candidate", () => {
+  assert.equal(
+    selectMusicFailoverNodeId("node-1", [
+      { id: "node-1", connected: true, sessionId: "s1" },
+      { id: "node-2", connected: false, sessionId: "s2" },
+      { id: "node-3", connected: true, sessionId: null },
+      { id: "node-4", connected: true, sessionId: "s4" }
+    ]),
+    "node-4"
+  );
+  assert.equal(
+    selectMusicFailoverNodeId("node-1", [
+      { id: "node-1", connected: true, sessionId: "s1" },
+      { id: "node-2", connected: true, sessionId: "s2" }
+    ]),
+    "node-2"
+  );
+  assert.equal(
+    selectMusicFailoverNodeId("node-1", [
+      { id: "node-1", connected: true, sessionId: "s1" },
+      { id: "   ", connected: true, sessionId: "s2" },
+      { id: "node-2", connected: true, sessionId: "   " }
+    ]),
+    null
+  );
 });
 
 test("Music failover requires a different connected node", () => {
