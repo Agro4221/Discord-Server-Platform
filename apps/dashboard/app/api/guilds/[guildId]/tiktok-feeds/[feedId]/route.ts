@@ -29,8 +29,9 @@ export async function DELETE(request: Request, context: { params: Promise<{ guil
   return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": "application/json; charset=utf-8" } });
 }
 
-export async function POST(_request: Request, context: { params: Promise<{ guildId: string; feedId: string }> }) {
+export async function POST(request: Request, context: { params: Promise<{ guildId: string; feedId: string }> }) {
   if (!await currentSession()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  try { assertSameOrigin(request); } catch { return NextResponse.json({ error: "bad_origin" }, { status: 403 }); }
   const { guildId, feedId } = await context.params;
   const response = await fetch(upstream("/api/guilds/" + encodeURIComponent(guildId) + "/tiktok-feeds/" + encodeURIComponent(feedId) + "/test"), {
     method: "POST", headers
