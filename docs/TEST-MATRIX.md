@@ -345,3 +345,6 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-05 — Configuration validation snapshot
 - Added automated negative coverage for blank/whitespace critical DB and Lavalink configuration plus custom Lavalink node passwords.
 - Live deployment still needs a disposable startup test with malformed .env values to confirm fail-fast behavior.
+## 2026-10-05 — Docker runtime contract snapshot
+- Static deployment coverage now verifies that all Compose secret fallbacks are removed and the container-internal Management API remains on port 3002.
+- Live release-gate case: start from the standard .env.example flow with MANAGEMENT_API_PORT=39001, then confirm Dashboard management requests reach the bot successfully through bot:3002.
