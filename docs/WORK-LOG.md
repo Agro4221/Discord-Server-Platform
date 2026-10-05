@@ -1260,3 +1260,10 @@ Never write credentials, tokens or private user data here.
 - Deployment contract now statically requires the runtime smoke-check probes and HTTP status expectations.
 - Source checkpoint: `95877c00ac9fff5d1615d519f202a316ba403783`.
 - Fresh CI is not visible yet; live DNS/TLS/external access and clean-host execution remain release-gate checks.
+
+## 2026-10-05 — VPS reinstall secret persistence
+- Fixed a real reinstallation failure mode in `install-vps.sh`: existing `MANAGEMENT_API_KEY`, `POSTGRES_PASSWORD` and `LAVALINK_PASSWORD` are now preserved instead of being rotated on every installer rerun.
+- New installations still generate missing secrets automatically.
+- Deployment contract now requires the secret-preservation helpers and explicit per-secret handling.
+- Source checkpoint: `73e5ebdf792f38ae2ab29fb0ba0adba7f224154f`.
+- Fresh CI is not visible yet; clean-host/reinstall execution remains a live release-gate check.
