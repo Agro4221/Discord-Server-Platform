@@ -2427,7 +2427,7 @@ export class Music implements PlatformModule {
 
     const action = interaction.customId.slice("dsp:music:".length);
     if (action === "autoplay-toggle") {
-      if (!await this.canManageMusicMember(member)) {
+      if (!await this.canManageMusicMember(interaction.guild.id, member)) {
         await interaction.reply({ content: "Autoplay настраивается пользователями с DJ-ролью или Manage Server.", ephemeral: true });
         return;
       }
