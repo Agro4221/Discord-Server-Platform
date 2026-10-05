@@ -251,7 +251,6 @@ export function AutomationPanel({
               <option value="number-eq">number-eq</option>
               <option value="number-gt">number-gt</option>
               <option value="number-lt">number-lt</option>
-              <option value="number-eq">number-eq</option>
               <option value="has-role">has-role</option>
               <option value="channel-is">channel-is</option>
               <option value="cooldown-clear">cooldown-clear</option>
