@@ -1292,3 +1292,10 @@ Never write credentials, tokens or private user data here.
 - Deployment contract explicitly guards this preservation rule.
 - Source checkpoint: `3b2f0de1bd925a87059cc8bd740a076dec084083`.
 - Current PR head still has no visible GitHub Actions check-runs; clean-host reinstall remains the live validation gate.
+
+## 2026-10-05 — Management API key validation
+- Hardened configuration loading so `MANAGEMENT_API_KEY` must contain non-whitespace content; a blank/whitespace-only key is rejected at startup.
+- Added regression coverage for empty, space-only and tab-only values.
+- This preserves the local Control Center no-login design while ensuring the Management API itself cannot start with an effectively empty bearer secret.
+- Source checkpoint: `333ce7ca164fa0e0dd7c0ba776bc5315c0217924`.
+- Fresh CI remains unavailable on the current PR head.
