@@ -198,3 +198,11 @@ test("music vote skip threshold scales with human listeners", async () => {
   assert.equal(voteSkipThreshold(5), 3);
   assert.equal(voteSkipThreshold(10), 6);
 });
+
+
+test("music request cooldown reports only positive remaining time", async () => {
+  const { remainingMusicRequestCooldown } = await import("../src/modules/music.js");
+  assert.equal(remainingMusicRequestCooldown(10_500, 10_000), 500);
+  assert.equal(remainingMusicRequestCooldown(10_000, 10_500), 0);
+  assert.equal(remainingMusicRequestCooldown(10_000, 10_000), 0);
+});
