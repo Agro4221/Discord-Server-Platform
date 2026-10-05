@@ -316,3 +316,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-05 — Management API security snapshot
 - Configuration regression coverage now rejects empty and whitespace-only Management API keys before the server can start.
 - Live release-gate case: verify unauthenticated Management API requests still receive 401 and that the configured bearer key is required in local/VPS deployments.
+
+### 2026-10-05 — Management API authorization snapshot
+- Dedicated regression tests cover Management API authentication failure/success cases at the pure authorization-contract level.
+- Live release-gate case remains: unauthenticated HTTP request must return 401; exact configured Bearer key must authorize; malformed/expired deployment configuration must not expose mutations.
