@@ -211,7 +211,7 @@ export function normalizeMusicRequestApprovalMode(value: string): MusicRequestAp
 
 const MUSIC_FILTER_ACTIONS = [
   "clear", "bassboost-low", "bassboost-medium", "bassboost-high",
-  "rock", "classic", "pop", "electronic", "fullsound", "gaming", "nightcore", "8d"
+  "rock", "classic", "pop", "electronic", "fullsound", "karaoke", "gaming", "nightcore", "8d"
 ] as const;
 
 type MusicFilterAction = (typeof MUSIC_FILTER_ACTIONS)[number];
@@ -1270,6 +1270,9 @@ export class Music implements PlatformModule {
       case "fullsound":
         await player.filterManager.setEQPreset("FullSound");
         break;
+      case "karaoke":
+        await player.filterManager.toggleKaraoke();
+        break;
       case "gaming":
         await player.filterManager.setEQPreset("Gaming");
         break;
@@ -1293,6 +1296,7 @@ export class Music implements PlatformModule {
       pop: "Pop",
       electronic: "Electronic",
       fullsound: "Full Sound",
+      karaoke: "Karaoke",
       gaming: "Gaming",
       nightcore: "Nightcore",
       "8d": "8D"
