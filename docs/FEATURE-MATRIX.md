@@ -191,7 +191,7 @@
 | Separate permissions for play / skip / stop / seek / volume / filters | 🟡 |
 | Separate queue add / remove / move permissions | 🟡 |
 | DJ role policy | ✅ |
-| Vote skip | 🟡 |
+| Vote skip | ✅ | Non-DJ users can vote to skip the current track; threshold scales from active human voice listeners and votes expire with the current track/session |
 | Per-user request cooldown | 🟡 |
 | Per-user queued-track limit | 🟡 |
 | Fair queue / requester rotation | 🟡 |
