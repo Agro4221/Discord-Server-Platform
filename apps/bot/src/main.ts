@@ -164,7 +164,8 @@ async function main(): Promise<void> {
   const verification = new Verification(database, (guildId) => client.guilds.cache.get(guildId));
   const onboarding = new Onboarding(database);
   const analytics = new Analytics(database);
-  const music = new Music(database, runtimeConfig, identities);
+  const commandPolicy = new CommandPolicyService(database);
+  const music = new Music(database, runtimeConfig, identities, commandPolicy);
   const moderationPresets = new ModerationPresets(database, autoMod, security, moderation);
   const automation = new AutomationEngine(database, moderation, {
     tickets,
@@ -174,7 +175,6 @@ async function main(): Promise<void> {
   });
   const customCommands = new CustomCommandService(database, runtimeConfig);
   const autoResponder = new AutoResponder(database);
-  const commandPolicy = new CommandPolicyService(database);
   const polls = new Polls(database);
   const reputation = new Reputation(database);
   const birthdays = new Birthdays(database);
