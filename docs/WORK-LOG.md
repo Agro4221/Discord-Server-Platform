@@ -604,3 +604,11 @@ Never write credentials, tokens or private user data here.
 ## 2026-10-05 — Documentation reconciliation
 - Reconciled stale Matrix rows for per-guild provider credentials and Additional social feeds; both were already implemented and CI-verified.
 - Current code checkpoint before the next Music slice: `0056f930327f06c23f567ac81229617b4b79dd40`.
+
+
+## 2026-10-05 — Music queue parity reconciliation
+- CI #1982 verified the multi-result music search picker.
+- CI #1986 verified Queue Export/Share and the current queue-control path.
+- Reconciled Feature Matrix rows that were stale versus the actual Music implementation: search picker, queue remove/range/move/front/clear, skip-to, history, requester display, export/share, compact controls, Loop One, progress and controller refresh.
+- Final source checkpoint: cd08f1b967030663d735da3b8f9d7c41cd5bbd17.
+- Next single Music slice: Filters / FX quick-access button.
