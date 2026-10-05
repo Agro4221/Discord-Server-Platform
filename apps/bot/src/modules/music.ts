@@ -2587,7 +2587,9 @@ export class Music implements PlatformModule {
                     ? "tdsearch:" + query
                     : provider === "qobuz" && !/^https?:\/\//i.test(query)
                       ? "qbsearch:" + query
-                      : query,
+                      : provider === "jiosaavn" && !/^https?:\/\//i.test(query)
+                        ? "jssearch:" + query
+                        : query,
         track: null,
         source: "query"
       });
