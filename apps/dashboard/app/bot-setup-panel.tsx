@@ -35,6 +35,8 @@ export function BotSetupPanel() {
   const [token, setToken] = useState("");
   const [presenceName, setPresenceName] = useState("");
   const [username, setUsername] = useState("");
+  const [avatarData, setAvatarData] = useState<string | null>(null);
+  const [bannerData, setBannerData] = useState<string | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,6 +65,43 @@ export function BotSetupPanel() {
     setPresenceName(value.presenceName ?? "");
     setUsername(value.username ?? "");
   }
+
+  async function readImage(file: File): Promise<string> {
+    if (!["image/png", "image/jpeg", "image/gif"].includes(file.type)) {
+      throw new Error("Разрешены только PNG, JPEG и GIF.");
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      throw new Error("Файл не должен быть больше 3 MB.");
+    }
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Не удалось прочитать изображение."));
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result !== "string" || !/^data:image\/(png|jpeg|gif);base64,/i.test(result)) {
+          reject(new Error("Некорректный формат изображения."));
+          return;
+        }
+        resolve(result);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function pickImage(file: File | undefined, setter: (value: string | null) => void) {
+    if (!file) {
+      setter(null);
+      return;
+    }
+    try {
+      setter(await readImage(file));
+      setError("");
+    } catch (caught) {
+      setter(null);
+      setError(caught instanceof Error ? caught.message : "Не удалось загрузить изображение.");
+    }
+  }
+
 
   useEffect(() => { void load(); }, []);
 
@@ -112,7 +151,9 @@ export function BotSetupPanel() {
           ...(token ? { token } : {}),
           enabled,
           presenceName: presenceName.trim() || null,
-          ...(username.trim() ? { username: username.trim() } : {})
+          ...(username.trim() ? { username: username.trim() } : {}),
+          ...(avatarData !== null ? { avatarData } : {}),
+          ...(bannerData !== null ? { bannerData } : {})
         })
       });
       const body = await response.json().catch(() => ({}));
@@ -198,6 +239,31 @@ export function BotSetupPanel() {
               style={inputStyle}
               disabled={loading || saving}
             />
+          </label>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <label style={{ display: "grid", gap: 5, fontSize: 10 }}>
+            Avatar
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/gif"
+              onChange={(e) => void pickImage(e.target.files?.[0], setAvatarData)}
+              disabled={loading || saving}
+              style={{ ...inputStyle, padding: "7px 8px" }}
+            />
+            <span style={{ opacity: 0.42 }}>Оставь пустым, чтобы не менять. До 3 MB.</span>
+          </label>
+          <label style={{ display: "grid", gap: 5, fontSize: 10 }}>
+            Banner
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/gif"
+              onChange={(e) => void pickImage(e.target.files?.[0], setBannerData)}
+              disabled={loading || saving}
+              style={{ ...inputStyle, padding: "7px 8px" }}
+            />
+            <span style={{ opacity: 0.42 }}>Оставь пустым, чтобы не менять. До 3 MB.</span>
           </label>
         </div>
 
