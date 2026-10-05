@@ -125,6 +125,51 @@ test("music playlist continuation state persists and clears", { skip: !enabled }
   }
 });
 
+test("music playlist continuation state is cleared when the referenced playlist is edited", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345736";
+  const botIdentityId = "test-music-stale-continuation";
+  try {
+    await migrate(db);
+    await db.query("DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2", [guildId,botIdentityId]);
+    await db.query("DELETE FROM music_playlists WHERE guild_id=$1", [guildId]);
+
+    const playlist = await db.query<{ id: string }>(
+      "INSERT INTO music_playlists(guild_id,user_id,name,visibility,tracks) VALUES($1,$2,$3,'personal','[$4::jsonb]') RETURNING id",
+      [guildId,"234567890123456793","Editable Continuation",JSON.stringify({info:{identifier:"track-1"}})]
+    );
+    const playlistId = playlist.rows[0]!.id;
+
+    await db.query(
+      "INSERT INTO music_players(guild_id,bot_identity_id,voice_channel_id,text_channel_id,state,playlist_id,playlist_next_index,playlist_order,playlist_requester_user_id) VALUES($1,$2,$3,$4,'{}'::jsonb,$5,$6,$7::jsonb,$8)",
+      [guildId,botIdentityId,"voice-stale","text-stale",playlistId,1,"[0]","234567890123456793"]
+    );
+
+    await db.query(
+      "UPDATE music_playlists SET tracks=$1::jsonb,updated_at=now() WHERE id=$2",
+      [JSON.stringify([{info:{identifier:"track-2"}}]),playlistId]
+    );
+    await db.query(
+      "UPDATE music_players SET playlist_id=NULL,playlist_next_index=0,playlist_order=NULL,playlist_requester_user_id=NULL WHERE guild_id=$1 AND bot_identity_id=$2 AND playlist_id=$3",
+      [guildId,botIdentityId,playlistId]
+    );
+
+    const saved = await db.query<{ playlist_id: string | null; playlist_next_index: number; playlist_order: unknown; playlist_requester_user_id: string | null }>(
+      "SELECT playlist_id,playlist_next_index,playlist_order,playlist_requester_user_id FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
+      [guildId,botIdentityId]
+    );
+    assert.equal(saved.rows[0]?.playlist_id, null);
+    assert.equal(Number(saved.rows[0]?.playlist_next_index), 0);
+    assert.equal(saved.rows[0]?.playlist_order, null);
+    assert.equal(saved.rows[0]?.playlist_requester_user_id, null);
+  } finally {
+    await db.query("DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",[guildId,botIdentityId]).catch(() => undefined);
+    await db.query("DELETE FROM music_playlists WHERE guild_id=$1",[guildId]).catch(() => undefined);
+    await db.close();
+  }
+});
+
+
 test("music shared playlists are guild-visible while personal playlists stay private", { skip: !enabled }, async () => {
   const db = new Database(process.env.DATABASE_URL!);
   const guildId = "123456789012345734";
