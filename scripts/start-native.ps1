@@ -96,6 +96,15 @@ function Stop-NativeProcess([string]$Name) {
   } catch {}
 }
 
+function Rotate-Log([string]$Path, [int64]$MaxBytes = 10MB) {
+  if (-not (Test-Path $Path -PathType Leaf)) { return }
+  if ((Get-Item $Path).Length -le $MaxBytes) { return }
+
+  $rotated = "$Path.1"
+  Remove-Item $rotated -Force -ErrorAction SilentlyContinue
+  Move-Item -Path $Path -Destination $rotated -Force
+}
+
 function Start-NativeProcess(
   [string]$Name,
   [string]$FilePath,
@@ -106,6 +115,8 @@ function Start-NativeProcess(
   Stop-NativeProcess $Name
   $stdout = Join-Path $logRoot "$LogName.out.log"
   $stderr = Join-Path $logRoot "$LogName.err.log"
+  Rotate-Log $stdout
+  Rotate-Log $stderr
 
   $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
   Set-Content -Path (Join-Path $runtimeRoot "$Name.pid") -Value $process.Id -Encoding ASCII
@@ -241,20 +252,8 @@ try {
     Write-Host "Created local .env from .env.example."
   }
 
-  $token = Get-EnvValue "DISCORD_TOKEN"
-  if ([string]::IsNullOrWhiteSpace($token)) {
-    $token = Read-Host "Discord bot token"
-    if ([string]::IsNullOrWhiteSpace($token)) { throw "DISCORD_TOKEN is required." }
-    Set-EnvValue "DISCORD_TOKEN" $token
-  }
-
-  $clientId = Get-EnvValue "DISCORD_CLIENT_ID"
-  if ([string]::IsNullOrWhiteSpace($clientId)) {
-    $clientId = Read-Host "Discord client ID"
-    if ([string]::IsNullOrWhiteSpace($clientId)) { throw "DISCORD_CLIENT_ID is required." }
-    Set-EnvValue "DISCORD_CLIENT_ID" $clientId
-  }
-
+  # Discord credentials are optional at process startup.
+  # Control Center -> Bot Fleet can register them after the Management API is online.
   if ([string]::IsNullOrWhiteSpace((Get-EnvValue "DASHBOARD_AUTH_REQUIRED"))) {
     Set-EnvValue "DASHBOARD_AUTH_REQUIRED" "false"
   }
@@ -276,6 +275,9 @@ try {
   $env:MANAGEMENT_API_HOST = "127.0.0.1"
   $env:LAVALINK_HOST = "127.0.0.1"
   $env:LAVALINK_PORT = "2333"
+  $managementApiPort = Get-EnvValue "MANAGEMENT_API_PORT"
+  if ([string]::IsNullOrWhiteSpace($managementApiPort)) { $managementApiPort = "3002" }
+  $env:MANAGEMENT_API_PORT = $managementApiPort
 
   $password = Get-EnvValue "LAVALINK_PASSWORD"
   if ([string]::IsNullOrWhiteSpace($password)) { throw "LAVALINK_PASSWORD is required." }
@@ -344,7 +346,16 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Dashboard build failed." }
   }
 
+  $botNodeHeap = Get-EnvValue "BOT_NODE_MAX_OLD_SPACE_MB"
+  if ([string]::IsNullOrWhiteSpace($botNodeHeap)) { $botNodeHeap = "768" }
+  if ($botNodeHeap -notmatch "^\d+$" -or [int]$botNodeHeap -lt 256 -or [int]$botNodeHeap -gt 2048) {
+    throw "BOT_NODE_MAX_OLD_SPACE_MB must be between 256 and 2048 MiB."
+  }
+
+  $previousNodeOptions = $env:NODE_OPTIONS
+  $env:NODE_OPTIONS = "--max-old-space-size=$botNodeHeap"
   Start-NativeProcess "bot" "npm.cmd" @("run", "start", "-w", "apps/bot") (Get-Location).Path "bot"
+  $env:NODE_OPTIONS = $previousNodeOptions
 
   $healthPort = Get-EnvValue "HEALTH_PORT"
   if ([string]::IsNullOrWhiteSpace($healthPort)) { $healthPort = "3001" }
@@ -361,9 +372,17 @@ try {
     if ([string]::IsNullOrWhiteSpace($dashboardPort)) { $dashboardPort = "3000" }
 
     $env:BOT_HEALTH_URL = $healthUrl
-    $env:MANAGEMENT_API_URL = "http://127.0.0.1:3002"
+    $env:MANAGEMENT_API_URL = "http://127.0.0.1:$managementApiPort"
 
+    $dashboardNodeHeap = Get-EnvValue "DASHBOARD_NODE_MAX_OLD_SPACE_MB"
+    if ([string]::IsNullOrWhiteSpace($dashboardNodeHeap)) { $dashboardNodeHeap = "512" }
+    if ($dashboardNodeHeap -notmatch "^\d+$" -or [int]$dashboardNodeHeap -lt 256 -or [int]$dashboardNodeHeap -gt 2048) {
+      throw "DASHBOARD_NODE_MAX_OLD_SPACE_MB must be between 256 and 2048 MiB."
+    }
+
+    $env:NODE_OPTIONS = "--max-old-space-size=$dashboardNodeHeap"
     Start-NativeProcess "dashboard" "npm.cmd" @("run", "start", "-w", "apps/dashboard") (Get-Location).Path "dashboard"
+    $env:NODE_OPTIONS = $previousNodeOptions
 
     $dashboardUrl = "http://127.0.0.1:{0}/" -f $dashboardPort
     if (-not (Wait-Http $dashboardUrl 60 2)) {
@@ -374,7 +393,7 @@ try {
   }
 
   Write-Host ""
-  Write-Host "Vexa is running in native Windows mode."
+  Write-Host "Discord Server Platform is running in native Windows mode."
   Write-Host "Docker Desktop is not required and is not started by this launcher."
   Write-Host "Lavalink nodes: $($nodes.Count)"
   Write-Host "Bot health: $healthUrl"
