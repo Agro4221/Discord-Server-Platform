@@ -610,3 +610,9 @@ Feature Matrix полностью reconciled: все строки ✅.
 - This complements installer secret preservation and prevents a damaged configuration from being presented as a successful upgrade.
 - Deployment CI contract checks the guard textually; live upgrade/recovery is still a release-gate task.
 - Source checkpoint: `67ed79823ca844e1daa088b9631f7a41a45c26be`.
+
+### 2026-10-05 — VPS upgrade domain validation
+- Existing VPS upgrades now validate `DOMAIN` from `.env` before public Caddy probing.
+- Invalid/missing domain configuration fails early and explicitly.
+- Deployment CI contract preserves this guard.
+- Source checkpoint: `83f7e61bb7b9cfc25902effc011023ff8b5af288`.
