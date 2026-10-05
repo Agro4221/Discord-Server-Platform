@@ -661,3 +661,13 @@ Never write credentials, tokens or private user data here.
 - CI #2020 passed completely.
 - Final source checkpoint: 04cb2828e9b112ec1212c09972582992b1dd9d4f.
 - Next single Music slice: Per-user queued-track limit.
+
+
+## 2026-10-05 — Music per-user queued-track limit
+- Added migration 89 with max_queued_per_user on music_settings; default 10, range 0–100.
+- Added /queue-limit and /music queue-limit management command.
+- Enforced pending-track limits on play/request channel, search picker and saved playlist load; system autoplay remains exempt.
+- Added pure helper tests for limit normalization, requester counting and remaining slots.
+- CI #2034 passed completely.
+- Final source checkpoint: c18f1de1a0a404531f1686e363cfa060c6232293.
+- Next single Music slice: Max guild queue size.
