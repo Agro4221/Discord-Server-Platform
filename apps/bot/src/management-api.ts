@@ -99,6 +99,17 @@ type ApiOptions = {
     ) => Promise<boolean>;
     delete: (guildId: string, feedId: number) => Promise<boolean>;
     testFeed: (guildId: string, feedId: number) => Promise<{ title: string; url: string }>;
+    listTikTokFeeds: (guildId: string) => Promise<unknown[]>;
+    createTikTokFeed: (
+      guildId: string,
+      channelId: string,
+      credentialId: number,
+      intervalSeconds: number,
+      options?: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[]; embedConfig?: Record<string, unknown> | null }
+    ) => Promise<unknown>;
+    setTikTokFeedEnabled: (guildId: string, feedId: number, enabled: boolean) => Promise<boolean>;
+    deleteTikTokFeed: (guildId: string, feedId: number) => Promise<boolean>;
+    testTikTokFeed: (guildId: string, feedId: number) => Promise<{ id: string; title: string; url: string }>;
   };
   streamAlerts?: {
     list: (guildId: string) => Promise<unknown[]>;
@@ -872,6 +883,110 @@ export class ManagementApiServer {
               metadata: { provider }
             });
             this.json(res, 200, { ok: true, guildId, feed });
+            return;
+          }
+
+
+          const tiktokFeedsMatch = path.match(/^\/api\/guilds\/([^/]+)\/tiktok-feeds$/);
+          const tiktokFeedItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/tiktok-feeds\/(\d+)$/);
+          const tiktokFeedTestMatch = path.match(/^\/api\/guilds\/([^/]+)\/tiktok-feeds\/(\d+)\/test$/);
+
+          if ((tiktokFeedsMatch || tiktokFeedItemMatch || tiktokFeedTestMatch) && !this.options.notifications) {
+            this.json(res, 500, { error: "notifications_unavailable" });
+            return;
+          }
+          if (method === "GET" && tiktokFeedsMatch) {
+            const guildId = tiktokFeedsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, feeds: await this.options.notifications!.listTikTokFeeds(guildId) });
+            return;
+          }
+          if (method === "POST" && tiktokFeedsMatch) {
+            const guildId = tiktokFeedsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const channelId = typeof body.channelId === "string" ? body.channelId : "";
+            const credentialId = Number(body.credentialId);
+            const intervalSeconds = Number(body.intervalSeconds ?? 300);
+            if (!/^\d{17,20}$/.test(channelId) || !Number.isSafeInteger(credentialId) ||
+                !Number.isFinite(intervalSeconds)) {
+              throw new RequestInputError("invalid_tiktok_feed", 400);
+            }
+            const feed = await this.options.notifications!.createTikTokFeed(
+              guildId, channelId, credentialId, intervalSeconds, {
+                messageTemplate: typeof body.messageTemplate === "string" ? body.messageTemplate : undefined,
+                includeKeywords: Array.isArray(body.includeKeywords)
+                  ? body.includeKeywords.filter((v): v is string => typeof v === "string")
+                  : undefined,
+                excludeKeywords: Array.isArray(body.excludeKeywords)
+                  ? body.excludeKeywords.filter((v): v is string => typeof v === "string")
+                  : undefined,
+                embedConfig: body.embedConfig && typeof body.embedConfig === "object" && !Array.isArray(body.embedConfig)
+                  ? body.embedConfig as Record<string, unknown>
+                  : null
+              }
+            );
+            await this.options.auditLog.record({
+              guildId, source: "dashboard", action: "tiktok_feed.created",
+              targetType: "notification-tiktok-feed", targetId: String((feed as { id: number }).id)
+            });
+            this.json(res, 200, { ok: true, feed });
+            return;
+          }
+          if (method === "POST" && tiktokFeedTestMatch) {
+            const guildId = tiktokFeedTestMatch[1] ?? "";
+            const feedId = Number(tiktokFeedTestMatch[2]);
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !Number.isSafeInteger(feedId)) {
+              this.json(res, 404, { error: "guild_or_feed_not_found" });
+              return;
+            }
+            try {
+              const result = await this.options.notifications!.testTikTokFeed(guildId, feedId);
+              await this.options.auditLog.record({
+                guildId, source: "dashboard", action: "tiktok_feed.test",
+                targetType: "notification-tiktok-feed", targetId: String(feedId)
+              });
+              this.json(res, 200, { ok: true, result });
+            } catch (error) {
+              this.json(res, 400, { error: String(error).replace(/^Error:\s*/, "") });
+            }
+            return;
+          }
+          if (method === "PUT" && tiktokFeedItemMatch) {
+            const guildId = tiktokFeedItemMatch[1] ?? "";
+            const feedId = Number(tiktokFeedItemMatch[2]);
+            const body = await readJson(req);
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !Number.isSafeInteger(feedId) || typeof body.enabled !== "boolean") {
+              this.json(res, 400, { error: "invalid_tiktok_feed_update" });
+              return;
+            }
+            const updated = await this.options.notifications!.setTikTokFeedEnabled(guildId, feedId, body.enabled);
+            if (!updated) {
+              this.json(res, 404, { error: "tiktok_feed_not_found" });
+              return;
+            }
+            this.json(res, 200, { ok: true });
+            return;
+          }
+          if (method === "DELETE" && tiktokFeedItemMatch) {
+            const guildId = tiktokFeedItemMatch[1] ?? "";
+            const feedId = Number(tiktokFeedItemMatch[2]);
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !Number.isSafeInteger(feedId)) {
+              this.json(res, 404, { error: "guild_or_feed_not_found" });
+              return;
+            }
+            const deleted = await this.options.notifications!.deleteTikTokFeed(guildId, feedId);
+            if (!deleted) {
+              this.json(res, 404, { error: "tiktok_feed_not_found" });
+              return;
+            }
+            this.json(res, 200, { ok: true });
             return;
           }
 
