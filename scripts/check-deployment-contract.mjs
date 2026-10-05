@@ -78,7 +78,7 @@ for (const legacyDoc of ["docs/VEXA-ADMIN-BLUEPRINT.md"]) {
     await access(legacyDoc);
     throw new Error("Obsolete design document still exists: " + legacyDoc);
   } catch (error) {
-    if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
       continue;
     }
     throw error;
