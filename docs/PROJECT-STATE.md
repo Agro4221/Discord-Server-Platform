@@ -590,3 +590,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - loadConfig() now consistently uses requiredNonBlank() for MANAGEMENT_API_KEY, DATABASE_URL and LAVALINK_PASSWORD.
 ## 2026-10-05 — VPS secret validation
 - VPS install and upgrade flows now reject whitespace-only critical secrets consistently with bot runtime validation.
+## 2026-10-05 — Native Windows local-first checkpoint
+- Native Windows is the primary everyday local deployment for the gaming/streaming PC; Docker is optional.
+- start.bat launches one Lavalink + bot with Dashboard disabled by default. control-center.bat enables the Dashboard. start.bat -Lavalink2 enables the second Lavalink only when redundancy is needed.
+- First-run startup no longer requires Discord credentials before Control Center/Bot Fleet registration.
+- Native Dashboard is loopback-only and follows the configured Management API and Dashboard ports.
+- Resource defaults are documented in docs/RESOURCE-REQUIREMENTS.md and exposed in .env.example.
