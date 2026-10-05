@@ -1,7 +1,7 @@
 import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicPitch, normalizeMusicSpeed, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
+import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd, toggleMusicDistortion } from "../src/modules/music.js";
 
 test("music controls require the same voice channel unless Manage Server is granted", () => {
   assert.equal(canControlMusic("voice-1", "voice-1", false), true);
@@ -174,6 +174,7 @@ test("music quick filter actions allow only known presets", async () => {
     "karaoke",
     "tremolo",
     "vibrato",
+    "distortion",
     "gaming",
     "nightcore",
     "8d"
@@ -185,6 +186,22 @@ test("music quick filter actions allow only known presets", async () => {
   }
 });
 
+
+test("Music distortion toggle produces a Lavalink-compatible distortion payload", () => {
+  const enabled = toggleMusicDistortion(undefined);
+  assert.deepEqual(enabled, {
+    sinOffset: 0.4,
+    sinScale: 1.5,
+    cosOffset: 0.4,
+    cosScale: 1.5,
+    tanOffset: 0.4,
+    tanScale: 1.5,
+    offset: 0.4,
+    scale: 1.5
+  });
+  assert.equal(toggleMusicDistortion(enabled), null);
+  assert.equal(toggleMusicDistortion(null) !== null, true);
+});
 
 test("Music playlist snapshot keeps current track first and caps at 500", () => {
   const queued = Array.from({ length: 600 }, (_, index) => "Q" + index);

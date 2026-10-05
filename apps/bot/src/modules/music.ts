@@ -211,10 +211,38 @@ export function normalizeMusicRequestApprovalMode(value: string): MusicRequestAp
 
 const MUSIC_FILTER_ACTIONS = [
   "clear", "bassboost-low", "bassboost-medium", "bassboost-high",
-  "rock", "classic", "pop", "electronic", "fullsound", "karaoke", "tremolo", "vibrato", "gaming", "nightcore", "8d"
+  "rock", "classic", "pop", "electronic", "fullsound", "karaoke", "tremolo", "vibrato", "distortion", "gaming", "nightcore", "8d"
 ] as const;
 
 type MusicFilterAction = (typeof MUSIC_FILTER_ACTIONS)[number];
+
+type MusicDistortionSettings = {
+  sinOffset: number;
+  sinScale: number;
+  cosOffset: number;
+  cosScale: number;
+  tanOffset: number;
+  tanScale: number;
+  offset: number;
+  scale: number;
+};
+
+const MUSIC_DISTORTION_PRESET: Readonly<MusicDistortionSettings> = Object.freeze({
+  sinOffset: 0.4,
+  sinScale: 1.5,
+  cosOffset: 0.4,
+  cosScale: 1.5,
+  tanOffset: 0.4,
+  tanScale: 1.5,
+  offset: 0.4,
+  scale: 1.5
+});
+
+export function toggleMusicDistortion(
+  current: MusicDistortionSettings | null | undefined
+): MusicDistortionSettings | null {
+  return current ? null : { ...MUSIC_DISTORTION_PRESET };
+}
 
 export function shuffleMusicItems<T>(items: readonly T[]): T[] {
   const result = [...items];
@@ -1285,6 +1313,13 @@ export class Music implements PlatformModule {
       case "vibrato":
         await player.filterManager.toggleVibrato();
         break;
+      case "distortion": {
+        const nextDistortion = toggleMusicDistortion(player.filterManager.data?.distortion);
+        if (nextDistortion) player.filterManager.data.distortion = nextDistortion;
+        else delete player.filterManager.data.distortion;
+        await player.filterManager.applyPlayerFilters();
+        break;
+      }
       case "gaming":
         await player.filterManager.setEQPreset("Gaming");
         break;
@@ -1311,6 +1346,7 @@ export class Music implements PlatformModule {
       karaoke: "Karaoke",
       tremolo: "Tremolo",
       vibrato: "Vibrato",
+      distortion: "Distortion",
       gaming: "Gaming",
       nightcore: "Nightcore",
       "8d": "8D"
