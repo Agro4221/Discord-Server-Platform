@@ -87,11 +87,15 @@ docker compose "${COMPOSE_ARGS[@]}" up -d --build
 
 for _ in $(seq 1 60); do
   if curl -fsS "http://127.0.0.1:${HEALTH_PORT:-3001}/health" >/dev/null; then
-    echo ""
-    echo "Discord Server Platform is running."
-    echo "Public Control Center: https://${DOMAIN}/"
-    echo "Register the Discord bot in Control Center -> Bot Fleet."
-    exit 0
+    dashboard_code="$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:${DASHBOARD_PORT:-3000}/" || true)"
+    caddy_code="$(curl -ksS -o /dev/null -w '%{http_code}' --resolve "${DOMAIN}:443:127.0.0.1" "https://${DOMAIN}/" || true)"
+    if [[ "${dashboard_code}" == "200" && "${caddy_code}" == "401" ]]; then
+      echo ""
+      echo "Discord Server Platform is running."
+      echo "Public Control Center: https://${DOMAIN}/"
+      echo "Register the Discord bot in Control Center -> Bot Fleet."
+      exit 0
+    fi
   fi
   sleep 2
 done
