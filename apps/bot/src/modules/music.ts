@@ -1353,6 +1353,11 @@ export class Music implements PlatformModule {
     if (!query) return;
 
     const key = `${message.guild.id}:${message.author.id}`;
+    const remaining = remainingMusicRequestCooldown(this.requestCooldownUntil.get(key) ?? 0);
+    if (remaining > 0) {
+      await message.reply("⏳ Подожди ещё " + Math.ceil(remaining / 1000) + " сек. перед следующим запросом.").catch(() => undefined);
+      return;
+    }
     if (this.requestInFlight.has(key)) {
       await message.reply("⏳ Твой предыдущий запрос ещё обрабатывается.").catch(() => undefined);
       return;
@@ -1389,6 +1394,7 @@ export class Music implements PlatformModule {
         return;
       }
 
+      this.requestCooldownUntil.set(key, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
       const suffix = queued.truncated
         ? ` — добавлены первые ${MAX_PLAYLIST_TRACKS} треков`
         : "";
