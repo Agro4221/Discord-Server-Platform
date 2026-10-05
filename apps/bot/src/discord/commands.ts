@@ -939,7 +939,15 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       )
       .addSubcommand((sub) => sub.setName("resume").setDescription("Resume playback"))
       .addSubcommand((sub) => sub.setName("previous").setDescription("Play previous track"))
-      .addSubcommand((sub) => sub.setName("lyrics").setDescription("Show lyrics for the current track"))
+      .addSubcommand((sub) =>
+        sub
+          .setName("lyrics")
+          .setDescription("Show lyrics or lyrics source status")
+          .addStringOption((o) => o.setName("action").setDescription("Lyrics action").addChoices(
+            { name: "Show", value: "show" },
+            { name: "Status", value: "status" }
+          ))
+      )
       .addSubcommand((sub) => sub.setName("skip").setDescription("Skip current track"))
       .addSubcommand((sub) => sub.setName("vote-skip").setDescription("Vote to skip the current track"))
       .addSubcommand((sub) =>
