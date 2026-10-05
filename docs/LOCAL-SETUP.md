@@ -80,3 +80,17 @@ Do not commit `.env`. Secrets stay in the local environment.
 ## VPS
 
 VPS deployment uses the same application architecture. See `scripts/install-vps.sh` and `scripts/upgrade.sh` for the Docker-based deployment path.
+
+## Docker optional failover node
+
+The normal Docker start uses one Lavalink node to keep the local resource footprint low:
+
+    .\start-local.bat
+
+For a two-node Docker run:
+
+    .\start-local.bat -Lavalink2
+
+The second node is enabled through the `failover` Compose profile and remains part of the supported Music failover topology.
+
+Run the Docker release gate with `-RequireLavalink2` when the second node is intentionally enabled.
