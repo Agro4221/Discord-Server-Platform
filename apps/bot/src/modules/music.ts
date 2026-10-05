@@ -88,6 +88,13 @@ export function musicPlaylistContinuationBatch(
   return { indexes, nextIndex: newIndex, done: newIndex >= order.length };
 }
 
+export function shouldInvalidateMusicPlaylistContinuation(
+  continuationPlaylistId: string | null | undefined,
+  editedPlaylistId: string
+): boolean {
+  return Boolean(continuationPlaylistId) && continuationPlaylistId === editedPlaylistId;
+}
+
 export function mergeMusicPlaylistTracks<T>(
   target: readonly T[],
   source: readonly T[],
@@ -1624,6 +1631,7 @@ export class Music implements PlatformModule {
         return;
       }
       await this.db.query("DELETE FROM music_playlists WHERE id=$1", [row.id]);
+      await this.invalidatePlaylistContinuation(guildId, row.id);
       await interaction.reply({ content: "🗑️ Плейлист **" + name + "** удалён.", ephemeral: true });
       return;
     }
@@ -1708,6 +1716,7 @@ export class Music implements PlatformModule {
         "UPDATE music_playlists SET tracks=$1::jsonb,updated_at=now() WHERE id=$2",
         [JSON.stringify(merged.tracks),row.id]
       );
+      await this.invalidatePlaylistContinuation(guildId, row.id);
       const suffix = merged.truncated > 0 ? " Лишние треки отброшены из-за лимита 500." : "";
       await interaction.reply({
         content: "🔀 В **" + name + "** добавлено **" + merged.added + "** уникальных треков из **" + source.name + "**; дублей пропущено: **" + merged.duplicates + "**." + suffix,
@@ -1747,6 +1756,7 @@ export class Music implements PlatformModule {
         "UPDATE music_playlists SET tracks=$1::jsonb,updated_at=now() WHERE id=$2",
         [JSON.stringify(updated),row.id]
       );
+      await this.invalidatePlaylistContinuation(guildId, row.id);
       await interaction.reply({
         content: action === "remove"
           ? "🗑️ Трек №" + trackPosition + " удалён из **" + name + "**."
@@ -1787,6 +1797,7 @@ export class Music implements PlatformModule {
         "UPDATE music_playlists SET tracks=$1::jsonb,updated_at=now() WHERE id=$2",
         [JSON.stringify(stored),row.id]
       );
+      await this.invalidatePlaylistContinuation(guildId, row.id);
       await interaction.reply({ content: "➕ Трек добавлен в **" + name + "**.", ephemeral: true });
       return;
     }
@@ -4117,6 +4128,17 @@ export class Music implements PlatformModule {
     }
     await this.persistPlayer(player);
     return added > 0;
+  }
+
+  private async invalidatePlaylistContinuation(guildId: string, playlistId: string): Promise<void> {
+    const continuation = this.playlistContinuations.get(guildId);
+    if (!shouldInvalidateMusicPlaylistContinuation(continuation?.playlistId, playlistId)) return;
+
+    this.playlistContinuations.delete(guildId);
+    await this.db.query(
+      "UPDATE music_players SET playlist_id=NULL,playlist_next_index=0,playlist_order=NULL,playlist_requester_user_id=NULL,updated_at=now() WHERE guild_id=$1 AND bot_identity_id=$2 AND playlist_id=$3",
+      [guildId,this.config.botIdentityId,playlistId]
+    );
   }
 
   private async autoplayNext(player: Player, lastPlayedTrack: Track): Promise<void> {
