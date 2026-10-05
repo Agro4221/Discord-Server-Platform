@@ -300,3 +300,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-05 — VPS upgrade configuration snapshot
 - Static deployment verification now requires the upgrade path to reject missing critical runtime secrets before starting containers.
 - Live release-gate case: remove/blank one critical secret in a disposable installation and verify the upgrade fails before Compose startup.
+
+### 2026-10-05 — VPS domain validation snapshot
+- Deployment contract now requires the upgrade path to reject a missing or malformed configured domain before HTTPS smoke probing.
+- Live release-gate case: corrupt `DOMAIN` in a disposable existing installation and verify the upgrade fails before service restart.
