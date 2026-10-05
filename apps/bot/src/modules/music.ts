@@ -624,13 +624,18 @@ export class Music implements PlatformModule {
       void (async () => {
         try {
           const continued = await this.continueMusicPlaylist(player);
-          const autoplay = await this.autoplayEnabled(player.guildId);
-          if (!continued && lastTrack && shouldAutoplayAfterQueueEnd(
-            autoplay,
-            player.repeatMode,
-            player.queue.tracks.length
-          )) {
-            await this.autoplayNext(player, lastTrack);
+          const radio = await this.musicRadioSettings(player.guildId);
+          if (!continued && radio.enabled && player.repeatMode === "off" && player.queue.tracks.length === 0) {
+            await this.radioNext(player, lastTrack);
+          } else {
+            const autoplay = await this.autoplayEnabled(player.guildId);
+            if (!continued && !radio.enabled && lastTrack && shouldAutoplayAfterQueueEnd(
+              autoplay,
+              player.repeatMode,
+              player.queue.tracks.length
+            )) {
+              await this.autoplayNext(player, lastTrack);
+            }
           }
         } catch (error) {
           logger.warn("Music autoplay cycle failed", {
@@ -964,7 +969,7 @@ export class Music implements PlatformModule {
     if (!interaction.inGuild()) return;
     const directAliases = new Set([
       "play", "search", "pause", "resume", "previous", "skip", "vote-skip", "stop", "shuffle",
-      "playlist", "favorite", "filter", "queue-policy", "queue-limit", "queue-size", "queue", "repeat", "seek", "volume", "autoplay", "247", "providers", "nowplaying", "lyrics"
+      "playlist", "favorite", "filter", "queue-policy", "queue-limit", "queue-size", "queue", "repeat", "seek", "volume", "autoplay", "radio", "247", "providers", "nowplaying", "lyrics"
     ]);
     if (interaction.commandName !== "music" && !directAliases.has(interaction.commandName)) return;
 
@@ -1047,6 +1052,9 @@ export class Music implements PlatformModule {
         break;
       case "autoplay":
         await this.autoplay(interaction);
+        break;
+      case "radio":
+        await this.radio(interaction);
         break;
       case "247":
         await this.twentyFourSeven(interaction);
@@ -2840,6 +2848,79 @@ export class Music implements PlatformModule {
     await interaction.reply({ content: `Autoplay ${enabled ? "включён" : "выключен"}.`, ephemeral: true });
   }
 
+  private async radio(interaction: ChatInputCommandInteraction): Promise<void> {
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Radio настраивается пользователями с DJ-ролью или Manage Server.", ephemeral: true });
+      return;
+    }
+
+    const action = interaction.options.getString("action", true);
+    const current = await this.musicRadioSettings(interaction.guildId!);
+
+    if (action === "status") {
+      const seedSuffix = current.seed ? " · seed: **" + current.seed + "**" : "";
+      await interaction.reply({
+        content: "📻 Radio: **" + (current.enabled ? "включено" : "выключено") + "** · режим: **" + current.mode + "**" + seedSuffix,
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (action === "stop") {
+      await this.setMusicRadio(interaction.guildId!, false, current.mode, current.seed);
+      await interaction.reply({ content: "📻 Radio выключено.", ephemeral: true });
+      return;
+    }
+
+    if (action !== "start") {
+      await interaction.reply({ content: "Неизвестное действие Radio.", ephemeral: true });
+      return;
+    }
+
+    const mode = normalizeMusicRadioMode(interaction.options.getString("mode")) ?? current.mode;
+    const seedInput = interaction.options.getString("seed");
+    const player = this.manager?.players.get(interaction.guildId!);
+    const currentTrack = player?.queue.current ?? null;
+    const seed = seedInput?.trim() || (mode === "artist" ? String(currentTrack?.info.author ?? "").trim() : "");
+    if (!seed) {
+      await interaction.reply({
+        content: mode === "artist"
+          ? "Для artist-радио нужен текущий трек или параметр seed."
+          : "Для этого режима обязательно укажи seed.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    const voice = member?.voice.channelId;
+    if (!voice) {
+      await interaction.reply({ content: "Сначала зайди в голосовой канал.", ephemeral: true });
+      return;
+    }
+
+    if (!await this.canQueueMusic(interaction.guildId!, interaction.user.id, interaction.channelId)) {
+      await interaction.reply({ content: "Добавление Radio запрещено политикой Music.", ephemeral: true });
+      return;
+    }
+
+    const radioPlayer = player ?? await this.getOrCreatePlayer(interaction, voice);
+    if (radioPlayer.voiceChannelId !== voice) {
+      await interaction.reply({ content: "Музыкальный бот уже занят другим голосовым каналом.", ephemeral: true });
+      return;
+    }
+    if (!radioPlayer.connected) await radioPlayer.connect();
+
+    await this.setMusicRadio(interaction.guildId!, true, mode, seed);
+    const added = await this.radioNext(radioPlayer, currentTrack);
+    await interaction.reply({
+      content: added
+        ? "📻 Radio запущено: **" + mode + "** · **" + seed + "**."
+        : "📻 Radio сохранено, но сейчас не удалось подобрать первый трек. Следующая попытка будет при окончании очереди.",
+      ephemeral: true
+    });
+  }
+
   private async seek(interaction: ChatInputCommandInteraction): Promise<void> {
     const player = this.manager?.players.get(interaction.guildId!);
     const track = player?.queue.current;
@@ -4085,6 +4166,99 @@ export class Music implements PlatformModule {
     );
   }
 
+  private async musicRadioSettings(guildId: string): Promise<{
+    enabled: boolean;
+    mode: MusicRadioMode;
+    seed: string | null;
+  }> {
+    const result = await this.db.query<{
+      radio_enabled: boolean;
+      radio_mode: string;
+      radio_seed: string | null;
+    }>(
+      "SELECT radio_enabled,radio_mode,radio_seed FROM music_settings WHERE guild_id=$1",
+      [guildId]
+    );
+    return {
+      enabled: result.rows[0]?.radio_enabled ?? false,
+      mode: normalizeMusicRadioMode(result.rows[0]?.radio_mode ?? "artist") ?? "artist",
+      seed: result.rows[0]?.radio_seed ?? null
+    };
+  }
+
+  private async setMusicRadio(
+    guildId: string,
+    enabled: boolean,
+    mode?: MusicRadioMode,
+    seed?: string | null
+  ): Promise<void> {
+    const normalizedSeed = typeof seed === "string"
+      ? seed.trim().replace(/\s+/g, " ").slice(0, 200)
+      : null;
+    await this.db.query(
+      "INSERT INTO music_settings(guild_id,radio_enabled,radio_mode,radio_seed) VALUES($1,$2,$3,$4) ON CONFLICT(guild_id) DO UPDATE SET radio_enabled=EXCLUDED.radio_enabled,radio_mode=EXCLUDED.radio_mode,radio_seed=EXCLUDED.radio_seed,updated_at=now()",
+      [guildId,enabled,mode ?? "artist",normalizedSeed || null]
+    );
+  }
+
+  private async radioNext(player: Player, lastTrack: Track | null): Promise<boolean> {
+    const settings = await this.musicRadioSettings(player.guildId);
+    if (!settings.enabled) return false;
+    if (this.autoplayInFlight.has(player.guildId)) return false;
+
+    let seed = settings.seed?.trim() ?? "";
+    if (settings.mode === "artist" && !seed) {
+      seed = String(lastTrack?.info.author ?? "").trim();
+    }
+    if (!seed) {
+      logger.warn("Music radio has no usable seed", {
+        guildId: player.guildId,
+        mode: settings.mode
+      });
+      return false;
+    }
+
+    const recent = await this.db.query<{ identifier: string | null; url: string | null }>(
+      "SELECT identifier,url FROM music_history WHERE guild_id=$1 AND bot_identity_id=$2 ORDER BY played_at DESC,id DESC LIMIT $3",
+      [player.guildId,this.config.botIdentityId,MUSIC_AUTOPLAY_RECENT_HISTORY_LIMIT]
+    );
+    const excludedIdentifiers = new Set<string>();
+    const excludedUris = new Set<string>();
+    const addIdentifier = (value: unknown) => {
+      if (typeof value === "string" && value.trim()) excludedIdentifiers.add(value.trim());
+    };
+    const addUri = (value: unknown) => {
+      if (typeof value === "string" && value.trim()) excludedUris.add(value.trim());
+    };
+    addIdentifier(lastTrack?.info.identifier);
+    addUri(lastTrack?.info.uri);
+    for (const track of player.queue.tracks) {
+      addIdentifier(track.info.identifier);
+      addUri(track.info.uri);
+    }
+    for (const row of recent.rows) {
+      addIdentifier(row.identifier);
+      addUri(row.url);
+    }
+
+    const result = await player.search(
+      { query: buildMusicRadioQuery(settings.mode, seed), source: "ytsearch" },
+      this.client?.user
+    );
+    const candidate = selectMusicArtistAwareAutoplayCandidate(
+      result.tracks as Track[],
+      settings.mode === "artist" ? seed : null,
+      excludedIdentifiers,
+      excludedUris
+    );
+    if (!candidate) return false;
+
+    player.queue.add(candidate);
+    if (!player.playing) await player.play();
+    await this.persistPlayer(player);
+    return true;
+  }
+
   private async continueMusicPlaylist(player: Player): Promise<boolean> {
     if (player.repeatMode !== "off") return false;
     const continuation = this.playlistContinuations.get(player.guildId);
@@ -4522,6 +4696,19 @@ export function normalizeMusicRepeatMode(value: string): MusicRepeatMode | null 
 
 export function toggleMusicAutoplay(enabled: boolean): boolean {
   return !enabled;
+}
+
+export type MusicRadioMode = "artist" | "genre" | "search";
+
+export function normalizeMusicRadioMode(value: string | null | undefined): MusicRadioMode | null {
+  return value === "artist" || value === "genre" || value === "search" ? value : null;
+}
+
+export function buildMusicRadioQuery(mode: MusicRadioMode, seed: string): string {
+  const normalized = seed.trim().replace(/\s+/g, " ");
+  if (mode === "artist") return normalized + " songs";
+  if (mode === "genre") return normalized + " music mix";
+  return normalized;
 }
 
 export function shouldAutoplayAfterQueueEnd(
