@@ -1367,7 +1367,7 @@ export class Music implements PlatformModule {
     );
 
     if (!result.tracks.length) {
-      return { added: 0, truncated: false, firstTitle: "", firstAuthor: "" };
+      return { added: 0, truncated: false, limited: false, firstTitle: "", firstAuthor: "" };
     }
 
     const maxTracks = remainingSlots === null ? MAX_PLAYLIST_TRACKS : Math.min(MAX_PLAYLIST_TRACKS, remainingSlots);
