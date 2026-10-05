@@ -1342,3 +1342,10 @@ Never write credentials, tokens or private user data here.
 - Validated the scanner independently with a temporary safe fixture (passes) and a synthetic GitHub token fixture (correctly fails).
 - Source checkpoint: 498cf355d3933fa8af12e286d46e070c9837fa6f.
 - Fresh CI is not visible yet; the scanner still needs the branch CI run.
+
+## 2026-10-05 — Critical runtime configuration validation
+- Hardened config loading so DATABASE_URL and LAVALINK_PASSWORD require non-blank values.
+- Custom LAVALINK_NODES entries now reject whitespace-only node passwords.
+- Added deterministic regression coverage for blank/whitespace/tab values and malformed custom-node secrets.
+- Source checkpoints: e99821d236617fc5144d40ae18f562a8d8a8bd5f (config), c12b224744e85d5eddefd62cc76721d27952b921 (tests).
+- Fresh CI is not visible yet.
