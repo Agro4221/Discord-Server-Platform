@@ -265,7 +265,7 @@
 | Tidal | ✅ | LavaSrc mirror source + Tidal token + explicit tdsearch / provider selection in Music play/search; live provider validation remains a release-gate check |
 | Qobuz | ✅ | LavaSrc direct source + Qobuz user OAuth token + explicit qbsearch / provider selection in Music play/search; Qobuz account/token availability remains a release-gate check |
 | yt-dlp | 🟡 |
-| JioSaavn | 🟡 |
+| JioSaavn | ✅ | LavaSrc direct source + JioSaavn secret key + explicit jssearch / provider selection in Music play/search; live provider validation remains a release-gate check |
 
 Важно: часть сервисов может использоваться как metadata/search/mirror источник, а часть — как прямой audio source. Реальную поддержку проверяем по конкретному LavaSrc/source adapter и credentials; не считаем provider готовым только потому, что он появился в списке конфигурации.
 
