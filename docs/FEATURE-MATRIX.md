@@ -192,7 +192,7 @@
 | Separate queue add / remove / move permissions | 🟡 |
 | DJ role policy | ✅ |
 | Vote skip | ✅ | Non-DJ users can vote to skip the current track; threshold scales from active human voice listeners and votes expire with the current track/session |
-| Per-user request cooldown | 🟡 |
+| Per-user request cooldown | ✅ | Successful music queue requests are throttled per user/server for 5 seconds across slash play and request channel |
 | Per-user queued-track limit | 🟡 |
 | Fair queue / requester rotation | 🟡 |
 | Max guild queue size | 🟡 |
