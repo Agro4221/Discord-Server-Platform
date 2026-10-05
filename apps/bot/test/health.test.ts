@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { HealthServer } from "../src/health.js";
+import { HealthServer, healthStatusCode, type HealthState } from "../src/health.js";
 
 test("health starts in a non-ready state", () => {
   const health = new HealthServer();
@@ -24,7 +24,6 @@ test("health state updates are preserved", () => {
   assert.equal(state.modules["temporary-voice"], "ready");
 });
 
-import { healthStatusCode, type HealthState } from "../src/health.js";
 
 function state(overrides: Partial<HealthState> = {}): HealthState {
   return {
