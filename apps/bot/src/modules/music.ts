@@ -49,17 +49,17 @@ export function normalizeMusicPlaylistVisibility(shared: boolean): MusicPlaylist
   return shared ? "shared" : "personal";
 }
 
-export type MusicSearchProvider = "youtube" | "yandex" | "spotify" | "applemusic" | "deezer" | "vkmusic" | "tidal" | "qobuz";
+export type MusicSearchProvider = "youtube" | "yandex" | "spotify" | "applemusic" | "deezer" | "vkmusic" | "tidal" | "qobuz" | "jiosaavn";
 
 export function normalizeMusicSearchProvider(value: string | null | undefined): MusicSearchProvider | null {
-  if (value === "youtube" || value === "yandex" || value === "spotify" || value === "applemusic" || value === "deezer" || value === "vkmusic" || value === "tidal" || value === "qobuz") return value;
+  if (value === "youtube" || value === "yandex" || value === "spotify" || value === "applemusic" || value === "deezer" || value === "vkmusic" || value === "tidal" || value === "qobuz" || value === "jiosaavn") return value;
   return null;
 }
 
 export function resolveMusicSearchRequest(
   query: string,
   provider?: MusicSearchProvider | null
-): { query: string; source?: "ytsearch" | "ymsearch" | "spsearch" | "amsearch" | "dzsearch" | "vksearch" | "tdsearch" | "qbsearch" } {
+): { query: string; source?: "ytsearch" | "ymsearch" | "spsearch" | "amsearch" | "dzsearch" | "vksearch" | "tdsearch" | "qbsearch" | "jssearch" } {
   const normalized = query.trim();
   if (/^https?:\/\//i.test(normalized)) return { query: normalized };
   if (/^ymsearch:/i.test(normalized)) {
@@ -83,6 +83,9 @@ export function resolveMusicSearchRequest(
   if (/^qbsearch:/i.test(normalized)) {
     return { query: normalized.replace(/^qbsearch:\s*/i, ""), source: "qbsearch" };
   }
+  if (/^jssearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^jssearch:\s*/i, ""), source: "jssearch" };
+  }
   if (/^ytsearch:/i.test(normalized)) {
     return { query: normalized.replace(/^ytsearch:\s*/i, ""), source: "ytsearch" };
   }
@@ -93,6 +96,7 @@ export function resolveMusicSearchRequest(
   if (provider === "vkmusic") return { query: normalized, source: "vksearch" };
   if (provider === "tidal") return { query: normalized, source: "tdsearch" };
   if (provider === "qobuz") return { query: normalized, source: "qbsearch" };
+  if (provider === "jiosaavn") return { query: normalized, source: "jssearch" };
   return { query: normalized, source: "ytsearch" };
 }
 
