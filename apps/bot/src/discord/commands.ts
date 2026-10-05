@@ -1007,6 +1007,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
               { name: "Delete", value: "delete" },
               { name: "List", value: "list" },
               { name: "Search", value: "search" },
+              { name: "Import URL", value: "import" },
               { name: "View tracks", value: "view" },
               { name: "Add current", value: "add" },
               { name: "Remove track", value: "remove" },
