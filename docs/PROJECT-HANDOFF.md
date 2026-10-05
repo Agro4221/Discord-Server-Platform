@@ -378,8 +378,8 @@ Premium parity = **совокупность сильных функций раз
 PR: **#3** — `feat: Discord platform expansion + Music v2`
 PR остаётся **draft**.
 
-Текущий source checkpoint:
-`9ca8b24d022ee4494873da651162ccba583d3f53`
+Текущий source/docs checkpoint:
+`4897b4f949881e1d5f2d617bab6f6f884aebc9cf`
 
 Branch HEAD is tracked by the PR/branch ref; the source checkpoint above identifies the last code-changing commit.
 
@@ -692,3 +692,12 @@ Feature Matrix полностью reconciled: все строки ✅.
 - First-run native startup intentionally permits missing Discord credentials so Control Center can register the bot through Fleet.
 - Native Dashboard must stay bound to 127.0.0.1.
 - Keep the default native memory caps conservative unless measured workloads justify raising them.
+
+### 2026-10-05 — Native launcher/resource pass
+- Current branch HEAD: `4897b4f949881e1d5f2d617bab6f6f884aebc9cf`.
+- Native Windows is the primary local path for the gaming/streaming PC; Docker remains optional for deployment/reproducibility/VPS.
+- One-click entrypoints are `start.bat`, `control-center.bat`, `stop.bat`, and `native-status.bat`.
+- Native startup permits missing Discord credentials so Bot Fleet registration can happen through Control Center after the Management API is online.
+- Native Dashboard binds to loopback and follows configured ports.
+- Resource caps and hardware tiers are documented in `docs/RESOURCE-REQUIREMENTS.md`.
+- Live Windows/runtime/resource validation is still pending; do not mark native acceptance complete from static inspection alone.
