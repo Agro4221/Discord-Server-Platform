@@ -923,3 +923,10 @@ Never write credentials, tokens or private user data here.
 - Completed before testing: legacy Dashboard removal and Control Center consolidation; no-login local admin contract; Docker single-Lavalink default with opt-in failover node; VPS installer/upgrade self-healing secrets; Music Spotify/Yandex provider wiring through LavaSrc; Automation warn/channel-creation actions and scheduler-index fix; AutoMod detector breadth expansion; persisted moderation-channel lock cleanup.
 - Next phase is verification: repository CI, unit/regression coverage expansion, live Discord smoke, native Windows runtime, Lavalink failover, Fleet takeover, VPS clean-host, chaos/soak/security and performance measurements.
 - From this point, a code change should be driven by a failing test, a reproduced runtime defect or an explicitly approved scope addition.
+
+
+## 2026-10-05 — Verification baseline #2442
+- First post-freeze full CI baseline passed end-to-end: dependency audit, source/deployment/observability contracts, typecheck, bot tests, Domain build, Bot build and Dashboard build.
+- Two stale provider expectations were found and corrected in the initial test run; the next full baseline passed with the expanded Spotify/Yandex provider contract.
+- Added regression coverage for AutoMod burst/image-only/YouTube-only detectors, Automation warn/channel creation runtime, and persisted moderation channel-lock cleanup.
+- No new feature scope is being added from this point unless a failing test or reproducible runtime defect requires it.
