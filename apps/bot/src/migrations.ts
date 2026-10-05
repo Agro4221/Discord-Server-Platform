@@ -1408,6 +1408,15 @@ const migrations = [
       "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS fair_queue_enabled boolean NOT NULL DEFAULT false;"
     ])
   },
+  {
+    version: 92,
+    name: "music_vote_skip_settings",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS vote_skip_enabled boolean NOT NULL DEFAULT true;",
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS vote_skip_percent real NOT NULL DEFAULT 0.6 CHECK(vote_skip_percent BETWEEN 0.1 AND 1);",
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS vote_skip_minimum integer NOT NULL DEFAULT 1 CHECK(vote_skip_minimum BETWEEN 1 AND 99);"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
