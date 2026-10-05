@@ -826,3 +826,15 @@ Never write credentials, tokens or private user data here.
 - CI #2156 passed completely: observability/deployment contracts, Typecheck, 171 tests, domain build, bot build and Dashboard build.
 - Final source checkpoint: 36ba498f2446abf5e144bc88ba0d1f296374656c.
 - Next single Music slice: **Autoplay duplicate/recent-track avoidance**.
+
+
+## 2026-10-05 — Music Autoplay duplicate / recent-track avoidance
+- Completed duplicate and recent-track protection for Music Autoplay.
+- Added a persistent identifier field to music_history so Autoplay can reliably recognize tracks across bot restarts instead of relying only on in-memory state.
+- Autoplay now excludes the track that just finished, tracks already waiting in the queue, and the last 20 historical plays for the same guild/bot identity.
+- URL fallback is also checked for compatibility with older history rows that predate the identifier migration.
+- Search results are filtered before insertion, so recent/duplicate candidates are never added merely because they were the first Lavalink result.
+- Added unit coverage for identifier/URL exclusion and PostgreSQL migration coverage for the new history identifier column.
+- CI #2161 passed completely: source/deployment/observability contracts, Typecheck, 171 tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: 6194b069485b84f7e1d3ebd81118a96a07e4e6aa.
+- Next single Music slice: **Artist-aware / similar-track Autoplay**.
