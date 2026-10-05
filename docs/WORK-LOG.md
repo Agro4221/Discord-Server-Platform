@@ -895,3 +895,14 @@ Never write credentials, tokens or private user data here.
 - CI #2190 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
 - Final source checkpoint for this slice: 66106e46cda3e63221922435516613f13fa2f6f7.
 - Next single Music slice: **Speed control**.
+
+
+## 2026-10-05 — Music Speed control
+- Completed independent playback speed control for the Music player.
+- Added top-level `/speed` because `/music` remains at Discord's 25-subcommand limit; Prefix supports `!speed` as well.
+- Speed uses the existing Lavalink timescale filter, changing only playback speed while preserving the other timescale values.
+- Supported range is 0.5×–2.0×; 1.0× restores normal speed. DJ / Manage Server permission is required for changes.
+- Added shared speed normalization and deterministic unit coverage.
+- CI #2195 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: 60b4115acc25d945bfbd31f1b0bbb6bebae73378.
+- Next single Music slice: **Tremolo / additional Lavalink effects**.
