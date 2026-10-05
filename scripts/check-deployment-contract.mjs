@@ -68,7 +68,7 @@ try {
 try {
   execFileSync("docker", ["compose", "-f", "docker-compose.yml", "-f", "docker-compose.vps.yml", "config"], {
     stdio: "pipe",
-    env: { ...process.env, DOMAIN: "panel.example.com", DASHBOARD_BASIC_AUTH_USER: "admin", DASHBOARD_BASIC_AUTH_HASH: "$argon2id$dummy" }
+    env: { ...process.env, DOMAIN: "panel.example.com", DASHBOARD_BASIC_AUTH_USER: "admin", DASHBOARD_BASIC_AUTH_HASH: "$argon2id$dummy", POSTGRES_PASSWORD: "contract-postgres-password", LAVALINK_PASSWORD: "contract-lavalink-password", MANAGEMENT_API_KEY: "contract-management-api-key" }
   });
 } catch {
   throw new Error("VPS Compose overlay failed config validation");
