@@ -184,6 +184,73 @@ test("AutoMod repeated-text rule honors its own window", () => {
   );
 });
 
+test("AutoMod leaves clean messages untouched", async () => {
+  clearModuleEnabledCache();
+  const queries: string[] = [];
+  const deletes: string[] = [];
+  const db = {
+    async query<T>(text: string) {
+      queries.push(text);
+      if (text.startsWith("SELECT enabled FROM guild_modules")) {
+        return { rows: [{ enabled: true }] } as { rows: T[] };
+      }
+      if (text.startsWith("SELECT enabled,blocked_words")) {
+        return { rows: [{
+          enabled: true,
+          blocked_words: [],
+          max_mentions: 6,
+          max_caps_ratio: 0.85,
+          max_repeated_messages: 5,
+          repeated_window_seconds: 10,
+          block_links: false,
+          block_invites: false,
+          max_links: 3,
+          max_emojis: 20,
+          max_line_length: 1000,
+          exempt_channel_ids: "",
+          exempt_role_ids: "",
+          delete_message: true,
+          timeout_minutes: 0
+        }] } as { rows: T[] };
+      }
+      if (text.startsWith("SELECT detector,threshold")) return { rows: [] } as { rows: T[] };
+      if (text.startsWith("INSERT INTO automod_events")) return { rows: [], rowCount: 1 } as { rows: T[] };
+      throw new Error("unexpected query: " + text);
+    }
+  } as never;
+
+  const events = new PlatformEventBus();
+  const automod = new AutoMod(db);
+
+  await automod.init({
+    client: {} as never,
+    db,
+    events,
+    auditLog: { record: async () => { throw new Error("audit should not be called"); } } as never,
+    identityId: "primary"
+  });
+
+  const message = {
+    id: "123456789012345678",
+    guild: {
+      id: "234567890123456789",
+      channels: { cache: new Map() }
+    },
+    channelId: "345678901234567890",
+    author: { id: "456789012345678901", bot: false },
+    member: null,
+    content: "hello everyone",
+    mentions: { users: { size: 0 }, roles: { size: 0 } },
+    delete: async () => { deletes.push("deleted"); }
+  };
+
+  await events.emit("message.create", message as never);
+  await automod.shutdown();
+
+  assert.deepEqual(deletes, []);
+  assert.equal(queries.some((query) => query.startsWith("INSERT INTO automod_events")), false);
+});
+
 test("AutoMod records a durable audit event for a handled violation", async () => {
   const auditEvents: unknown[] = [];
   const queries: string[] = [];
