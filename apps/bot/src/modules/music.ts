@@ -49,17 +49,17 @@ export function normalizeMusicPlaylistVisibility(shared: boolean): MusicPlaylist
   return shared ? "shared" : "personal";
 }
 
-export type MusicSearchProvider = "youtube" | "yandex" | "spotify" | "applemusic" | "deezer" | "vkmusic" | "tidal";
+export type MusicSearchProvider = "youtube" | "yandex" | "spotify" | "applemusic" | "deezer" | "vkmusic" | "tidal" | "qobuz";
 
 export function normalizeMusicSearchProvider(value: string | null | undefined): MusicSearchProvider | null {
-  if (value === "youtube" || value === "yandex" || value === "spotify" || value === "applemusic" || value === "deezer" || value === "vkmusic" || value === "tidal") return value;
+  if (value === "youtube" || value === "yandex" || value === "spotify" || value === "applemusic" || value === "deezer" || value === "vkmusic" || value === "tidal" || value === "qobuz") return value;
   return null;
 }
 
 export function resolveMusicSearchRequest(
   query: string,
   provider?: MusicSearchProvider | null
-): { query: string; source?: "ytsearch" | "ymsearch" | "spsearch" | "amsearch" | "dzsearch" | "vksearch" | "tdsearch" } {
+): { query: string; source?: "ytsearch" | "ymsearch" | "spsearch" | "amsearch" | "dzsearch" | "vksearch" | "tdsearch" | "qbsearch" } {
   const normalized = query.trim();
   if (/^https?:\/\//i.test(normalized)) return { query: normalized };
   if (/^ymsearch:/i.test(normalized)) {
@@ -80,6 +80,9 @@ export function resolveMusicSearchRequest(
   if (/^tdsearch:/i.test(normalized)) {
     return { query: normalized.replace(/^tdsearch:\s*/i, ""), source: "tdsearch" };
   }
+  if (/^qbsearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^qbsearch:\s*/i, ""), source: "qbsearch" };
+  }
   if (/^ytsearch:/i.test(normalized)) {
     return { query: normalized.replace(/^ytsearch:\s*/i, ""), source: "ytsearch" };
   }
@@ -89,6 +92,7 @@ export function resolveMusicSearchRequest(
   if (provider === "deezer") return { query: normalized, source: "dzsearch" };
   if (provider === "vkmusic") return { query: normalized, source: "vksearch" };
   if (provider === "tidal") return { query: normalized, source: "tdsearch" };
+  if (provider === "qobuz") return { query: normalized, source: "qbsearch" };
   return { query: normalized, source: "ytsearch" };
 }
 
@@ -925,7 +929,7 @@ export class Music implements PlatformModule {
         { name: "Yandex Music", enabled: process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true", mode: "direct" },
         { name: "VK Music", enabled: process.env.LAVASRC_VKMUSIC_ENABLED === "true" && Boolean(process.env.VK_MUSIC_USER_TOKEN?.trim()), mode: "direct" },
         { name: "Tidal", enabled: process.env.LAVASRC_TIDAL_ENABLED === "true" && Boolean(process.env.TIDAL_TOKEN?.trim()), mode: "mirror" },
-        { name: "Qobuz", enabled: process.env.LAVASRC_QOBUZ_ENABLED === "true", mode: "direct" },
+        { name: "Qobuz", enabled: process.env.LAVASRC_QOBUZ_ENABLED === "true" && Boolean(process.env.QOBUZ_USER_OAUTH_TOKEN?.trim()), mode: "direct" },
         { name: "yt-dlp", enabled: process.env.LAVASRC_YTDLP_ENABLED === "true", mode: "direct" },
         { name: "JioSaavn", enabled: process.env.LAVASRC_JIOSAAVN_ENABLED === "true", mode: "direct" }
       ]
