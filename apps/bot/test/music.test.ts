@@ -3,6 +3,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd, toggleMusicDistortion, selectMusicFailoverNodeId } from "../src/modules/music.js";
 
+test("Music provider diagnostics require provider enablement and required credentials", () => {
+  assert.equal(isMusicDeezerConfigured("true", "arl", "key"), true);
+  assert.equal(isMusicDeezerConfigured("true", "arl", ""), false);
+  assert.equal(isMusicYandexConfigured("true", "token"), true);
+  assert.equal(isMusicYandexConfigured("true", " "), false);
+  assert.equal(isMusicVkMusicConfigured("true", "token"), true);
+  assert.equal(isMusicVkMusicConfigured("false", "token"), false);
+  assert.equal(isMusicTidalConfigured("true", "token"), true);
+  assert.equal(isMusicQobuzConfigured("true", "token"), true);
+  assert.equal(isMusicJioSaavnConfigured("true", "secret"), true);
+  assert.equal(isMusicJioSaavnConfigured("true", ""), false);
+});
+
 test("Apple Music diagnostics require both provider enablement and API token", () => {
   assert.equal(isMusicAppleMusicConfigured("false", "token"), false);
   assert.equal(isMusicAppleMusicConfigured("true", ""), false);
