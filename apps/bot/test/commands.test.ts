@@ -133,6 +133,6 @@ test("Music lyrics command exposes show/status action", () => {
   assert.ok(lyrics);
   assert.deepEqual(
     lyrics?.options?.find((option) => option.name === "action")?.choices?.map((choice) => choice.value),
-    ["show", "status"]
+    ["show", "sync", "status"]
   );
 });
