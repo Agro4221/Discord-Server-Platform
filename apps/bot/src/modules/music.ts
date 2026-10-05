@@ -3104,6 +3104,52 @@ export function canControlMusic(
 }
 
 
+export function calculateMusicVoteSkipRequired(
+  listenerCount: number,
+  votePercent: number,
+  minimumVotes: number
+): number {
+  const listeners = Math.max(0, Math.floor(Number(listenerCount)));
+  const minimum = Math.max(1, Math.floor(Number(minimumVotes)));
+  if (listeners === 0) return minimum;
+
+  const percent = Math.min(1, Math.max(0, Number(votePercent)));
+  return Math.min(listeners, Math.max(1, minimum, Math.ceil(listeners * percent)));
+}
+
+export function formatMusicTime(milliseconds: number): string {
+  const totalSeconds = Math.max(0, Math.floor(Number(milliseconds) / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return hours + ":" + String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+  }
+
+  return Math.floor(totalSeconds / 60) + ":" + String(seconds).padStart(2, "0");
+}
+
+export function formatMusicProgress(
+  positionMs: number,
+  durationMs: number,
+  segments = 10
+): string {
+  const width = Math.max(1, Math.trunc(Number(segments)));
+  const duration = Math.max(0, Math.trunc(Number(durationMs)));
+  const position = Math.max(0, Math.trunc(Number(positionMs)));
+  const safePosition = duration > 0 ? Math.min(position, duration) : position;
+  const filled = duration > 0
+    ? Math.min(width, Math.max(0, Math.floor((safePosition / duration) * width)))
+    : 0;
+  const bar = "━".repeat(filled) + "─".repeat(width - filled);
+  const time = duration > 0
+    ? formatMusicTime(safePosition) + " / " + formatMusicTime(duration)
+    : formatMusicTime(safePosition) + " / live";
+
+  return bar + " " + time;
+}
+
 export function formatTrackProgress(player: Player, track: Track | null): string {
   if (!track) return "—";
   const durationMs = Math.max(0, Number(track.info.duration ?? 0));
