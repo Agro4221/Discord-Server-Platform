@@ -108,7 +108,7 @@ test("Music play and search expose YouTube, Yandex Music and Spotify providers",
   );
   assert.deepEqual(
     topLevelPlay?.options?.find((option) => option.name === "provider")?.choices?.map((choice) => choice.value),
-    ["youtube", "yandex", "spotify", "applemusic"]
+    ["youtube", "yandex", "spotify", "applemusic", "deezer"]
   );
 
   const music = commands.find((command) => command.name === "music");
