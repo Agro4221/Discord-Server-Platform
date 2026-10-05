@@ -32,6 +32,13 @@ const vpsUpgrade = await readFile("scripts/upgrade.sh", "utf8");
 const vpsCompose = await readFile("docker-compose.vps.yml", "utf8");
 const caddyExample = await readFile("infrastructure/caddy/Caddyfile.example", "utf8");
 const gitignore = await readFile(".gitignore", "utf8");
+const dockerCompose = await readFile("docker-compose.yml", "utf8");
+for (const insecureDefault of ["change-me-postgres", "change-me-local"]) {
+  if (dockerCompose.includes(insecureDefault)) {
+    throw new Error("Insecure Compose secret fallback is still present: " + insecureDefault);
+  }
+}
+
 
 if (vpsInstaller.includes("cp infrastructure/caddy/Caddyfile.example infrastructure/caddy/Caddyfile")) {
   throw new Error("VPS installer must not overwrite an existing Caddyfile");
