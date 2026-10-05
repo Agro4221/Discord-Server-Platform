@@ -34,6 +34,17 @@ type MusicRepeatMode = "off" | "track" | "queue";
 
 const MAX_PLAYLIST_TRACKS = 500;
 
+const MUSIC_FILTER_ACTIONS = [
+  "clear", "bassboost-low", "bassboost-medium", "bassboost-high",
+  "rock", "classic", "pop", "electronic", "fullsound", "gaming", "nightcore", "8d"
+] as const;
+
+type MusicFilterAction = (typeof MUSIC_FILTER_ACTIONS)[number];
+
+export function isMusicFilterAction(value: string): value is MusicFilterAction {
+  return (MUSIC_FILTER_ACTIONS as readonly string[]).includes(value);
+}
+
 export function nextMusicRepeatMode(mode: MusicRepeatMode): MusicRepeatMode {
   if (mode === "off") return "track";
   if (mode === "track") return "queue";
@@ -861,48 +872,12 @@ export class Music implements PlatformModule {
     if (!await this.canControl(interaction, player.voiceChannelId)) return;
 
     const action = interaction.options.getString("action", true);
+    if (!isMusicFilterAction(action)) {
+      await interaction.reply({ content: "Неизвестный filter action.", ephemeral: true });
+      return;
+    }
     try {
-      switch (action) {
-        case "clear":
-          await player.filterManager.resetFilters();
-          break;
-        case "bassboost-low":
-          await player.filterManager.setEQPreset("BassboostLow");
-          break;
-        case "bassboost-medium":
-          await player.filterManager.setEQPreset("BassboostMedium");
-          break;
-        case "bassboost-high":
-          await player.filterManager.setEQPreset("BassboostHigh");
-          break;
-        case "rock":
-          await player.filterManager.setEQPreset("Rock");
-          break;
-        case "classic":
-          await player.filterManager.setEQPreset("Classic");
-          break;
-        case "pop":
-          await player.filterManager.setEQPreset("Pop");
-          break;
-        case "electronic":
-          await player.filterManager.setEQPreset("Electronic");
-          break;
-        case "fullsound":
-          await player.filterManager.setEQPreset("FullSound");
-          break;
-        case "gaming":
-          await player.filterManager.setEQPreset("Gaming");
-          break;
-        case "nightcore":
-          await player.filterManager.toggleNightcore();
-          break;
-        case "8d":
-          await player.filterManager.toggleRotation(0.4);
-          break;
-        default:
-          await interaction.reply({ content: "Неизвестный filter action.", ephemeral: true });
-          return;
-      }
+      await this.applyFilterAction(player, action);
       await this.persistPlayer(player);
       await this.syncController(player);
       await interaction.reply({ content: "🎚️ Filter применён: **" + action + "**.", ephemeral: true });
@@ -914,6 +889,81 @@ export class Music implements PlatformModule {
       });
       await interaction.reply({ content: "Не удалось применить этот filter на текущем Lavalink node.", ephemeral: true });
     }
+  }
+
+  private async applyFilterAction(player: Player, action: MusicFilterAction): Promise<void> {
+    switch (action) {
+      case "clear":
+        await player.filterManager.resetFilters();
+        break;
+      case "bassboost-low":
+        await player.filterManager.setEQPreset("BassboostLow");
+        break;
+      case "bassboost-medium":
+        await player.filterManager.setEQPreset("BassboostMedium");
+        break;
+      case "bassboost-high":
+        await player.filterManager.setEQPreset("BassboostHigh");
+        break;
+      case "rock":
+        await player.filterManager.setEQPreset("Rock");
+        break;
+      case "classic":
+        await player.filterManager.setEQPreset("Classic");
+        break;
+      case "pop":
+        await player.filterManager.setEQPreset("Pop");
+        break;
+      case "electronic":
+        await player.filterManager.setEQPreset("Electronic");
+        break;
+      case "fullsound":
+        await player.filterManager.setEQPreset("FullSound");
+        break;
+      case "gaming":
+        await player.filterManager.setEQPreset("Gaming");
+        break;
+      case "nightcore":
+        await player.filterManager.toggleNightcore();
+        break;
+      case "8d":
+        await player.filterManager.toggleRotation(0.4);
+        break;
+    }
+  }
+
+  private filterPalette(): ActionRowBuilder<ButtonBuilder>[] {
+    const labels: Record<MusicFilterAction, string> = {
+      clear: "Clear",
+      "bassboost-low": "Bass Low",
+      "bassboost-medium": "Bass Med",
+      "bassboost-high": "Bass High",
+      rock: "Rock",
+      classic: "Classic",
+      pop: "Pop",
+      electronic: "Electronic",
+      fullsound: "Full Sound",
+      gaming: "Gaming",
+      nightcore: "Nightcore",
+      "8d": "8D"
+    };
+    return [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        ...MUSIC_FILTER_ACTIONS.slice(0, 5).map((action) =>
+          new ButtonBuilder().setCustomId("dsp:music:filter:" + action).setLabel(labels[action]).setStyle(ButtonStyle.Secondary)
+        )
+      ),
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        ...MUSIC_FILTER_ACTIONS.slice(5, 10).map((action) =>
+          new ButtonBuilder().setCustomId("dsp:music:filter:" + action).setLabel(labels[action]).setStyle(ButtonStyle.Secondary)
+        )
+      ),
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        ...MUSIC_FILTER_ACTIONS.slice(10).map((action) =>
+          new ButtonBuilder().setCustomId("dsp:music:filter:" + action).setLabel(labels[action]).setStyle(ButtonStyle.Secondary)
+        )
+      )
+    ];
   }
 
   private async favorite(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -2079,6 +2129,43 @@ export class Music implements PlatformModule {
     }
 
     const action = interaction.customId.slice("dsp:music:".length);
+    if (action === "filters") {
+      await interaction.reply({
+        content: "🎚️ Выбери фильтр или FX. Действия применяются к текущему треку сразу.",
+        components: this.filterPalette(),
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (action.startsWith("filter:")) {
+      const filterAction = action.slice("filter:".length);
+      if (!isMusicFilterAction(filterAction)) {
+        await interaction.reply({ content: "Неизвестный filter action.", ephemeral: true });
+        return;
+      }
+      try {
+        await this.applyFilterAction(player, filterAction);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await interaction.reply({
+          content: "🎚️ Filter применён: **" + filterAction + "**.",
+          ephemeral: true
+        });
+      } catch (error) {
+        logger.warn("Music quick filter operation failed", {
+          guildId: interaction.guild.id,
+          action: filterAction,
+          error: String(error)
+        });
+        await interaction.reply({
+          content: "Не удалось применить этот filter на текущем Lavalink node.",
+          ephemeral: true
+        });
+      }
+      return;
+    }
+
     let response = "";
 
     if (action === "pause") {
@@ -2474,7 +2561,8 @@ export class Music implements PlatformModule {
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId("dsp:music:queue").setEmoji("📋").setLabel("Очередь").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("dsp:music:lyrics").setEmoji("📜").setLabel("Текст").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("dsp:music:favorite").setEmoji("❤️").setLabel("В избранное").setStyle(ButtonStyle.Secondary)
+        new ButtonBuilder().setCustomId("dsp:music:favorite").setEmoji("❤️").setLabel("В избранное").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:filters").setEmoji("🎚️").setLabel("Фильтры").setStyle(ButtonStyle.Secondary)
       )
     ];
   }
