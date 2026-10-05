@@ -531,3 +531,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Regression tests cover empty and whitespace-only values.
 - Source checkpoint: `333ce7ca164fa0e0dd7c0ba776bc5315c0217924`.
 - CI verification remains pending/unavailable.
+
+## 2026-10-05 — Management API authorization contract
+- Bearer authorization is now isolated in a pure helper and covered by a dedicated test file.
+- The existing `ManagementApiServer` delegates to this helper; no endpoint permissions or local Dashboard login behavior were changed.
+- Source checkpoint: `3211e31ed8e07d0b41b0d25995a81e45ebef5f91`.
+- CI verification remains pending/unavailable.
