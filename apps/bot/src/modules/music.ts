@@ -1287,12 +1287,15 @@ export class Music implements PlatformModule {
         await interaction.reply({ content: "🎼 Плейлист **" + name + "** пуст.", ephemeral: true });
         return;
       }
-      const lines = stored.slice(0, 50).map((item, index) => {
-        const obj = item as { info?: { title?: string; author?: string } };
+      const lines: string[] = [];
+      for (let index = 0; index < stored.length && lines.length < 25; index += 1) {
+        const obj = stored[index] as { info?: { title?: string; author?: string } };
         const title = String(obj.info?.title ?? "Unknown track");
         const author = String(obj.info?.author ?? "Unknown artist");
-        return (index + 1) + ". **" + title + "** — " + author;
-      });
+        const line = (index + 1) + ". **" + title + "** — " + author;
+        if ((lines.join("\n") + (lines.length ? "\n" : "") + line).length > 1700) break;
+        lines.push(line);
+      }
       const suffix = stored.length > lines.length ? "\n… и ещё **" + (stored.length - lines.length) + "** треков." : "";
       await interaction.reply({
         content: "🎼 **" + name + "** (" + (row.visibility === "shared" ? "🌐 shared" : "👤 личный") + ")\n" + lines.join("\n") + suffix,
