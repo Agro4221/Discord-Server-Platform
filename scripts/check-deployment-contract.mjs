@@ -103,26 +103,20 @@ for (const upgradeContract of [
 }
 
 for (const upgradeDomainContract of [
-  'DOMAIN is missing or invalid in .env.',
-  'DOMAIN" =~ ^[A-Za-z0-9.-]+const localLauncher = await readFile("scripts/start-local.ps1", "utf8");
-for (const contract of [
-  "docker compose up -d",
-  "MANAGEMENT_API_KEY",
-  "Control Center",
-  "Bot Fleet",
-  "127.0.0.1",
-  "Start-Process"
-]) {
-  if (!localLauncher.includes(contract)) {
-    throw new Error("Local launcher contract missing: " + contract);
-  }
-}
-
-console.log("Deployment contract passed.");
-
+  "DOMAIN is missing or invalid in .env.",
+  'DOMAIN" =~ ^[A-Za-z0-9.-]+$'
 ]) {
   if (!vpsUpgrade.includes(upgradeDomainContract)) {
     throw new Error("VPS upgrade domain guard missing: " + upgradeDomainContract);
+  }
+}
+
+for (const caddyUpgradeContract of [
+  "Required Caddy setting is missing from .env: ${required_caddy_value}",
+  "for required_caddy_value in DOMAIN DASHBOARD_BASIC_AUTH_USER DASHBOARD_BASIC_AUTH_HASH"
+]) {
+  if (!vpsUpgrade.includes(caddyUpgradeContract)) {
+    throw new Error("VPS upgrade Caddy guard missing: " + caddyUpgradeContract);
   }
 }
 
