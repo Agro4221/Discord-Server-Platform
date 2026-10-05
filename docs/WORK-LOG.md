@@ -867,3 +867,18 @@ Never write credentials, tokens or private user data here.
 - README and PROJECT-STATE now describe deeper AutoMod/Security/Automation/Music expansion as post-RC work rather than blocking the current release candidate.
 - Remaining release blockers are environment-dependent: real Discord smoke/E2E, Lavalink/fleet failover, native Windows runtime, VPS clean-host acceptance and controlled chaos/soak/security validation.
 - The next CI run must verify this final documentation/UI cleanup tree before the RC is treated as the final automated state.
+
+## 2026-10-05 — Performance / resource-efficiency pass
+- Hot-path moduleEnabled checks are now cached for 5 seconds with bounded storage and concurrent single-flight deduplication, preventing per-event SQL and cache-miss query storms.
+- Leveling now caches guild settings and exclusion lists, reuses the already-resolved message.member where available, and invalidates exclusion state after configuration changes.
+- Automation rules are indexed by guild + event, so each Discord event no longer scans unrelated rules; schedule reloads now occur once per minute instead of every scheduler tick.
+- Reduced non-critical background polling overhead: Fleet reconciliation 15s→30s, reminders 5s→10s, giveaways 5s→10s. These changes keep the existing features while allowing a bounded small detection delay.
+- AutoMod now caches configuration/rules, bounds repeat-message history to the actual active repeat window instead of retaining an hour by default, and avoids querying the rules table on every message.
+- Fixed a serious AutoMod false-violation path: a clean message that matched neither base detectors nor custom rules is no longer treated as a violation, deleted, or persisted as an event.
+- Analytics no longer writes one UPSERT per event/message. Events are accumulated in memory by guild/event/minute and flushed in batches every 5 seconds; pending counts are retained on DB failure, reports flush pending data first, and concurrent flush/shutdown paths share one Promise so the database cannot close before a write finishes.
+- Logging configuration is now cached for 10 seconds, removing repeated configuration reads from high-volume audit event handlers.
+- Docker Lavalink defaults were aligned with the native resource profile: 128m initial / 512m maximum heap per node, with .env overrides for machines that genuinely need more.
+- Added regression coverage for module-cache single-flight, batched Analytics writes, and clean AutoMod messages.
+- CI #2397 passed completely on e722a37cab679aada1ef3afd599c902a40bedd2a: dependency/audit, source/deployment contracts, bot typecheck, bot tests, domain build, bot build and Dashboard build.
+### Next concrete work
+- Runtime measurement on the real Windows machine: capture Bot RSS/heap, PostgreSQL CPU/connection use and Lavalink RSS during idle, normal chat and Music playback before making any aggressive Discord.js cache/concurrency changes.
