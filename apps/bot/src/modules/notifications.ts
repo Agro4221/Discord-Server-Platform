@@ -380,17 +380,31 @@ export class Notifications implements PlatformModule {
       `UPDATE notification_tiktok_feeds nf
        SET processing_until=now()+interval '2 minutes'
        WHERE nf.id IN (
-         SELECT id FROM notification_tiktok_feeds
-         WHERE enabled=true
-           AND (processing_until IS NULL OR processing_until < now())
-           AND (last_polled_at IS NULL OR last_polled_at <= now() - make_interval(secs => interval_seconds))
-         ORDER BY last_polled_at NULLS FIRST
+         SELECT nf2.id
+         FROM notification_tiktok_feeds nf2
+         INNER JOIN guild_bot_assignments ga ON ga.guild_id=nf2.guild_id
+         WHERE nf2.enabled=true
+           AND (
+             ga.bot_identity_id=$1
+             OR (
+               $1='primary'
+               AND ga.bot_identity_id <> 'primary'
+               AND NOT EXISTS (
+                 SELECT 1 FROM bot_heartbeats bh
+                 WHERE bh.bot_identity_id=ga.bot_identity_id
+                   AND bh.last_seen_at >= now()-interval '90 seconds'
+               )
+             )
+           )
+           AND (nf2.processing_until IS NULL OR nf2.processing_until < now())
+           AND (nf2.last_polled_at IS NULL OR nf2.last_polled_at <= now() - make_interval(secs => nf2.interval_seconds))
+         ORDER BY nf2.last_polled_at NULLS FIRST
          LIMIT 20
          FOR UPDATE SKIP LOCKED
        )
        RETURNING nf.id,nf.guild_id,nf.channel_id,nf.credential_id,nf.target_open_id,nf.last_video_id,
                  nf.message_template,nf.include_keywords,nf.exclude_keywords,nf.embed_config`,
-      []
+      [this.identityId]
     );
 
     for (const feed of feeds.rows) await this.pollTikTokFeed(feed);
