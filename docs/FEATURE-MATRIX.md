@@ -235,7 +235,7 @@
 |---|---|
 | Current simple autoplay | ✅ |
 | Duplicate/recent-track avoidance | ✅ |
-| Artist-aware / similar-track autoplay | 🟡 |
+| Artist-aware / similar-track autoplay | ✅ |
 | Radio mode by artist/genre/search seed | 🟡 |
 | Playlist continuation after queue end | ✅ | |
 | Autoplay profile/settings in Dashboard | 🟡 |
