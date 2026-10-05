@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -225,6 +225,20 @@ test("music playlist names normalize whitespace and reject blanks", async () => 
   assert.equal(normalizeMusicPlaylistName("x".repeat(100))?.length, 80);
 });
 
+
+test("Music playlist pagination stays within page bounds", () => {
+  assert.equal(MUSIC_PLAYLIST_PAGE_SIZE, 25);
+  assert.equal(musicPlaylistPageCount(0), 1);
+  assert.equal(musicPlaylistPageCount(25), 1);
+  assert.equal(musicPlaylistPageCount(26), 2);
+  assert.equal(musicPlaylistPageCount(500), 20);
+  assert.equal(normalizeMusicPlaylistPage(-2, 3), 0);
+  assert.equal(normalizeMusicPlaylistPage(9, 3), 2);
+  assert.equal(isValidMusicPlaylistPage(0, 3), true);
+  assert.equal(isValidMusicPlaylistPage(2, 3), true);
+  assert.equal(isValidMusicPlaylistPage(3, 3), false);
+  assert.equal(isValidMusicPlaylistPage(1.5, 3), false);
+});
 
 test("favorite play shortcut validates 1-based positions within the visible 25 favorites", () => {
   assert.equal(isValidMusicSavedPosition(1, 25), true);
