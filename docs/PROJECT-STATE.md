@@ -583,3 +583,6 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - This removes the Docker first-run deadlock that could prevent Dashboard startup before Bot Fleet registration.
 ## 2026-10-05 — Health contract guard
 - Deployment validation explicitly protects the split between /health control-plane liveness and /ready full bot readiness.
+## 2026-10-05 — Lavalink secret contract
+- infrastructure/lavalink/application.yml no longer contains a predictable password fallback.
+- Lavalink server password must be supplied explicitly through LAVALINK_SERVER_PASSWORD.
