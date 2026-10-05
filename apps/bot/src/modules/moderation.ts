@@ -129,7 +129,11 @@ export class Moderation implements PlatformModule {
       "INSERT INTO moderation_notes(guild_id,target_user_id,moderator_user_id,note) VALUES($1,$2,$3,$4) RETURNING id",
       [guildId,targetUserId,moderatorUserId,clean]
     );
-    return Number(result.rows[0]?.id ?? 0);
+    const noteId = Number(result.rows[0]?.id ?? 0);
+    if (noteId > 0) {
+      await this.audit("moderation.note.added", guildId, moderatorUserId, targetUserId, { noteId });
+    }
+    return noteId;
   }
 
   async notes(guildId: string, targetUserId: string, limit = 10): Promise<Array<{
@@ -359,7 +363,7 @@ export class Moderation implements PlatformModule {
     }
 
     const result = await interaction.channel.bulkDelete(amount, true);
-    await this.audit("moderation.purge", interaction.guild.id, interaction.user.id, interaction.channelId, { requested: amount, deleted: result.size });
+    await this.audit("moderation.purge", interaction.guild.id, interaction.user.id, interaction.channelId, { requested: amount, deleted: result.size }, "channel");
     await interaction.reply({ content: `🧹 Удалено сообщений: **${result.size}**.`, ephemeral: true });
   }
 
@@ -378,7 +382,7 @@ export class Moderation implements PlatformModule {
     }
 
     await interaction.channel.setRateLimitPerUser(seconds, "Configured by Vexa");
-    await this.audit("moderation.slowmode", interaction.guild.id, interaction.user.id, interaction.channelId, { seconds });
+    await this.audit("moderation.slowmode", interaction.guild.id, interaction.user.id, interaction.channelId, { seconds }, "channel");
     await interaction.reply({ content: seconds === 0 ? "🐢 Slowmode отключён." : `🐢 Slowmode: **${seconds} сек.**`, ephemeral: true });
   }
 
@@ -400,7 +404,7 @@ export class Moderation implements PlatformModule {
       [interaction.guild.id,channel.id,current]
     );
     await channel.permissionOverwrites.edit(everyone,{ SendMessages: false },{ reason: "Vexa channel lock" });
-    await this.audit("moderation.channel.lock", interaction.guild.id, interaction.user.id, channel.id, {});
+    await this.audit("moderation.channel.lock", interaction.guild.id, interaction.user.id, channel.id, {}, "channel");
     await interaction.reply({ content: "🔒 Канал заблокирован для @everyone.", ephemeral: true });
   }
 
@@ -426,7 +430,7 @@ export class Moderation implements PlatformModule {
       { reason: "Vexa channel unlock" }
     );
     await this.db.query("DELETE FROM moderation_channel_locks WHERE guild_id=$1 AND channel_id=$2",[interaction.guild.id,channel.id]);
-    await this.audit("moderation.channel.unlock", interaction.guild.id, interaction.user.id, channel.id, {});
+    await this.audit("moderation.channel.unlock", interaction.guild.id, interaction.user.id, channel.id, {}, "channel");
     await interaction.reply({ content: "🔓 Канал разблокирован.", ephemeral: true });
   }
 
@@ -441,7 +445,7 @@ export class Moderation implements PlatformModule {
       return;
     }
     const result = await message.channel.bulkDelete(Math.min(100,amount + 1), true);
-    await this.audit("moderation.purge", message.guild.id, message.author.id, message.channelId, { requested: amount, deleted: result.size });
+    await this.audit("moderation.purge", message.guild.id, message.author.id, message.channelId, { requested: amount, deleted: result.size }, "channel");
   }
 
   async slowmodeFromMessage(message: Message, seconds: number): Promise<void> {
@@ -455,7 +459,7 @@ export class Moderation implements PlatformModule {
       return;
     }
     await message.channel.setRateLimitPerUser(seconds,"Configured by Vexa");
-    await this.audit("moderation.slowmode", message.guild.id, message.author.id, message.channelId, { seconds });
+    await this.audit("moderation.slowmode", message.guild.id, message.author.id, message.channelId, { seconds }, "channel");
     await message.reply(seconds === 0 ? "🐢 Slowmode отключён." : `🐢 Slowmode: ${seconds} сек.`);
   }
 
@@ -472,7 +476,7 @@ export class Moderation implements PlatformModule {
       [message.guild.id,message.channelId,current]
     );
     await message.channel.permissionOverwrites.edit(everyone,{ SendMessages: false },{ reason: "Vexa channel lock" });
-    await this.audit("moderation.channel.lock",message.guild.id,message.author.id,message.channelId,{});
+    await this.audit("moderation.channel.lock",message.guild.id,message.author.id,message.channelId,{},"channel");
     await message.reply("🔒 Канал заблокирован для @everyone.");
   }
 
@@ -489,7 +493,7 @@ export class Moderation implements PlatformModule {
     const previous = stored.rows[0]?.previous_send_messages ?? null;
     await message.channel.permissionOverwrites.edit(message.guild.roles.everyone,{ SendMessages: previous },{ reason: "Vexa channel unlock" });
     await this.db.query("DELETE FROM moderation_channel_locks WHERE guild_id=$1 AND channel_id=$2",[message.guild.id,message.channelId]);
-    await this.audit("moderation.channel.unlock",message.guild.id,message.author.id,message.channelId,{});
+    await this.audit("moderation.channel.unlock",message.guild.id,message.author.id,message.channelId,{},"channel");
     await message.reply("🔓 Канал разблокирован.");
   }
 
@@ -762,8 +766,12 @@ export class Moderation implements PlatformModule {
   }
 
   private async applyWarn(guildId: string, moderatorUserId: string, target: User, reason: string): Promise<void> {
-    await this.audit("moderation.warn.attempted", guildId, moderatorUserId, target.id, { reason });
     const caseId = await this.recordBestEffort(guildId, target.id, moderatorUserId, "warn", reason);
+    if (caseId) {
+      await this.audit("moderation.warn.applied", guildId, moderatorUserId, target.id, { reason, caseId });
+    } else {
+      await this.audit("moderation.warn.case_persistence_failed", guildId, moderatorUserId, target.id, { reason });
+    }
     await this.safeDm(target, `На сервере тебе выдано предупреждение. Причина: ${reason}`);
     if (caseId) await this.applyEscalationIfNeeded(guildId, target.id, caseId);
   }
@@ -947,10 +955,11 @@ export class Moderation implements PlatformModule {
           const channel = guild?.channels.cache.get(rule.channel_id);
           if (!channel || !channel.isTextBased() || !("bulkDelete" in channel)) throw new Error("cleanup_channel_unavailable");
           const deleted = await channel.bulkDelete(rule.max_messages, true);
-          await this.audit("moderation.autopurge",rule.guild_id,"system",rule.channel_id,{cleanupRuleId:Number(rule.id),requested:rule.max_messages,deleted:deleted.size});
+          await this.audit("moderation.autopurge",rule.guild_id,"system",rule.channel_id,{cleanupRuleId:Number(rule.id),requested:rule.max_messages,deleted:deleted.size},"channel");
           await this.db.query("UPDATE moderation_cleanup_rules SET processing_until=NULL WHERE id=$1",[rule.id]);
         } catch (error) {
           await this.db.query("UPDATE moderation_cleanup_rules SET processing_until=NULL WHERE id=$1",[rule.id]).catch(() => undefined);
+          await this.audit("moderation.autopurge.failed",rule.guild_id,"system",rule.channel_id,{cleanupRuleId:Number(rule.id),error:String(error).slice(0,500)},"channel");
           logger.warn("Scheduled moderation cleanup failed",{cleanupRuleId:rule.id,guildId:rule.guild_id,channelId:rule.channel_id,error:String(error)});
         }
       }
@@ -1016,6 +1025,13 @@ export class Moderation implements PlatformModule {
           );
         } catch (error) {
           await this.db.query("UPDATE moderation_cases SET resolved_at=NULL WHERE id=$1", [row.id]);
+          await this.audit(
+            row.action === "ban" ? "moderation.ban.expired.failed" : "moderation.timeout.expired.failed",
+            row.guild_id,
+            "system",
+            row.target_user_id,
+            { caseId: Number(row.id), error: String(error).slice(0,500) }
+          );
           logger.warn("Timed punishment expiry failed", {
             guildId: row.guild_id,
             userId: row.target_user_id,
@@ -1035,7 +1051,8 @@ export class Moderation implements PlatformModule {
     guildId: string,
     actorUserId: string,
     targetId: string,
-    metadata: Record<string, unknown>
+    metadata: Record<string, unknown>,
+    targetType: string = "user"
   ): Promise<void> {
     try {
       await this.auditLog?.record({
@@ -1043,7 +1060,7 @@ export class Moderation implements PlatformModule {
         actorUserId,
         source: actorUserId === "system" ? "system" : "discord",
         action,
-        targetType: "user",
+        targetType,
         targetId,
         metadata
       });
