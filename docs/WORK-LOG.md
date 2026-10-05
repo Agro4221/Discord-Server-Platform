@@ -1215,3 +1215,11 @@ Never write credentials, tokens or private user data here.
 - Hardened the scanner to support multiline imports and to require actual files rather than accepting directories as resolved modules.
 - Source checkpoint: `35442a31c3161421576b96e89ebe3fd1b2d73e08`.
 - The new source commits are not yet covered by a fresh Actions run in the current connector session; the last available run remains #2369 on the pre-hardening checkpoint.
+
+## 2026-10-05 — Music provider diagnostics consistency
+- Found a real Dashboard diagnostics defect: Apple Music was exposed twice in `Music.dashboardState()`, with contradictory readiness rules.
+- Removed the duplicate provider entry and centralized Apple Music readiness in `isMusicAppleMusicConfigured()`.
+- Both Dashboard state and `/music providers` now require the LavaSrc Apple Music switch plus a non-empty `APPLE_MUSIC_API_TOKEN`.
+- Added regression coverage for disabled, missing-token, whitespace-token and valid-token cases.
+- Source checkpoint after the fix: `53008d169a1b4a12659656c665e97125f2ca182e`.
+- No fresh GitHub Actions run is currently visible for this checkpoint; do not mark this slice CI-verified yet.
