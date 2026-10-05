@@ -38,12 +38,6 @@ export type AppConfig = {
   nodeEnv: "development" | "test" | "production";
 };
 
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing required environment variable: ${name}`);
-  return value;
-}
-
 function requiredNonBlank(name: string): string {
   const value = process.env[name];
   if (!value?.trim()) throw new Error(`Missing required environment variable: ${name}`);
@@ -103,7 +97,7 @@ function parseLavalinkNodes(): AppConfig["lavalinkNodes"] {
       id: "local",
       host: process.env.LAVALINK_HOST ?? "127.0.0.1",
       port: port("LAVALINK_PORT", 2333),
-      password: required("LAVALINK_PASSWORD"),
+      password: requiredNonBlank("LAVALINK_PASSWORD"),
       ...(process.env.LAVALINK_SECURE === "true" ? { secure: true } : {})
     }];
   }
@@ -127,7 +121,7 @@ function parseLavalinkNodes(): AppConfig["lavalinkNodes"] {
       typeof node.id !== "string" || !/^[A-Za-z0-9._-]{1,80}$/.test(node.id) ||
       typeof node.host !== "string" || !node.host.trim() ||
       typeof node.port !== "number" || !Number.isInteger(node.port) || node.port < 1 || node.port > 65535 ||
-      typeof node.password !== "string" || !node.password
+      typeof node.password !== "string" || !node.password.trim()
     ) {
       throw new Error(`Invalid Lavalink node at index ${index}`);
     }
@@ -177,7 +171,7 @@ export function loadConfig(): AppConfig {
     managementApiHost,
     managementApiPort: port("MANAGEMENT_API_PORT", 3002),
     managementApiKey: requiredNonBlank("MANAGEMENT_API_KEY"),
-    databaseUrl: required("DATABASE_URL"),
+    databaseUrl: requiredNonBlank("DATABASE_URL"),
     lavalinkHost: process.env.LAVALINK_HOST ?? "127.0.0.1",
     lavalinkPort: port("LAVALINK_PORT", 2333),
     lavalinkPassword: required("LAVALINK_PASSWORD"),
