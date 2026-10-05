@@ -1352,10 +1352,12 @@ export class Music implements PlatformModule {
     if (!await this.canQueueMusic(guildId, requester.id)) throw new Error("music_queue_permission_denied");
 
     const existing = this.manager.players.get(guildId);
-    const maxQueuedPerUser = (await this.musicSettings(guildId)).maxQueuedPerUser;
-    const queuedByUser = countMusicQueuedByUser(existing?.queue.tracks ?? [], requester.id);
-    const remainingSlots = remainingMusicQueueSlots(queuedByUser, maxQueuedPerUser);
-    if (remainingSlots === 0) {
+    const settings = await this.musicSettings(guildId);
+    const queued = existing?.queue.tracks ?? [];
+    const queuedByUser = countMusicQueuedByUser(queued, requester.id);
+    const remainingUserSlots = remainingMusicQueueSlots(queuedByUser, settings.maxQueuedPerUser);
+    const remainingGuildSlots = remainingMusicGuildQueueSlots(queued.length, settings.maxQueueSize);
+    if (remainingUserSlots === 0 || remainingGuildSlots === 0) {
       return { added: 0, truncated: false, limited: true, firstTitle: "", firstAuthor: "" };
     }
     const player = existing ?? await this.manager.createPlayer({
@@ -1381,7 +1383,11 @@ export class Music implements PlatformModule {
       return { added: 0, truncated: false, limited: false, firstTitle: "", firstAuthor: "" };
     }
 
-    const maxTracks = remainingSlots === null ? MAX_PLAYLIST_TRACKS : Math.min(MAX_PLAYLIST_TRACKS, remainingSlots);
+    const maxTracks = Math.min(
+      MAX_PLAYLIST_TRACKS,
+      ...(remainingUserSlots === null ? [] : [remainingUserSlots]),
+      ...(remainingGuildSlots === null ? [] : [remainingGuildSlots])
+    );
     const tracks = result.tracks.slice(0, maxTracks);
     for (const track of tracks) player.queue.add(track);
     if (!player.playing) await player.play();
@@ -1393,7 +1399,7 @@ export class Music implements PlatformModule {
     return {
       added: tracks.length,
       truncated: result.tracks.length > tracks.length && remainingSlots === null,
-      limited: remainingSlots !== null && result.tracks.length > tracks.length,
+      limited: (remainingUserSlots !== null || remainingGuildSlots !== null) && result.tracks.length > tracks.length,
       firstTitle: first.info.title,
       firstAuthor: first.info.author ?? "Unknown artist"
     };
