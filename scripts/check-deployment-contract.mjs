@@ -155,6 +155,30 @@ for (const caddyUpgradeContract of [
   }
 }
 
+const nativeLauncher = await readFile("scripts/start-native.ps1", "utf8");
+const nativeEntry = await readFile("start.bat", "utf8");
+const nativeDashboardEntry = await readFile("control-center.bat", "utf8");
+const nativeStopEntry = await readFile("stop.bat", "utf8");
+for (const contract of [
+  "Control Center -> Bot Fleet can register them",
+  "MANAGEMENT_API_URL = \"http://127.0.0.1:$managementApiPort\"",
+  "Rotate-Log",
+  "BOT_NODE_MAX_OLD_SPACE_MB",
+  "DASHBOARD_NODE_MAX_OLD_SPACE_MB"
+]) {
+  if (!nativeLauncher.includes(contract)) {
+    throw new Error("Native launcher contract missing: " + contract);
+  }
+}
+if (nativeLauncher.includes('Read-Host "Discord bot token"') || nativeLauncher.includes('Read-Host "Discord client ID"')) {
+  throw new Error("Native launcher must not require Discord credentials before Control Center startup");
+}
+if (nativeEntry.includes("docker") || !nativeEntry.includes("start-native.bat")) {
+  throw new Error("start.bat must be a native launcher alias");
+}
+if (!nativeDashboardEntry.includes("-Dashboard") || !nativeStopEntry.includes("-Down")) {
+  throw new Error("Native convenience entrypoints are incomplete");
+}
 const localLauncher = await readFile("scripts/start-local.ps1", "utf8");
 for (const contract of [
   "docker compose up -d",
