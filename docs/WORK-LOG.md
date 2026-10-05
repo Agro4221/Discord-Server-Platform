@@ -1246,3 +1246,10 @@ Never write credentials, tokens or private user data here.
 - The same selector is now used for the initial availability check and immediately before `moveNode()`.
 - Added deterministic regression coverage for unavailable, non-resumable and valid failover candidates.
 - Source checkpoint: `3e854a4e158eaa332a625cfba1f375ca837411f7`.
+
+## 2026-10-05 — Backup guild-scope hardening
+- Hardened `BackupService` public guild-scoped methods with strict Discord snowflake-format validation (17–20 digits).
+- Added regression coverage for invalid guild IDs, cross-guild read/restore/delete rejection and invalid backup filenames.
+- Existing local backup round-trip and retention behavior remains unchanged.
+- Source checkpoint: `9ca8b24d022ee4494873da651162ccba583d3f53`.
+- Fresh CI is not visible yet; keep this slice unverified until Actions reports the new checkpoint.
