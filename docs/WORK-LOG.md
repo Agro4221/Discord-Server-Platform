@@ -966,6 +966,18 @@ Never write credentials, tokens or private user data here.
 - Next single Music slice: **Custom EQ editor**.
 
 
+## 2026-10-05 — Moderation full action logging
+- Closed the real Moderation backlog gap instead of extending the Music filter surface.
+- Moderation runtime audit now records successful warning completion with the resulting Case ID and explicitly records case-persistence failure.
+- Private moderation notes emit an audit event without storing note contents in audit metadata.
+- Scheduled AutoPurge failures and timed ban/timeout expiry failures are audit-visible, so operational failures no longer exist only in the application logger.
+- Channel-targeted moderation events now use targetType=channel instead of being mislabeled as user targets.
+- This closes the Feature Matrix item Moderation → Full action logging.
+- CI verification for this source/test increment is pending connector visibility; the PR head is the feature branch commit below.
+- Source checkpoint: 8b3fc2964b910d2de8196ad56e0062ea4593f96a.
+- The previous Named effect profiles Music backlog item is removed: it is not a target parity feature and will not drive the next increment.
+- Next single backlog slice: Music provider parity — Yandex Music, a benchmarked Juniper-style provider target rather than another arbitrary Lavalink filter.
+
 ## 2026-10-05 — Music Custom EQ editor
 - Completed the independent Custom EQ editor slice.
 - Added a top-level `/eq` command because the `/music` command remains constrained by Discord's subcommand limit.
