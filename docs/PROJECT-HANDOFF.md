@@ -684,3 +684,5 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Compose already injects the same secret into both Lavalink nodes.
 ## 2026-10-05 — Config validator checkpoint
 - The required() helper was removed intentionally; keep requiredNonBlank() as the sole required secret validator.
+## 2026-10-05 — VPS secret contract
+- Keep critical secret checks whitespace-aware in both install-vps.sh and upgrade.sh; do not regress to plain -z checks.
