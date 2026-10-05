@@ -25,15 +25,17 @@ import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 
 type MusicRepeatMode = "off" | "track" | "queue";
-export type MusicSearchProvider = "auto" | "youtube" | "youtube_music" | "soundcloud";
+export type MusicSearchProvider = "auto" | "youtube" | "youtube_music" | "soundcloud" | "spotify" | "yandex_music";
 export type MusicFilterPreset = "off" | "nightcore" | "vaporwave" | "karaoke" | "rotation" | "tremolo" | "vibrato" | "lowpass";
 export const MAX_MUSIC_ENQUEUE_TRACKS = 100;
-type MusicSearchSource = "ytsearch" | "ytmsearch" | "scsearch";
+type MusicSearchSource = "ytsearch" | "ytmsearch" | "scsearch" | "spsearch" | "ymsearch";
 
 const MUSIC_PROVIDER_SOURCES: Record<Exclude<MusicSearchProvider, "auto">, MusicSearchSource> = {
   youtube: "ytsearch",
   youtube_music: "ytmsearch",
-  soundcloud: "scsearch"
+  soundcloud: "scsearch",
+  spotify: "spsearch",
+  yandex_music: "ymsearch"
 };
 
 class PostgresQueueStore implements QueueStoreManager {
@@ -1907,7 +1909,7 @@ async function applyMusicFilterPreset(
 
 export function normalizeMusicSearchProvider(value: string): MusicSearchProvider | null {
   const normalized = value.trim().toLowerCase();
-  return normalized === "auto" || normalized === "youtube" || normalized === "youtube_music" || normalized === "soundcloud"
+  return normalized === "auto" || normalized === "youtube" || normalized === "youtube_music" || normalized === "soundcloud" || normalized === "spotify" || normalized === "yandex_music"
     ? normalized
     : null;
 }
@@ -1921,11 +1923,11 @@ export function buildMusicSearch(
   if (/^https?:\/\//i.test(query)) return { query };
 
   if (provider === "auto") {
-    if (/^(ytsearch|ytmsearch|scsearch):/i.test(query)) return { query };
+    if (/^(ytsearch|ytmsearch|scsearch|spsearch|ymsearch):/i.test(query)) return { query };
     return { query, source: "ytsearch" };
   }
 
-  const normalizedQuery = query.replace(/^(ytsearch|ytmsearch|scsearch):\s*/i, "");
+  const normalizedQuery = query.replace(/^(ytsearch|ytmsearch|scsearch|spsearch|ymsearch):\s*/i, "");
   if (!normalizedQuery) return null;
   return { query: normalizedQuery, source: MUSIC_PROVIDER_SOURCES[provider] };
 }
