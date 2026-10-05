@@ -243,7 +243,7 @@ try {
     Stop-NativeProcess "bot"
     Stop-NativeProcess "lavalink2"
     Stop-NativeProcess "lavalink"
-    Write-Host "Native Vexa processes stopped."
+    Write-Host "Native Discord Server Platform processes stopped."
     exit 0
   }
 
@@ -254,12 +254,7 @@ try {
 
   # Discord credentials are optional at process startup.
   # Control Center -> Bot Fleet can register them after the Management API is online.
-  if ([string]::IsNullOrWhiteSpace((Get-EnvValue "DASHBOARD_AUTH_REQUIRED"))) {
-    Set-EnvValue "DASHBOARD_AUTH_REQUIRED" "false"
-  }
-
   Ensure-Secret "MANAGEMENT_API_KEY" 48
-  Ensure-Secret "DASHBOARD_SESSION_SECRET" 48
   Ensure-Secret "LAVALINK_PASSWORD" 24
 
   Import-EnvFile
