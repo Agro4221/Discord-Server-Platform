@@ -906,3 +906,13 @@ Never write credentials, tokens or private user data here.
 - CI #2195 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
 - Final source checkpoint for this slice: 60b4115acc25d945bfbd31f1b0bbb6bebae73378.
 - Next single Music slice: **Tremolo / additional Lavalink effects**.
+
+
+## 2026-10-05 — Music Tremolo audio effect
+- Completed the independent Tremolo audio effect slice.
+- Added `tremolo` to the Music filter command and quick-filter palette; it uses the existing Lavalink `toggleTremolo()` filter manager API.
+- Kept the same controller resync, persistence and Lavalink error handling path as the other Music effects.
+- Added unit coverage confirming Tremolo is accepted as a valid quick-filter action.
+- CI #2200 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: f2e90f7d758eaf41c8c1d8f6069824efe8f1e5ea.
+- Next single Music slice: **Vibrato audio effect**.
