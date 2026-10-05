@@ -682,3 +682,5 @@ Feature Matrix полностью reconciled: все строки ✅.
 ## 2026-10-05 — Lavalink password follow-up
 - Do not reintroduce a default password into infrastructure/lavalink/application.yml; the server secret must come from LAVALINK_SERVER_PASSWORD.
 - Compose already injects the same secret into both Lavalink nodes.
+## 2026-10-05 — Config validator checkpoint
+- The required() helper was removed intentionally; keep requiredNonBlank() as the sole required secret validator.
