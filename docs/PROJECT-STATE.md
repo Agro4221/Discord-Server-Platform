@@ -406,3 +406,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - CI #1990 is green.
 - Filters / FX quick-access is complete and CI-verified.
 - Next high-value slice: Save queue button.
+
+
+## 2026-10-05 — Music Save Queue verified
+- Source checkpoint: 6f2d6b57ec49336eb96a6ba24975476e4bc413f3.
+- CI #1997 is green.
+- Save Queue and Save current queue as playlist are implemented on top of existing playlist persistence.
+- Next high-value slice: Load playlist with optional shuffle.
