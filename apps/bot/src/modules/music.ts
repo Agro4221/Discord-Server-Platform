@@ -3891,6 +3891,95 @@ export class Music implements PlatformModule {
     );
   }
 
+  private async continueMusicPlaylist(player: Player): Promise<boolean> {
+    if (player.repeatMode !== "off") return false;
+    const continuation = this.playlistContinuations.get(player.guildId);
+    if (!continuation) return false;
+
+    const result = await this.db.query<{ tracks: unknown[] }>(
+      "SELECT tracks FROM music_playlists WHERE id=$1 AND guild_id=$2",
+      [continuation.playlistId,player.guildId]
+    );
+    const stored = Array.isArray(result.rows[0]?.tracks) ? result.rows[0].tracks : [];
+    if (!stored.length) {
+      this.playlistContinuations.delete(player.guildId);
+      await this.persistPlayer(player);
+      return false;
+    }
+
+    const order = Array.isArray(continuation.order) && continuation.order.length === stored.length
+      ? continuation.order
+      : stored.map((_, index) => index);
+    const startIndex = Math.max(0, Math.min(continuation.nextIndex, order.length));
+    if (startIndex >= order.length) {
+      this.playlistContinuations.delete(player.guildId);
+      await this.persistPlayer(player);
+      return false;
+    }
+
+    const settings = await this.musicSettings(player.guildId);
+    const queuedByUser = countMusicQueuedByUser(player.queue.tracks, continuation.requesterUserId);
+    const remainingUserSlots = remainingMusicQueueSlots(queuedByUser, settings.maxQueuedPerUser);
+    const remainingGuildSlots = remainingMusicGuildQueueSlots(player.queue.tracks.length, settings.maxQueueSize);
+    if (remainingUserSlots === 0 || remainingGuildSlots === 0) {
+      await this.persistPlayer(player);
+      return false;
+    }
+
+    const loadLimit = Math.min(
+      MAX_PLAYLIST_TRACKS,
+      ...(remainingUserSlots === null ? [] : [remainingUserSlots]),
+      ...(remainingGuildSlots === null ? [] : [remainingGuildSlots])
+    );
+    const indexes = order.slice(startIndex,startIndex + loadLimit);
+    const requester = await this.client?.users.fetch(continuation.requesterUserId).catch(() => null) ?? this.client?.user;
+    if (!requester) {
+      logger.warn("Music playlist continuation requester unavailable", {
+        guildId: player.guildId,
+        requesterUserId: continuation.requesterUserId
+      });
+      return false;
+    }
+
+    let added = 0;
+    for (const index of indexes) {
+      const item = stored[index];
+      if (!item) continue;
+      try {
+        const built = this.manager?.utils.buildTrack(
+          item as Parameters<LavalinkManager["utils"]["buildTrack"]>[0],
+          requester
+        );
+        if (!built) continue;
+        player.queue.add(built);
+        added += 1;
+      } catch (error) {
+        logger.warn("Saved music playlist continuation restore failed", {
+          guildId: player.guildId,
+          playlistId: continuation.playlistId,
+          error: String(error)
+        });
+      }
+    }
+
+    const nextIndex = startIndex + indexes.length;
+    if (nextIndex >= order.length) {
+      this.playlistContinuations.delete(player.guildId);
+    } else {
+      this.playlistContinuations.set(player.guildId, {
+        ...continuation,
+        nextIndex
+      });
+    }
+
+    if (added > 0) {
+      await this.applyFairQueue(player, settings.fairQueueEnabled);
+      if (!player.playing) await player.play();
+    }
+    await this.persistPlayer(player);
+    return added > 0;
+  }
+
   private async autoplayNext(player: Player, lastPlayedTrack: Track): Promise<void> {
     if (!await this.autoplayEnabled(player.guildId)) return;
     if (this.autoplayInFlight.has(player.guildId)) return;
@@ -3925,21 +4014,32 @@ export class Music implements PlatformModule {
   }): Promise<void> {
     await this.db.query(
       `INSERT INTO music_players(
-        guild_id,bot_identity_id,voice_channel_id,text_channel_id,state
+        guild_id,bot_identity_id,voice_channel_id,text_channel_id,state,
+        playlist_id,playlist_next_index,playlist_order,playlist_requester_user_id
       )
-      VALUES($1,$2,$3,$4,$5::jsonb)
+      VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8::jsonb,$9)
       ON CONFLICT(guild_id,bot_identity_id)
       DO UPDATE SET
         voice_channel_id=EXCLUDED.voice_channel_id,
         text_channel_id=EXCLUDED.text_channel_id,
         state=EXCLUDED.state,
+        playlist_id=EXCLUDED.playlist_id,
+        playlist_next_index=EXCLUDED.playlist_next_index,
+        playlist_order=EXCLUDED.playlist_order,
+        playlist_requester_user_id=EXCLUDED.playlist_requester_user_id,
         updated_at=now()`,
       [
         player.guildId,
         this.config.botIdentityId,
         player.voiceChannelId ?? null,
         player.textChannelId ?? null,
-        JSON.stringify(player.toJSON())
+        JSON.stringify(player.toJSON()),
+        this.playlistContinuations.get(player.guildId)?.playlistId ?? null,
+        this.playlistContinuations.get(player.guildId)?.nextIndex ?? 0,
+        this.playlistContinuations.get(player.guildId)?.order
+          ? JSON.stringify(this.playlistContinuations.get(player.guildId)?.order)
+          : null,
+        this.playlistContinuations.get(player.guildId)?.requesterUserId ?? null
       ]
     ).catch((error) => logger.warn("Failed to persist music player", { error: String(error) }));
   }
