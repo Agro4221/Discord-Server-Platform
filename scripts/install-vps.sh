@@ -77,9 +77,27 @@ set_env() {
 set_env DOMAIN "${DOMAIN}"
 set_env DASHBOARD_BASIC_AUTH_USER "${DASHBOARD_BASIC_AUTH_USER}"
 set_env DASHBOARD_BASIC_AUTH_HASH "${DASHBOARD_BASIC_AUTH_HASH}"
-set_env MANAGEMENT_API_KEY "$(openssl rand -hex 32)"
-set_env POSTGRES_PASSWORD "$(openssl rand -hex 24)"
-set_env LAVALINK_PASSWORD "$(openssl rand -hex 24)"
+
+get_env() {
+  local key="$1" line value
+  line="$(grep -E "^${key}=" .env | tail -n1 || true)"
+  value="${line#*=}"
+  value="${value#\'}"
+  value="${value%\'}"
+  printf "%s" "${value}"
+}
+
+ensure_secret() {
+  local key="$1" generated="$2" current
+  current="$(get_env "${key}")"
+  if [[ -z "${current}" ]]; then
+    set_env "${key}" "${generated}"
+  fi
+}
+
+ensure_secret MANAGEMENT_API_KEY "$(openssl rand -hex 32)"
+ensure_secret POSTGRES_PASSWORD "$(openssl rand -hex 24)"
+ensure_secret LAVALINK_PASSWORD "$(openssl rand -hex 24)"
 
 chmod 600 .env infrastructure/caddy/Caddyfile
 docker compose "${COMPOSE_ARGS[@]}" config >/dev/null
