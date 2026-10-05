@@ -66,6 +66,30 @@ export function BotSetupPanel() {
 
   useEffect(() => { void load(); }, []);
 
+  async function testCredentials() {
+    if (!/^\d{17,20}$/.test(setup.clientId) || !token) {
+      setError("Для проверки нужны Client ID и текущий token.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/bot", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ clientId: setup.clientId, token })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "bot_credential_test_failed");
+      setMessage("Credentials валидны: " + String(body.bot?.username ?? "Discord bot") + ".");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось проверить credentials.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function save() {
     if (!/^d{17,20}$/.test(setup.clientId)) {
       setError("Client ID должен быть Discord Application ID.");
@@ -177,9 +201,14 @@ export function BotSetupPanel() {
           </label>
         </div>
 
-        <button type="button" onClick={() => void save()} disabled={loading || saving} style={{ ...inputStyle, cursor: saving ? "default" : "pointer", background: saving ? "#1a202a" : "#293767", borderColor: "#3b4b80" }}>
-          {saving ? "Сохранение…" : "Сохранить и применить"}
-        </button>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <button type="button" onClick={() => void testCredentials()} disabled={loading || saving || !token} style={{ ...inputStyle, cursor: saving ? "default" : "pointer", background: "#171e2a" }}>
+            {saving ? "Проверка…" : "Проверить credentials"}
+          </button>
+          <button type="button" onClick={() => void save()} disabled={loading || saving} style={{ ...inputStyle, cursor: saving ? "default" : "pointer", background: saving ? "#1a202a" : "#293767", borderColor: "#3b4b80" }}>
+            {saving ? "Сохранение…" : "Сохранить и применить"}
+          </button>
+        </div>
       </div>
 
       <div style={{ padding: 14, border: "1px solid #252d39", borderRadius: 14, background: "#11161e" }}>
