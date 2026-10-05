@@ -138,6 +138,20 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .setName("autoplay")
       .setDescription("Show or change autoplay")
       .addBooleanOption((o) => o.setName("enabled").setDescription("Autoplay state")),
+    new SlashCommandBuilder()
+      .setName("radio")
+      .setDescription("Start or stop radio by artist, genre or search seed")
+      .addStringOption((o) => o.setName("action").setDescription("Radio action").addChoices(
+        { name: "Start", value: "start" },
+        { name: "Stop", value: "stop" },
+        { name: "Status", value: "status" }
+      ).setRequired(true))
+      .addStringOption((o) => o.setName("mode").setDescription("Radio seed type").addChoices(
+        { name: "Artist", value: "artist" },
+        { name: "Genre", value: "genre" },
+        { name: "Search", value: "search" }
+      ))
+      .addStringOption((o) => o.setName("seed").setDescription("Artist, genre or search seed").setMaxLength(200)),
     new SlashCommandBuilder().setName("nowplaying").setDescription("Show the current track"),
 
     new SlashCommandBuilder()
@@ -909,22 +923,6 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .setName("autoplay")
           .setDescription("Enable or disable autoplay")
           .addBooleanOption((o) => o.setName("enabled").setDescription("Autoplay state"))
-      )
-      .addSubcommand((sub) =>
-        sub
-          .setName("radio")
-          .setDescription("Start or stop radio by artist, genre or search seed")
-          .addStringOption((o) => o.setName("action").setDescription("Radio action").addChoices(
-            { name: "Start", value: "start" },
-            { name: "Stop", value: "stop" },
-            { name: "Status", value: "status" }
-          ).setRequired(true))
-          .addStringOption((o) => o.setName("mode").setDescription("Radio seed type").addChoices(
-            { name: "Artist", value: "artist" },
-            { name: "Genre", value: "genre" },
-            { name: "Search", value: "search" }
-          ))
-          .addStringOption((o) => o.setName("seed").setDescription("Artist, genre or search seed").setMaxLength(200))
       )
       .addSubcommand((sub) =>
         sub
