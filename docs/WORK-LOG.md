@@ -1001,6 +1001,17 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Yandex playback still requires the user's Lavalink credentials/runtime.
 - Source checkpoint: 5514371977eb7a13f5696ebabf34a159a40d7094.
 
+## 2026-10-05 — Music VK Music provider parity
+- Added an explicit VK Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as VK Music use LavaSrc vksearch; users can also use the explicit vksearch: prefix from prefix/request-channel flows.
+- Direct VK Music URLs continue through Lavalink/LavaSrc URL resolution.
+- Approval-mode requests preserve the selected VK Music source across the moderation step.
+- Provider status now treats VK Music as configured only when the LavaSrc switch and VK user token are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Current LavaSrc documentation identifies VK Music as direct playback and documents vksearch plus VK track/album/playlist/artist URLs; it also warns about RU-region availability and the sensitivity of the user token.
+- Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live VK Music playback remains a release-gate validation item.
+- Source checkpoint: 6835e397e4bc0a26a817921b5fd8bb27116143da.
+
 ## 2026-10-05 — Music Deezer provider parity
 - Added an explicit Deezer Music search provider to /play, /music play and /music search.
 - Non-URL searches selected as Deezer use LavaSrc dzsearch; users can also use the explicit dzsearch: prefix from prefix/request-channel flows.
