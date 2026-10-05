@@ -34,3 +34,20 @@ export async function PUT(request: Request) {
     headers: { "content-type": "application/json; charset=utf-8" }
   });
 }
+
+
+export async function POST(request: Request) {
+  try { assertSameOrigin(request); } catch {
+    return NextResponse.json({ error: "bad_origin" }, { status: 403 });
+  }
+  const response = await fetch(upstream("/api/bot/test"), {
+    method: "POST",
+    cache: "no-store",
+    headers,
+    body: await request.text()
+  });
+  return new NextResponse(await response.text(), {
+    status: response.status,
+    headers: { "content-type": "application/json; charset=utf-8" }
+  });
+}
