@@ -902,7 +902,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .addSubcommand((sub) =>
         sub
           .setName("play")
-          .setDescription("Play a song or search YouTube")
+           .setDescription("Play a song, playlist or provider search")
           .addStringOption((o) => o.setName("query").setDescription("Song, artist, URL or playlist").setMaxLength(2000).setRequired(true))
            .addStringOption((o) => o.setName("provider").setDescription("Search provider").addChoices(
              { name: "YouTube", value: "youtube" },
