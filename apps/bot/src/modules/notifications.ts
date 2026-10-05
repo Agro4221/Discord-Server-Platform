@@ -6,6 +6,8 @@ import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
+import type { IntegrationCredentialRepository, ProviderCredentialSecret } from "../integration-credentials.js";
+import { TikTokDisplayClient, type TikTokCredentialStore } from "../tiktok-display.js";
 
 export type NotificationEmbedConfig = {
   title?: string;
@@ -15,6 +17,23 @@ export type NotificationEmbedConfig = {
   footer?: string;
   image?: string;
   thumbnail?: string;
+};
+
+export type TikTokNotificationFeedRecord = {
+  id: number;
+  guildId: string;
+  channelId: string;
+  credentialId: number;
+  targetOpenId: string;
+  targetLabel: string;
+  enabled: boolean;
+  intervalSeconds: number;
+  lastVideoId: string | null;
+  lastPolledAt: string | null;
+  messageTemplate: string;
+  includeKeywords: string[];
+  excludeKeywords: string[];
+  embedConfig: NotificationEmbedConfig | null;
 };
 
 export type NotificationFeedRecord = {
@@ -52,8 +71,14 @@ export class Notifications implements PlatformModule {
   private client?: Client;
   private running = false;
   private identityId = "primary";
+  private readonly tiktok: TikTokDisplayClient;
 
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    private readonly integrationCredentials: IntegrationCredentialRepository
+  ) {
+    this.tiktok = new TikTokDisplayClient();
+  }
 
   async listFeeds(guildId: string): Promise<NotificationFeedRecord[]> {
     const result = await this.db.query<{
@@ -230,6 +255,208 @@ export class Notifications implements PlatformModule {
     return { title: first.title, url: first.url };
   }
 
+  async listTikTokFeeds(guildId: string): Promise<TikTokNotificationFeedRecord[]> {
+    const result = await this.db.query<{
+      id: string; guild_id: string; channel_id: string; credential_id: string;
+      target_open_id: string; target_label: string; enabled: boolean; interval_seconds: number;
+      last_video_id: string | null; last_polled_at: string | null; message_template: string;
+      include_keywords: string[]; exclude_keywords: string[]; embed_config: NotificationEmbedConfig | null;
+    }>(
+      "SELECT id,guild_id,channel_id,credential_id,target_open_id,target_label,enabled,interval_seconds,last_video_id,last_polled_at,message_template,include_keywords,exclude_keywords,embed_config FROM notification_tiktok_feeds WHERE guild_id=$1 ORDER BY id DESC",
+      [guildId]
+    );
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      guildId: row.guild_id,
+      channelId: row.channel_id,
+      credentialId: Number(row.credential_id),
+      targetOpenId: row.target_open_id,
+      targetLabel: row.target_label,
+      enabled: row.enabled,
+      intervalSeconds: row.interval_seconds,
+      lastVideoId: row.last_video_id,
+      lastPolledAt: row.last_polled_at,
+      messageTemplate: row.message_template,
+      includeKeywords: Array.isArray(row.include_keywords) ? row.include_keywords : [],
+      excludeKeywords: Array.isArray(row.exclude_keywords) ? row.exclude_keywords : [],
+      embedConfig: normalizeNotificationEmbedConfig(row.embed_config)
+    }));
+  }
+
+  async addTikTokFeed(
+    guildId: string,
+    channelId: string,
+    credentialId: number,
+    intervalSeconds: number,
+    options: {
+      messageTemplate?: string;
+      includeKeywords?: string[];
+      excludeKeywords?: string[];
+      embedConfig?: NotificationEmbedConfig | null;
+    } = {}
+  ): Promise<TikTokNotificationFeedRecord> {
+    const credential = await this.integrationCredentials.getSecret(guildId, credentialId, "tiktok");
+    if (!credential) throw new Error("tiktok_credential_not_found");
+
+    const tiktokCredential = toTikTokCredential(credential);
+    const profile = await this.tiktok.getProfile(tiktokCredential, async (refreshed) => {
+      await this.integrationCredentials.updateSecret(guildId, credentialId, "tiktok", refreshed);
+    });
+
+    const safeInterval = Math.min(Math.max(Math.trunc(intervalSeconds), 60), 86_400);
+    const messageTemplate = normalizeFeedTemplate(options.messageTemplate ?? "🎵 **Новый TikTok**\n**{title}**\n{url}");
+    const includeKeywords = normalizeKeywords(options.includeKeywords);
+    const excludeKeywords = normalizeKeywords(options.excludeKeywords);
+    const embedConfig = options.embedConfig ? normalizeNotificationEmbedConfig(options.embedConfig) : null;
+
+    const result = await this.db.query<{ id: string }>(
+      "INSERT INTO notification_tiktok_feeds(guild_id,channel_id,credential_id,target_open_id,target_label,interval_seconds,message_template,include_keywords,exclude_keywords,embed_config) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) RETURNING id",
+      [
+        guildId, channelId, credentialId, profile.openId, profile.displayName || profile.openId,
+        safeInterval, messageTemplate, includeKeywords, excludeKeywords,
+        embedConfig ? JSON.stringify(embedConfig) : null
+      ]
+    );
+    const id = Number(result.rows[0]?.id);
+    if (!id) throw new Error("tiktok_feed_create_failed");
+    const feed = (await this.listTikTokFeeds(guildId)).find((item) => item.id === id);
+    if (!feed) throw new Error("tiktok_feed_create_failed");
+    return feed;
+  }
+
+  async setTikTokFeedEnabled(guildId: string, id: number, enabled: boolean): Promise<boolean> {
+    const result = await this.db.query(
+      "UPDATE notification_tiktok_feeds SET enabled=$1,updated_at=now() WHERE id=$2 AND guild_id=$3",
+      [enabled, id, guildId]
+    );
+    return result.rowCount === 1;
+  }
+
+  async deleteTikTokFeed(guildId: string, id: number): Promise<boolean> {
+    const result = await this.db.query(
+      "DELETE FROM notification_tiktok_feeds WHERE id=$1 AND guild_id=$2",
+      [id, guildId]
+    );
+    return result.rowCount === 1;
+  }
+
+  async testTikTokFeed(guildId: string, id: number): Promise<{ id: string; title: string; url: string }> {
+    const feed = (await this.listTikTokFeeds(guildId)).find((item) => item.id === id);
+    if (!feed) throw new Error("tiktok_feed_not_found");
+
+    const credential = await this.integrationCredentials.getSecret(guildId, feed.credentialId, "tiktok");
+    if (!credential) throw new Error("tiktok_credential_not_found");
+    const tiktokCredential = toTikTokCredential(credential);
+    const result = await this.tiktok.listRecentVideos(tiktokCredential, {
+      maxCount: 1,
+      persist: async (refreshed) => {
+        await this.integrationCredentials.updateSecret(guildId, feed.credentialId, "tiktok", refreshed);
+      }
+    });
+    const video = result.videos[0];
+    if (!video) throw new Error("tiktok_no_videos");
+
+    const channel = this.client?.channels.cache.get(feed.channelId);
+    if (!channel?.isTextBased() || !("send" in channel)) throw new Error("destination_unavailable");
+
+    const entry = {
+      title: video.title || video.description || "TikTok video",
+      url: video.shareUrl || video.embedLink || "https://www.tiktok.com/"
+    };
+    const content = renderFeedTemplate(feed.messageTemplate, entry);
+    const embed = buildNotificationEmbed(feed.embedConfig, entry);
+    await channel.send({ content: content || undefined, embeds: embed ? [embed] : undefined });
+    return { id: video.id, title: entry.title, url: entry.url };
+  }
+
+  private async pollTikTokFeeds(): Promise<void> {
+    if (!this.client) return;
+
+    const feeds = await this.db.query<{
+      id: string; guild_id: string; channel_id: string; credential_id: string;
+      target_open_id: string; last_video_id: string | null; message_template: string;
+      include_keywords: string[]; exclude_keywords: string[]; embed_config: NotificationEmbedConfig | null;
+    }>(
+      `UPDATE notification_tiktok_feeds nf
+       SET processing_until=now()+interval '2 minutes'
+       WHERE nf.id IN (
+         SELECT id FROM notification_tiktok_feeds
+         WHERE enabled=true
+           AND (processing_until IS NULL OR processing_until < now())
+           AND (last_polled_at IS NULL OR last_polled_at <= now() - make_interval(secs => interval_seconds))
+         ORDER BY last_polled_at NULLS FIRST
+         LIMIT 20
+         FOR UPDATE SKIP LOCKED
+       )
+       RETURNING nf.id,nf.guild_id,nf.channel_id,nf.credential_id,nf.target_open_id,nf.last_video_id,
+                 nf.message_template,nf.include_keywords,nf.exclude_keywords,nf.embed_config`,
+      []
+    );
+
+    for (const feed of feeds.rows) await this.pollTikTokFeed(feed);
+  }
+
+  private async pollTikTokFeed(feed: {
+    id: string; guild_id: string; channel_id: string; credential_id: string;
+    target_open_id: string; last_video_id: string | null; message_template: string;
+    include_keywords: string[]; exclude_keywords: string[]; embed_config: NotificationEmbedConfig | null;
+  }): Promise<void> {
+    try {
+      const credential = await this.integrationCredentials.getSecret(feed.guild_id, Number(feed.credential_id), "tiktok");
+      if (!credential) throw new Error("tiktok_credential_not_found");
+      const result = await this.tiktok.listRecentVideos(toTikTokCredential(credential), {
+        maxCount: 20,
+        persist: async (refreshed) => {
+          await this.integrationCredentials.updateSecret(feed.guild_id, Number(feed.credential_id), "tiktok", refreshed);
+        }
+      });
+      const first = result.videos.find((video) => video.id !== feed.last_video_id) ?? result.videos[0];
+      if (!first || first.id === feed.last_video_id) {
+        await this.markTikTokPolled(feed.id);
+        return;
+      }
+
+      const entry = {
+        title: first.title || first.description || "TikTok video",
+        url: first.shareUrl || first.embedLink || "https://www.tiktok.com/"
+      };
+      const title = entry.title.toLocaleLowerCase();
+      const include = feed.include_keywords.length === 0 ||
+        feed.include_keywords.some((keyword) => title.includes(String(keyword).toLocaleLowerCase()));
+      const exclude = feed.exclude_keywords.some((keyword) => title.includes(String(keyword).toLocaleLowerCase()));
+
+      if (include && !exclude) {
+        const channel = this.client?.channels.cache.get(feed.channel_id);
+        if (!channel?.isTextBased() || !("send" in channel)) throw new Error("destination_unavailable");
+        const content = renderFeedTemplate(feed.message_template, entry);
+        const embed = buildNotificationEmbed(feed.embed_config, entry);
+        await channel.send({ content: content || undefined, embeds: embed ? [embed] : undefined });
+      }
+
+      await this.db.query(
+        "UPDATE notification_tiktok_feeds SET last_video_id=$1,last_polled_at=now(),processing_until=NULL WHERE id=$2",
+        [first.id, feed.id]
+      );
+    } catch (error) {
+      logger.warn("TikTok feed poll failed", {
+        feedId: feed.id,
+        guildId: feed.guild_id,
+        error: String(error)
+      });
+      await this.db.query(
+        "UPDATE notification_tiktok_feeds SET last_polled_at=now(),processing_until=NULL WHERE id=$1",
+        [feed.id]
+      );
+    }
+  }
+
+  private async markTikTokPolled(id: string): Promise<void> {
+    await this.db.query(
+      "UPDATE notification_tiktok_feeds SET last_polled_at=now(),processing_until=NULL WHERE id=$1",
+      [id]
+    );
+  }
+
   async deleteFeed(guildId: string, id: number): Promise<boolean> {
     const result = await this.db.query("DELETE FROM notification_feeds WHERE id=$1 AND guild_id=$2", [id,guildId]);
     return result.rowCount === 1;
@@ -347,6 +574,7 @@ export class Notifications implements PlatformModule {
       for (const feed of feeds.rows) {
         await this.poll(feed);
       }
+      await this.pollTikTokFeeds();
     } finally {
       this.running = false;
     }
@@ -490,6 +718,19 @@ export function buildNotificationEmbed(
   if (config.thumbnail) embed.setThumbnail(config.thumbnail);
 
   return Object.keys(embed.data).length ? embed : null;
+}
+
+function toTikTokCredential(secret: ProviderCredentialSecret): TikTokCredentialStore {
+  if (!secret.clientId || !secret.clientSecret || !secret.accessToken || !secret.refreshToken) {
+    throw new Error("invalid_tiktok_credential");
+  }
+  return {
+    ...secret,
+    clientId: secret.clientId,
+    clientSecret: secret.clientSecret,
+    accessToken: secret.accessToken,
+    refreshToken: secret.refreshToken
+  };
 }
 
 function normalizeFeedTemplate(value?: string): string {
