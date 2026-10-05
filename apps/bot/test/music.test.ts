@@ -206,3 +206,28 @@ test("music request cooldown reports only positive remaining time", async () => 
   assert.equal(remainingMusicRequestCooldown(10_000, 10_500), 0);
   assert.equal(remainingMusicRequestCooldown(10_000, 10_000), 0);
 });
+
+
+test("music per-user queue limit helpers enforce bounds and available slots", async () => {
+  const {
+    normalizeMusicQueueLimit,
+    countMusicQueuedByUser,
+    remainingMusicQueueSlots
+  } = await import("../src/modules/music.js");
+
+  assert.equal(normalizeMusicQueueLimit(-5), 0);
+  assert.equal(normalizeMusicQueueLimit(10.9), 10);
+  assert.equal(normalizeMusicQueueLimit(999), 100);
+  assert.equal(normalizeMusicQueueLimit(Number.NaN), 10);
+
+  const tracks = [
+    { requester: { id: "u1" } },
+    { requester: { id: "u2" } },
+    { requester: { id: "u1" } }
+  ];
+  assert.equal(countMusicQueuedByUser(tracks, "u1"), 2);
+  assert.equal(countMusicQueuedByUser(tracks, "u3"), 0);
+  assert.equal(remainingMusicQueueSlots(2, 10), 8);
+  assert.equal(remainingMusicQueueSlots(10, 10), 0);
+  assert.equal(remainingMusicQueueSlots(999, 0), null);
+});
