@@ -59,6 +59,11 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='music_playlists' AND column_name='visibility'"
     );
     assert.equal(musicPlaylistVisibility.rows.length, 1);
+    const musicPlaylistContinuationColumns = await db.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='music_players' AND column_name = ANY($1)",
+      [["playlist_id","playlist_next_index","playlist_order","playlist_requester_user_id"]]
+    );
+    assert.equal(musicPlaylistContinuationColumns.rows.length, 4);
     const approvalColumns = await db.query(
       "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='music_settings' AND column_name = ANY($1)",
       [["request_approval_mode","max_queued_per_user","max_queue_size","fair_queue_enabled"]]
@@ -67,6 +72,55 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
     assert.equal(Number(version), Number(first.rows[0]?.count));
     assert.equal(Number(second.rows[0]?.count), Number(version));
   } finally {
+    await db.close();
+  }
+});
+
+test("music playlist continuation state persists and clears", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345735";
+  const botIdentityId = "test-music-continuation";
+  try {
+    await migrate(db);
+    await db.query("DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2", [guildId,botIdentityId]);
+
+    const playlist = await db.query<{ id: string }>(
+      "INSERT INTO music_playlists(guild_id,user_id,name,visibility,tracks) VALUES($1,$2,$3,'personal','[]'::jsonb) RETURNING id",
+      [guildId,"234567890123456792","Continuation"]
+    );
+    const playlistId = playlist.rows[0]!.id;
+
+    await db.query(
+      "INSERT INTO music_players(guild_id,bot_identity_id,voice_channel_id,text_channel_id,state,playlist_id,playlist_next_index,playlist_order,playlist_requester_user_id) VALUES($1,$2,$3,$4,'{}'::jsonb,$5,$6,$7::jsonb,$8)",
+      [guildId,botIdentityId,"voice-cont","text-cont",playlistId,25,"[2,0,1]","234567890123456792"]
+    );
+    const saved = await db.query<{
+      playlist_id: string | null;
+      playlist_next_index: number;
+      playlist_order: unknown;
+      playlist_requester_user_id: string | null;
+    }>(
+      "SELECT playlist_id,playlist_next_index,playlist_order,playlist_requester_user_id FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
+      [guildId,botIdentityId]
+    );
+    assert.equal(saved.rows[0]?.playlist_id, playlistId);
+    assert.equal(Number(saved.rows[0]?.playlist_next_index), 25);
+    assert.deepEqual(saved.rows[0]?.playlist_order, [2,0,1]);
+    assert.equal(saved.rows[0]?.playlist_requester_user_id, "234567890123456792");
+
+    await db.query(
+      "UPDATE music_players SET playlist_id=NULL,playlist_next_index=0,playlist_order=NULL,playlist_requester_user_id=NULL WHERE guild_id=$1 AND bot_identity_id=$2",
+      [guildId,botIdentityId]
+    );
+    const cleared = await db.query<{ playlist_id: string | null; playlist_requester_user_id: string | null }>(
+      "SELECT playlist_id,playlist_requester_user_id FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
+      [guildId,botIdentityId]
+    );
+    assert.equal(cleared.rows[0]?.playlist_id, null);
+    assert.equal(cleared.rows[0]?.playlist_requester_user_id, null);
+  } finally {
+    await db.query("DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",[guildId,botIdentityId]).catch(() => undefined);
+    await db.query("DELETE FROM music_playlists WHERE guild_id=$1",[guildId]).catch(() => undefined);
     await db.close();
   }
 });
