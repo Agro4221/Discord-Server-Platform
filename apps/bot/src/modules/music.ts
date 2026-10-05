@@ -1737,8 +1737,6 @@ export class Music implements PlatformModule {
 
       await this.applyFairQueue(player, settings.fairQueueEnabled);
       if (!player.playing && added > 0) await player.play();
-      await this.persistPlayer(player);
-      await this.syncController(player);
       const continuationRemaining = itemsToLoad.length < stored.length;
       if (continuationRemaining) {
         this.playlistContinuations.set(guildId, {
