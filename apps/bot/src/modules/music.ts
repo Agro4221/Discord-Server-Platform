@@ -961,52 +961,6 @@ export class Music implements PlatformModule {
       const value = Number(input.value);
       if (!Number.isInteger(value) || value < 0 || value > 200) throw new Error("invalid_volume");
       await player.setVolume(value);
-    } else if (action === "eq") {
-      const mode = (args[0] ?? "show").toLowerCase();
-      if (mode === "show") {
-        const lines = Array.from({ length: MUSIC_EQ_BAND_COUNT }, (_, band) => {
-          const gain = Number(player.filterManager.equalizerBands[band]?.gain ?? 0);
-          return "Band " + band + ": **" + gain.toFixed(3) + "**";
-        });
-        await message.reply("🎚️ **Custom EQ**\nДиапазон gain: **-0.25…1.00**\n\n" + lines.join("\n"));
-        return true;
-      }
-      if (!(manageGuild || dj)) {
-        await message.reply("Редактировать EQ могут пользователи с DJ-ролью или Manage Server.");
-        return true;
-      }
-      if (mode === "reset") {
-        try {
-          await player.filterManager.clearEQ();
-          await this.persistPlayer(player);
-          await this.syncController(player);
-          await message.reply("🎚️ Custom EQ сброшен.");
-        } catch (error) {
-          logger.warn("Music prefix custom EQ reset failed", { guildId: message.guild.id, error: String(error) });
-          await message.reply("Не удалось сбросить Custom EQ на текущем Lavalink node.");
-        }
-        return true;
-      }
-      if (mode !== "set") {
-        await message.reply("Использование: !eq show | !eq set <band 0-14> <gain -0.25..1.00> | !eq reset.");
-        return true;
-      }
-      const band = normalizeMusicEqBand(Number(args[1] ?? ""));
-      const gain = normalizeMusicEqGain(Number(args[2] ?? ""));
-      if (band === null || gain === null) {
-        await message.reply("Использование: !eq set <band 0-14> <gain -0.25..1.00>.");
-        return true;
-      }
-      try {
-        await player.filterManager.setEQ([{ band, gain }]);
-        await this.persistPlayer(player);
-        await this.syncController(player);
-        await message.reply("🎚️ EQ band " + band + ": gain " + gain.toFixed(3) + ".");
-      } catch (error) {
-        logger.warn("Music prefix custom EQ set failed", { guildId: message.guild.id, band, gain, error: String(error) });
-        await message.reply("Не удалось изменить Custom EQ на текущем Lavalink node.");
-      }
-      return true;
     } else if (action === "autoplay") {
       if (typeof input.enabled !== "boolean") throw new Error("invalid_autoplay");
       await this.setAutoplay(guildId, input.enabled);
@@ -3885,6 +3839,98 @@ export class Music implements PlatformModule {
         logger.warn("Music prefix speed operation failed", { guildId: message.guild.id, speed, error: String(error) });
         await message.reply("Не удалось изменить speed на текущем Lavalink node.");
       }
+    } else if (action === "eq") {
+      const mode = (args[0] ?? "show").toLowerCase();
+      if (mode === "show") {
+        const lines = Array.from({ length: MUSIC_EQ_BAND_COUNT }, (_, band) => {
+          const gain = Number(player.filterManager.equalizerBands[band]?.gain ?? 0);
+          return "Band " + band + ": **" + gain.toFixed(3) + "**";
+        });
+        await message.reply("🎚️ **Custom EQ**\nДиапазон gain: **-0.25…1.00**\n\n" + lines.join("\n"));
+        return true;
+      }
+      if (!(manageGuild || dj)) {
+        await message.reply("Редактировать EQ могут пользователи с DJ-ролью или Manage Server.");
+        return true;
+      }
+      if (mode === "reset") {
+        try {
+          await player.filterManager.clearEQ();
+          await this.persistPlayer(player);
+          await this.syncController(player);
+          await message.reply("🎚️ Custom EQ сброшен.");
+        } catch (error) {
+          logger.warn("Music prefix custom EQ reset failed", { guildId: message.guild.id, error: String(error) });
+          await message.reply("Не удалось сбросить Custom EQ на текущем Lavalink node.");
+        }
+        return true;
+      }
+      if (mode !== "set") {
+        await message.reply("Использование: !eq show | !eq set <band 0-14> <gain -0.25..1.00> | !eq reset.");
+        return true;
+      }
+      const band = normalizeMusicEqBand(Number(args[1] ?? ""));
+      const gain = normalizeMusicEqGain(Number(args[2] ?? ""));
+      if (band === null || gain === null) {
+        await message.reply("Использование: !eq set <band 0-14> <gain -0.25..1.00>.");
+        return true;
+      }
+      try {
+        await player.filterManager.setEQ([{ band, gain }]);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await message.reply("🎚️ EQ band " + band + ": gain " + gain.toFixed(3) + ".");
+      } catch (error) {
+        logger.warn("Music prefix custom EQ set failed", { guildId: message.guild.id, band, gain, error: String(error) });
+        await message.reply("Не удалось изменить Custom EQ на текущем Lavalink node.");
+      }
+      return true;
+    } else if (action === "eq") {
+      const mode = (args[0] ?? "show").toLowerCase();
+      if (mode === "show") {
+        const lines = Array.from({ length: MUSIC_EQ_BAND_COUNT }, (_, band) => {
+          const gain = Number(player.filterManager.equalizerBands[band]?.gain ?? 0);
+          return "Band " + band + ": **" + gain.toFixed(3) + "**";
+        });
+        await message.reply("🎚️ **Custom EQ**\nДиапазон gain: **-0.25…1.00**\n\n" + lines.join("\n"));
+        return true;
+      }
+      if (!(manageGuild || dj)) {
+        await message.reply("Редактировать EQ могут пользователи с DJ-ролью или Manage Server.");
+        return true;
+      }
+      if (mode === "reset") {
+        try {
+          await player.filterManager.clearEQ();
+          await this.persistPlayer(player);
+          await this.syncController(player);
+          await message.reply("🎚️ Custom EQ сброшен.");
+        } catch (error) {
+          logger.warn("Music prefix custom EQ reset failed", { guildId: message.guild.id, error: String(error) });
+          await message.reply("Не удалось сбросить Custom EQ на текущем Lavalink node.");
+        }
+        return true;
+      }
+      if (mode !== "set") {
+        await message.reply("Использование: !eq show | !eq set <band 0-14> <gain -0.25..1.00> | !eq reset.");
+        return true;
+      }
+      const band = normalizeMusicEqBand(Number(args[1] ?? ""));
+      const gain = normalizeMusicEqGain(Number(args[2] ?? ""));
+      if (band === null || gain === null) {
+        await message.reply("Использование: !eq set <band 0-14> <gain -0.25..1.00>.");
+        return true;
+      }
+      try {
+        await player.filterManager.setEQ([{ band, gain }]);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await message.reply("🎚️ EQ band " + band + ": gain " + gain.toFixed(3) + ".");
+      } catch (error) {
+        logger.warn("Music prefix custom EQ set failed", { guildId: message.guild.id, band, gain, error: String(error) });
+        await message.reply("Не удалось изменить Custom EQ на текущем Lavalink node.");
+      }
+      return true;
     } else if (action === "autoplay") {
       if (!(manageGuild || dj)) {
         await message.reply("Autoplay настраивается пользователями с DJ-ролью или Manage Server.");
