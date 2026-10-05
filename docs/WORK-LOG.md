@@ -1023,6 +1023,15 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Deezer playback remains a release-gate validation item.
 - Source checkpoint: 1506f05970543b980f1005d6beb49e8da107fa1a.
 
+## 2026-10-05 — Music effect-state persistence reconciliation
+- Audited the existing Music resume path instead of adding duplicate state machinery.
+- Player persistence already stores Lavalink player JSON, including the filter state.
+- Resumed players restore data.filters into the Lavalink filter manager before queue synchronization and repeat-state restoration.
+- Feature Matrix row “Persist and restore effect state” is therefore reconciled from 🟡 to ✅.
+- No source change was needed for this increment.
+- Current source checkpoint: 6835e397e4bc0a26a817921b5fd8bb27116143da.
+
+
 ## 2026-10-05 — Music Apple Music provider parity
 - Added an explicit Apple Music search provider to /play, /music play and /music search.
 - Non-URL searches selected as Apple Music use LavaSrc amsearch; users can also use the explicit amsearch: prefix from prefix/request-channel flows.
