@@ -308,3 +308,17 @@ test("Fair Queue keeps unknown requesters in their own rotation group", async ()
     ["u1", "a1", "u2", "a2"]
   );
 });
+
+
+test("music progress formatter clamps position and formats elapsed time", async () => {
+  const { formatMusicProgress, formatMusicTime } = await import("../src/modules/music.js");
+  assert.equal(formatMusicTime(0), "0:00");
+  assert.equal(formatMusicTime(65_000), "1:05");
+  assert.equal(formatMusicTime(3_661_000), "1:01:01");
+
+  const full = formatMusicProgress(60_000, 120_000, 10);
+  assert.equal(full, "━━━━━───── 1:00 / 2:00");
+
+  const over = formatMusicProgress(999_000, 120_000, 10);
+  assert.equal(over, "━━━━━━━━━━ 2:00 / 2:00");
+});
