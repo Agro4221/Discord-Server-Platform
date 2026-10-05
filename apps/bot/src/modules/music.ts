@@ -2305,7 +2305,9 @@ export class Music implements PlatformModule {
             ? "spsearch:" + query
             : provider === "applemusic" && !/^https?:\/\//i.test(query)
               ? "amsearch:" + query
-              : query,
+              : provider === "deezer" && !/^https?:\/\//i.test(query)
+                ? "dzsearch:" + query
+                : query,
         track: null,
         source: "query"
       });
