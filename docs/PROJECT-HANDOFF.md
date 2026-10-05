@@ -373,33 +373,27 @@ Premium parity = **совокупность сильных функций раз
 
 ## 9. Последнее состояние разработки
 
-Репозиторий: `Agro4221/Discord-Server-Platform`  
-Рабочая ветка: `feature/music-v2`  
-PR: **#3** — `feat: Discord platform expansion + Music v2`  
+Репозиторий: `Agro4221/Discord-Server-Platform`
+Рабочая ветка: `feature/music-v2`
+PR: **#3** — `feat: Discord platform expansion + Music v2`
 PR остаётся **draft**.
 
 Текущий source HEAD:
-`3e854a4e158eaa332a625cfba1f375ca837411f7`
+`39f396e5444a52eadf084549231b965abef592a7`
 
-За последний проход:
-- исправлен Dashboard production build blocker в TikTok OAuth route;
-- добавлен CI contract для локальных Dashboard imports;
-- исправлена дублирующаяся Apple Music provider диагностика и добавлена regression coverage;
-- усилен Music/Lavalink failover: target selector требует connected + non-empty sessionId, исключает failed node и используется непосредственно перед move;
-- добавлена regression coverage failover eligibility.
+Последние bounded срезы:
+- исправлен Dashboard TikTok OAuth import blocker;
+- добавлен Dashboard local-import CI contract;
+- выровнена Apple Music readiness;
+- усилен Music/Lavalink failover target selection;
+- выровнена credential-aware readiness для Deezer/Yandex/VK/Tidal/Qobuz/JioSaavn;
+- добавлены детерминированные regression tests.
 
-Последний доступный CI #2369 был до этих фиксов; новый CI для текущего HEAD в доступном состоянии пока не появился, поэтому текущий кодовый срез **не считать CI-verified**.
+Последний доступный CI #2369 относится к старому checkpoint и после наших последующих изменений не является доказательством текущего состояния. Текущий HEAD считать **не CI-verified**, пока новый Actions run явно не появится.
 
-Feature Matrix полностью reconciled: все строки ✅. Основной оставшийся инженерный слой — release-gate hardening и environment-dependent acceptance.
+Feature Matrix полностью reconciled: все строки ✅.
 
-Live validation:
-- реальный Discord;
-- Lavalink voice playback и multi-node failover;
-- Windows local runtime UX;
-- E2E/chaos/soak/security;
-- clean-host/VPS acceptance;
-- реальная проверка внешних Music/social providers.
-
+Следующий инженерный приоритет: продолжать release-gate hardening одним bounded срезом, затем live validation (Discord/Lavalink, Windows, E2E/chaos/soak/security, clean-host/VPS и внешние провайдеры).
 ## 10. Как продолжать в новом чате
 
 1. Прочитать **этот файл полностью**.
