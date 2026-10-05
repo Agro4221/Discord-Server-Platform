@@ -867,6 +867,13 @@ export class Music implements PlatformModule {
       return;
     }
 
+    const cooldownKey = interaction.guildId! + ":" + interaction.user.id;
+    const remaining = remainingMusicRequestCooldown(this.requestCooldownUntil.get(cooldownKey) ?? 0);
+    if (remaining > 0) {
+      await interaction.reply({ content: "⏳ Подожди ещё " + Math.ceil(remaining / 1000) + " сек. перед следующим запросом.", ephemeral: true });
+      return;
+    }
+
     const queued = await this.queueQuery(
       interaction.guildId!,
       voiceChannelId,
@@ -880,6 +887,7 @@ export class Music implements PlatformModule {
       return;
     }
 
+    this.requestCooldownUntil.set(cooldownKey, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
     const suffix = queued.truncated
       ? ` (добавлены первые ${MAX_PLAYLIST_TRACKS} треков)`
       : "";
