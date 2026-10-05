@@ -49,6 +49,30 @@ export function normalizeMusicPlaylistVisibility(shared: boolean): MusicPlaylist
   return shared ? "shared" : "personal";
 }
 
+export type MusicSearchProvider = "youtube" | "yandex";
+
+export function normalizeMusicSearchProvider(value: string | null | undefined): MusicSearchProvider | null {
+  if (value === "youtube" || value === "yandex") return value;
+  return null;
+}
+
+export function resolveMusicSearchRequest(
+  query: string,
+  provider?: MusicSearchProvider | null
+): { query: string; source?: "ytsearch" | "ymsearch" } {
+  const normalized = query.trim();
+  if (/^https?:\/\//i.test(normalized)) return { query: normalized };
+  if (/^ymsearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^ymsearch:\s*/i, ""), source: "ymsearch" };
+  }
+  if (/^ytsearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^ytsearch:\s*/i, ""), source: "ytsearch" };
+  }
+  return provider === "yandex"
+    ? { query: normalized, source: "ymsearch" }
+    : { query: normalized, source: "ytsearch" };
+}
+
 export function normalizeMusicPlaylistSearch(value: string): string | null {
   const normalized = value.trim().slice(0, 80);
   return normalized ? normalized : null;
@@ -922,8 +946,8 @@ export class Music implements PlatformModule {
 
       const query = String(input.query ?? "").trim();
       if (!query) throw new Error("music_query_required");
-      const source = /^https?:\/\//i.test(query) ? undefined : "ytsearch";
-      const result = await player.search(source ? { query, source } : { query }, this.client?.user);
+      const resolved = resolveMusicSearchRequest(query, normalizeMusicSearchProvider(String(input.mode ?? "")));
+      const result = await player.search(resolved.source ? { query: resolved.query, source: resolved.source } : { query: resolved.query }, this.client?.user);
       if (!result.tracks.length) throw new Error("music_track_not_found");
 
       player.queue.add(result.tracks[0]!);
@@ -1157,6 +1181,7 @@ export class Music implements PlatformModule {
       await interaction.reply({ content: "Поисковый запрос пуст.", ephemeral: true });
       return;
     }
+    const provider = normalizeMusicSearchProvider(interaction.options.getString("provider"));
     if (!this.manager) throw new Error("music_manager_unavailable");
 
     const existing = this.manager.players.get(interaction.guildId!);
@@ -1170,8 +1195,9 @@ export class Music implements PlatformModule {
     if (player.voiceChannelId !== voiceChannelId) throw new Error("music_player_in_other_voice");
     if (!player.connected) await player.connect();
 
+    const resolved = resolveMusicSearchRequest(query, provider);
     const result = await player.search(
-      { query, source: /^https?:\/\//i.test(query) ? undefined : "ytsearch" },
+      resolved.source ? { query: resolved.query, source: resolved.source } : { query: resolved.query },
       interaction.user
     );
     const tracks = result.tracks.slice(0, 5) as Track[];
@@ -1219,6 +1245,7 @@ export class Music implements PlatformModule {
       await interaction.reply({ content: "Поисковый запрос пуст.", ephemeral: true });
       return;
     }
+    const provider = normalizeMusicSearchProvider(interaction.options.getString("provider"));
 
     const cooldownKey = interaction.guildId! + ":" + interaction.user.id;
     const remaining = remainingMusicRequestCooldown(this.requestCooldownUntil.get(cooldownKey) ?? 0);
@@ -1231,7 +1258,7 @@ export class Music implements PlatformModule {
       interaction.guildId!,
       voiceChannelId,
       interaction.channelId,
-      query,
+      provider === "yandex" ? resolveMusicSearchRequest(query, provider).source + ":" + resolveMusicSearchRequest(query, provider).query : query,
       interaction.user
     );
 
@@ -2288,9 +2315,9 @@ export class Music implements PlatformModule {
     }
     if (!player.connected) await player.connect();
 
-    const source = /^https?:\/\//i.test(query) ? undefined : "ytsearch";
+    const resolved = resolveMusicSearchRequest(query);
     const result = await player.search(
-      source ? { query, source } : { query },
+      resolved.source ? { query: resolved.query, source: resolved.source } : { query: resolved.query },
       requester
     );
 
@@ -2884,7 +2911,7 @@ export class Music implements PlatformModule {
       ["Spotify","LavaSrc",process.env.LAVASRC_SPOTIFY_ENABLED === "true"],
       ["Apple Music","LavaSrc",process.env.LAVASRC_APPLEMUSIC_ENABLED === "true"],
       ["Deezer","LavaSrc",process.env.LAVASRC_DEEZER_ENABLED === "true"],
-      ["Yandex Music","LavaSrc",process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true"],
+      ["Yandex Music","LavaSrc",process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true" && Boolean(process.env.YANDEX_MUSIC_ACCESS_TOKEN?.trim())],
       ["VK Music","LavaSrc",process.env.LAVASRC_VKMUSIC_ENABLED === "true"],
       ["Tidal","LavaSrc",process.env.LAVASRC_TIDAL_ENABLED === "true"],
       ["Qobuz","LavaSrc",process.env.LAVASRC_QOBUZ_ENABLED === "true"],
