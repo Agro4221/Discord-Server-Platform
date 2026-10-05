@@ -445,16 +445,30 @@ export class AutoMod implements PlatformModule {
 
     const content = message.content;
     const mentions = message.mentions.users.size + message.mentions.roles.size;
-    const key = `${message.guild.id}:${message.author.id}`;
+    const rules = await this.getEnabledRules(message.guild.id);
     const now = Date.now();
-    const bucket = this.recent.get(key) ?? [];
-    const historyCutoff = now - 3_600_000;
-    const history = bucket
-      .filter((item) => item.timestamp >= historyCutoff)
-      .slice(-99);
+    const repeatWindows = [
+      config.repeatedWindowSeconds,
+      ...rules
+        .filter((rule) => rule.detector === "repeated-text")
+        .map((rule) => rule.windowSeconds ?? config.repeatedWindowSeconds)
+    ].map(clampAutoModWindowSeconds);
+    const maxRepeatWindowSeconds = repeatWindows.length ? Math.max(...repeatWindows) : 0;
 
-    history.push({ content: content.toLocaleLowerCase(), timestamp: now });
-    this.recent.set(key, history);
+    const key = `${message.guild.id}:${message.author.id}`;
+    const bucket = this.recent.get(key) ?? [];
+    const history = maxRepeatWindowSeconds > 0
+      ? bucket
+          .filter((item) => item.timestamp >= now - maxRepeatWindowSeconds * 1000)
+          .slice(-99)
+      : [];
+
+    if (maxRepeatWindowSeconds > 0) {
+      history.push({ content: content.toLocaleLowerCase(), timestamp: now });
+      this.recent.set(key, history);
+    } else {
+      this.recent.delete(key);
+    }
 
     const baseCutoff = now - config.repeatedWindowSeconds * 1000;
     const recent = history.filter((item) => item.timestamp >= baseCutoff);
@@ -472,8 +486,6 @@ export class AutoMod implements PlatformModule {
       await this.applyBaseViolation(message, reason, config);
       return;
     }
-
-    const rules = await this.getEnabledRules(message.guild.id);
     const roleIds = message.member?.roles.cache.map((role) => role.id) ?? [];
 
     for (const rule of rules) {
