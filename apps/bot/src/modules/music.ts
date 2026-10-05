@@ -3181,8 +3181,8 @@ export class Music implements PlatformModule {
 
     if (interaction.isButton() && interaction.customId.startsWith("dsp:music:playlist-page:") && interaction.guild) {
       const parts = interaction.customId.split(":");
-      const token = parts[4] ?? "";
-      const page = Number(parts[5]);
+      const token = parts[3] ?? "";
+      const page = Number(parts[4]);
       const session = this.playlistPaginationSessions.get(token);
       if (
         !session ||
@@ -3193,9 +3193,6 @@ export class Music implements PlatformModule {
       ) {
         await interaction.update({ content: "Эта навигация устарела. Выполни команду ещё раз.", components: [] });
         return;
-      }
-      if (session.expiresAt < Date.now()) {
-        this.playlistPaginationSessions.delete(token);
       }
       await this.renderMusicPlaylistPagination(interaction,token,session,page);
       return;
