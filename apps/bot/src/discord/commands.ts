@@ -993,9 +993,11 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
             o.setName("action").setDescription("Action").addChoices(
               { name: "Add current", value: "add" },
               { name: "Remove current", value: "remove" },
-              { name: "List", value: "list" }
+              { name: "List", value: "list" },
+              { name: "Play", value: "play" }
             ).setRequired(true)
           )
+          .addIntegerOption((o) => o.setName("track").setDescription("Favorite number (1-based)").setMinValue(1).setMaxValue(25))
       )
       .addSubcommand((sub) =>
         sub
@@ -1013,7 +1015,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
               { name: "Add current", value: "add" },
               { name: "Remove track", value: "remove" },
               { name: "Move track", value: "move" },
-              { name: "Load", value: "load" }
+              { name: "Play", value: "play" }
             ).setRequired(true)
           )
           .addStringOption((o) => o.setName("name").setDescription("Playlist name").setMaxLength(80))
