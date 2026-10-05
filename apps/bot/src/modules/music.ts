@@ -38,6 +38,13 @@ declare module "lavalink-client" {
 type MusicRepeatMode = "off" | "track" | "queue";
 type MusicPlaylistVisibility = "personal" | "shared";
 
+type MusicPlaylistContinuation = {
+  playlistId: string;
+  nextIndex: number;
+  order: number[] | null;
+  requesterUserId: string;
+};
+
 export function normalizeMusicPlaylistVisibility(shared: boolean): MusicPlaylistVisibility {
   return shared ? "shared" : "personal";
 }
@@ -366,6 +373,7 @@ export class Music implements PlatformModule {
   private readonly requestInFlight = new Set<string>();
   private readonly requestCooldownUntil = new Map<string, number>();
   private readonly failoverInFlight = new Set<string>();
+  private readonly playlistContinuations = new Map<string, MusicPlaylistContinuation>();
   private readonly voteSkipSessions = new Map<string, { trackIdentifier: string; voters: Set<string>; expiresAt: number }>();
   private readonly searchSessions = new Map<string, { guildId: string; userId: string; tracks: Track[]; expiresAt: number }>();
   private readonly playlistPaginationSessions = new Map<string, {
@@ -401,6 +409,7 @@ export class Music implements PlatformModule {
     this.requestInFlight.clear();
     this.requestCooldownUntil.clear();
     this.failoverInFlight.clear();
+    this.playlistContinuations.clear();
     this.voteSkipSessions.clear();
     this.playlistPaginationSessions.clear();
     for (const timer of this.autoLeaveTimers.values()) clearTimeout(timer);
@@ -546,6 +555,7 @@ export class Music implements PlatformModule {
       this.cancelAutoLeave(player.guildId);
       this.lastPlayedTracks.delete(player.guildId);
       this.autoplayInFlight.delete(player.guildId);
+      this.playlistContinuations.delete(player.guildId);
       void this.db.query(
         "DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
         [player.guildId, this.config.botIdentityId]
