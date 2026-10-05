@@ -33,6 +33,12 @@ const vpsCompose = await readFile("docker-compose.vps.yml", "utf8");
 const caddyExample = await readFile("infrastructure/caddy/Caddyfile.example", "utf8");
 const gitignore = await readFile(".gitignore", "utf8");
 
+if (vpsInstaller.includes("cp infrastructure/caddy/Caddyfile.example infrastructure/caddy/Caddyfile")) {
+  throw new Error("VPS installer must not overwrite an existing Caddyfile");
+}
+if (!vpsInstaller.includes("if [[ ! -f infrastructure/caddy/Caddyfile ]]")) {
+  throw new Error("VPS installer must preserve an existing Caddyfile");
+}
 if (vpsInstaller.includes("DASHBOARD_ADMIN_PASSWORD")) {
   throw new Error("Legacy Dashboard admin password flow is still present in VPS installer");
 }
