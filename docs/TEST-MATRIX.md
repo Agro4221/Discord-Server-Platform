@@ -308,3 +308,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-05 — Upgrade path regression snapshot
 - Deployment validation distinguishes local upgrades from VPS/Caddy upgrades; public `DOMAIN` is required only when the Caddy overlay exists.
 - Live regression case: run a local upgrade without `DOMAIN` and a VPS upgrade with valid `DOMAIN`/Basic Auth settings.
+
+### 2026-10-05 — VPS reinstall configuration snapshot
+- Static deployment verification requires the installer to preserve an existing Caddyfile.
+- Live release-gate case: modify a disposable Caddyfile, rerun the installer, and verify the file remains intact while the stack upgrades successfully.
