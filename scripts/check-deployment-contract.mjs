@@ -66,7 +66,7 @@ for (const legacyPath of [
     await access(legacyPath);
     throw new Error("Obsolete Dashboard file still exists: " + legacyPath);
   } catch (error) {
-    if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
       continue;
     }
     throw error;

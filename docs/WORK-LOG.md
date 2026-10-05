@@ -889,3 +889,10 @@ Never write credentials, tokens or private user data here.
 - Updated `scripts/check-deployment-contract.mjs` to validate the active `page.tsx -> control-center.tsx` entrypoint, reject removed credential placeholders and assert that deleted legacy Dashboard/Vexa files stay absent.
 - This is a correctness fix for the CI contract only; no implemented bot feature was removed.
 - Fresh CI verification after this follow-up is required before treating the cleanup head as green.
+
+
+## 2026-10-05 — Cleanup CI contract syntax fix
+- CI #2400 reached the deployment-contract step but failed because the new legacy-file absence check used a TypeScript type assertion inside the plain JavaScript `scripts/check-deployment-contract.mjs`.
+- Replaced the invalid assertion with a normal JavaScript `error.code === "ENOENT"` check.
+- The active Dashboard remains `page.tsx -> control-center.tsx`; no feature behavior changed.
+- Final cleanup CI must validate this corrected contract on the latest head.
