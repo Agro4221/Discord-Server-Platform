@@ -32,7 +32,9 @@ for (const contract of [
   "docker compose up -d",
   "MANAGEMENT_API_KEY",
   "127.0.0.1",
-  "Start-Process"
+  "Start-Process",
+  "Lavalink2",
+  "docker compose --profile failover up -d"
 ]) {
   if (!localLauncher.includes(contract)) {
     throw new Error("Local launcher contract missing: " + contract);
