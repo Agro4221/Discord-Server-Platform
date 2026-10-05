@@ -1443,6 +1443,15 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_music_request_approvals_guild_requester ON music_request_approvals(guild_id,requester_user_id,created_at DESC);"
     ])
   },
+  {
+    version: 94,
+    name: "music_shared_playlists",
+    sql: q([
+      "ALTER TABLE music_playlists ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'personal' CHECK(visibility IN ('personal','shared'));",
+      "CREATE INDEX IF NOT EXISTS idx_music_playlists_shared ON music_playlists(guild_id,visibility,updated_at DESC);",
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_music_playlists_shared_name ON music_playlists(guild_id,name) WHERE visibility='shared';"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
