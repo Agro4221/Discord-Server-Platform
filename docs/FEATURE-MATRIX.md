@@ -260,7 +260,7 @@
 | Spotify | 🟡 |
 | Apple Music | 🟡 |
 | Deezer | 🟡 |
-| **Yandex Music** | 🟡 |
+| **Yandex Music** | ✅ | LavaSrc source + access-token wiring + explicit ymsearch / provider selection in Music play/search; live provider playback still belongs to release-gate validation |
 | VK Music | 🟡 |
 | Tidal | 🟡 |
 | Qobuz | 🟡 |
