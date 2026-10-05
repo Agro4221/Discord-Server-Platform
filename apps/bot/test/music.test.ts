@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, normalizeMusicRadioMode, buildMusicRadioQuery, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicPitch, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -521,4 +521,15 @@ test("Music radio mode normalizes supported modes and builds the expected seed q
   assert.equal(buildMusicRadioQuery("artist", "  Linkin   Park "), "Linkin Park songs");
   assert.equal(buildMusicRadioQuery("genre", " liquid  drum and bass "), "liquid drum and bass music mix");
   assert.equal(buildMusicRadioQuery("search", "summer night drive"), "summer night drive");
+});
+
+
+test("Music pitch normalization accepts the supported range and rounds to cents", () => {
+  assert.equal(normalizeMusicPitch(0.5), 0.5);
+  assert.equal(normalizeMusicPitch(1), 1);
+  assert.equal(normalizeMusicPitch(1.234), 1.23);
+  assert.equal(normalizeMusicPitch(2), 2);
+  assert.equal(normalizeMusicPitch(0.49), null);
+  assert.equal(normalizeMusicPitch(2.01), null);
+  assert.equal(normalizeMusicPitch(Number.NaN), null);
 });
