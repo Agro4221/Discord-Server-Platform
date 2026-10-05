@@ -36,6 +36,11 @@ declare module "lavalink-client" {
 }
 
 type MusicRepeatMode = "off" | "track" | "queue";
+type MusicPlaylistVisibility = "personal" | "shared";
+
+export function normalizeMusicPlaylistVisibility(shared: boolean): MusicPlaylistVisibility {
+  return shared ? "shared" : "personal";
+}
 
 const MAX_PLAYLIST_TRACKS = 500;
 export const MUSIC_REQUEST_COOLDOWN_MS = 5_000;
@@ -1166,18 +1171,20 @@ export class Music implements PlatformModule {
   private async savedPlaylist(interaction: ChatInputCommandInteraction): Promise<void> {
     const action = interaction.options.getString("action", true);
     const name = interaction.options.getString("name")?.trim().slice(0, 80) ?? "";
+    const shared = interaction.options.getBoolean("shared") === true;
     const guildId = interaction.guild!.id;
 
     if (action === "list") {
-      const result = await this.db.query<{ name: string; tracks: unknown[] }>(
-        "SELECT name,tracks FROM music_playlists WHERE guild_id=$1 AND user_id=$2 ORDER BY updated_at DESC LIMIT 25",
+      const result = await this.db.query<{ name: string; tracks: unknown[]; visibility: MusicPlaylistVisibility }>(
+        "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') ORDER BY visibility DESC,updated_at DESC LIMIT 25",
         [guildId,interaction.user.id]
       );
       const lines = result.rows.map((row, index) =>
-        (index + 1) + ". **" + row.name + "** — " + String(Array.isArray(row.tracks) ? row.tracks.length : 0) + " треков"
+        (index + 1) + ". " + (row.visibility === "shared" ? "🌐" : "👤") + " **" + row.name + "** — " +
+        String(Array.isArray(row.tracks) ? row.tracks.length : 0) + " треков"
       );
       await interaction.reply({
-        content: lines.length ? "🎼 **Мои плейлисты**\n" + lines.join("\n") : "🎼 Плейлистов пока нет.",
+        content: lines.length ? "🎼 **Доступные плейлисты**\n" + lines.join("\n") : "🎼 Плейлистов пока нет.",
         ephemeral: true
       });
       return;
@@ -1189,22 +1196,43 @@ export class Music implements PlatformModule {
     }
 
     if (action === "create") {
-      try {
-        await this.db.query(
-          "INSERT INTO music_playlists(guild_id,user_id,name) VALUES($1,$2,$3)",
-          [guildId,interaction.user.id,name]
-        );
-      } catch {
-        await interaction.reply({ content: "Плейлист с таким именем уже существует.", ephemeral: true });
+      const visibility = normalizeMusicPlaylistVisibility(shared);
+      if (visibility === "shared" && !await this.canManageMusicMember(
+        guildId,
+        await interaction.guild!.members.fetch(interaction.user.id).catch(() => null)
+      )) {
+        await interaction.reply({ content: "Создавать shared-плейлисты могут только DJ или Manage Server.", ephemeral: true });
         return;
       }
-      await interaction.reply({ content: "🎼 Плейлист **" + name + "** создан.", ephemeral: true });
+      try {
+        await this.db.query(
+          "INSERT INTO music_playlists(guild_id,user_id,name,visibility) VALUES($1,$2,$3,$4)",
+          [guildId,interaction.user.id,name,visibility]
+        );
+      } catch {
+        await interaction.reply({
+          content: visibility === "shared"
+            ? "Shared-плейлист с таким именем уже существует."
+            : "Личный плейлист с таким именем уже существует.",
+          ephemeral: true
+        });
+        return;
+      }
+      await interaction.reply({
+        content: "🎼 " + (visibility === "shared" ? "Shared-плейлист" : "Плейлист") + " **" + name + "** создан.",
+        ephemeral: true
+      });
       return;
     }
 
-    const playlist = await this.db.query<{ id: string; tracks: unknown[] }>(
-      "SELECT id,tracks FROM music_playlists WHERE guild_id=$1 AND user_id=$2 AND name=$3",
-      [guildId,interaction.user.id,name]
+    const playlist = await this.db.query<{
+      id: string;
+      tracks: unknown[];
+      visibility: MusicPlaylistVisibility;
+      user_id: string;
+    }>(
+      "SELECT id,tracks,visibility,user_id FROM music_playlists WHERE guild_id=$1 AND name=$2 AND (user_id=$3 OR visibility='shared') ORDER BY CASE WHEN user_id=$3 THEN 0 ELSE 1 END LIMIT 1",
+      [guildId,name,interaction.user.id]
     );
     const row = playlist.rows[0];
     if (!row) {
@@ -1212,7 +1240,17 @@ export class Music implements PlatformModule {
       return;
     }
 
+    const canEdit = row.user_id === interaction.user.id ||
+      await this.canManageMusicMember(
+        guildId,
+        await interaction.guild!.members.fetch(interaction.user.id).catch(() => null)
+      );
+
     if (action === "delete") {
+      if (!canEdit) {
+        await interaction.reply({ content: "Удалять этот shared-плейлист могут только его создатель, DJ или Manage Server.", ephemeral: true });
+        return;
+      }
       await this.db.query("DELETE FROM music_playlists WHERE id=$1", [row.id]);
       await interaction.reply({ content: "🗑️ Плейлист **" + name + "** удалён.", ephemeral: true });
       return;
@@ -1223,6 +1261,10 @@ export class Music implements PlatformModule {
     const shouldShuffle = action === "load" && interaction.options.getBoolean("shuffle") === true;
 
     if (action === "add") {
+      if (!canEdit) {
+        await interaction.reply({ content: "Изменять этот shared-плейлист могут только его создатель, DJ или Manage Server.", ephemeral: true });
+        return;
+      }
       const track = current?.queue.current;
       if (!track) {
         await interaction.reply({ content: "Нужен текущий трек в плеере.", ephemeral: true });
