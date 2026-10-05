@@ -357,3 +357,5 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-05 — Lavalink secret configuration snapshot
 - Deployment contract now rejects the predictable Lavalink password fallback and verifies the explicit environment binding.
 - Live release-gate case: start both Lavalink nodes with the launcher-generated secret and verify authenticated /version healthchecks succeed.
+## 2026-10-05 — Configuration validation snapshot
+- Existing config tests cover blank MANAGEMENT_API_KEY, DATABASE_URL and LAVALINK_PASSWORD values; the implementation is now aligned with those tests.
