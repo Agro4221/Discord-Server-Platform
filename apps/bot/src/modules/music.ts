@@ -211,7 +211,7 @@ export function normalizeMusicRequestApprovalMode(value: string): MusicRequestAp
 
 const MUSIC_FILTER_ACTIONS = [
   "clear", "bassboost-low", "bassboost-medium", "bassboost-high",
-  "rock", "classic", "pop", "electronic", "fullsound", "karaoke", "tremolo", "vibrato", "distortion", "gaming", "nightcore", "8d"
+  "rock", "classic", "pop", "electronic", "fullsound", "karaoke", "tremolo", "vibrato", "distortion", "lowpass", "gaming", "nightcore", "8d"
 ] as const;
 
 type MusicFilterAction = (typeof MUSIC_FILTER_ACTIONS)[number];
@@ -1332,6 +1332,9 @@ export class Music implements PlatformModule {
         await player.filterManager.applyPlayerFilters();
         break;
       }
+      case "lowpass":
+        await player.filterManager.toggleLowPass();
+        break;
       case "gaming":
         await player.filterManager.setEQPreset("Gaming");
         break;
@@ -1359,6 +1362,7 @@ export class Music implements PlatformModule {
       tremolo: "Tremolo",
       vibrato: "Vibrato",
       distortion: "Distortion",
+      lowpass: "Low Pass",
       gaming: "Gaming",
       nightcore: "Nightcore",
       "8d": "8D"
