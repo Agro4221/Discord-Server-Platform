@@ -379,7 +379,7 @@ PR: **#3** — `feat: Discord platform expansion + Music v2`
 PR остаётся **draft**.
 
 Текущий source/docs checkpoint:
-`4897b4f949881e1d5f2d617bab6f6f884aebc9cf`
+`aa3965dbcff690fd05ff8d87c744c57268047acc`
 
 Branch HEAD is tracked by the PR/branch ref; the source checkpoint above identifies the last code-changing commit.
 
