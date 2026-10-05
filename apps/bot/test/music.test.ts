@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, normalizeMusicRadioMode, buildMusicRadioQuery, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -509,4 +509,15 @@ test("Music artist-aware autoplay falls back to any allowed result when same-art
     )?.info.identifier,
     "other-artist"
   );
+});
+
+
+test("Music radio mode normalizes supported modes and builds the expected seed query", () => {
+  assert.equal(normalizeMusicRadioMode("artist"), "artist");
+  assert.equal(normalizeMusicRadioMode("genre"), "genre");
+  assert.equal(normalizeMusicRadioMode("search"), "search");
+  assert.equal(normalizeMusicRadioMode("radio"), null);
+  assert.equal(buildMusicRadioQuery("artist", "  Linkin   Park "), "Linkin Park songs");
+  assert.equal(buildMusicRadioQuery("genre", " liquid  drum and bass "), "liquid drum and bass music mix");
+  assert.equal(buildMusicRadioQuery("search", "summer night drive"), "summer night drive");
 });
