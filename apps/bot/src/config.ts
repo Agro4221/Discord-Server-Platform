@@ -174,7 +174,7 @@ export function loadConfig(): AppConfig {
     databaseUrl: requiredNonBlank("DATABASE_URL"),
     lavalinkHost: process.env.LAVALINK_HOST ?? "127.0.0.1",
     lavalinkPort: port("LAVALINK_PORT", 2333),
-    lavalinkPassword: required("LAVALINK_PASSWORD"),
+    lavalinkPassword: requiredNonBlank("LAVALINK_PASSWORD"),
     lavalinkNodes: parseLavalinkNodes(),
     backupDirectory: process.env.BACKUP_DIRECTORY ?? "./data/backups",
     backupRetentionCount: integer("BACKUP_RETENTION_COUNT", 30, 1, 10_000),
