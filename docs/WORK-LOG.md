@@ -838,3 +838,14 @@ Never write credentials, tokens or private user data here.
 - CI #2161 passed completely: source/deployment/observability contracts, Typecheck, 171 tests, domain build, bot build and Dashboard build.
 - Final source checkpoint for this slice: 6194b069485b84f7e1d3ebd81118a96a07e4e6aa.
 - Next single Music slice: **Artist-aware / similar-track Autoplay**.
+
+
+## 2026-10-05 — Music Autoplay artist-aware selection
+- Completed the artist-aware Autoplay slice on top of duplicate/recent-track protection.
+- When the last track has an artist, Autoplay first searches that artist and prefers an allowed different track by the same artist.
+- The existing current-track, queued-track and recent-history exclusions remain authoritative for the artist-aware path as well.
+- When no suitable same-artist result is available, Autoplay falls back to the existing title + artist search and keeps the same exclusion rules.
+- Added deterministic helper coverage for normalized artist matching and safe fallback selection.
+- CI #2166 passed completely: source/deployment/observability contracts, Typecheck, 171 tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: 36560ac76566f8eb6bc230feb684a81c9c1b3ed0.
+- Next single Music slice: **Radio mode by artist/genre/search seed**.
