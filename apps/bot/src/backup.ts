@@ -54,6 +54,7 @@ export class BackupService {
   }
 
   async createGuildBackup(guildId: string): Promise<string> {
+    assertGuildId(guildId);
     await this.ensureDirectory();
     const payload = await new ConfigTransferService(this.db).exportGuild(guildId);
     const filename = `guild-${guildId}-${Date.now()}.json.gz`;
@@ -71,6 +72,7 @@ export class BackupService {
   }
 
   async restoreGuildBackup(targetGuildId: string, file: string): Promise<void> {
+    assertGuildId(targetGuildId);
     const safe = this.safeBackupName(file);
     if (!this.belongsToGuild(safe, targetGuildId)) throw new Error("backup_guild_mismatch");
     const path = join(this.directory, safe);
@@ -87,6 +89,7 @@ export class BackupService {
   }
 
   async listBackups(guildId?: string): Promise<string[]> {
+    if (guildId) assertGuildId(guildId);
     await this.ensureDirectory();
     const local = await readdir(this.directory);
     const result = new Set(
@@ -121,6 +124,7 @@ export class BackupService {
   }
 
   async deleteBackup(file: string, guildId?: string): Promise<void> {
+    if (guildId) assertGuildId(guildId);
     const safe = this.safeBackupName(file);
     if (guildId && !this.belongsToGuild(safe, guildId)) throw new Error("backup_guild_mismatch");
     await unlink(join(this.directory, safe)).catch((error: unknown) => {
@@ -130,6 +134,7 @@ export class BackupService {
   }
 
   async readBackup(file: string, guildId?: string): Promise<unknown> {
+    if (guildId) assertGuildId(guildId);
     const safe = this.safeBackupName(file);
     if (guildId && !this.belongsToGuild(safe, guildId)) throw new Error("backup_guild_mismatch");
 
@@ -310,6 +315,10 @@ async function gunzipBuffer(input: Buffer): Promise<Buffer> {
 
   await pipeline(Readable.from([input]), createGunzip(), limiter);
   return Buffer.concat(chunks);
+}
+
+function assertGuildId(guildId: string): void {
+  if (!/^\d{17,20}$/.test(guildId)) throw new Error("invalid_guild_id");
 }
 
 function isNotFound(error: unknown): boolean {
