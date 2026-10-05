@@ -597,3 +597,10 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Deployment CI contract requires the smoke-check probes to remain present.
 - Source checkpoint: `95877c00ac9fff5d1615d519f202a316ba403783`.
 - Fresh CI is still not visible; live DNS/TLS and actual clean-host execution are release-gate tasks.
+
+### 2026-10-05 — VPS reinstall safety
+- Re-running the VPS installer no longer rotates existing Management API, PostgreSQL or Lavalink secrets.
+- This preserves the existing PostgreSQL role/password relationship and Management API access across reinstall/repair operations while still auto-generating missing secrets on first install.
+- Deployment contract checks for the preservation helpers.
+- Source checkpoint: `73e5ebdf792f38ae2ab29fb0ba0adba7f224154f`.
+- Fresh CI and actual existing-volume reinstall remain release-gate validation items.
