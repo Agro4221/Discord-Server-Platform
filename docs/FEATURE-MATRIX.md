@@ -207,7 +207,7 @@
 | Server/shared playlists | ✅ | |
 | Playlist add/remove/reorder individual tracks | ✅ | |
 | Import playlists from supported URLs | ✅ | |
-| Save queue as playlist | 🟡 |
+| Save queue as playlist | ✅ | |
 | Play favorites / play playlist shortcuts | 🟡 |
 | Playlist pagination and richer management UI | 🟡 |
 
