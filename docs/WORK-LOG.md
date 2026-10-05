@@ -778,3 +778,14 @@ Never write credentials, tokens or private user data here.
 - CI #2125 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
 - Final source checkpoint: `81a484619fd88aea937d85b7c2fe04db82c26da1`.
 - Next single Music slice: **Playlist pagination and richer management UI**.
+
+## 2026-10-05 — Music playlist pagination / richer management UI
+- Completed paginated Music playlist management UI.
+- `List`, `Search` and `View tracks` now use temporary user-scoped Discord sessions with Previous / page / Next buttons instead of a hard 25-item display ceiling.
+- Personal/shared visibility is rechecked from PostgreSQL on every page change, so deleted, moved or newly updated playlists/tracks are not served from a stale snapshot.
+- A 500-track playlist can be viewed across 20 pages of 25 tracks; the 500-track storage capacity is unchanged.
+- Pagination controls are handled before the active-player guard, so browsing saved playlists does not require Music playback to be running.
+- Added pagination helper regression coverage and fixed the CI-discovered handler restoration issue before the final green run.
+- CI #2135 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `0403a96d5d67acc1a603b58048ff8476e4cceb6c`.
+- Next single Music slice: **Playlist continuation after queue end**.
