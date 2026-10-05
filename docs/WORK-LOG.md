@@ -1299,3 +1299,10 @@ Never write credentials, tokens or private user data here.
 - This preserves the local Control Center no-login design while ensuring the Management API itself cannot start with an effectively empty bearer secret.
 - Source checkpoint: `333ce7ca164fa0e0dd7c0ba776bc5315c0217924`.
 - Fresh CI remains unavailable on the current PR head.
+
+## 2026-10-05 — Management API authorization contract
+- Extracted the Management API Bearer-key check into `isManagementApiAuthorizationValid()` without changing the server routing/authentication model.
+- Added direct regression coverage for missing headers, wrong schemes, empty Bearer values, wrong keys, prefix mismatches and successful exact-key authorization.
+- Combined with config validation, the Management API now has both a startup non-blank-secret guard and a directly testable request authorization contract.
+- Source checkpoint: `3211e31ed8e07d0b41b0d25995a81e45ebef5f91`.
+- Fresh CI remains unavailable on the current PR head.
