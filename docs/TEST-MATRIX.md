@@ -296,3 +296,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-05 — VPS reinstall/recovery snapshot
 - Deployment contract now covers preservation of existing installer-generated secrets across reruns.
 - Live release-gate case: rerun installer against an existing PostgreSQL volume and confirm bot/API/database continuity without secret rotation.
+
+### 2026-10-05 — VPS upgrade configuration snapshot
+- Static deployment verification now requires the upgrade path to reject missing critical runtime secrets before starting containers.
+- Live release-gate case: remove/blank one critical secret in a disposable installation and verify the upgrade fails before Compose startup.
