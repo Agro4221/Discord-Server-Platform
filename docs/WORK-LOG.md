@@ -1012,6 +1012,13 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Qobuz playback remains a release-gate validation item.
 - Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
 
+## 2026-10-05 — Notifications Kick alert parity reconciliation
+- Reconciled the stale Kick stream-alert Matrix row against the existing implementation.
+- Kick support includes per-guild credentials, OAuth client-credentials token acquisition with caching, channel lookup and live-state polling.
+- Target parsing accepts Kick URLs, slugs and broadcaster IDs and has dedicated regression coverage.
+- No source change was required for this reconciliation.
+- TikTok remains the real unfinished social-adapter gap; it is not being marked complete without a reliable implementation.
+
 ## 2026-10-05 — Music yt-dlp source parity reconciliation
 - Reconciled the remaining yt-dlp Matrix gap against the actual LavaSrc integration.
 - LavaSrc exposes yt-dlp as a Direct source manager, but its documented search query is still ytsearch; therefore no duplicate/fake provider choice was added beside YouTube.
