@@ -137,6 +137,64 @@ export function isValidMusicLyricsPage(page: number, totalPages: number): boolea
   return Number.isInteger(page) && page >= 0 && page < Math.max(1, Math.floor(totalPages));
 }
 
+export type MusicTimedLyricLine = {
+  timestamp: number;
+  duration: number | null;
+  line: string;
+};
+
+export function normalizeMusicTimedLyrics(lines: unknown): MusicTimedLyricLine[] {
+  if (!Array.isArray(lines)) return [];
+  return lines
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const timestamp = Number(row.timestamp);
+      const line = typeof row.line === "string" ? row.line.trim() : "";
+      if (!Number.isFinite(timestamp) || timestamp < 0 || !line) return null;
+      const durationValue = row.duration === null || row.duration === undefined ? null : Number(row.duration);
+      return {
+        timestamp: Math.floor(timestamp),
+        duration: durationValue !== null && Number.isFinite(durationValue) && durationValue >= 0 ? Math.floor(durationValue) : null,
+        line
+      };
+    })
+    .filter((item): item is MusicTimedLyricLine => item !== null)
+    .sort((a,b) => a.timestamp - b.timestamp);
+}
+
+export function findMusicTimedLyricIndex(lines: readonly MusicTimedLyricLine[], positionMs: number): number {
+  const position = Math.max(0, Math.floor(Number(positionMs)));
+  let index = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i]!.timestamp > position) break;
+    index = i;
+  }
+  return index;
+}
+
+export function formatMusicSyncedLyrics(
+  lines: readonly MusicTimedLyricLine[],
+  positionMs: number,
+  radius = 2
+): string {
+  if (!lines.length) return "Нет тайм-кодов.";
+  const current = findMusicTimedLyricIndex(lines, positionMs);
+  const center = current < 0 ? 0 : current;
+  const safeRadius = Math.max(0, Math.min(4, Math.floor(radius)));
+  const start = Math.max(0, center - safeRadius);
+  const end = Math.min(lines.length, center + safeRadius + 1);
+  return lines.slice(start,end).map((item,index) => {
+    const absoluteIndex = start + index;
+    const marker = absoluteIndex === current ? "▶ **" : "   ";
+    const close = absoluteIndex === current ? "**" : "";
+    const total = Math.floor(item.timestamp / 1000);
+    const minutes = Math.floor(total / 60);
+    const seconds = total % 60;
+    return marker + "[" + minutes + ":" + String(seconds).padStart(2,"0") + "] " + item.line + close;
+  }).join("\n");
+}
+
 export function normalizeMusicPlaylistImportUrl(value: string): string | null {
   try {
     const url = new URL(value.trim());
@@ -628,6 +686,7 @@ export class Music implements PlatformModule {
     chunks: string[];
     expiresAt: number;
   }>();
+  private readonly lyricsSyncTimers = new Map<string, NodeJS.Timeout>();
   private searchSequence = 0;
   private playlistPaginationSequence = 0;
   private lyricsPaginationSequence = 0;
@@ -656,6 +715,8 @@ export class Music implements PlatformModule {
     this.playlistContinuations.clear();
     this.voteSkipSessions.clear();
     this.playlistPaginationSessions.clear();
+    for (const timer of this.lyricsSyncTimers.values()) clearInterval(timer);
+    this.lyricsSyncTimers.clear();
     this.lyricsPaginationSessions.clear();
     for (const timer of this.autoLeaveTimers.values()) clearTimeout(timer);
     this.autoLeaveTimers.clear();
@@ -807,6 +868,10 @@ export class Music implements PlatformModule {
       this.lastPlayedTracks.delete(player.guildId);
       this.autoplayInFlight.delete(player.guildId);
       this.playlistContinuations.delete(player.guildId);
+      for (const [token, timer] of this.lyricsSyncTimers) {
+        clearInterval(timer);
+        this.lyricsSyncTimers.delete(token);
+      }
       for (const [token, session] of this.lyricsPaginationSessions) {
         if (session.guildId === player.guildId) this.lyricsPaginationSessions.delete(token);
       }
@@ -2282,6 +2347,90 @@ export class Music implements PlatformModule {
 
   private async lyrics(interaction: ChatInputCommandInteraction): Promise<void> {
     const action = interaction.options.getString("action") ?? "show";
+    if (action === "sync") {
+      const player = this.manager?.players.get(interaction.guild!.id);
+      if (!player || !player.queue.current) {
+        await interaction.reply({ content: "📜 Сейчас ничего не играет.", ephemeral: true });
+        return;
+      }
+      if (!await this.canControl(interaction, player.voiceChannelId)) return;
+
+      try {
+        const current = player.queue.current;
+        const result = await player.getLyrics(current);
+        const lines = normalizeMusicTimedLyrics(result && typeof result === "object" ? (result as { lines?: unknown }).lines : null);
+        if (lines.length < 2) {
+          await interaction.reply({
+            content: "📜 Для этого трека нет достаточных тайм-кодов для live sync.",
+            ephemeral: true
+          });
+          return;
+        }
+
+        const token = Date.now().toString(36) + "-" + (++this.lyricsPaginationSequence).toString(36);
+        const trackIdentifier = current.info.identifier ?? current.info.uri ?? current.info.title;
+        let stopped = false;
+
+        const update = async (): Promise<void> => {
+          if (stopped) return;
+          const active = this.manager?.players.get(interaction.guild!.id);
+          const activeTrack = active?.queue.current;
+          const identifier = activeTrack?.info.identifier ?? activeTrack?.info.uri ?? activeTrack?.info.title;
+          if (!active || !activeTrack || identifier !== trackIdentifier) {
+            stopped = true;
+            const timer = this.lyricsSyncTimers.get(token);
+            if (timer) clearInterval(timer);
+            this.lyricsSyncTimers.delete(token);
+            return;
+          }
+
+          const basePosition = Math.max(0, Number(active.lastPosition ?? 0));
+          const elapsed = active.paused
+            ? 0
+            : Math.max(0, Date.now() - Number(active.lastPositionChange ?? Date.now()));
+          const positionMs = basePosition + elapsed;
+
+          const currentIndex = findMusicTimedLyricIndex(lines, positionMs);
+          const content =
+            "📜 **Live lyrics**\n\n" +
+            formatMusicSyncedLyrics(lines, positionMs) +
+            (currentIndex >= lines.length - 1 ? "\n\n✅ Песня почти закончилась." : "");
+
+          await interaction.editReply({ content }).catch(() => {
+            stopped = true;
+          });
+
+          if (stopped || currentIndex >= lines.length - 1) {
+            const timer = this.lyricsSyncTimers.get(token);
+            if (timer) clearInterval(timer);
+            this.lyricsSyncTimers.delete(token);
+          }
+        };
+
+        await interaction.reply({
+          content: "📜 **Live lyrics**\n\n" + formatMusicSyncedLyrics(lines, Number(player.lastPosition ?? 0)),
+          ephemeral: true
+        });
+
+        const timer = setInterval(() => { void update(); }, 2000);
+        this.lyricsSyncTimers.set(token, timer);
+        timer.unref();
+        await update();
+      } catch (error) {
+        logger.warn("Music synced lyrics lookup failed", {
+          guildId: interaction.guild!.id,
+          error: String(error)
+        });
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({
+            content: "Не удалось получить синхронизированный текст трека.",
+            ephemeral: true
+          });
+        }
+      }
+      return;
+    }
+
     if (action === "status") {
       const configuredSources = [
         ["YouTube", true],
