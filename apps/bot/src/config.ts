@@ -44,6 +44,12 @@ function required(name: string): string {
   return value;
 }
 
+function requiredNonBlank(name: string): string {
+  const value = process.env[name];
+  if (!value?.trim()) throw new Error(`Missing required environment variable: ${name}`);
+  return value;
+}
+
 function port(name: string, fallback: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
@@ -170,7 +176,7 @@ export function loadConfig(): AppConfig {
     healthPort: port("HEALTH_PORT", 3001),
     managementApiHost,
     managementApiPort: port("MANAGEMENT_API_PORT", 3002),
-    managementApiKey: required("MANAGEMENT_API_KEY"),
+    managementApiKey: requiredNonBlank("MANAGEMENT_API_KEY"),
     databaseUrl: required("DATABASE_URL"),
     lavalinkHost: process.env.LAVALINK_HOST ?? "127.0.0.1",
     lavalinkPort: port("LAVALINK_PORT", 2333),
