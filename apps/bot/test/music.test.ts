@@ -1,7 +1,14 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, chunkMusicFilterActions, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicSearchProvider, resolveMusicSearchRequest, chunkMusicLyrics, musicLyricsPageCount, normalizeMusicLyricsPage, isValidMusicLyricsPage, normalizeMusicTimedLyrics, findMusicTimedLyricIndex, formatMusicSyncedLyrics, normalizeMusicPitch, normalizeMusicSpeed, normalizeMusicEqBand, normalizeMusicEqGain, MUSIC_EQ_BAND_COUNT, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, chunkMusicFilterActions, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicSearchProvider, resolveMusicSearchRequest, chunkMusicLyrics, musicLyricsPageCount, normalizeMusicLyricsPage, isValidMusicLyricsPage, normalizeMusicTimedLyrics, findMusicTimedLyricIndex, formatMusicSyncedLyrics, normalizeMusicPitch, normalizeMusicSpeed, normalizeMusicEqBand, normalizeMusicEqGain, MUSIC_EQ_BAND_COUNT, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack, isMusicAppleMusicConfigured } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd, toggleMusicDistortion } from "../src/modules/music.js";
+
+test("Apple Music diagnostics require both provider enablement and API token", () => {
+  assert.equal(isMusicAppleMusicConfigured("false", "token"), false);
+  assert.equal(isMusicAppleMusicConfigured("true", ""), false);
+  assert.equal(isMusicAppleMusicConfigured("true", "   "), false);
+  assert.equal(isMusicAppleMusicConfigured("true", "token"), true);
+});
 
 test("music controls require the same voice channel unless Manage Server is granted", () => {
   assert.equal(canControlMusic("voice-1", "voice-1", false), true);
