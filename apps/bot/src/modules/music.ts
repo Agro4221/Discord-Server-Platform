@@ -95,6 +95,27 @@ export function shouldInvalidateMusicPlaylistContinuation(
   return Boolean(continuationPlaylistId) && continuationPlaylistId === editedPlaylistId;
 }
 
+export type MusicAutoplayTrackLike = {
+  info: {
+    identifier?: string;
+    uri?: string | null;
+  };
+};
+
+export function isMusicAutoplayCandidateAllowed<T extends MusicAutoplayTrackLike>(
+  track: T,
+  excludedIdentifiers: ReadonlySet<string>,
+  excludedUris: ReadonlySet<string>
+): boolean {
+  const identifier = track.info.identifier?.trim();
+  const uri = typeof track.info.uri === "string" ? track.info.uri.trim() : "";
+  if (identifier && excludedIdentifiers.has(identifier)) return false;
+  if (uri && excludedUris.has(uri)) return false;
+  return true;
+}
+
+export const MUSIC_AUTOPLAY_RECENT_HISTORY_LIMIT = 20;
+
 export function mergeMusicPlaylistTracks<T>(
   target: readonly T[],
   source: readonly T[],
@@ -3044,8 +3065,8 @@ export class Music implements PlatformModule {
   private async recordHistory(guildId: string, track: Track): Promise<void> {
     const requesterId = typeof track.requester?.id === "string" ? track.requester.id : null;
     await this.db.query(
-      "INSERT INTO music_history(guild_id,bot_identity_id,requester_id,title,author,url,duration_ms) VALUES($1,$2,$3,$4,$5,$6,$7)",
-      [guildId,this.config.botIdentityId,requesterId,String(track.info.title ?? "Unknown track").slice(0,500),String(track.info.author ?? "").slice(0,300),(track.info.uri ?? null) as string | null,Math.max(0,Math.trunc(Number(track.info.duration ?? 0)))]
+      "INSERT INTO music_history(guild_id,bot_identity_id,requester_id,identifier,title,author,url,duration_ms) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
+      [guildId,this.config.botIdentityId,requesterId,String(track.info.identifier ?? "").slice(0,300) || null,String(track.info.title ?? "Unknown track").slice(0,500),String(track.info.author ?? "").slice(0,300),(track.info.uri ?? null) as string | null,Math.max(0,Math.trunc(Number(track.info.duration ?? 0)))]
     );
     await this.db.query(
       "DELETE FROM music_history WHERE id IN (SELECT id FROM music_history WHERE guild_id=$1 AND bot_identity_id=$2 ORDER BY played_at DESC,id DESC OFFSET 200)",
@@ -4150,13 +4171,38 @@ export class Music implements PlatformModule {
       const seed = `${lastPlayedTrack.info.author ?? ""} ${lastPlayedTrack.info.title ?? ""}`.trim();
       if (!seed) return;
 
+      const recent = await this.db.query<{ identifier: string | null; url: string | null }>(
+        "SELECT identifier,url FROM music_history WHERE guild_id=$1 AND bot_identity_id=$2 ORDER BY played_at DESC,id DESC LIMIT $3",
+        [player.guildId,this.config.botIdentityId,MUSIC_AUTOPLAY_RECENT_HISTORY_LIMIT]
+      );
+
+      const excludedIdentifiers = new Set<string>();
+      const excludedUris = new Set<string>();
+      const addIdentifier = (value: unknown) => {
+        if (typeof value === "string" && value.trim()) excludedIdentifiers.add(value.trim());
+      };
+      const addUri = (value: unknown) => {
+        if (typeof value === "string" && value.trim()) excludedUris.add(value.trim());
+      };
+
+      addIdentifier(lastPlayedTrack.info.identifier);
+      addUri(lastPlayedTrack.info.uri);
+      for (const track of player.queue.tracks) {
+        addIdentifier(track.info.identifier);
+        addUri(track.info.uri);
+      }
+      for (const row of recent.rows) {
+        addIdentifier(row.identifier);
+        addUri(row.url);
+      }
+
       const result = await player.search(
         { query: seed, source: "ytsearch" },
         this.client?.user
       );
 
       const candidate = result.tracks.find(
-        (track) => track.info.identifier !== lastPlayedTrack.info.identifier
+        (track) => isMusicAutoplayCandidateAllowed(track, excludedIdentifiers, excludedUris)
       );
       if (!candidate) return;
 
