@@ -264,6 +264,18 @@ export function isMusicFilterAction(value: string): value is MusicFilterAction {
   return (MUSIC_FILTER_ACTIONS as readonly string[]).includes(value);
 }
 
+export function chunkMusicFilterActions(
+  actions: readonly MusicFilterAction[],
+  chunkSize = 5
+): MusicFilterAction[][] {
+  const safeChunkSize = Math.max(1, Math.floor(chunkSize));
+  const chunks: MusicFilterAction[][] = [];
+  for (let index = 0; index < actions.length; index += safeChunkSize) {
+    chunks.push([...actions.slice(index, index + safeChunkSize)]);
+  }
+  return chunks;
+}
+
 export function nextMusicRepeatMode(mode: MusicRepeatMode): MusicRepeatMode {
   if (mode === "off") return "track";
   if (mode === "track") return "queue";
@@ -1351,23 +1363,13 @@ export class Music implements PlatformModule {
       nightcore: "Nightcore",
       "8d": "8D"
     };
-    return [
+    return chunkMusicFilterActions(MUSIC_FILTER_ACTIONS).map((actions) =>
       new ActionRowBuilder<ButtonBuilder>().addComponents(
-        ...MUSIC_FILTER_ACTIONS.slice(0, 5).map((action) =>
-          new ButtonBuilder().setCustomId("dsp:music:filter:" + action).setLabel(labels[action]).setStyle(ButtonStyle.Secondary)
-        )
-      ),
-      new ActionRowBuilder<ButtonBuilder>().addComponents(
-        ...MUSIC_FILTER_ACTIONS.slice(5, 10).map((action) =>
-          new ButtonBuilder().setCustomId("dsp:music:filter:" + action).setLabel(labels[action]).setStyle(ButtonStyle.Secondary)
-        )
-      ),
-      new ActionRowBuilder<ButtonBuilder>().addComponents(
-        ...MUSIC_FILTER_ACTIONS.slice(10).map((action) =>
+        ...actions.map((action) =>
           new ButtonBuilder().setCustomId("dsp:music:filter:" + action).setLabel(labels[action]).setStyle(ButtonStyle.Secondary)
         )
       )
-    ];
+    );
   }
 
   private async favorite(interaction: ChatInputCommandInteraction): Promise<void> {
