@@ -336,3 +336,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-05 — Compose deployment snapshot
 - Static deployment validation now rejects change-me PostgreSQL/Lavalink secret fallbacks and supplies ephemeral secrets for Compose config checks.
 - Live release-gate case remains: start the platform from a fresh local/VPS .env, verify generated secrets are non-default, and confirm service startup/restart continuity.
+
+## 2026-10-05 — Source hygiene snapshot
+- Repaired secret-scanner regex boundaries and added GitHub fine-grained token/AWS access-key patterns.
+- Positive/negative synthetic fixtures passed locally against the scanner logic.
+- CI verification remains pending for the branch head.
