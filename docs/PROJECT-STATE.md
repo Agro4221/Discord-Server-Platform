@@ -14,7 +14,7 @@ development
 `78a14d4cbb6b15ade0e7111e266eeff970a674e4`
 
 ## Current phase
-Release candidate — functional development frozen for live acceptance. Current development HEAD is CI-verified; remaining release-gate work is live Discord/runtime validation. Broader feature expansion is post-RC work, not a reason to keep extending the release indefinitely.
+Technical implementation freeze — current agreed feature scope is implemented; next phase is verification and live acceptance. Remaining work is tests/real-environment validation, not foundational feature construction.
 
 ## Working subsystems
 - Discord Core with typed event bus and module lifecycle.
@@ -42,15 +42,15 @@ Release candidate — functional development frozen for live acceptance. Current
 - Docker Compose / Dockerfiles for local-to-VPS topology.
 - Native Windows local runtime for low-overhead gaming/streaming, with single-Lavalink default and opt-in Dashboard/second Lavalink.
 
-## Remaining release-gate / post-RC work
+## Remaining verification work
 - Live Discord E2E smoke test on the user's real test server.
 - Lavalink restart/resume and multi-node failover validation in the real runtime.
 - Multi-bot fleet takeover validation with real secondary identities.
 - Windows native launcher/runtime validation on the actual gaming/streaming PC.
-- VPS clean-host install/upgrade acceptance and reverse-proxy production drill.
+- VPS clean-host install/upgrade acceptance and secure remote-access/reverse-proxy drill.
 - Full E2E/chaos/soak/security runs in a controlled environment.
 
-The deeper AutoMod, Security and Automation catalogs and additional Music providers remain valid post-RC expansion work. They are deliberately not release blockers for this candidate.
+The current implementation includes the agreed Automation action breadth, expanded AutoMod detector set, Spotify/Yandex Music provider wiring through LavaSrc, optional Docker Lavalink2 failover, native/Docker Fleet handling and VPS bootstrap/upgrade secret repair. Further feature additions after this freeze require an explicit scope decision.
 
 ## Verification
 - GitHub Actions CI runs on Node.js 24.17.
@@ -621,3 +621,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Replaced the outdated implementation-order document with a current RC/completion strategy.
 - Compressed `docs/CHAT-CONTEXT.md` into a current handoff snapshot and aligned `docs/TEST-STRATEGY.md` with the checks the repository actually runs.
 - This cleanup does not remove any implemented feature or administrative capability.
+
+
+## 2026-10-05 — Technical implementation freeze
+- Closed the known code-level completion gaps identified during the pre-test pass: Automation warn + create-channel, Automation scheduler guild-index bug, persisted moderation channel-lock cleanup, expanded AutoMod detectors, Spotify/Yandex Music provider wiring, Docker optional Lavalink2 topology, VPS bootstrap/upgrade secret repair and cleanup of legacy Dashboard implementations/contracts.
+- Current work now switches from feature construction to verification. The next objective is to exercise the implemented system systematically and convert every real failure into a regression fix.
