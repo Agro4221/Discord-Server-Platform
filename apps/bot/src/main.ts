@@ -490,7 +490,15 @@ async function main(): Promise<void> {
       create: async (guildId, channelId, url, intervalSeconds, options) =>
         notifications.addFeed(guildId, channelId, url, intervalSeconds, options),
       update: async (guildId, feedId, input) => notifications.updateFeed(guildId, feedId, input),
-      delete: async (guildId, feedId) => notifications.deleteFeed(guildId, feedId)
+      delete: async (guildId, feedId) => notifications.deleteFeed(guildId, feedId),
+      testFeed: async (guildId, feedId) => notifications.testFeed(guildId, feedId),
+      listTikTokFeeds: async (guildId) => notifications.listTikTokFeeds(guildId),
+      createTikTokFeed: async (guildId, channelId, credentialId, intervalSeconds, options) =>
+        notifications.addTikTokFeed(guildId, channelId, credentialId, intervalSeconds, options),
+      setTikTokFeedEnabled: async (guildId, feedId, enabled) =>
+        notifications.setTikTokFeedEnabled(guildId, feedId, enabled),
+      deleteTikTokFeed: async (guildId, feedId) => notifications.deleteTikTokFeed(guildId, feedId),
+      testTikTokFeed: async (guildId, feedId) => notifications.testTikTokFeed(guildId, feedId)
     },
     streamAlerts: {
       list: async (guildId) => streamAlerts.list(guildId),
