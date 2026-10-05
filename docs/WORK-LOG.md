@@ -728,3 +728,13 @@ Never write credentials, tokens or private user data here.
 - CI #2098 passed completely: deployment contract, Typecheck, Test bot, domain build, bot build and Dashboard build.
 - Final source checkpoint: `e512c4f57fd23df31934cefd192cd46fe7ffbe5d`.
 - Next single Music slice: **Playlist add/remove/reorder individual tracks**.
+
+## 2026-10-05 — Music playlist track management
+- Completed individual track management for Music playlists.
+- Extended the existing `/music playlist` command with `view`, `remove` and `move` actions; track positions are 1-based and bounded to the existing 500-track playlist limit.
+- `view` shows numbered track entries and safely bounds output for Discord message limits, making later remove/reorder actions practical from Discord itself.
+- Personal and shared playlist permissions remain consistent with the previous slice: owners can edit their own playlists, while DJ or Manage Server can edit shared playlists owned by others.
+- Removal and reordering use immutable helper functions with regression coverage, preserving the original array and rejecting invalid positions.
+- CI #2103 passed completely: deployment/observability contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `ba9114b24b5c759237623a8a4d028402fc0b8a62`.
+- Next single Music slice: **Playlist search/filtering**.
