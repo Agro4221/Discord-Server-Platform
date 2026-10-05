@@ -1015,11 +1015,13 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
               { name: "Add current", value: "add" },
               { name: "Remove track", value: "remove" },
               { name: "Move track", value: "move" },
+              { name: "Merge", value: "merge" },
               { name: "Play", value: "play" }
             ).setRequired(true)
           )
           .addStringOption((o) => o.setName("name").setDescription("Playlist name").setMaxLength(80))
           .addStringOption((o) => o.setName("query").setDescription("Search text for playlist names").setMaxLength(80))
+          .addStringOption((o) => o.setName("source").setDescription("Source playlist name for merge").setMaxLength(80))
           .addIntegerOption((o) => o.setName("track").setDescription("Track number (1-based)").setMinValue(1).setMaxValue(500))
           .addIntegerOption((o) => o.setName("to").setDescription("New position for the track (1-based)").setMinValue(1).setMaxValue(500))
           .addBooleanOption((o) => o.setName("shuffle").setDescription("Shuffle tracks when loading the playlist"))
