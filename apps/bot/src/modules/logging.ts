@@ -47,6 +47,13 @@ const DEFAULTS: LoggingConfig = {
   bans: true
 };
 
+type LoggingConfigCacheEntry = {
+  config: LoggingConfig;
+  expiresAt: number;
+};
+
+const CONFIG_CACHE_TTL_MS = 10_000;
+
 export class Logging implements PlatformModule {
   readonly name = "logging";
   private client?: Client;
