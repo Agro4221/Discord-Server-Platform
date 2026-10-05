@@ -119,7 +119,7 @@ async function main(): Promise<void> {
   const communityTools = new CommunityTools(database);
   const logging = new Logging(database);
   const starboard = new Starboard(database);
-  const automation = new AutomationEngine(database);
+  const automation = new AutomationEngine(database, moderation);
   const security = new Security(database);
   const notifications = new Notifications(database);
   const streamAlerts = new StreamAlerts(database, config.streamAlerts);
