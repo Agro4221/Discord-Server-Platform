@@ -1358,3 +1358,10 @@ Never write credentials, tokens or private user data here.
 - Deployment contract now asserts the internal Management API port and rejects insecure fallbacks across the Compose file.
 - Source checkpoints: 2f318068f5ad4b1d06102a98b5b97cfce072395f (Compose), 8a5ee949145093fc53d72109670d8c2e5e6548dc (contract).
 - Fresh CI is not visible yet; local/VPS runtime smoke still needs live execution.
+## 2026-10-05 — First-run Control Center health gate fixed
+- Found a concrete bootstrap deadlock: the bot intentionally stays running in degraded state when Discord credentials are not configured, but Docker used /health as a strict readiness check, keeping Dashboard blocked behind bot: service_healthy.
+- Split health semantics: /health now returns 200 once the database is ready (control-plane liveness), while /ready remains strict and returns 200 only when the overall bot state is ready.
+- This preserves the intended first-run flow: Control Center can start, register the Discord bot in Bot Fleet, and the bot can later become /ready without requiring credentials before Dashboard startup.
+- Added health regression coverage for database-ready/no-Discord, database-starting, strict /ready and unknown paths.
+- Source checkpoints: eab7ee52df98991aee358600dd59358cf28553f1 (health implementation), fbf987fb95606f0ce4c3266e1e574f6b3b7011bf (tests).
+- Fresh CI is not visible yet; live first-run Docker startup remains a release-gate check.
