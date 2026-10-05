@@ -52,6 +52,7 @@ export class Logging implements PlatformModule {
   private client?: Client;
   private auditLog?: AuditLog;
   private unsubscribe?: () => void;
+  private readonly configCache = new Map<string, LoggingConfigCacheEntry>();
 
   constructor(private readonly db: Database) {}
 
@@ -88,6 +89,7 @@ export class Logging implements PlatformModule {
     this.unsubscribe = undefined;
     this.client = undefined;
     this.auditLog = undefined;
+    this.configCache.clear();
   }
 
   async configure(guildId: string, patch: Partial<LoggingConfig>): Promise<LoggingConfig> {
@@ -124,10 +126,18 @@ export class Logging implements PlatformModule {
       [guildId, next.enabled]
     );
 
+    this.configCache.set(guildId, {
+      config: next,
+      expiresAt: Date.now() + CONFIG_CACHE_TTL_MS
+    });
     return next;
   }
 
   async getConfig(guildId: string): Promise<LoggingConfig> {
+    const now = Date.now();
+    const cached = this.configCache.get(guildId);
+    if (cached && cached.expiresAt > now) return cached.config;
+
     const result = await this.db.query<{
       enabled: boolean;
       channel_id: string | null;
@@ -150,9 +160,16 @@ export class Logging implements PlatformModule {
     );
 
     const row = result.rows[0];
-    if (!row) return { ...DEFAULTS };
+    if (!row) {
+      const config = { ...DEFAULTS };
+      this.configCache.set(guildId, {
+        config,
+        expiresAt: now + CONFIG_CACHE_TTL_MS
+      });
+      return config;
+    }
 
-    return {
+    const config: LoggingConfig = {
       enabled: row.enabled,
       channelId: row.channel_id,
       messageDelete: row.message_delete,
@@ -169,6 +186,11 @@ export class Logging implements PlatformModule {
       roleUpdate: row.role_update,
       bans: row.bans
     };
+    this.configCache.set(guildId, {
+      config,
+      expiresAt: now + CONFIG_CACHE_TTL_MS
+    });
+    return config;
   }
 
   async handlePrefixCommand(message: Message, commandName: string, args: string[]): Promise<boolean> {
