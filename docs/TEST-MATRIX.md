@@ -362,3 +362,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-05 — VPS secret validation snapshot
 - Static deployment validation protects whitespace-aware critical secret handling in installer and upgrade scripts.
 - Live release-gate case: pre-seed a VPS .env with whitespace-only critical secrets and verify install regenerates them / upgrade rejects them before compose startup.
+## 2026-10-05 — Native Windows launcher snapshot
+- Static deployment contract now protects the native first-run launcher, loopback Dashboard, configurable Management API port, resource caps and convenience entrypoints.
+- Live release-gate: clean Windows machine with Node.js, PostgreSQL and Java/Lavalink installed; run start.bat with no Discord credentials, then register through Control Center → Bot Fleet.
+- Live resource-gate: capture native-status.bat at idle, during music playback, Dashboard use, simultaneous guild/music activity and with game + OBS running.
