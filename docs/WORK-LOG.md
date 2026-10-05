@@ -1012,6 +1012,15 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Qobuz playback remains a release-gate validation item.
 - Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
 
+## 2026-10-05 — Music paginated lyrics navigation
+- Reworked the Music lyrics response into a paginated Discord UI.
+- Lyrics are chunked to a safe message size, preferring line boundaries and falling back to word boundaries.
+- Added previous/next navigation buttons with disabled edge states.
+- Pagination sessions are bound to guild, user and track and expire after five minutes.
+- Stale or cross-user navigation is rejected without exposing another user's lyrics session.
+- Added deterministic tests for chunking, page counts and page validation.
+- Source checkpoint: 32ebba6d2ef325dc9801bdaec01f02ebdbc9239e.
+
 ## 2026-10-05 — Music Tidal provider parity
 - Added an explicit Tidal Music search provider to /play, /music play and /music search.
 - Non-URL searches selected as Tidal use LavaSrc tdsearch; users can also use the explicit tdsearch: prefix from prefix/request-channel flows.
