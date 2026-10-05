@@ -641,3 +641,13 @@ Never write credentials, tokens or private user data here.
 - CI #2004 passed completely.
 - Final source checkpoint: 7ff06bf24613e8efc9d24fd95bcd214138c24e79.
 - Next single Music slice: Vote skip.
+
+
+## 2026-10-05 — Music Vote Skip
+- Added Vote Skip as a separate Music action while preserving DJ/Manage Server direct skip.
+- Votes are short-lived, bound to the current track identifier and de-duplicated by user.
+- Threshold is 60% of active human listeners in the current voice channel, with a minimum of one vote.
+- Added /vote-skip and /music vote-skip plus regression coverage for the threshold contract.
+- CI #2012 passed completely.
+- Final source checkpoint: a87bc7803d200b371332b136e7bfe732b03bbdfe.
+- Next single Music slice: Per-user request cooldown.
