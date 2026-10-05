@@ -1306,3 +1306,10 @@ Never write credentials, tokens or private user data here.
 - Combined with config validation, the Management API now has both a startup non-blank-secret guard and a directly testable request authorization contract.
 - Source checkpoint: `3211e31ed8e07d0b41b0d25995a81e45ebef5f91`.
 - Fresh CI remains unavailable on the current PR head.
+
+## 2026-10-05 — Dashboard mutation-route CSRF hardening
+- Audited Dashboard `app/api` mutation routes and found three concrete origin-check gaps: Help Page deletion, Moderation Preset mutation, and Role Automation creation.
+- Added `assertSameOrigin()` to those routes without changing their existing session/API-key forwarding model.
+- Added `scripts/check-dashboard-route-security.mjs` and wired it into CI; it scans Dashboard API routes and requires mutation handlers to contain an `assertSameOrigin()` call.
+- Source checkpoints: `ba3b4e5c3f6f79eaa03d84d0369c0c1e9d2eb9be`, `41c54ed4596896bac09f50e8ab2f3e708d4af7ff`, `6512a5658221614b6d9a4dadfe8e12cc33c3f76c`, CI contract `6f5cb19d2f38f46606a422c7b5b0fec167562b04`, checker `1fe226f405e1d596274d214a6e0664a112422fd4`.
+- Fresh CI is still not visible for the current PR head.
