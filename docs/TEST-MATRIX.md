@@ -354,3 +354,6 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-05 — Health deployment contract snapshot
 - Deployment contract now checks the intended /health liveness and /ready readiness semantics in addition to unit-level health tests.
 - Environment limitation: this session cannot execute Docker/network smoke tests due unavailable outbound DNS.
+## 2026-10-05 — Lavalink secret configuration snapshot
+- Deployment contract now rejects the predictable Lavalink password fallback and verifies the explicit environment binding.
+- Live release-gate case: start both Lavalink nodes with the launcher-generated secret and verify authenticated /version healthchecks succeed.
