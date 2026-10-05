@@ -7,6 +7,9 @@ function upstream(path: string): string {
 
 async function forward(request: Request, context: { params: Promise<{ guildId: string }> }, method: "GET" | "POST" | "DELETE") {
   if (!await currentSession()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (method !== "GET") {
+    try { assertSameOrigin(request); } catch { return NextResponse.json({ error: "bad_origin" }, { status: 403 }); }
+  }
   const { guildId } = await context.params;
   const input = method === "GET" || method === "DELETE" ? undefined : await request.text();
   const response = await fetch(upstream("/api/guilds/" + encodeURIComponent(guildId) + "/role-automation"), {
