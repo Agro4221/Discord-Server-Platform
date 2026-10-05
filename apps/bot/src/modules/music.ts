@@ -26,6 +26,7 @@ import type { AppConfig } from "../config.js";
 import type { BotIdentityRepository } from "../bot-identity.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
+import type { CommandPolicyService } from "../command-policy.js";
 import { logger } from "../logger.js";
 
 declare module "lavalink-client" {
@@ -252,12 +253,16 @@ export class Music implements PlatformModule {
   private readonly voteSkipSessions = new Map<string, { trackIdentifier: string; voters: Set<string>; expiresAt: number }>();
   private readonly searchSessions = new Map<string, { guildId: string; userId: string; tracks: Track[]; expiresAt: number }>();
   private searchSequence = 0;
+  private commandPolicy?: CommandPolicyService;
 
   constructor(
     private readonly db: Database,
     private readonly config: AppConfig,
-    private readonly identities: BotIdentityRepository
-  ) {}
+    private readonly identities: BotIdentityRepository,
+    commandPolicy?: CommandPolicyService
+  ) {
+    this.commandPolicy = commandPolicy;
+  }
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
@@ -2299,6 +2304,25 @@ export class Music implements PlatformModule {
     return true;
   }
 
+  private async controllerPolicyAllowed(
+    guildId: string,
+    action: string,
+    member: import("discord.js").GuildMember,
+    channelId: string
+  ): Promise<boolean> {
+    if (!this.commandPolicy) return true;
+    const commandName =
+      action === "loop-one" ? "repeat" :
+      action.startsWith("seek-") ? "seek" :
+      action.startsWith("volume-") ? "volume" :
+      action.startsWith("filter:") || action === "filters" ? "filter" :
+      action === "save-queue" ? "queue" :
+      action === "autoplay-toggle" ? "autoplay" :
+      action === "search" ? "play" :
+      action;
+    return this.commandPolicy.checkMemberAction(guildId, commandName, member, channelId);
+  }
+
   private async onInteraction(interaction: Interaction): Promise<void> {
     if (interaction.isModalSubmit() && interaction.customId === "dsp:music:save-queue" && interaction.guild) {
       const player = this.manager?.players.get(interaction.guild.id);
@@ -2426,6 +2450,11 @@ export class Music implements PlatformModule {
     }
 
     const action = interaction.customId.slice("dsp:music:".length);
+    if (!await this.controllerPolicyAllowed(interaction.guild.id, action, member, interaction.channelId)) {
+      await interaction.reply({ content: "Это действие запрещено политикой Music для твоей роли или канала.", ephemeral: true });
+      return;
+    }
+
     if (action === "autoplay-toggle") {
       if (!await this.canManageMusicMember(interaction.guild.id, member)) {
         await interaction.reply({ content: "Autoplay настраивается пользователями с DJ-ролью или Manage Server.", ephemeral: true });
