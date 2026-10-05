@@ -1192,18 +1192,26 @@ export class Music implements PlatformModule {
       }
       if (!player.connected) await player.connect();
 
-      let added = 0;
-      const itemsToLoad = (shouldShuffle ? shuffleMusicItems(stored) : stored).slice(0, MAX_PLAYLIST_TRACKS);
+      const maxQueuedPerUser = (await this.musicSettings(guildId)).maxQueuedPerUser;
+      const queuedByUser = countMusicQueuedByUser(player.queue.tracks, interaction.user.id);
+      const remainingSlots = remainingMusicQueueSlots(queuedByUser, maxQueuedPerUser);
+      if (remainingSlots === 0) {
+        await interaction.reply({ content: "⛔ Твой лимит ожидающих треков уже достигнут.", ephemeral: true });
+        return;
+      }
+
+      const itemsToLoad = (shouldShuffle ? shuffleMusicItems(stored) : stored).slice(
+        0,
+        remainingSlots === null ? MAX_PLAYLIST_TRACKS : remainingSlots
+      );
+      const builtTracks: Track[] = [];
       for (const item of itemsToLoad) {
         try {
           const built = this.manager?.utils.buildTrack(
             item as Parameters<LavalinkManager["utils"]["buildTrack"]>[0],
             interaction.user
           );
-          if (built) {
-            player.queue.add(built);
-            added += 1;
-          }
+          if (built) builtTracks.push(built);
         } catch (error) {
           logger.warn("Saved music track restore failed", {
             guildId,
@@ -1213,11 +1221,18 @@ export class Music implements PlatformModule {
         }
       }
 
+      let added = 0;
+      for (const built of builtTracks) {
+        player.queue.add(built);
+        added += 1;
+      }
+
       if (!player.playing && added > 0) await player.play();
       await this.persistPlayer(player);
       await this.syncController(player);
+      const limitedSuffix = remainingSlots !== null && stored.length > added ? " — в пределах лимита пользователя" : "";
       await interaction.reply({
-        content: "▶️ В очередь загружено **" + added + "** треков из **" + name + "**" + (shouldShuffle ? " в случайном порядке" : "") + ".",
+        content: "▶️ В очередь загружено **" + added + "** треков из **" + name + "**" + (shouldShuffle ? " в случайном порядке" : "") + limitedSuffix + ".",
         ephemeral: true
       });
       return;
@@ -2290,8 +2305,17 @@ export class Music implements PlatformModule {
         await interaction.reply({ content: "Результат больше недоступен.", ephemeral: true });
         return;
       }
+      const maxQueuedPerUser = (await this.musicSettings(interaction.guild.id)).maxQueuedPerUser;
+      const queuedByUser = countMusicQueuedByUser(player.queue.tracks, interaction.user.id);
+      const remainingSlots = remainingMusicQueueSlots(queuedByUser, maxQueuedPerUser);
+      if (remainingSlots === 0) {
+        this.searchSessions.delete(token);
+        await interaction.update({ content: "⛔ Твой лимит ожидающих треков уже достигнут.", embeds: [], components: [] });
+        return;
+      }
       player.queue.add(selected);
       if (!player.playing) await player.play();
+      this.requestCooldownUntil.set(interaction.guild.id + ":" + interaction.user.id, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
       await this.persistPlayer(player);
       await this.syncController(player);
       this.searchSessions.delete(token);
