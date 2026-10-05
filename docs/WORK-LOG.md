@@ -1369,3 +1369,10 @@ Never write credentials, tokens or private user data here.
 - Deployment contract now statically verifies that /health uses database readiness for control-plane liveness while /ready keeps strict full-readiness semantics.
 - Source checkpoint: fbb3ba0e5aa93ff5431a03af65a6b46b41d8bf9c.
 - Container-side smoke execution could not be run in this environment because outbound DNS/network access is unavailable; CI remains the authoritative automated gate.
+## 2026-10-05 — Lavalink password fallback hardening
+- Found a remaining predictable-password fallback in infrastructure/lavalink/application.yml: LAVALINK_SERVER_PASSWORD defaulted to change-me-local.
+- Removed the default so standalone Lavalink startup now requires the explicit environment secret; Docker Compose already supplies the same secret to both Lavalink nodes.
+- Deployment contract now rejects change-me-local in the Lavalink config and requires the explicit ${LAVALINK_SERVER_PASSWORD} binding.
+- Current source checkpoints: Lavalink config b91e2ab6db53949c97aad28091712de74c8e4a27; deployment contract ac703f4941fcfda2749d7b9129d0e139ae32e5c6.
+- This matches current Lavalink configuration guidance that LAVALINK_SERVER_PASSWORD is an environment-variable setting and environment variables take precedence over application.yml. citeturn475136search0turn475136search1
+- Fresh CI is still not visible; live Lavalink startup remains a release-gate check.
