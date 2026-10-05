@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -10,6 +10,12 @@ test("music controls require the same voice channel unless Manage Server is gran
   assert.equal(canControlMusic("voice-2", null, false), false);
   assert.equal(canControlMusic(null, "voice-1", true), true);
   assert.equal(canControlMusic("voice-2", "voice-1", true), true);
+});
+
+test("Music playlist visibility normalizes to personal or shared", async () => {
+  const { normalizeMusicPlaylistVisibility } = await import("../src/modules/music.js");
+  assert.equal(normalizeMusicPlaylistVisibility(false), "personal");
+  assert.equal(normalizeMusicPlaylistVisibility(true), "shared");
 });
 
 test("Music request approval mode accepts only off or approval", () => {
