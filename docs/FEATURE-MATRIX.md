@@ -157,16 +157,16 @@
 
 | Функция | План |
 |---|---|
-| Multi-result search picker | 🟡 | Search returns several candidates with buttons/select instead of silently choosing the first result |
-| Queue remove by track | 🟡 |
-| Queue remove by range | 🟡 |
-| Queue move/reorder | 🟡 |
-| Queue insert / add to front | 🟡 |
-| Skip-to track | 🟡 |
-| Clear queue without destroying player | 🟡 |
-| Queue history / recently played | 🟡 |
-| Show requester per queued track | 🟡 |
-| Queue export / share | 🟡 |
+| Multi-result search picker | ✅ | Music search returns up to five candidates and lets the requester choose one with a short-lived picker session | Search returns several candidates with buttons/select instead of silently choosing the first result |
+| Queue remove by track | ✅ | Queue controls support position-based removal |
+| Queue remove by range | ✅ | Queue controls support start/end range removal |
+| Queue move/reorder | ✅ | Queue controls support arbitrary destination and move-to-front |
+| Queue insert / add to front | ✅ | Existing controls support move-to-front; regular insertion is provided by play/search |
+| Skip-to track | ✅ | Music skip-to trims the queue to the selected position and starts it |
+| Clear queue without destroying player | ✅ | Queue clear removes pending tracks while preserving current playback |
+| Queue history / recently played | ✅ | Recent playback history is persisted/exposed by Music |
+| Show requester per queued track | ✅ | Queue pages display requester mention when available |
+| Queue export / share | ✅ | Queue supports copy-friendly Share output and full JSON Export attachment |
 | Save current queue as playlist | 🟡 |
 | Load playlist with optional shuffle | 🟡 |
 
@@ -174,15 +174,15 @@
 
 | Функция | План |
 |---|---|
-| Emoji-only compact controls where appropriate | 🟡 |
-| Explicit **Loop One / Зациклить трек** button | 🟡 | Separate controller button; must clearly distinguish from queue repeat |
-| Visual progress / elapsed time in controller | 🟡 |
+| Emoji-only compact controls where appropriate | ✅ | Controller uses emoji-first compact controls for common actions |
+| Explicit **Loop One / Зациклить трек** button | ✅ | Dedicated controller button toggles track repeat independently of Queue Loop | Separate controller button; must clearly distinguish from queue repeat |
+| Visual progress / elapsed time in controller | ✅ | Controller exposes current progress and elapsed position |
 | Previous / rewind / forward controls | ✅ |
 | Queue / lyrics / favorite controls | ✅ |
 | Filters / FX quick-access button | 🟡 |
 | Save queue button | 🟡 |
 | Radio/autoplay button | 🟡 |
-| Controller state refresh after every action | 🟡 |
+| Controller state refresh after every action | ✅ | Music actions persist state and resync the controller message |
 
 #### DJ / permissions / anti-abuse
 
