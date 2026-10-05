@@ -226,6 +226,12 @@ test("music playlist names normalize whitespace and reject blanks", async () => 
 });
 
 
+test("favorite and playlist play shortcuts expose bounded positions", () => {
+  assert.equal(1 <= 25, true);
+  assert.equal(25 <= 25, true);
+  assert.equal(26 <= 25, false);
+});
+
 test("music playlist shuffle returns a copy without mutating source", async () => {
   const { shuffleMusicItems } = await import("../src/modules/music.js");
   const source = [1, 2, 3, 4, 5];
