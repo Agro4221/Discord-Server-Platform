@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { currentSession } from "../../../../../../lib/auth";
+import { assertSameOrigin, currentSession } from "../../../../../../lib/auth";
 
 function upstream(path: string): string {
   return new URL(path, process.env.MANAGEMENT_API_URL ?? "http://127.0.0.1:3002").toString();
 }
 
-export async function DELETE(_request: Request, context: { params: Promise<{ guildId: string; slug: string }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ guildId: string; slug: string }> }) {
   if (!await currentSession()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  try { assertSameOrigin(request); } catch { return NextResponse.json({ error: "bad_origin" }, { status: 403 }); }
   const { guildId, slug } = await context.params;
   const response = await fetch(upstream("/api/guilds/" + encodeURIComponent(guildId) + "/help-pages/" + encodeURIComponent(slug)), {
     method: "DELETE",
