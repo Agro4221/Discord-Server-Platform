@@ -1406,3 +1406,12 @@ Never write credentials, tokens or private user data here.
 - Added docs/RESOURCE-REQUIREMENTS.md and native-status.bat for PC tier planning and real working-set measurement.
 - Native launcher/resource contract is protected by scripts/check-deployment-contract.mjs.
 - Live Windows acceptance remains required; PowerShell/Docker smoke execution was not possible in this environment because external DNS/network access is unavailable.
+## 2026-10-05 — Single BAT + first-run dependency bootstrap
+- Simplified native Windows startup to exactly one root batch file: start.bat. Removed the obsolete start-native.bat, control-center.bat, stop.bat, native-status.bat and Docker start-local.bat wrappers.
+- start.bat now drives the native PowerShell launcher directly; default mode starts PostgreSQL, one Lavalink, bot and Control Center. Optional behavior uses the same file: -NoDashboard, -Lavalink2, -Rebuild, -Down, -Status.
+- First-run bootstrap now installs missing Node.js LTS, PostgreSQL 17 and Microsoft OpenJDK 17 through WinGet, installs npm dependencies, creates the default local database and downloads Lavalink 4.2.2.
+- Lavalink 4.2.2 downloads are pinned to the official release and SHA-256 checked; an existing JAR is also checked and replaced when its checksum differs.
+- Native Dashboard is loopback-only and follows the configured local port.
+- Resource estimates were recalculated for DSP-only workload, excluding games, OBS, browser, Discord client and other user applications: ~0.7–1.7 GiB typical, ~2–2.5 GiB practical reserve for the standard full stack.
+- Hardware tiers: 4 GB minimum / 8 GB recommended / 16 GB comfortable / 32 GB maximum-practical headroom for unusually large multi-identity deployments.
+- Added a CI PowerShell syntax check and deployment contract for the single-launcher/dependency-bootstrap model.
