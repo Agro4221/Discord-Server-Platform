@@ -674,3 +674,6 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Preserve the split between host-published Management API port and container-internal port: external mapping is configurable, internal bot/Dashboard port is 3002.
 - Do not reintroduce change-me credential fallbacks into any Compose service.
 - This is runtime/recovery hardening; no new user-facing feature is being introduced.
+## 2026-10-05 — First-run Control Center bootstrap fix
+- Keep /health and /ready semantically separate: /health must permit the Control Center to come up after database readiness, while /ready represents full bot readiness.
+- Do not restore strict Discord readiness semantics to the Docker healthcheck, because the supported first-run flow intentionally starts without Discord credentials.
