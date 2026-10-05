@@ -548,3 +548,8 @@ Live validation, требующая пользовательского окру�
 ### 2026-10-05 — Music phase begins after platform-wide parity pass
 - Platform-wide unfinished non-Music high-value slices are now largely closed/reconciled.
 - Next single implementation slice: **Music — skip-to track**.
+
+
+### 2026-10-05 — Current checkpoint after Music Filters
+- Filters / FX quick-access is complete and CI-verified (#1990).
+- Next single module: Save queue button.
