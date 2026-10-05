@@ -340,7 +340,7 @@ function normalizeFeedEntries(document: Record<string, any>): { key: string; tit
   });
 }
 
-async function assertSafeFeedUrl(raw: string): Promise<void> {
+export async function assertSafeFeedUrl(raw: string): Promise<void> {
   let url: URL;
   try {
     url = new URL(raw);
