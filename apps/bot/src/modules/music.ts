@@ -2572,6 +2572,7 @@ export class Music implements PlatformModule {
       return;
     }
     if (!await this.canControl(interaction, player.voiceChannelId)) return;
+    this.playlistContinuations.delete(interaction.guildId!);
     await player.stopPlaying();
     await interaction.reply({ content: "⏹️ Остановлено.", ephemeral: true });
   }
@@ -2965,6 +2966,7 @@ export class Music implements PlatformModule {
       const from = interaction.options.getInteger("from");
       const end = interaction.options.getInteger("end");
       if (action === "clear") {
+        this.playlistContinuations.delete(interaction.guild.id);
         queue.splice(0, queue.length);
         await this.persistPlayer(player);
         await this.syncController(player);
@@ -3706,12 +3708,34 @@ export class Music implements PlatformModule {
         voice_channel_id: string | null;
         text_channel_id: string | null;
         state: unknown;
+        playlist_id: string | null;
+        playlist_next_index: number;
+        playlist_order: unknown;
+        playlist_requester_user_id: string | null;
       }>(
-        "SELECT voice_channel_id,text_channel_id,state FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
+        "SELECT voice_channel_id,text_channel_id,state,playlist_id,playlist_next_index,playlist_order,playlist_requester_user_id FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
         [guildId, this.config.botIdentityId]
       );
       const savedRow = saved.rows[0];
       if (!savedRow?.voice_channel_id) continue;
+
+      if (
+        savedRow.playlist_id &&
+        savedRow.playlist_requester_user_id &&
+        Number.isInteger(Number(savedRow.playlist_next_index)) &&
+        Number(savedRow.playlist_next_index) >= 0
+      ) {
+        this.playlistContinuations.set(guildId, {
+          playlistId: savedRow.playlist_id,
+          nextIndex: Number(savedRow.playlist_next_index),
+          order: Array.isArray(savedRow.playlist_order) && savedRow.playlist_order.every((value) => Number.isInteger(Number(value)))
+            ? savedRow.playlist_order.map((value) => Number(value))
+            : null,
+          requesterUserId: savedRow.playlist_requester_user_id
+        });
+      } else {
+        this.playlistContinuations.delete(guildId);
+      }
 
       let savedState: { repeatMode?: unknown } = {};
       try {
