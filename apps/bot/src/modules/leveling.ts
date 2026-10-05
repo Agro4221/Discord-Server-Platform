@@ -23,11 +23,24 @@ type LevelSettings = {
   dailyXpCap: number;
 };
 
+type SettingsCacheEntry = {
+  settings: LevelSettings;
+  expiresAt: number;
+};
+
+type ExclusionCacheEntry = {
+  channels: Set<string>;
+  roles: Set<string>;
+  expiresAt: number;
+};
+
 export class Leveling implements PlatformModule {
   readonly name = "leveling";
   private unsubscribe?: () => void;
   private voiceTimer?: NodeJS.Timeout;
   private readonly cooldowns = new Map<string, number>();
+  private readonly settingsCache = new Map<string, SettingsCacheEntry>();
+  private readonly exclusionCache = new Map<string, ExclusionCacheEntry>();
   private messageCounter = 0;
   private client?: ModuleContext["client"];
 
@@ -51,6 +64,8 @@ export class Leveling implements PlatformModule {
     if (this.voiceTimer) clearInterval(this.voiceTimer);
     this.voiceTimer = undefined;
     this.cooldowns.clear();
+    this.settingsCache.clear();
+    this.exclusionCache.clear();
     this.messageCounter = 0;
     this.client = undefined;
   }
@@ -123,6 +138,7 @@ export class Leveling implements PlatformModule {
         cooldown_seconds=EXCLUDED.cooldown_seconds,
         announce_level_up=EXCLUDED.announce_level_up,
         voice_enabled=EXCLUDED.voice_enabled,
+        xp_per_message=EXCLUDED.xp_per_message,
         voice_xp_per_minute=EXCLUDED.voice_xp_per_minute,
         voice_ignore_afk=EXCLUDED.voice_ignore_afk,
         voice_min_members=EXCLUDED.voice_min_members,
@@ -147,9 +163,18 @@ export class Leveling implements PlatformModule {
        ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()`,
       [guildId]
     );
+
+    this.settingsCache.set(guildId, {
+      settings: { enabled: true, ...next },
+      expiresAt: Date.now() + 15_000
+    });
   }
 
   private async settings(guildId: string): Promise<LevelSettings> {
+    const now = Date.now();
+    const cached = this.settingsCache.get(guildId);
+    if (cached && cached.expiresAt > now) return cached.settings;
+
     const result = await this.db.query<{
       enabled: boolean;
       xp_per_message: number;
@@ -168,7 +193,7 @@ export class Leveling implements PlatformModule {
     );
 
     const row = result.rows[0];
-    return {
+    const settings = {
       enabled: row?.enabled ?? false,
       xpPerMessage: row?.xp_per_message ?? 10,
       cooldownSeconds: row?.cooldown_seconds ?? 30,
@@ -176,9 +201,15 @@ export class Leveling implements PlatformModule {
       voiceEnabled: row?.voice_enabled ?? true,
       voiceXpPerMinute: row?.voice_xp_per_minute ?? 5,
       voiceIgnoreAfk: row?.voice_ignore_afk ?? true,
-      voiceMinMembers: row?.voice_min_members ?? 1,
+      voiceMinMembers: Number(row?.voice_min_members ?? 1),
       dailyXpCap: Number(row?.daily_xp_cap ?? 0)
     };
+
+    this.settingsCache.set(guildId, {
+      settings,
+      expiresAt: now + 15_000
+    });
+    return settings;
   }
 
   private async replyRank(
@@ -314,7 +345,7 @@ export class Leveling implements PlatformModule {
     if (!await moduleEnabled(this.db, message.guild.id, "leveling", false)) return;
 
     const setting = await this.settings(message.guild.id);
-    if (await this.isExcluded(message.guild.id, message.channelId, message.author.id)) return;
+    if (await this.isExcluded(message.guild.id, message.channelId, message.author.id, message.member ?? undefined)) return;
     const key = `${message.guild.id}:${message.author.id}`;
     const now = Date.now();
     const previous = this.cooldowns.get(key) ?? 0;
@@ -343,7 +374,7 @@ export class Leveling implements PlatformModule {
         });
 
       for (const state of eligible) {
-        if (await this.isExcluded(guild.id, state.channelId ?? "", state.id)) continue;
+        if (await this.isExcluded(guild.id, state.channelId ?? "", state.id, state.member ?? undefined)) continue;
         await this.addXp(
           guild.id,
           state.id,
@@ -356,27 +387,36 @@ export class Leveling implements PlatformModule {
     }
   }
 
-  private async isExcluded(guildId: string, channelId: string, userId: string): Promise<boolean> {
-    if (channelId) {
-      const channelExcluded = await this.db.query(
-        "SELECT 1 FROM leveling_exclusions WHERE guild_id=$1 AND kind='channel' AND ref_id=$2 LIMIT 1",
-        [guildId, channelId]
+  private async isExcluded(
+    guildId: string,
+    channelId: string,
+    userId: string,
+    member?: import("discord.js").GuildMember
+  ): Promise<boolean> {
+    const now = Date.now();
+    let cached = this.exclusionCache.get(guildId);
+    if (!cached || cached.expiresAt <= now) {
+      const result = await this.db.query<{ kind: "role" | "channel"; ref_id: string }>(
+        "SELECT kind,ref_id FROM leveling_exclusions WHERE guild_id=$1",
+        [guildId]
       );
-      if (channelExcluded.rows[0]) return true;
+      const channels = new Set<string>();
+      const roles = new Set<string>();
+      for (const row of result.rows) {
+        if (row.kind === "channel") channels.add(row.ref_id);
+        else roles.add(row.ref_id);
+      }
+      cached = { channels, roles, expiresAt: now + 30_000 };
+      this.exclusionCache.set(guildId, cached);
     }
 
+    if (channelId && cached.channels.has(channelId)) return true;
+
     const guild = this.client?.guilds.cache.get(guildId);
-    const member = guild?.members.cache.get(userId) ?? await guild?.members.fetch(userId).catch(() => null);
-    if (!member) return false;
+    const resolvedMember = member ?? guild?.members.cache.get(userId) ?? await guild?.members.fetch(userId).catch(() => null);
+    if (!resolvedMember || cached.roles.size === 0) return false;
 
-    const roleIds = member.roles.cache.map((role) => role.id);
-    if (!roleIds.length) return false;
-
-    const roleExcluded = await this.db.query(
-      "SELECT 1 FROM leveling_exclusions WHERE guild_id=$1 AND kind='role' AND ref_id=ANY($2::text[]) LIMIT 1",
-      [guildId, roleIds]
-    );
-    return Boolean(roleExcluded.rows[0]);
+    return resolvedMember.roles.cache.some((role) => cached!.roles.has(role.id));
   }
 
   async listRewards(guildId: string): Promise<Array<{
@@ -444,6 +484,7 @@ export class Leveling implements PlatformModule {
     } else {
       await this.db.query("DELETE FROM leveling_exclusions WHERE guild_id=$1 AND kind=$2 AND ref_id=$3", [guildId,kind,refId]);
     }
+    this.exclusionCache.delete(guildId);
   }
 
   async leaderboard(guildId: string, limit = 10): Promise<Array<{ userId: string; xp: number; level: number }>> {
