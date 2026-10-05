@@ -165,6 +165,7 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "voteSkipPercent", label: "Vote-to-skip доля слушателей", type: "number", min: 0.1, max: 1, step: 0.05 },
       { key: "voteSkipMinimum", label: "Vote-to-skip минимум голосов", type: "number", min: 1, max: 99 },
       { key: "fairQueueEnabled", label: "Fair Queue / requester rotation", type: "boolean", description: "Чередовать треки разных участников, когда в очереди есть несколько requester." }
+      { key: "requestApprovalMode", label: "Request approval mode", type: "text", description: "off — запросы добавляются сразу; approval — новые пользовательские запросы сначала проходят подтверждение DJ или Manage Server." }
     ]
   }
 ];
@@ -302,6 +303,7 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       voteSkipPercent: "vote_skip_percent",
       voteSkipMinimum: "vote_skip_minimum",
       fairQueueEnabled: "fair_queue_enabled"
+      requestApprovalMode: "request_approval_mode"
     }
   }
 };
