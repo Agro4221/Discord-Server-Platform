@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -445,4 +445,12 @@ test("Music playlist merge stops at the 500-track capacity", () => {
   assert.equal(merged.duplicates, 0);
   assert.equal(merged.truncated, 2);
   assert.equal(merged.tracks.at(-1)?.info.identifier, "source-1");
+});
+
+
+test("Music playlist continuation invalidates only the edited playlist", () => {
+  assert.equal(shouldInvalidateMusicPlaylistContinuation("playlist-1", "playlist-1"), true);
+  assert.equal(shouldInvalidateMusicPlaylistContinuation("playlist-1", "playlist-2"), false);
+  assert.equal(shouldInvalidateMusicPlaylistContinuation(null, "playlist-1"), false);
+  assert.equal(shouldInvalidateMusicPlaylistContinuation(undefined, "playlist-1"), false);
 });
