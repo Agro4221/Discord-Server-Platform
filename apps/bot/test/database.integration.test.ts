@@ -25,7 +25,7 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
         "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs","moderation_presets","ticket_sla_settings","help_pages","analytics_settings","music_history","custom_forms","custom_form_submissions","onboarding_flows","server_config_presets","ticket_panels","music_request_approvals"
       ]]
     );
-    assert.equal(tables.rows.length, 28);
+    assert.equal(tables.rows.length, 29);
     const version = (await db.query("SELECT max(version) AS version FROM schema_migrations")).rows[0]?.version;
     const retryColumn = await db.query(
       "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='automation_delayed_jobs' AND column_name='dead_lettered_at'"
