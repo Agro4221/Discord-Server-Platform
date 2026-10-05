@@ -464,3 +464,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - A fresh Actions run for this repaired checkpoint is still pending/unavailable in the current connector session; do not mark this slice CI-verified yet.
 - Next concrete engineering focus: release-gate hardening across recovery/failure paths and live environment validation, one bounded slice at a time.
 
+## 2026-10-05 — Music provider diagnostics consistency
+- Audited Music provider readiness and found duplicate Apple Music reporting in Dashboard state.
+- Consolidated the readiness condition so Dashboard diagnostics and `/music providers` agree: provider enabled only when LavaSrc Apple Music is enabled and `APPLE_MUSIC_API_TOKEN` is non-empty.
+- Added deterministic regression tests.
+- Source checkpoint: `53008d169a1b4a12659656c665e97125f2ca182e`.
+- Fresh CI for the repaired/hardened checkpoint is not yet visible in the current connector session.
