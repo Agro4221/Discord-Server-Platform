@@ -10,6 +10,7 @@ const CACHE_TTL_MS = 5_000;
 const MAX_CACHE_ENTRIES = 25_000;
 const PRUNE_EVERY = 512;
 const moduleEnabledCache = new Map<string, ModuleEnabledCacheEntry>();
+const moduleEnabledInflight = new Map<string, Promise<boolean>>();
 let cacheReads = 0;
 
 export async function moduleEnabled(
@@ -26,28 +27,41 @@ export async function moduleEnabled(
     return cached.enabled;
   }
 
-  const result = await db.query<{ enabled: boolean }>(
-    "SELECT enabled FROM guild_modules WHERE guild_id=$1 AND module_key=$2",
-    [guildId, key]
-  );
-  const enabled = result.rows[0]?.enabled ?? defaultEnabled;
+  const existing = moduleEnabledInflight.get(cacheKey);
+  if (existing) return existing;
 
-  moduleEnabledCache.set(cacheKey, {
-    enabled,
-    expiresAt: now + CACHE_TTL_MS
-  });
+  const load = (async (): Promise<boolean> => {
+    try {
+      const result = await db.query<{ enabled: boolean }>(
+        "SELECT enabled FROM guild_modules WHERE guild_id=$1 AND module_key=$2",
+        [guildId, key]
+      );
+      const enabled = result.rows[0]?.enabled ?? defaultEnabled;
 
-  cacheReads += 1;
-  if (cacheReads % PRUNE_EVERY === 0 || moduleEnabledCache.size > MAX_CACHE_ENTRIES) {
-    pruneModuleEnabledCache(now);
-  }
+      moduleEnabledCache.set(cacheKey, {
+        enabled,
+        expiresAt: now + CACHE_TTL_MS
+      });
 
-  return enabled;
+      cacheReads += 1;
+      if (cacheReads % PRUNE_EVERY === 0 || moduleEnabledCache.size > MAX_CACHE_ENTRIES) {
+        pruneModuleEnabledCache(Date.now());
+      }
+
+      return enabled;
+    } finally {
+      moduleEnabledInflight.delete(cacheKey);
+    }
+  })();
+
+  moduleEnabledInflight.set(cacheKey, load);
+  return load;
 }
 
 export function clearModuleEnabledCache(guildId?: string, key?: ModuleKey): void {
   if (!guildId && !key) {
     moduleEnabledCache.clear();
+    moduleEnabledInflight.clear();
     return;
   }
 
