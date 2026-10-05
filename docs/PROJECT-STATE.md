@@ -399,3 +399,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-05 — Matrix reconciliation
 - Per-guild provider credentials and Additional social feeds are now marked complete in the Feature Matrix.
 - Remaining yellow items are predominantly advanced Music functionality.
+
+
+## 2026-10-05 — Music Filters verified
+- Source checkpoint: 6952f255a82af69702fe11e2ce11535052776192.
+- CI #1990 is green.
+- Filters / FX quick-access is complete and CI-verified.
+- Next high-value slice: Save queue button.
