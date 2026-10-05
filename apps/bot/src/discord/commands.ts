@@ -139,6 +139,10 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .setDescription("Show or change pitch")
       .addNumberOption((o) => o.setName("value").setDescription("0.5-2.0, 1.0 = normal").setMinValue(0.5).setMaxValue(2).setRequired(false)),
     new SlashCommandBuilder()
+      .setName("speed")
+      .setDescription("Show or change playback speed")
+      .addNumberOption((o) => o.setName("value").setDescription("0.5-2.0, 1.0 = normal").setMinValue(0.5).setMaxValue(2).setRequired(false)),
+    new SlashCommandBuilder()
       .setName("autoplay")
       .setDescription("Show or change autoplay")
       .addBooleanOption((o) => o.setName("enabled").setDescription("Autoplay state")),
