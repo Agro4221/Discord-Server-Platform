@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { AutoMod, clampAutoModWindowSeconds, detectAutoModViolation, detectorMatches, parseAutoModIdList } from "../src/modules/automod.js";
+import { clearModuleEnabledCache } from "../src/module-utils.js";
+import { PlatformEventBus } from "../src/events.js";
 
 test("AutoMod configure sends every extended setting to PostgreSQL", async () => {
   const queries: Array<{ text: string; values: readonly unknown[] }> = [];
