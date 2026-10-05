@@ -481,3 +481,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Required credentials/tokens are now part of the readiness signal rather than only the LavaSrc feature toggle.
 - Source checkpoint: `39f396e5444a52eadf084549231b965abef592a7`.
 - CI verification is pending.
+
+## 2026-10-05 — Backup/restore recovery hardening
+- `BackupService` now validates every guild-scoped public API input against the expected 17–20 digit Discord snowflake shape before filesystem/remote operations.
+- Integration regression coverage verifies invalid IDs and cross-guild backup isolation without changing the existing backup format or retention policy.
+- Source checkpoint: `9ca8b24d022ee4494873da651162ccba583d3f53`.
+- CI verification is pending/unavailable in the current connector session.
