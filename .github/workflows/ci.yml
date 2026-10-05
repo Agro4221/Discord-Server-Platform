@@ -50,6 +50,9 @@ jobs:
       - name: Check Dashboard local imports
         run: node scripts/check-dashboard-imports.mjs
 
+      - name: Check Dashboard route security
+        run: node scripts/check-dashboard-route-security.mjs
+
       - name: Validate deployment config
         run: |
           bash -n scripts/install-vps.sh scripts/upgrade.sh
