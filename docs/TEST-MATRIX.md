@@ -593,3 +593,10 @@ This section records **feature scope status**, not live-test results. The main t
 - ✅ `kick` validation contract.
 - ✅ `kick` runtime with rendered reason and `kickable` guard.
 - ✅ CI #1845 full pipeline.
+
+
+## 2026-10-05 — Post-freeze automated baseline
+- ✅ CI #2442 passed the complete automated repository pipeline on the frozen implementation tree.
+- ✅ New regression coverage: Music Spotify/Yandex providers; AutoMod burst spam/image-only/YouTube-only detectors; Automation warn/create-channel validation and runtime; persisted moderation channel-lock cleanup.
+- ✅ Deployment contract verifies the active Control Center entrypoint, absence of legacy Dashboard files/auth state, optional Docker Lavalink2 profile and required runtime secret contracts.
+- ⚠ Live Discord, real Lavalink node-loss/migration, multi-bot runtime, native Windows, VPS clean-host, chaos/soak/security and real workload performance remain environment-dependent.
