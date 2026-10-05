@@ -39,7 +39,7 @@ export function NotificationsPanel({
   const [embedTitle, setEmbedTitle] = useState("");
   const [embedDescription, setEmbedDescription] = useState("");
   const [embedUrl, setEmbedUrl] = useState("");
-  const [embedColor, setEmbedColor] = useState("#5865F2");
+  const [embedColor, setEmbedColor] = useState("");
   const [embedFooter, setEmbedFooter] = useState("");
   const [embedImage, setEmbedImage] = useState("");
   const [embedThumbnail, setEmbedThumbnail] = useState("");
@@ -48,7 +48,7 @@ export function NotificationsPanel({
   const [editingInclude, setEditingInclude] = useState("");
   const [editingExclude, setEditingExclude] = useState("");
   const [editingEmbed, setEditingEmbed] = useState<EmbedConfig>({
-    title: "", description: "", url: "", color: "#5865F2", footer: "", image: "", thumbnail: ""
+    title: "", description: "", url: "", color: "", footer: "", image: "", thumbnail: ""
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -286,7 +286,7 @@ export function NotificationsPanel({
                   title: feed.embedConfig?.title ?? "",
                   description: feed.embedConfig?.description ?? "",
                   url: feed.embedConfig?.url ?? "",
-                  color: feed.embedConfig?.color ?? "#5865F2",
+                  color: feed.embedConfig?.color ?? "",
                   footer: feed.embedConfig?.footer ?? "",
                   image: feed.embedConfig?.image ?? "",
                   thumbnail: feed.embedConfig?.thumbnail ?? ""
