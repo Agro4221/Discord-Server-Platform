@@ -917,3 +917,9 @@ Never write credentials, tokens or private user data here.
 - The default Docker Music topology remains functional with one Lavalink node; `start-local.bat -Lavalink2` explicitly enables the second node and passes both nodes into `LAVALINK_NODES`.
 - Docker release-gate now checks only the primary node by default and validates the second node when `-RequireLavalink2` is requested.
 - The two-node failover capability is preserved; the normal local runtime no longer starts an unnecessary second JVM.
+
+## 2026-10-05 — Technical implementation freeze / start of verification phase
+- The agreed technical scope is now frozen.
+- Completed before testing: legacy Dashboard removal and Control Center consolidation; no-login local admin contract; Docker single-Lavalink default with opt-in failover node; VPS installer/upgrade self-healing secrets; Music Spotify/Yandex provider wiring through LavaSrc; Automation warn/channel-creation actions and scheduler-index fix; AutoMod detector breadth expansion; persisted moderation-channel lock cleanup.
+- Next phase is verification: repository CI, unit/regression coverage expansion, live Discord smoke, native Windows runtime, Lavalink failover, Fleet takeover, VPS clean-host, chaos/soak/security and performance measurements.
+- From this point, a code change should be driven by a failing test, a reproduced runtime defect or an explicitly approved scope addition.
