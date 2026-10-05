@@ -181,21 +181,21 @@
 | Queue / lyrics / favorite controls | ✅ |
 | Filters / FX quick-access button | ✅ | Music controller exposes a quick filter palette reusing the existing Lavalink preset/FX actions |
 | Save queue button | ✅ | Music controller opens a modal and saves the current track plus pending queue into a named personal playlist |
-| Radio/autoplay button | 🟡 |
+| Radio/autoplay button | ✅ | Persistent Music controller exposes an Autoplay On/Off toggle using the existing autoplay setting |
 | Controller state refresh after every action | ✅ | Music actions persist state and resync the controller message |
 
 #### DJ / permissions / anti-abuse
 
 | Функция | План |
 |---|---|
-| Separate permissions for play / skip / stop / seek / volume / filters | 🟡 |
+| Separate permissions for play / skip / stop / seek / volume / filters | ✅ | Controller actions use the same per-command role/channel policy as Slash and Prefix command execution |
 | Separate queue add / remove / move permissions | 🟡 |
 | DJ role policy | ✅ |
 | Vote skip | ✅ | Non-DJ users can vote to skip the current track; threshold scales from active human voice listeners and votes expire with the current track/session |
 | Per-user request cooldown | ✅ | Successful music queue requests are throttled per user/server for 5 seconds across slash play and request channel |
 | Per-user queued-track limit | ✅ | Per-user pending queue cap is configurable from 0 (unlimited) to 100 and enforced on manual add paths |
 | Fair queue / requester rotation | 🟡 |
-| Max guild queue size | 🟡 |
+| Max guild queue size | ✅ | Total pending queue size is persisted/configurable up to 500 and enforced on queue-add paths |
 | Optional approval/moderation mode for requests | 🟡 |
 
 #### Playlists / saved state
