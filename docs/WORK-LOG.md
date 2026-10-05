@@ -622,3 +622,13 @@ Never write credentials, tokens or private user data here.
 - CI #1990 passed completely.
 - Final source checkpoint: 6952f255a82af69702fe11e2ce11535052776192.
 - Next single Music slice: Save queue button.
+
+
+## 2026-10-05 — Music Save Queue
+- Added a Save Queue button to the persistent Music controller.
+- Button opens a Discord modal for playlist name and stores the current track plus pending queue using the existing music_playlists persistence.
+- Playlist names are normalized and existing names are never overwritten silently.
+- Added regression coverage for playlist-name normalization and unresolved queue-track serialization.
+- CI #1997 passed completely.
+- Final source checkpoint: 6f2d6b57ec49336eb96a6ba24975476e4bc413f3.
+- Next single Music slice: Load playlist with optional shuffle.
