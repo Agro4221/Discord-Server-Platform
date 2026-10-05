@@ -243,3 +243,10 @@ test("music guild queue size helpers enforce bounds and remaining capacity", asy
   assert.equal(remainingMusicGuildQueueSlots(100, 100), 0);
   assert.equal(remainingMusicGuildQueueSlots(999, 0), null);
 });
+
+
+test("music autoplay controller toggle flips the persisted state target", async () => {
+  const { toggleMusicAutoplay } = await import("../src/modules/music.js");
+  assert.equal(toggleMusicAutoplay(false), true);
+  assert.equal(toggleMusicAutoplay(true), false);
+});
