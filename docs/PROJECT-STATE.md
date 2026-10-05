@@ -501,3 +501,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Static deployment verification requires the preservation helpers to remain in the installer.
 - Source checkpoint: `73e5ebdf792f38ae2ab29fb0ba0adba7f224154f`.
 - CI is pending/unavailable; actual reinstall on an existing Docker volume remains environment-dependent.
+
+## 2026-10-05 — VPS upgrade secret guard
+- `upgrade.sh` now validates all critical runtime secrets before bringing the stack back up.
+- Missing `MANAGEMENT_API_KEY`, `POSTGRES_PASSWORD` or `LAVALINK_PASSWORD` stops the upgrade with an explicit error.
+- Source checkpoint: `67ed79823ca844e1daa088b9631f7a41a45c26be`.
+- CI verification remains pending/unavailable; live recovery against an existing installation remains required.
