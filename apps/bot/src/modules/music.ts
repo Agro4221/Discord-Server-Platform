@@ -626,7 +626,7 @@ export class Music implements PlatformModule {
           const continued = await this.continueMusicPlaylist(player);
           const radio = await this.musicRadioSettings(player.guildId);
           if (!continued && radio.enabled && player.repeatMode === "off" && player.queue.tracks.length === 0) {
-            await this.radioNext(player, lastTrack);
+            await this.radioNext(player, lastTrack ?? null);
           } else {
             const autoplay = await this.autoplayEnabled(player.guildId);
             if (!continued && !radio.enabled && lastTrack && shouldAutoplayAfterQueueEnd(
