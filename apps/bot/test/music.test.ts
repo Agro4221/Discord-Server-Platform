@@ -205,6 +205,7 @@ test("Music filter palette keeps every Discord action row at five buttons or few
     "vibrato",
     "distortion",
     "lowpass",
+    "channelmix",
     "gaming",
     "nightcore",
     "8d"
