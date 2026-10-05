@@ -105,6 +105,38 @@ export function isValidMusicSavedPosition(position: number, length: number): boo
   return Number.isInteger(position) && position >= 1 && position <= Math.min(length, 25);
 }
 
+export function chunkMusicLyrics(text: string, maxLength = 3600): string[] {
+  const normalized = text.trim();
+  if (!normalized) return [];
+  const limit = Math.max(500, Math.min(3900, Math.floor(maxLength)));
+  const chunks: string[] = [];
+  let remaining = normalized;
+
+  while (remaining.length > limit) {
+    let splitAt = remaining.lastIndexOf("\n", limit);
+    if (splitAt < Math.floor(limit * 0.5)) splitAt = remaining.lastIndexOf(" ", limit);
+    if (splitAt < Math.floor(limit * 0.5)) splitAt = limit;
+    chunks.push(remaining.slice(0, splitAt).trim());
+    remaining = remaining.slice(splitAt).trimStart();
+  }
+
+  if (remaining) chunks.push(remaining);
+  return chunks;
+}
+
+export function musicLyricsPageCount(chunks: readonly unknown[]): number {
+  return Math.max(1, chunks.length);
+}
+
+export function normalizeMusicLyricsPage(page: number, totalPages: number): number {
+  const maxPage = Math.max(1, Math.floor(totalPages)) - 1;
+  return Math.min(Math.max(Math.trunc(page), 0), maxPage);
+}
+
+export function isValidMusicLyricsPage(page: number, totalPages: number): boolean {
+  return Number.isInteger(page) && page >= 0 && page < Math.max(1, Math.floor(totalPages));
+}
+
 export function normalizeMusicPlaylistImportUrl(value: string): string | null {
   try {
     const url = new URL(value.trim());
@@ -589,8 +621,16 @@ export class Music implements PlatformModule {
     sharedOnly?: boolean;
     expiresAt: number;
   }>();
+  private readonly lyricsPaginationSessions = new Map<string, {
+    guildId: string;
+    userId: string;
+    trackIdentifier: string;
+    chunks: string[];
+    expiresAt: number;
+  }>();
   private searchSequence = 0;
   private playlistPaginationSequence = 0;
+  private lyricsPaginationSequence = 0;
   private commandPolicy?: CommandPolicyService;
   private auditLog?: ModuleContext["auditLog"];
 
@@ -616,6 +656,7 @@ export class Music implements PlatformModule {
     this.playlistContinuations.clear();
     this.voteSkipSessions.clear();
     this.playlistPaginationSessions.clear();
+    this.lyricsPaginationSessions.clear();
     for (const timer of this.autoLeaveTimers.values()) clearTimeout(timer);
     this.autoLeaveTimers.clear();
 
@@ -766,6 +807,9 @@ export class Music implements PlatformModule {
       this.lastPlayedTracks.delete(player.guildId);
       this.autoplayInFlight.delete(player.guildId);
       this.playlistContinuations.delete(player.guildId);
+      for (const [token, session] of this.lyricsPaginationSessions) {
+        if (session.guildId === player.guildId) this.lyricsPaginationSessions.delete(token);
+      }
       void this.db.query(
         "DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",
         [player.guildId, this.config.botIdentityId]
@@ -2245,7 +2289,13 @@ export class Music implements PlatformModule {
     if (!await this.canControl(interaction, player.voiceChannelId)) return;
 
     try {
-      const result = await player.getLyrics(player.queue.current!);
+      const current = player.queue.current;
+      if (!current) {
+        await interaction.reply({ content: "📜 Сейчас ничего не играет.", ephemeral: true });
+        return;
+      }
+
+      const result = await player.getLyrics(current);
       if (!result) {
         await interaction.reply({ content: "📜 Для этого трека текст не найден.", ephemeral: true });
         return;
@@ -2257,40 +2307,77 @@ export class Music implements PlatformModule {
           ? result.lines.map((line) => String(line.line ?? "")).filter(Boolean).join("\n")
           : "";
 
-      if (!textValue) {
+      const chunks = chunkMusicLyrics(textValue);
+      if (!chunks.length) {
         await interaction.reply({ content: "📜 Для этого трека текст не найден.", ephemeral: true });
         return;
       }
 
-      const chunks: string[] = [];
-      for (let i = 0; i < textValue.length; i += 3800) {
-        chunks.push(textValue.slice(i, i + 3800));
-      }
-
-      await interaction.reply({
-        content: chunks.length === 1
-          ? "📜 **Текст**\n" + chunks[0]
-          : "📜 **Текст, часть 1/" + chunks.length + "**\n" + chunks[0],
-        ephemeral: true
+      const token = Date.now().toString(36) + "-" + (++this.lyricsPaginationSequence).toString(36);
+      this.lyricsPaginationSessions.set(token, {
+        guildId: interaction.guild!.id,
+        userId: interaction.user.id,
+        trackIdentifier: current.info.identifier ?? current.info.uri ?? current.info.title,
+        chunks,
+        expiresAt: Date.now() + 5 * 60_000
       });
 
-      for (let i = 1; i < chunks.length; i += 1) {
-        await interaction.followUp({
-          content: "📜 **Текст, часть " + (i + 1) + "/" + chunks.length + "**\n" + chunks[i],
-          ephemeral: true
-        });
-      }
+      const page = this.buildLyricsPage(token, 0);
+      await interaction.reply({
+        content: page.content,
+        components: page.components,
+        ephemeral: true
+      });
     } catch (error) {
       logger.warn("Music lyrics lookup failed", {
         guildId: interaction.guild!.id,
         error: String(error)
       });
+      if (interaction.replied || interaction.deferred) return;
       await interaction.reply({
         content: "Не удалось получить текст трека. Возможно, для него нет lyrics source.",
         ephemeral: true
       });
     }
   }
+
+  private buildLyricsPage(token: string, requestedPage: number): {
+    content: string;
+    components: ActionRowBuilder<ButtonBuilder>[];
+  } {
+    const session = this.lyricsPaginationSessions.get(token);
+    if (!session) {
+      return { content: "📜 Эта навигация устарела. Запроси текст заново.", components: [] };
+    }
+
+    const totalPages = musicLyricsPageCount(session.chunks);
+    const page = normalizeMusicLyricsPage(requestedPage, totalPages);
+    const content =
+      "📜 **Текст** · " + (page + 1) + "/" + totalPages + "\n\n" +
+      session.chunks[page];
+
+    const components = totalPages > 1
+      ? [
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+              .setCustomId("dsp:music:lyrics-page:" + token + ":" + Math.max(0, page - 1))
+              .setEmoji("⬅️")
+              .setLabel("Назад")
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(page === 0),
+            new ButtonBuilder()
+              .setCustomId("dsp:music:lyrics-page:" + token + ":" + Math.min(totalPages - 1, page + 1))
+              .setEmoji("➡️")
+              .setLabel("Дальше")
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(page >= totalPages - 1)
+          )
+        ]
+      : [];
+
+    return { content, components };
+  }
+
 
   private async queueQuery(
     guildId: string,
@@ -4180,6 +4267,26 @@ export class Music implements PlatformModule {
       return;
     }
 
+
+    if (interaction.isButton() && interaction.customId.startsWith("dsp:music:lyrics-page:") && interaction.guild) {
+      const parts = interaction.customId.split(":");
+      const token = parts[3] ?? "";
+      const page = Number(parts[4]);
+      const session = this.lyricsPaginationSessions.get(token);
+      if (
+        !session ||
+        session.guildId !== interaction.guild.id ||
+        session.userId !== interaction.user.id ||
+        session.expiresAt < Date.now() ||
+        !isValidMusicLyricsPage(page, musicLyricsPageCount(session?.chunks ?? []))
+      ) {
+        await interaction.update({ content: "📜 Эта навигация устарела. Запроси текст заново.", components: [] });
+        if (token) this.lyricsPaginationSessions.delete(token);
+        return;
+      }
+      await interaction.update(this.buildLyricsPage(token, page));
+      return;
+    }
 
     if (interaction.isButton() && interaction.customId.startsWith("dsp:music:playlist-page:") && interaction.guild) {
       const parts = interaction.customId.split(":");
