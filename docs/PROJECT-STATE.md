@@ -519,3 +519,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - `check-deployment-contract.mjs` was reconciled to one clean contract flow after the new guards were added.
 - Current upgrade source checkpoint: `dcd9476f76a01995f532dc69e24185079ec93d42`.
 - Current PR still has no check-runs; automated verification remains pending.
+
+## 2026-10-05 — VPS Caddy configuration preservation
+- Re-running the installer preserves an existing `infrastructure/caddy/Caddyfile` instead of overwriting it with the example template.
+- Deployment contract requires the preservation condition.
+- Source checkpoint: `3b2f0de1bd925a87059cc8bd740a076dec084083`.
+- Automated CI remains unavailable for the current branch head; live reinstall validation is still required.
