@@ -67,12 +67,20 @@ export function clampMusicVolume(value: number): number {
   return Math.min(200, Math.max(0, Math.round(value)));
 }
 type MusicQueueTrackLike = {
+  encoded?: string;
   info: {
     identifier?: string;
     title?: string;
     author?: string | null;
     duration?: number;
     uri?: string | null;
+    isSeekable?: boolean;
+    isStream?: boolean;
+    position?: number;
+    artworkUrl?: string | null;
+    isrc?: string | null;
+    sourceName?: string;
+    length?: number;
   };
   requester?: { id?: string };
 };
@@ -499,7 +507,7 @@ export class Music implements PlatformModule {
         positionMs
       } : null,
       queue: (player?.queue.tracks.slice(0, 25) ?? []).map((track) => ({
-        title: track.info.title,
+        title: track.info.title ?? "Unknown track",
         author: track.info.author ?? "Unknown artist",
         durationMs: Number(track.info.duration ?? 0)
       })),
@@ -852,11 +860,11 @@ export class Music implements PlatformModule {
     });
   }
 
-  private serializedTrack(track: Track): { encoded?: string; info: Record<string, unknown> } {
+  private serializedTrack(track: MusicQueueTrackLike): { encoded?: string; info: Record<string, unknown> } {
     return {
       encoded: track.encoded,
       info: {
-        identifier: track.info.identifier,
+        identifier: track.info.identifier ?? "",
         isSeekable: Boolean(track.info.isSeekable),
         author: track.info.author ?? "",
         length: Number((track.info as typeof track.info & { length?: number; duration?: number }).length ?? (track.info as typeof track.info & { duration?: number }).duration ?? 0),
