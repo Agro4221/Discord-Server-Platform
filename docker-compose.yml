@@ -57,7 +57,7 @@ services:
     restart: unless-stopped
     environment:
       _JAVA_OPTIONS: "-Xms256m -Xmx768m"
-      LAVALINK_SERVER_PASSWORD: ${LAVALINK_PASSWORD:-change-me-local}
+      LAVALINK_SERVER_PASSWORD: ${LAVALINK_PASSWORD:?LAVALINK_PASSWORD must be set}
       LAVASRC_SPOTIFY_ENABLED: ${LAVASRC_SPOTIFY_ENABLED:-false}
       LAVASRC_APPLEMUSIC_ENABLED: ${LAVASRC_APPLEMUSIC_ENABLED:-false}
       LAVASRC_DEEZER_ENABLED: ${LAVASRC_DEEZER_ENABLED:-false}
@@ -98,12 +98,13 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change-me-postgres}@postgres:5432/discord_platform
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/discord_platform
       LAVALINK_HOST: lavalink
       LAVALINK_PORT: 2333
-      LAVALINK_NODES: '[{"id":"local","host":"lavalink","port":2333,"password":"${LAVALINK_PASSWORD:-change-me-local}"},{"id":"local-2","host":"lavalink2","port":2334,"password":"${LAVALINK_PASSWORD:-change-me-local}"}]'
+      LAVALINK_NODES: '[{"id":"local","host":"lavalink","port":2333,"password":"${LAVALINK_PASSWORD:?LAVALINK_PASSWORD must be set}"},{"id":"local-2","host":"lavalink2","port":2334,"password":"${LAVALINK_PASSWORD:?LAVALINK_PASSWORD must be set}"}]'
       HEALTH_HOST: 0.0.0.0
       MANAGEMENT_API_HOST: 0.0.0.0
+      MANAGEMENT_API_PORT: 3002
       DSP_CONTAINERIZED: "true"
       MANAGEMENT_API_KEY: ${MANAGEMENT_API_KEY}
     healthcheck:
