@@ -11,7 +11,7 @@ Self-hosted Discord Server Platform: local-first, resilient, modular, no artific
 development
 
 ## Current phase
-Release candidate — code/CI verified, ready for live Discord validation.
+Release candidate — functional development frozen for live acceptance. Current development HEAD is CI-verified; remaining release-gate work is live Discord/runtime validation. Broader feature expansion is post-RC work, not a reason to keep extending the release indefinitely.
 
 ## Working subsystems
 - Discord Core with typed event bus and module lifecycle.
@@ -39,14 +39,15 @@ Release candidate — code/CI verified, ready for live Discord validation.
 - Docker Compose / Dockerfiles for local-to-VPS topology.
 - Native Windows local runtime for low-overhead gaming/streaming, with single-Lavalink default and opt-in Dashboard/second Lavalink.
 
-## Still under development
-- Full AutoMod rule editor and richer response policies beyond the current persisted rule set.
-- Full Security response workflow beyond the current anti-raid/quarantine/destructive-burst response.
-- Full Automation condition/action catalog beyond the currently supported safe builder.
-- Music provider breadth and multi-node failover validation beyond the current Lavalink foundation.
-- Full multi-bot fleet orchestration beyond automatic stale-guild failover, persisted assignments and health UI.
-- Full E2E/chaos/soak/security test suite and live Discord validation.
-- VPS installer/reverse-proxy production drill and clean-host acceptance.
+## Remaining release-gate / post-RC work
+- Live Discord E2E smoke test on the user's real test server.
+- Lavalink restart/resume and multi-node failover validation in the real runtime.
+- Multi-bot fleet takeover validation with real secondary identities.
+- Windows native launcher/runtime validation on the actual gaming/streaming PC.
+- VPS clean-host install/upgrade acceptance and reverse-proxy production drill.
+- Full E2E/chaos/soak/security runs in a controlled environment.
+
+The deeper AutoMod, Security and Automation catalogs and additional Music providers remain valid post-RC expansion work. They are deliberately not release blockers for this candidate.
 
 ## Verification
 - GitHub Actions CI runs on Node.js 24.17.
@@ -59,6 +60,13 @@ Release candidate — code/CI verified, ready for live Discord validation.
 Read docs/WORK-LOG.md before continuing work in a new chat.
 Read docs/TEST-MATRIX.md before declaring a subsystem complete.
 Never commit credentials, bot tokens, provider secrets or private user data.
+
+## 2026-10-05 — Release-candidate gate checkpoint
+- Current development HEAD: 8daf1401258d9c94d72bac491948cce8a2b12555.
+- GitHub Actions CI run #1846 (37237396426) completed successfully on this exact HEAD.
+- The green CI job completed dependency installation/audit, source hygiene, deployment and observability checks, bot typecheck, bot tests, domain build, bot build and Dashboard production build.
+- Functional development is now treated as frozen for the release candidate. New work should be driven by a live failure, a concrete correctness/security defect, or an explicitly chosen post-RC feature.
+- Remaining release-gate items are environment-dependent: real Discord smoke/E2E, Lavalink/fleet failover, Windows runtime, VPS clean-host acceptance and controlled chaos/soak/security validation.
 
 
 ## 2026-09-19 — Giveaway lifecycle hardening
