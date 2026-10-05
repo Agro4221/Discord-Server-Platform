@@ -1481,6 +1481,13 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_music_settings_radio_enabled ON music_settings(radio_enabled) WHERE radio_enabled=true;"
     ])
   },
+  {
+    version: 98,
+    name: "notification_feed_embeds",
+    sql: q([
+      "ALTER TABLE notification_feeds ADD COLUMN IF NOT EXISTS embed_config jsonb;"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
