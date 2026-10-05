@@ -789,3 +789,16 @@ Never write credentials, tokens or private user data here.
 - CI #2135 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
 - Final source checkpoint: `0403a96d5d67acc1a603b58048ff8476e4cceb6c`.
 - Next single Music slice: **Playlist continuation after queue end**.
+
+## 2026-10-05 — Music playlist continuation after queue end
+- Completed automatic continuation for saved Music playlists when the initially loaded batch does not fit into the current queue limits.
+- Added migration 95 with durable continuation state on `music_players`: playlist ID, next source index, optional saved shuffle order and original requester ID.
+- Loading a playlist now stores continuation state when tracks remain beyond the first batch; when the queue reaches its end, the next batch is restored automatically from the same playlist.
+- Saved shuffle order is reused for later batches instead of generating a new random order on every continuation.
+- Continuation preserves the original requester identity and rechecks the current per-user/server queue limits plus Fair Queue before adding the next batch.
+- Continuation state is restored after player recovery/restart and is cleared by explicit queue clearing, Stop, playlist completion or player destruction.
+- Saved-playlist continuation takes priority over Autoplay so a partially loaded playlist finishes before radio-style Autoplay begins.
+- Added unit coverage for continuation batching and PostgreSQL coverage for durable continuation state.
+- CI #2147 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `92ad5ef802a3a89cd7aac7831959228c77947add`.
+- Next single Music slice: **Playlists — duplicate handling / merge**.
