@@ -945,6 +945,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .setDescription("Show lyrics or lyrics source status")
           .addStringOption((o) => o.setName("action").setDescription("Lyrics action").addChoices(
             { name: "Show", value: "show" },
+            { name: "Live sync", value: "sync" },
             { name: "Status", value: "status" }
           ))
       )
