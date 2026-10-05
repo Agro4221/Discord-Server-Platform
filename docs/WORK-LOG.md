@@ -1001,6 +1001,17 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Yandex playback still requires the user's Lavalink credentials/runtime.
 - Source checkpoint: 5514371977eb7a13f5696ebabf34a159a40d7094.
 
+## 2026-10-05 — Music Tidal provider parity
+- Added an explicit Tidal Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as Tidal use LavaSrc tdsearch; users can also use the explicit tdsearch: prefix from prefix/request-channel flows.
+- Direct tidal.com/browse URLs continue through Lavalink/LavaSrc URL resolution.
+- Approval-mode requests preserve the selected Tidal source across the moderation step.
+- Provider status now treats Tidal as configured only when the LavaSrc switch and Tidal token are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Current LavaSrc documentation identifies Tidal playback as mirror-based and documents tdsearch plus track/album/playlist/artist URLs.
+- Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Tidal playback remains a release-gate validation item.
+- Source checkpoint: 593061182db741fe3da9c3f27f51418efcdaaee6.
+
 ## 2026-10-05 — Music VK Music provider parity
 - Added an explicit VK Music search provider to /play, /music play and /music search.
 - Non-URL searches selected as VK Music use LavaSrc vksearch; users can also use the explicit vksearch: prefix from prefix/request-channel flows.
