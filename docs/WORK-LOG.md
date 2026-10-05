@@ -953,3 +953,14 @@ Never write credentials, tokens or private user data here.
 - CI #2213 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
 - Final source checkpoint for this slice: `ec7ba9c027b7ce581a47f9875d5c5374efbdc920`.
 - Next single Music slice: **Channel Mix audio effect**.
+
+
+## 2026-10-05 — Music Channel Mix audio effect
+- Completed the independent Channel Mix audio effect slice.
+- Added `channelmix` to the Music filter command and quick-filter palette.
+- Uses the native `lavalink-client` Channel Mix path through `setAudioOutput()`, toggling between stereo and mono.
+- The toggle derives its current state from the persisted `data.channelMix` payload, so restored players do not depend on transient in-memory filter state.
+- Added deterministic unit coverage for the persisted stereo/mono payload transition and the five-buttons-per-Discord-Action-Row palette contract.
+- CI #2215 initially caught a test-fixture omission for the new action; the fixture was corrected and CI #2216 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: `722a8866d30753a77bbe51fbe72ccd687eb19e49`.
+- Next single Music slice: **Custom EQ editor**.
