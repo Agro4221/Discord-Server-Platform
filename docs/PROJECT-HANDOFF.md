@@ -633,3 +633,8 @@ Feature Matrix полностью reconciled: все строки ✅.
 - The application still intentionally has no end-user Dashboard login, but its Management API cannot start with an empty or whitespace-only API key.
 - `MANAGEMENT_API_KEY` is validated as non-blank during config loading and is covered by regression tests.
 - Source checkpoint: `333ce7ca164fa0e0dd7c0ba776bc5315c0217924`.
+
+### 2026-10-05 — Management API auth regression coverage
+- Keep the local Control Center intentionally login-free while protecting every Management API request with the configured exact Bearer key.
+- `isManagementApiAuthorizationValid()` is now directly regression-tested and rejects blank keys/headers, alternate auth schemes and non-exact credentials.
+- Source checkpoint: `3211e31ed8e07d0b41b0d25995a81e45ebef5f91`.
