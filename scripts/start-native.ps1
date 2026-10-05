@@ -501,7 +501,6 @@ try {
     throw "Bot health endpoint did not become ready: $healthUrl"
   }
 
-  $runDashboard = $Dashboard -or -not $NoDashboard
   if ($runDashboard) {
     $dashboardPort = Get-EnvValue "DASHBOARD_PORT"
     if ([string]::IsNullOrWhiteSpace($dashboardPort)) { $dashboardPort = "3000" }
@@ -534,11 +533,11 @@ try {
   Write-Host "Bot health: $healthUrl"
   Write-Host "Logs: $logRoot"
 
-  if ($Dashboard) {
+  if ($runDashboard) {
     Write-Host "Control Center: $dashboardUrl"
     if (-not $NoOpen) { Start-Process $dashboardUrl }
   } else {
-    Write-Host "Dashboard is OFF for low-overhead gaming mode. Add -Dashboard when you need it."
+    Write-Host "Dashboard is OFF for low-overhead mode. Add -NoDashboard only when needed."
   }
 
   Write-Host ""
