@@ -261,3 +261,50 @@ test("music vote-to-skip threshold scales with listeners and honors minimum", as
   assert.equal(calculateMusicVoteSkipRequired(20, 0.2, 6), 6);
   assert.equal(calculateMusicVoteSkipRequired(20, 0.8, 2), 16);
 });
+
+
+test("Fair Queue rotates requester groups while preserving each requester's order", async () => {
+  const { rebalanceMusicQueueByRequester } = await import("../src/modules/music.js");
+  const tracks = [
+    { id: "a1", requester: "A" },
+    { id: "a2", requester: "A" },
+    { id: "a3", requester: "A" },
+    { id: "b1", requester: "B" },
+    { id: "b2", requester: "B" }
+  ];
+
+  const result = rebalanceMusicQueueByRequester(
+    tracks,
+    (track) => track.requester
+  );
+
+  assert.deepEqual(result.map((track) => track.id), ["a1", "b1", "a2", "b2", "a3"]);
+});
+
+test("Fair Queue leaves a single requester unchanged", async () => {
+  const { rebalanceMusicQueueByRequester } = await import("../src/modules/music.js");
+  const tracks = [
+    { id: "a1", requester: "A" },
+    { id: "a2", requester: "A" }
+  ];
+
+  assert.deepEqual(
+    rebalanceMusicQueueByRequester(tracks, (track) => track.requester).map((track) => track.id),
+    ["a1", "a2"]
+  );
+});
+
+test("Fair Queue keeps unknown requesters in their own rotation group", async () => {
+  const { rebalanceMusicQueueByRequester } = await import("../src/modules/music.js");
+  const tracks = [
+    { id: "u1", requester: null },
+    { id: "a1", requester: "A" },
+    { id: "u2", requester: null },
+    { id: "a2", requester: "A" }
+  ];
+
+  assert.deepEqual(
+    rebalanceMusicQueueByRequester(tracks, (track) => track.requester).map((track) => track.id),
+    ["u1", "a1", "u2", "a2"]
+  );
+});
