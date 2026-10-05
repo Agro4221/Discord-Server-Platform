@@ -144,6 +144,17 @@ export function normalizeMusicQueueLimit(value: number): number {
   return Math.min(100, Math.max(0, Math.trunc(value)));
 }
 
+export function normalizeMusicQueueSize(value: number): number {
+  if (!Number.isFinite(value)) return 100;
+  return Math.min(500, Math.max(0, Math.trunc(value)));
+}
+
+export function remainingMusicGuildQueueSlots(queueSize: number, limit: number): number | null {
+  const normalizedLimit = normalizeMusicQueueSize(limit);
+  if (normalizedLimit === 0) return null;
+  return Math.max(0, normalizedLimit - Math.max(0, Math.trunc(queueSize)));
+}
+
 export function countMusicQueuedByUser<T extends { requester?: { id?: string } }>(tracks: readonly T[], userId: string): number {
   return tracks.reduce((count, track) => count + (track.requester?.id === userId ? 1 : 0), 0);
 }
@@ -2629,9 +2640,10 @@ export class Music implements PlatformModule {
     return result.rows[0]?.autoplay ?? false;
   }
 
-  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number; twentyFourSeven: boolean; queueAccess: "everyone" | "dj"; maxQueuedPerUser: number }> {
+  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number; twentyFourSeven: boolean; queueAccess: "everyone" | "dj"; maxQueuedPerUser: number;
+      maxQueueSize: number }> {
     const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number; twenty_four_seven: boolean; queue_access: "everyone" | "dj"; max_queued_per_user: number }>(
-      "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds,twenty_four_seven,queue_access,max_queued_per_user FROM music_settings WHERE guild_id=$1",
+      "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds,twenty_four_seven,queue_access,max_queued_per_user,max_queue_size FROM music_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -2643,7 +2655,8 @@ export class Music implements PlatformModule {
       autoLeaveSeconds: Math.min(Math.max(Number(row?.auto_leave_seconds ?? 30), 0), 86400),
       twentyFourSeven: row?.twenty_four_seven ?? false,
       queueAccess: row?.queue_access === "dj" ? "dj" : "everyone",
-      maxQueuedPerUser: normalizeMusicQueueLimit(Number(row?.max_queued_per_user ?? 10))
+      maxQueuedPerUser: normalizeMusicQueueLimit(Number(row?.max_queued_per_user ?? 10)),
+      maxQueueSize: Math.min(500, Math.max(0, Math.trunc(Number(row?.max_queue_size ?? 100))))
     };
   }
 
