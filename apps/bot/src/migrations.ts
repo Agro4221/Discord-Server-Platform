@@ -1510,6 +1510,14 @@ const migrations = [
     ])
   },
   {
+    version: 101,
+    name: "integration_credentials_tiktok",
+    sql: q([
+      "ALTER TABLE integration_credentials DROP CONSTRAINT IF EXISTS integration_credentials_provider_check;",
+      "ALTER TABLE integration_credentials ADD CONSTRAINT integration_credentials_provider_check CHECK(provider IN ('twitch','youtube','kick','tiktok'));"
+    ])
+  },
+  {
     version: 98,
     name: "notification_feed_embeds",
     sql: q([
