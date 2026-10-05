@@ -123,3 +123,16 @@ test("Music play and search expose YouTube, Yandex Music and Spotify providers",
     ["query", "provider"]
   );
 });
+
+
+test("Music lyrics command exposes show/status action", () => {
+  const commands = buildCommands().map((command) => command.toJSON());
+  const music = commands.find((command) => command.name === "music");
+  const lyrics = music?.options?.find((option) => option.name === "lyrics");
+
+  assert.ok(lyrics);
+  assert.deepEqual(
+    lyrics?.options?.find((option) => option.name === "action")?.choices?.map((choice) => choice.value),
+    ["show", "status"]
+  );
+});
