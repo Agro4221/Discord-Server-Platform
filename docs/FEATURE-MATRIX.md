@@ -226,7 +226,6 @@
 | Speed control | ✅ |
 | Tremolo / Vibrato / Distortion / Low Pass / Channel Mix / rotation / other Lavalink effects | 🟡 | Core effects covered: Tremolo ✅, Vibrato ✅, Distortion ✅, Low Pass ✅, Channel Mix ✅, 8D rotation ✅; remaining work is higher-level effect tooling and any non-core/plugin-specific filters
 | Custom EQ editor | ✅ | `/eq show`, `/eq set`, `/eq reset` and `!eq` equivalents |
-| Named effect profiles | 🟡 | e.g. Gaming / Anime / Chill / Party |
 | Persist and restore effect state | 🟡 |
 
 #### Autoplay / radio
@@ -272,7 +271,7 @@
 
 ### Music product principle
 
-Music должен стремиться к функциональности сильных платных музыкальных ботов без искусственного Premium wall: расширенное управление очередью, DJ permissions, vote-skip, полноценный controller, loop-one, фильтры, autoplay/radio, lyrics, saved/shared playlists, fairness/anti-spam и широкая поддержка музыкальных источников относятся к общему продукту.
+Music должен стремиться к функциональности сильных музыкальных ботов без искусственного Premium wall: расширенное управление очередью, DJ permissions, vote-skip, полноценный controller, loop-one, только релевантные аудио-возможности, autoplay/radio, lyrics, saved/shared playlists, fairness/anti-spam и широкая поддержка музыкальных источников относятся к общему продукту. Отдельные Lavalink-фильтры не добавляются автоматически только потому, что библиотека их поддерживает.
 
 Новые музыкальные функции должны проходить через общие permissions, persistence, audit/diagnostics и Dashboard contract.
 
@@ -347,7 +346,7 @@ Music должен стремиться к функциональности си
 | Timed punishments | ✅ |
 | Escalation policies | ✅ |
 | Mod notes / history | ✅ |
-| Full action logging | 🟡 |
+| Full action logging | ✅ | Runtime moderation actions, warning completion/case persistence, private mod notes, scheduled cleanup failures and timed-punishment expiry failures are audit-visible; non-user targets use explicit target types |
 | Rule-specific AutoMod punishments | ✅ |
 | Rate limits per rule | ✅ |
 | Channel / role / user exemptions | ✅ / расширять |
