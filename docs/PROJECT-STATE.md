@@ -558,3 +558,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - No backup runtime behavior changed; the configuration contract now matches the implemented behavior.
 - Source checkpoint: b54754910ebfced9712a4a7fa4061d343e8d32bf.
 - Fresh CI remains unavailable in the current connector session.
+## 2026-10-05 — Compose secret contract
+- docker-compose.yml now fails configuration resolution when POSTGRES_PASSWORD or LAVALINK_PASSWORD is absent instead of silently using change-me defaults.
+- CI and check-deployment-contract provide ephemeral validation values only for config parsing.
+- Regression guard prevents the insecure defaults from returning.
