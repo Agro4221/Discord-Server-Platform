@@ -671,3 +671,14 @@ Never write credentials, tokens or private user data here.
 - CI #2034 passed completely.
 - Final source checkpoint: c18f1de1a0a404531f1686e363cfa060c6232293.
 - Next single Music slice: Max guild queue size.
+
+
+## 2026-10-05 — Music controller permissions + autoplay
+- Completed the Music controller permission parity slice and autoplay controller quick action.
+- Persistent controller now has an Autoplay On/Off button; state is read from the existing guild autoplay setting.
+- Controller actions map to the existing CommandPolicyService, so configured per-command role/channel restrictions apply to buttons as well as Slash/Prefix execution.
+- Added shared member-action policy API and regression coverage for default allow, role/channel denies and disabled commands.
+- CI #2056 passed completely.
+- Reconciled stale matrix state for Max guild queue size, which was already implemented before this slice.
+- Final source checkpoint: `af87eaa40211d33f2b49879c3ee210c9f6b266ac`.
+- Next single Music slice: **separate queue add/remove/move permissions**.
