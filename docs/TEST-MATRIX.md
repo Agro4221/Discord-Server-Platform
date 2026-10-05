@@ -320,3 +320,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-05 — Management API authorization snapshot
 - Dedicated regression tests cover Management API authentication failure/success cases at the pure authorization-contract level.
 - Live release-gate case remains: unauthenticated HTTP request must return 401; exact configured Bearer key must authorize; malformed/expired deployment configuration must not expose mutations.
+
+### 2026-10-05 — Dashboard mutation security snapshot
+- Static coverage now enforces that POST/PUT/PATCH/DELETE Dashboard API routes include the shared same-origin check.
+- Live release-gate case remains: cross-origin/browser mutation attempts must return 403 while same-origin Dashboard mutations continue to reach the authenticated Management API.
