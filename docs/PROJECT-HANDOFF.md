@@ -568,3 +568,8 @@ Live validation, требующая пользовательского окру�
 ### 2026-10-05 — Current checkpoint after Vote Skip
 - Vote Skip is complete and CI-verified (#2012).
 - Next single module: Per-user request cooldown.
+
+
+### 2026-10-05 — Current checkpoint after request cooldown
+- Per-user request cooldown is complete and CI-verified (#2020).
+- Next single module: Per-user queued-track limit.
