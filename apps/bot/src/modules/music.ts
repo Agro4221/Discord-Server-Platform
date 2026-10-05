@@ -1407,7 +1407,7 @@ export class Music implements PlatformModule {
     const first = tracks[0]!;
     return {
       added: tracks.length,
-      truncated: result.tracks.length > tracks.length && remainingSlots === null,
+      truncated: result.tracks.length > tracks.length && remainingUserSlots === null && remainingGuildSlots === null,
       limited: (remainingUserSlots !== null || remainingGuildSlots !== null) && result.tracks.length > tracks.length,
       firstTitle: first.info.title,
       firstAuthor: first.info.author ?? "Unknown artist"
@@ -2684,7 +2684,7 @@ export class Music implements PlatformModule {
 
   private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number; twentyFourSeven: boolean; queueAccess: "everyone" | "dj"; maxQueuedPerUser: number;
       maxQueueSize: number }> {
-    const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number; twenty_four_seven: boolean; queue_access: "everyone" | "dj"; max_queued_per_user: number }>(
+    const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number; twenty_four_seven: boolean; queue_access: "everyone" | "dj"; max_queued_per_user: number; max_queue_size: number }>(
       "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds,twenty_four_seven,queue_access,max_queued_per_user,max_queue_size FROM music_settings WHERE guild_id=$1",
       [guildId]
     );
