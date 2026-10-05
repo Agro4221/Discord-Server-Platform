@@ -441,3 +441,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - CI #2034 is green.
 - Per-user pending queue limit is complete and CI-verified.
 - Next high-value slice: Max guild queue size.
+
+
+## 2026-10-05 — Music controller permissions verified
+- Source checkpoint: `af87eaa40211d33f2b49879c3ee210c9f6b266ac`.
+- CI #2056 is green.
+- Controller permission parity and Autoplay quick toggle are complete; Max guild queue size is confirmed implemented.
+- Next high-value slice: **separate queue add/remove/move permissions**.
