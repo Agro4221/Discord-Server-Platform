@@ -1253,3 +1253,10 @@ Never write credentials, tokens or private user data here.
 - Existing local backup round-trip and retention behavior remains unchanged.
 - Source checkpoint: `9ca8b24d022ee4494873da651162ccba583d3f53`.
 - Fresh CI is not visible yet; keep this slice unverified until Actions reports the new checkpoint.
+
+## 2026-10-05 — VPS runtime smoke-gate hardening
+- VPS installer now waits for all practical layers it controls: bot health, direct Dashboard HTTP 200 and Caddy HTTPS edge returning 401 without credentials.
+- VPS upgrade performs the same checks when the Caddy overlay is active; local/non-VPS upgrades still require the bot and Dashboard to become healthy.
+- Deployment contract now statically requires the runtime smoke-check probes and HTTP status expectations.
+- Source checkpoint: `95877c00ac9fff5d1615d519f202a316ba403783`.
+- Fresh CI is not visible yet; live DNS/TLS/external access and clean-host execution remain release-gate checks.
