@@ -1280,3 +1280,9 @@ Never write credentials, tokens or private user data here.
 - Deployment contract now requires the explicit domain validation guard.
 - Source checkpoint: `83f7e61bb7b9cfc25902effc011023ff8b5af288`.
 - Fresh CI is still not visible; live existing-install upgrade remains a release-gate check.
+
+## 2026-10-05 — VPS upgrade guard reconciliation
+- Reconciled the deployment contract after extending VPS recovery checks: DOMAIN validation is now explicitly scoped to installations using the Caddy overlay, so ordinary local upgrades are not forced to define a public domain.
+- The deployment contract checker was restored to a clean, single-pass structure and retains migration, Compose, runtime smoke, secret-preservation, upgrade-secret and Caddy-setting assertions.
+- Source checkpoint: `dcd9476f76a01995f532dc69e24185079ec93d42` (upgrade script); deployment contract restoration follows in branch history.
+- CI/check-runs are still absent for the current PR head; live deployment validation remains pending.
