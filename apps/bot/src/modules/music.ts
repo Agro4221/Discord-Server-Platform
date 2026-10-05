@@ -47,10 +47,6 @@ export function normalizeMusicPlaylistSearch(value: string): string | null {
   return normalized ? normalized : null;
 }
 
-export function escapeMusicPlaylistLike(value: string): string {
-  return value.replace(/[\\%_]/g, (character) => "\\" + character);
-}
-
 export function removeMusicPlaylistTrack<T>(tracks: T[], position: number): T[] | null {
   if (!Number.isInteger(position) || position < 1 || position > tracks.length) return null;
   const index = position - 1;
@@ -1230,13 +1226,13 @@ export class Music implements PlatformModule {
         await interaction.reply({ content: "Укажи текст для поиска.", ephemeral: true });
         return;
       }
-      const pattern = "%" + escapeMusicPlaylistLike(query) + "%";
+      const pattern = "%" + query + "%";
       const result = await this.db.query<{
         name: string;
         tracks: unknown[];
         visibility: MusicPlaylistVisibility;
       }>(
-        "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') AND ($4=false OR visibility='shared') AND name ILIKE $3 ESCAPE '\\' ORDER BY visibility DESC,updated_at DESC LIMIT 25",
+        "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') AND ($4=false OR visibility='shared') AND name ILIKE $3 ORDER BY visibility DESC,updated_at DESC LIMIT 25",
         [guildId,interaction.user.id,pattern,sharedOnly]
       );
       const lines = result.rows.map((row, index) =>
