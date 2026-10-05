@@ -858,3 +858,12 @@ Never write credentials, tokens or private user data here.
 - Automation now has `kick` alongside `timeout`, `ban`, role management, nickname, message, reaction, channel, cooldown and logging actions.
 - Kick supports `@event` or explicit user IDs, rendered reasons up to 500 characters, and Discord `kickable` hierarchy protection.
 - Current development HEAD: `8e909adab460ae498c3258ec6cc59b2d55b7c820`.
+
+
+## 2026-10-05 — RC freeze and final automated gate preparation
+- Release candidate status is now explicitly frozen for live acceptance rather than expanded indefinitely.
+- Re-checked CI on the pre-freeze HEAD `8daf1401258d9c94d72bac491948cce8a2b12555`: run #1846 (37237396426) passed all automated stages.
+- Post-verification cleanup was intentionally limited to two concrete correctness/documentation issues: removed the duplicated author section in README and removed a duplicated `number-eq` option from the Automation Builder UI.
+- README and PROJECT-STATE now describe deeper AutoMod/Security/Automation/Music expansion as post-RC work rather than blocking the current release candidate.
+- Remaining release blockers are environment-dependent: real Discord smoke/E2E, Lavalink/fleet failover, native Windows runtime, VPS clean-host acceptance and controlled chaos/soak/security validation.
+- The next CI run must verify this final documentation/UI cleanup tree before the RC is treated as the final automated state.
