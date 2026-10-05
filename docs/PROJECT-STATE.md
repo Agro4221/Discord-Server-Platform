@@ -544,3 +544,11 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Added a CI scanner (`scripts/check-dashboard-route-security.mjs`) to enforce the contract for future mutation routes.
 - Current CI workflow checkpoint: `6f5cb19d2f38f46606a422c7b5b0fec167562b04`.
 - CI has not yet reported a run for the current branch head.
+
+## 2026-10-05 — Dashboard mutation security follow-up
+- Found and fixed a concrete remaining mutation gap: the Integration Credential test POST route lacked assertSameOrigin while its sibling DELETE route already had it.
+- The route-security CI checker is now per-handler: every exported POST/PUT/PATCH/DELETE is checked independently, preventing one protected mutation from masking another mutation in the same file.
+- Route fix checkpoint: 60b3a4ab7fd455fbe61bdcff6575c268f551666c.
+- Final checker checkpoint: 9fa32baf9c9522485b829c68a36675d191681492.
+- Docs checkpoint after this slice: 557688aa12492758bc50c6cfd606a61298b1c5ed.
+- Fresh CI remains pending/unavailable in the current connector session.
