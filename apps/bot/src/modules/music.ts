@@ -139,6 +139,21 @@ export function remainingMusicRequestCooldown(cooldownUntil: number, now = Date.
   return Math.max(0, cooldownUntil - now);
 }
 
+export function normalizeMusicQueueLimit(value: number): number {
+  if (!Number.isFinite(value)) return 10;
+  return Math.min(100, Math.max(0, Math.trunc(value)));
+}
+
+export function countMusicQueuedByUser<T extends { requester?: { id?: string } }>(tracks: readonly T[], userId: string): number {
+  return tracks.reduce((count, track) => count + (track.requester?.id === userId ? 1 : 0), 0);
+}
+
+export function remainingMusicQueueSlots(queuedCount: number, limit: number): number | null {
+  const normalizedLimit = normalizeMusicQueueLimit(limit);
+  if (normalizedLimit === 0) return null;
+  return Math.max(0, normalizedLimit - Math.max(0, Math.trunc(queuedCount)));
+}
+
 export function voteSkipThreshold(listenerCount: number): number {
   const safe = Math.max(1, Math.floor(listenerCount));
   return Math.max(1, Math.ceil(safe * 0.6));
@@ -2550,7 +2565,7 @@ export class Music implements PlatformModule {
 
   private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number; twentyFourSeven: boolean; queueAccess: "everyone" | "dj" }> {
     const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number; twenty_four_seven: boolean; queue_access: "everyone" | "dj" }>(
-      "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds,twenty_four_seven,queue_access FROM music_settings WHERE guild_id=$1",
+      "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds,twenty_four_seven,queue_access,max_queued_per_user FROM music_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -2561,7 +2576,8 @@ export class Music implements PlatformModule {
       announceTrackStart: row?.announce_track_start ?? true,
       autoLeaveSeconds: Math.min(Math.max(Number(row?.auto_leave_seconds ?? 30), 0), 86400),
       twentyFourSeven: row?.twenty_four_seven ?? false,
-      queueAccess: row?.queue_access === "dj" ? "dj" : "everyone"
+      queueAccess: row?.queue_access === "dj" ? "dj" : "everyone",
+      maxQueuedPerUser: normalizeMusicQueueLimit(Number(row?.max_queued_per_user ?? 10))
     };
   }
 
