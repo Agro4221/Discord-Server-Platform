@@ -632,3 +632,12 @@ Never write credentials, tokens or private user data here.
 - CI #1997 passed completely.
 - Final source checkpoint: 6f2d6b57ec49336eb96a6ba24975476e4bc413f3.
 - Next single Music slice: Load playlist with optional shuffle.
+
+
+## 2026-10-05 — Music playlist shuffle
+- Added optional shuffle to saved playlist loading.
+- Shuffle operates on a copy of stored playlist tracks, so persisted playlist order remains unchanged.
+- Added regression coverage for non-mutating shuffle behavior.
+- CI #2004 passed completely.
+- Final source checkpoint: 7ff06bf24613e8efc9d24fd95bcd214138c24e79.
+- Next single Music slice: Vote skip.
