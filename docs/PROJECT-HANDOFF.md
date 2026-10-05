@@ -644,3 +644,10 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Fixed the discovered gaps in Help Pages deletion, Moderation Presets mutation and Role Automation creation.
 - `scripts/check-dashboard-route-security.mjs` now enforces the mutation-route contract in CI.
 - This complements the public VPS Caddy Basic Auth boundary and the internal Management API Bearer-key boundary without reintroducing end-user Dashboard login.
+
+### 2026-10-05 — Dashboard mutation gate follow-up
+- A second audit found one remaining concrete gap inside the Integration Credentials API: POST /test was missing assertSameOrigin even though DELETE was protected.
+- Fixed the POST handler and upgraded the route-security checker to validate each exported mutating handler independently.
+- Route checkpoint: 60b3a4ab7fd455fbe61bdcff6575c268f551666c; final checker checkpoint: 9fa32baf9c9522485b829c68a36675d191681492.
+- Continue with the next bounded release-gate audit; do not reopen completed feature modules. Keep the no-login local Control Center and internal Management API Bearer-key model unchanged.
+- Fresh CI remains unavailable in the current connector session; live Discord/Lavalink/Windows/E2E/chaos/soak/clean-host validation is still pending.
