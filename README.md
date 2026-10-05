@@ -170,6 +170,18 @@ scripts/start-local.ps1
 
 Перед первым live-запуском необходимо подготовить собственные Discord credentials и локальное окружение. Рекомендуется сначала пройти автоматические проверки, затем выполнить live-проверку на тестовом сервере.
 
+## 🖥️ Local Windows startup
+
+For the everyday gaming/streaming PC the primary path is native Windows, without Docker Desktop:
+
+    start.bat
+
+This starts PostgreSQL as an existing local installation, one Lavalink node and the bot. Dashboard is off by default to keep the background footprint low.
+
+Use `control-center.bat` when the web Control Center is needed. Use `start.bat -Lavalink2` only when a second Lavalink node is actually required for redundancy. Docker remains supported as an optional deployment/reproducibility path.
+
+Resource tiers are documented in `docs/RESOURCE-REQUIREMENTS.md`.
+
 ## 🧪 Проверка
 
 ~~~mermaid
