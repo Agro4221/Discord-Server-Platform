@@ -1482,6 +1482,25 @@ const migrations = [
     ])
   },
   {
+    version: 99,
+    name: "notification_tiktok_feeds",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS notification_tiktok_feeds (",
+      "  id bigserial PRIMARY KEY, guild_id text NOT NULL, channel_id text NOT NULL,",
+      "  credential_id bigint NOT NULL REFERENCES integration_credentials(id) ON DELETE CASCADE,",
+      "  target_open_id text NOT NULL, target_label text NOT NULL DEFAULT '',",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  interval_seconds integer NOT NULL DEFAULT 300 CHECK(interval_seconds BETWEEN 60 AND 86400),",
+      "  last_video_id text, last_polled_at timestamptz, processing_until timestamptz,",
+      "  message_template text NOT NULL DEFAULT '🎵 **Новый TikTok**\\n**{title}**\\n{url}',",
+      "  embed_config jsonb,",
+      "  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_notification_tiktok_feeds_polling ON notification_tiktok_feeds(enabled,processing_until,last_polled_at);",
+      "CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_tiktok_feed_guild_credential_target ON notification_tiktok_feeds(guild_id,credential_id,target_open_id);"
+    ])
+  },
+  {
     version: 98,
     name: "notification_feed_embeds",
     sql: q([
