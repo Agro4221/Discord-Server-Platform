@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -453,4 +453,27 @@ test("Music playlist continuation invalidates only the edited playlist", () => {
   assert.equal(shouldInvalidateMusicPlaylistContinuation("playlist-1", "playlist-2"), false);
   assert.equal(shouldInvalidateMusicPlaylistContinuation(null, "playlist-1"), false);
   assert.equal(shouldInvalidateMusicPlaylistContinuation(undefined, "playlist-1"), false);
+});
+
+
+test("Music autoplay candidate skips current, queued and recent track identifiers or URLs", () => {
+  const excludedIdentifiers = new Set(["current", "queued", "recent-id"]);
+  const excludedUris = new Set(["https://music.example/recent-url"]);
+
+  assert.equal(
+    isMusicAutoplayCandidateAllowed({ info: { identifier: "current", uri: "https://music.example/current" } }, excludedIdentifiers, excludedUris),
+    false
+  );
+  assert.equal(
+    isMusicAutoplayCandidateAllowed({ info: { identifier: "queued", uri: "https://music.example/queued" } }, excludedIdentifiers, excludedUris),
+    false
+  );
+  assert.equal(
+    isMusicAutoplayCandidateAllowed({ info: { identifier: "new-id", uri: "https://music.example/recent-url" } }, excludedIdentifiers, excludedUris),
+    false
+  );
+  assert.equal(
+    isMusicAutoplayCandidateAllowed({ info: { identifier: "new-id", uri: "https://music.example/new" } }, excludedIdentifiers, excludedUris),
+    true
+  );
 });
