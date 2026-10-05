@@ -189,7 +189,7 @@
 | Функция | План |
 |---|---|
 | Separate permissions for play / skip / stop / seek / volume / filters | ✅ | Controller actions use the same per-command role/channel policy as Slash and Prefix command execution |
-| Separate queue add / remove / move permissions | 🟡 |
+| Separate queue add / remove / move permissions | ✅ | Distinct queue-add, queue-remove and queue-move policy keys integrate with existing queueAccess and shared Command Policy |
 | DJ role policy | ✅ |
 | Vote skip | ✅ | Non-DJ users can vote to skip the current track; threshold scales from active human voice listeners and votes expire with the current track/session |
 | Per-user request cooldown | ✅ | Successful music queue requests are throttled per user/server for 5 seconds across slash play and request channel |
