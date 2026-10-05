@@ -2,6 +2,9 @@ import {
   ActionRowBuilder,
   AttachmentBuilder,
   ButtonBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   ButtonStyle,
   EmbedBuilder,
   type ButtonInteraction,
@@ -40,6 +43,11 @@ const MUSIC_FILTER_ACTIONS = [
 ] as const;
 
 type MusicFilterAction = (typeof MUSIC_FILTER_ACTIONS)[number];
+
+export function normalizeMusicPlaylistName(value: string): string | null {
+  const name = value.trim().replace(/\s+/g, " ").slice(0, 80);
+  return name.length >= 1 ? name : null;
+}
 
 export function isMusicFilterAction(value: string): value is MusicFilterAction {
   return (MUSIC_FILTER_ACTIONS as readonly string[]).includes(value);
@@ -2073,6 +2081,66 @@ export class Music implements PlatformModule {
   }
 
   private async onInteraction(interaction: Interaction): Promise<void> {
+    if (interaction.isModalSubmit() && interaction.customId === "dsp:music:save-queue" && interaction.guild) {
+      const player = this.manager?.players.get(interaction.guild.id);
+      if (!player) {
+        await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+        return;
+      }
+      const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+      if (!canControlMusic(member?.voice.channelId ?? null, player.voiceChannelId, interaction.memberPermissions?.has("ManageGuild") ?? false)) {
+        await interaction.reply({ content: "Сохранять очередь можно из того же голосового канала.", ephemeral: true });
+        return;
+      }
+
+      const name = normalizeMusicPlaylistName(interaction.fields.getTextInputValue("name"));
+      if (!name) {
+        await interaction.reply({ content: "Название плейлиста пустое или некорректное.", ephemeral: true });
+        return;
+      }
+
+      const tracks = [
+        ...(player.queue.current ? [player.queue.current] : []),
+        ...player.queue.tracks
+      ].slice(0, MAX_PLAYLIST_TRACKS);
+
+      if (!tracks.length) {
+        await interaction.reply({ content: "Нечего сохранять: очередь пуста.", ephemeral: true });
+        return;
+      }
+
+      try {
+        await this.db.query(
+          "INSERT INTO music_playlists(guild_id,user_id,name,tracks) VALUES($1,$2,$3,$4::jsonb)",
+          [
+            interaction.guild.id,
+            interaction.user.id,
+            name,
+            JSON.stringify(tracks.map((track) => this.serializedTrack(track)))
+          ]
+        );
+      } catch (error) {
+        const message = String(error);
+        if (/unique|duplicate|23505/i.test(message)) {
+          await interaction.reply({ content: "Плейлист **" + name + "** уже существует. Выбери другое имя.", ephemeral: true });
+          return;
+        }
+        logger.warn("Music queue playlist save failed", {
+          guildId: interaction.guild.id,
+          userId: interaction.user.id,
+          error: message
+        });
+        await interaction.reply({ content: "Не удалось сохранить текущую очередь.", ephemeral: true });
+        return;
+      }
+
+      await interaction.reply({
+        content: "💾 Очередь сохранена в **" + name + "**: **" + tracks.length + "** трек(ов).",
+        ephemeral: true
+      });
+      return;
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith("dsp:music:search:") && interaction.guild) {
       const parts = interaction.customId.split(":");
       const token = parts[3];
@@ -2129,6 +2197,22 @@ export class Music implements PlatformModule {
     }
 
     const action = interaction.customId.slice("dsp:music:".length);
+    if (action === "save-queue") {
+      const modal = new ModalBuilder()
+        .setCustomId("dsp:music:save-queue")
+        .setTitle("Сохранить текущую очередь");
+      const nameInput = new TextInputBuilder()
+        .setCustomId("name")
+        .setLabel("Имя плейлиста")
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(80)
+        .setRequired(true)
+        .setPlaceholder("Например: Вечерний сет");
+      modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput));
+      await interaction.showModal(modal);
+      return;
+    }
+
     if (action === "filters") {
       await interaction.reply({
         content: "🎚️ Выбери фильтр или FX. Действия применяются к текущему треку сразу.",
@@ -2562,7 +2646,8 @@ export class Music implements PlatformModule {
         new ButtonBuilder().setCustomId("dsp:music:queue").setEmoji("📋").setLabel("Очередь").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("dsp:music:lyrics").setEmoji("📜").setLabel("Текст").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("dsp:music:favorite").setEmoji("❤️").setLabel("В избранное").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("dsp:music:filters").setEmoji("🎚️").setLabel("Фильтры").setStyle(ButtonStyle.Secondary)
+        new ButtonBuilder().setCustomId("dsp:music:filters").setEmoji("🎚️").setLabel("Фильтры").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("dsp:music:save-queue").setEmoji("💾").setLabel("Сохранить").setStyle(ButtonStyle.Secondary)
       )
     ];
   }
