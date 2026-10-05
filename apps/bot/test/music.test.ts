@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -182,6 +182,12 @@ test("music quick filter actions allow only known presets", async () => {
   }
 });
 
+
+test("Music playlist search normalizes input", () => {
+  assert.equal(normalizeMusicPlaylistSearch("  evening set  "), "evening set");
+  assert.equal(normalizeMusicPlaylistSearch("   "), null);
+  assert.equal(normalizeMusicPlaylistSearch("x".repeat(100))?.length, 80);
+});
 
 test("Music playlist track removal and movement preserve order", () => {
   const tracks = ["A", "B", "C", "D"];
