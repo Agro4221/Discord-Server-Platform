@@ -47,6 +47,16 @@ export function normalizeMusicPlaylistSearch(value: string): string | null {
   return normalized ? normalized : null;
 }
 
+export function normalizeMusicPlaylistImportUrl(value: string): string | null {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function removeMusicPlaylistTrack<T>(tracks: T[], position: number): T[] | null {
   if (!Number.isInteger(position) || position < 1 || position > tracks.length) return null;
   const index = position - 1;
@@ -1204,6 +1214,99 @@ export class Music implements PlatformModule {
     const shared = interaction.options.getBoolean("shared") === true;
     const sharedOnly = interaction.options.getBoolean("shared-only") === true;
     const guildId = interaction.guild!.id;
+
+    if (action === "import") {
+      const importUrl = normalizeMusicPlaylistImportUrl(interaction.options.getString("query") ?? "");
+      if (!importUrl) {
+        await interaction.reply({ content: "Укажи корректный HTTP(S) URL плейлисты.", ephemeral: true });
+        return;
+      }
+      if (!name) {
+        await interaction.reply({ content: "Укажи имя новой плейлисты.", ephemeral: true });
+        return;
+      }
+
+      const visibility = normalizeMusicPlaylistVisibility(shared);
+      if (visibility === "shared" && !await this.canManageMusicMember(
+        guildId,
+        await interaction.guild!.members.fetch(interaction.user.id).catch(() => null)
+      )) {
+        await interaction.reply({ content: "Импортировать shared-плейлисты могут только DJ или Manage Server.", ephemeral: true });
+        return;
+      }
+      if (!this.manager) throw new Error("music_manager_unavailable");
+
+      const voiceChannelId = (await interaction.guild!.members.fetch(interaction.user.id)).voice.channelId;
+      if (!voiceChannelId) {
+        await interaction.reply({ content: "Для импорта сначала зайди в голосовой канал, чтобы Music смогла получить список треков.", ephemeral: true });
+        return;
+      }
+
+      try {
+        const existing = this.manager.players.get(guildId);
+        const player = existing ?? await this.manager.createPlayer({
+          guildId,
+          voiceChannelId,
+          textChannelId: await this.preferredTextChannelId(guildId, interaction.channelId),
+          volume: await this.defaultVolume(guildId),
+          selfDeaf: true
+        });
+        if (player.voiceChannelId !== voiceChannelId) {
+          await interaction.reply({ content: "Музыкальный бот уже занят другим голосовым каналом.", ephemeral: true });
+          return;
+        }
+        if (!player.connected) await player.connect();
+
+        const result = await player.search({ query: importUrl }, interaction.user);
+        if (!result.tracks.length) {
+          await interaction.reply({ content: "По этому URL не удалось получить ни одного трека.", ephemeral: true });
+          return;
+        }
+
+        const seen = new Set<string>();
+        const imported = (result.tracks as Track[]).filter((track) => {
+          const identifier = String(track.info.identifier ?? track.info.uri ?? "");
+          if (!identifier || seen.has(identifier)) return false;
+          seen.add(identifier);
+          return true;
+        }).slice(0, MAX_PLAYLIST_TRACKS);
+
+        if (!imported.length) {
+          await interaction.reply({ content: "В импортируемой плейлисте не осталось уникальных треков.", ephemeral: true });
+          return;
+        }
+
+        try {
+          await this.db.query(
+            "INSERT INTO music_playlists(guild_id,user_id,name,visibility,tracks) VALUES($1,$2,$3,$4,$5::jsonb)",
+            [guildId,interaction.user.id,name,visibility,JSON.stringify(imported.map((track) => this.serializedTrack(track)))]
+          );
+        } catch {
+          await interaction.reply({
+            content: visibility === "shared"
+              ? "Shared-плейлист с таким именем уже существует."
+              : "Личный плейлист с таким именем уже существует.",
+            ephemeral: true
+          });
+          return;
+        }
+
+        const limited = result.tracks.length > imported.length;
+        await interaction.reply({
+          content: "📥 " + (visibility === "shared" ? "Shared-плейлист" : "Плейлист") + " **" + name + "** импортирован: **" +
+            imported.length + "** треков" + (limited ? " (лишние/дубликаты отброшены)" : "") + ".",
+          ephemeral: true
+        });
+      } catch (error) {
+        logger.warn("Music playlist URL import failed", {
+          guildId,
+          userId: interaction.user.id,
+          error: String(error)
+        });
+        await interaction.reply({ content: "Не удалось импортировать плейлист по этому URL.", ephemeral: true });
+      }
+      return;
+    }
 
     if (action === "list") {
       const result = await this.db.query<{ name: string; tracks: unknown[]; visibility: MusicPlaylistVisibility }>(
