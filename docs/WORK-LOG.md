@@ -802,3 +802,16 @@ Never write credentials, tokens or private user data here.
 - CI #2147 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
 - Final source checkpoint: `92ad5ef802a3a89cd7aac7831959228c77947add`.
 - Next single Music slice: **Playlists — duplicate handling / merge**.
+
+
+## 2026-10-05 — Music playlist duplicate handling / merge
+- Completed the saved-playlist merge slice.
+- Added /music playlist → Merge with name as the target playlist and source as the source playlist.
+- Merge appends source tracks to the target in source order, preserves the existing target order and skips duplicate track identifiers already present in either playlist.
+- Source playlist access follows the existing visibility rules: personal playlists are owner-only and shared playlists are guild-visible.
+- The target playlist keeps the existing edit permissions; the source playlist is never deleted or modified by merge.
+- Merge respects the existing 500-track playlist capacity and reports added, duplicate and truncated counts back to the user.
+- Added regression coverage for order preservation, duplicate handling, source duplicates and the 500-track cap.
+- CI #2151 is the validation run for the code/test checkpoint 6eb88b3b8f1e672b04ca08af1ae7d6eed6ab9747.
+- Final source checkpoint will be recorded after the documentation commit and its resulting CI check.
+- Next single Music slice: Playlist continuation after edits / stale continuation safety.
