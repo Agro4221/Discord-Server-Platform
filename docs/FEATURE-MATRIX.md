@@ -224,7 +224,7 @@
 | Karaoke | ✅ |
 | Pitch control | ✅ |
 | Speed control | ✅ |
-| Tremolo / rotation / other Lavalink effects | 🟡 | Tremolo ✅; remaining rotation/additional effects still planned
+| Tremolo / Vibrato / rotation / other Lavalink effects | 🟡 | Tremolo ✅, Vibrato ✅; remaining additional effects still planned
 | Custom EQ editor | 🟡 |
 | Named effect profiles | 🟡 | e.g. Gaming / Anime / Chill / Party |
 | Persist and restore effect state | 🟡 |
