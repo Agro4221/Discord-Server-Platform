@@ -263,11 +263,13 @@ function Ensure-Postgres {
   & $pgIsReady -h 127.0.0.1 -p 5432 *> $null
   if ($LASTEXITCODE -ne 0) {
     Write-Host "Starting local PostgreSQL..."
-    & $pgCtl -D $dataRoot -l (Join-Path $logRoot "postgres.log") -o "-h 127.0.0.1 -p 5432" start *> $null
-    if ($LASTEXITCODE -ne 0) {
-      Get-Content (Join-Path $logRoot "postgres.log") -Tail 80 -ErrorAction SilentlyContinue
-      throw "Local PostgreSQL could not be started."
-    }
+    $pgLog = Join-Path $logRoot "postgres.log"
+    # Do not synchronously invoke pg_ctl here. On Windows, the native child
+    # process can keep inherited console handles alive even after PostgreSQL
+    # is ready, making PowerShell appear to hang. Start it asynchronously and
+    # use pg_isready below as the real readiness gate.
+    $pgArgs = @("-D", $dataRoot, "-l", $pgLog, "-o", "-h 127.0.0.1 -p 5432", "start", "-W")
+    Start-Process -FilePath $pgCtl -ArgumentList $pgArgs -WorkingDirectory (Get-Location).Path -WindowStyle Hidden | Out-Null
   }
 
   $ready = $false
