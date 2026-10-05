@@ -916,3 +916,14 @@ Never write credentials, tokens or private user data here.
 - CI #2200 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
 - Final source checkpoint for this slice: f2e90f7d758eaf41c8c1d8f6069824efe8f1e5ea.
 - Next single Music slice: **Vibrato audio effect**.
+
+
+## 2026-10-05 — Music Vibrato audio effect
+- Completed the independent Vibrato audio effect slice.
+- Added `vibrato` to the Music filter command and quick-filter palette; it uses the native Lavalink client `toggleVibrato()` API with the existing filter manager path.
+- Kept the same controller resync, persistence and Lavalink error handling path as the existing Music effects.
+- Added unit coverage confirming Vibrato is accepted as a valid quick-filter action.
+- Current Lavalink REST documentation defines Vibrato as a native player filter with frequency and depth parameters, and the project's lavalink-client exposes `toggleVibrato()` for it. citeturn845892search6
+- CI #2204 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: 970cbbc7348b7f2f981375d037907adcb1f9035a.
+- Next single Music slice: **additional Lavalink audio effects**.
