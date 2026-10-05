@@ -9,6 +9,12 @@ export type HealthState = {
   lastError?: string;
 };
 
+export function healthStatusCode(path: string, state: HealthState): number {
+  if (path !== "/health" && path !== "/ready") return 404;
+  if (path === "/health") return state.database === "ready" ? 200 : 503;
+  return state.status === "ready" ? 200 : 503;
+}
+
 export class HealthServer {
   private server?: Server;
   private state: HealthState = {
@@ -36,7 +42,7 @@ export class HealthServer {
       this.server = createServer((req, res) => {
         if (req.url === "/health" || req.url === "/ready") {
           const payload = JSON.stringify(this.state);
-          res.writeHead(this.state.status === "ready" ? 200 : 503, {
+          res.writeHead(healthStatusCode(req.url, this.state), {
             "content-type": "application/json; charset=utf-8",
             "cache-control": "no-store"
           });
