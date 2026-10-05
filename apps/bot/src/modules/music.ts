@@ -2281,6 +2281,28 @@ export class Music implements PlatformModule {
   }
 
   private async lyrics(interaction: ChatInputCommandInteraction): Promise<void> {
+    const action = interaction.options.getString("action") ?? "show";
+    if (action === "status") {
+      const configuredSources = [
+        ["YouTube", true],
+        ["Spotify", true],
+        ["Deezer", true],
+        ["Yandex Music", true]
+      ] as const;
+      const lines = configuredSources.map(([name, enabled]) =>
+        (enabled ? "🟢" : "⚪") + " **" + name + "** · LavaLyrics"
+      );
+      await interaction.reply({
+        content:
+          "📜 **Lyrics status**\n" +
+          "LavaLyrics: " + (this.initialized && this.connectedNodes.size > 0 ? "🟢 доступен" : "🟡 node недоступен") +
+          "\n\n" + lines.join("\n") +
+          "\n\nИсточники определяются конфигурацией Lavalink/LavaLyrics; отсутствие текста у отдельного трека не означает неисправность lyrics-модуля.",
+        ephemeral: true
+      });
+      return;
+    }
+
     const player = this.manager?.players.get(interaction.guild!.id);
     if (!player) {
       await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
