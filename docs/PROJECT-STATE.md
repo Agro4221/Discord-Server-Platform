@@ -596,3 +596,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - First-run startup no longer requires Discord credentials before Control Center/Bot Fleet registration.
 - Native Dashboard is loopback-only and follows the configured Management API and Dashboard ports.
 - Resource defaults are documented in docs/RESOURCE-REQUIREMENTS.md and exposed in .env.example.
+## 2026-10-05 — Native Windows + resource controls
+- Primary local path is native Windows without Docker Desktop.
+- Default gaming mode runs one Lavalink + bot; Dashboard and second Lavalink are opt-in.
+- Default Node/Lavalink memory ceilings are intentionally bounded and documented.
+- Native Dashboard is loopback-only; native Management API follows the configured local port.
