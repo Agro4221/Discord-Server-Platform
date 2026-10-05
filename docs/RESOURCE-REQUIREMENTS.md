@@ -6,7 +6,7 @@ This is an engineering budget for the current `feature/music-v2` runtime, not a 
 
 `start.bat` starts the native bot stack with PostgreSQL as a separately installed Windows service/process, one Lavalink node, and the compiled Discord bot. Dashboard is OFF.
 
-The current launcher defaults to `-Xms128m -Xmx512m` for the Lavalink JVM and caps the bot Node.js old-space heap at 768 MiB. Node.js documents `--max-old-space-size` as the V8 old-generation memory limit, so this is an intentional safety ceiling rather than a promise of actual RSS usage. citeturn516863search0
+The current launcher defaults to `-Xms128m -Xmx512m` for the Lavalink JVM and caps the bot Node.js old-space heap at 768 MiB. Node.js documents `--max-old-space-size` as the V8 old-generation memory limit, so this is an intentional safety ceiling rather than a promise of actual RSS usage.
 
 Estimated application footprint:
 - Lavalink: roughly 0.3–0.8 GiB RSS under ordinary playback, including the configured Java heap plus JVM/native overhead.
@@ -14,7 +14,7 @@ Estimated application footprint:
 - PostgreSQL: roughly 0.1–0.4 GiB for a small self-hosted installation; memory is workload/configuration dependent.
 - Total native DSP stack target: about 0.7–1.8 GiB RSS in normal operation, with about 2 GiB reserved as a practical safety budget.
 
-Lavalink is intended as a relatively small-footprint standalone audio node, and Lavalink 4 requires Java 17+. citeturn374577search9turn374577search2
+Lavalink is intended as a relatively small-footprint standalone audio node, and Lavalink 4 requires Java 17+.
 
 ## Full local mode
 
