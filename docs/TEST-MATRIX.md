@@ -324,3 +324,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-05 — Dashboard mutation security snapshot
 - Static coverage now enforces that POST/PUT/PATCH/DELETE Dashboard API routes include the shared same-origin check.
 - Live release-gate case remains: cross-origin/browser mutation attempts must return 403 while same-origin Dashboard mutations continue to reach the authenticated Management API.
+
+### 2026-10-05 — Dashboard mutation-route gate follow-up
+- Fixed the Integration Credentials credential-test POST mutation, which was missed because the first static checker only validated that the file contained some assertSameOrigin() call.
+- Static gate is now per-handler for POST/PUT/PATCH/DELETE, preventing sibling mutations in the same route file from being masked by one protected handler.
+- Fresh CI is still required; live browser cross-origin mutation testing remains a release-gate validation case.
