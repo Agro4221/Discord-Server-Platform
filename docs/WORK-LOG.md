@@ -1013,6 +1013,13 @@ Never write credentials, tokens or private user data here.
 - Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
 
 ## 2026-10-05 — Local Bot Setup / registration panel
+## 2026-10-05 — Bot Setup credential verification
+- Added a non-destructive Test action beside the Bot Token field.
+- Verification calls Discord API /users/@me with the supplied Bot token and requires the returned account to be a bot whose id matches the configured Client ID.
+- A successful test never saves the token or reconnects the bot; it only records a safe audit event and returns the bot username.
+- Added a reusable credential-verification helper with mocked regression coverage.
+- Source checkpoint: 0640410404b50117dc887aa41f23ee3b019a84f7.
+
 - Reconciled the existing bot registration backend with the local Dashboard.
 - Added a dedicated **Bot Setup** system section to DiscordAdmin.
 - Panel supports Discord Application/Client ID, write-only bot token, enable/disable, username and presence.
