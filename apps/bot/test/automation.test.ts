@@ -101,6 +101,26 @@ test("Automation set-cooldown action validates duration bounds", () => {
 });
 
 
+test("Automation warn and channel creation actions validate their safety bounds", () => {
+  assert.doesNotThrow(() => validateAutomationRule("message.create", [], [
+    { type: "warn", userId: "@event", reason: "Rule warning" },
+    { type: "create-channel", name: "ticket-{userId}", channelType: "text", parentId: null },
+    { type: "create-channel", name: "voice-{userId}", channelType: "voice", parentId: "123456789012345678" }
+  ]));
+  assert.throws(() => validateAutomationRule("message.create", [], [
+    { type: "warn", userId: "bad", reason: "Rule warning" }
+  ]), /invalid_warn_action/);
+  assert.throws(() => validateAutomationRule("message.create", [], [
+    { type: "create-channel", name: "", channelType: "text", parentId: null }
+  ]), /invalid_create_channel_name/);
+  assert.throws(() => validateAutomationRule("message.create", [], [
+    { type: "create-channel", name: "ticket", channelType: "thread", parentId: null }
+  ]), /invalid_create_channel_type/);
+  assert.throws(() => validateAutomationRule("message.create", [], [
+    { type: "create-channel", name: "ticket", channelType: "text", parentId: "bad" }
+  ]), /invalid_create_channel_parent/);
+});
+
 test("Automation cooldown actions set and clear rendered keyed cooldowns", async () => {
   const db = {
     async query<T>() {
