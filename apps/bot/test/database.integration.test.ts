@@ -135,7 +135,7 @@ test("music playlist continuation state is cleared when the referenced playlist 
     await db.query("DELETE FROM music_playlists WHERE guild_id=$1", [guildId]);
 
     const playlist = await db.query<{ id: string }>(
-      "INSERT INTO music_playlists(guild_id,user_id,name,visibility,tracks) VALUES($1,$2,$3,'personal','[$4::jsonb]') RETURNING id",
+      "INSERT INTO music_playlists(guild_id,user_id,name,visibility,tracks) VALUES($1,$2,$3,'personal',$4::jsonb) RETURNING id",
       [guildId,"234567890123456793","Editable Continuation",JSON.stringify({info:{identifier:"track-1"}})]
     );
     const playlistId = playlist.rows[0]!.id;
