@@ -682,3 +682,13 @@ Never write credentials, tokens or private user data here.
 - Reconciled stale matrix state for Max guild queue size, which was already implemented before this slice.
 - Final source checkpoint: `af87eaa40211d33f2b49879c3ee210c9f6b266ac`.
 - Next single Music slice: **separate queue add/remove/move permissions**.
+
+
+## 2026-10-05 — Music queue permissions
+- Completed separate Music queue mutation permissions.
+- Added synthetic Command Policy keys: `queue-add`, `queue-remove`, `queue-move`.
+- Queue-add policy is enforced on play/request-channel/saved-playlist/search-picker insertion paths.
+- Queue-remove and queue-move policies are enforced on queue mutations; when no special policy is stored, existing DJ/Manage Server behavior remains the fallback.
+- Control Center Command Policy can configure these scopes without a second permission store.
+- CI #2063 passed completely.
+- Source checkpoint for this slice: `cb859ef8abd6f44c8e34510f4c2db6ebcf77f512`.
