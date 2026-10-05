@@ -2042,9 +2042,8 @@ export class Music implements PlatformModule {
       return;
     }
 
-    const components = this.buildControllerComponents(player);
-
     const autoplay = await this.autoplayEnabled(interaction.guildId!);
+    const components = this.buildControllerComponents(player, autoplay);
     const embed = new EmbedBuilder()
       .setTitle("🎵 Сейчас играет")
       .setDescription(`**${track.info.title}**\n${track.info.author}`)
@@ -2244,7 +2243,8 @@ export class Music implements PlatformModule {
           { name: "Repeat", value: player.repeatMode, inline: true },
           { name: "Volume", value: String(player.volume), inline: true }
         );
-      await message.reply({ embeds: [embed], components: this.buildControllerComponents(player) });
+      const autoplay = await this.autoplayEnabled(message.guild.id);
+      await message.reply({ embeds: [embed], components: this.buildControllerComponents(player, autoplay) });
     } else if (action === "repeat") {
       const mode = normalizeMusicRepeatMode((args[0] ?? "").toLowerCase());
       if (!mode) {
@@ -2426,6 +2426,21 @@ export class Music implements PlatformModule {
     }
 
     const action = interaction.customId.slice("dsp:music:".length);
+    if (action === "autoplay-toggle") {
+      if (!await this.canManageMusicMember(member)) {
+        await interaction.reply({ content: "Autoplay настраивается пользователями с DJ-ролью или Manage Server.", ephemeral: true });
+        return;
+      }
+      const enabled = toggleMusicAutoplay(await this.autoplayEnabled(interaction.guild.id));
+      await this.setAutoplay(interaction.guild.id, enabled);
+      await this.syncController(player);
+      await interaction.reply({
+        content: "📻 Autoplay " + (enabled ? "включён" : "выключен") + ".",
+        ephemeral: true
+      });
+      return;
+    }
+
     if (action === "save-queue") {
       const modal = new ModalBuilder()
         .setCustomId("dsp:music:save-queue")
@@ -2856,7 +2871,7 @@ export class Music implements PlatformModule {
     };
   }
 
-  private buildControllerComponents(player: Player): ActionRowBuilder<ButtonBuilder>[] {
+  private buildControllerComponents(player: Player, autoplayEnabled = false): ActionRowBuilder<ButtonBuilder>[] {
     const repeat = player.repeatMode === "off" ? "🔁" : player.repeatMode === "track" ? "🔂" : "🔁";
     return [
       new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -2880,6 +2895,13 @@ export class Music implements PlatformModule {
         new ButtonBuilder().setCustomId("dsp:music:favorite").setEmoji("❤️").setLabel("В избранное").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("dsp:music:filters").setEmoji("🎚️").setLabel("Фильтры").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId("dsp:music:save-queue").setEmoji("💾").setLabel("Сохранить").setStyle(ButtonStyle.Secondary)
+      ),
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId("dsp:music:autoplay-toggle")
+          .setEmoji(autoplayEnabled ? "📻" : "⏭️")
+          .setLabel(autoplayEnabled ? "Autoplay: On" : "Autoplay: Off")
+          .setStyle(autoplayEnabled ? ButtonStyle.Primary : ButtonStyle.Secondary)
       )
     ];
   }
@@ -2922,7 +2944,8 @@ export class Music implements PlatformModule {
       )
       .setTimestamp();
 
-    const components = this.buildControllerComponents(player);
+    const autoplay = await this.autoplayEnabled(player.guildId);
+    const components = this.buildControllerComponents(player, autoplay);
 
     if (storedId) {
       const existing = await channel.messages.fetch(storedId).catch(() => null);
@@ -2987,6 +3010,10 @@ function formatDurationSeconds(totalSeconds: number): string {
 }
 export function normalizeMusicRepeatMode(value: string): MusicRepeatMode | null {
   return value === "off" || value === "track" || value === "queue" ? value : null;
+}
+
+export function toggleMusicAutoplay(enabled: boolean): boolean {
+  return !enabled;
 }
 
 export function shouldAutoplayAfterQueueEnd(
