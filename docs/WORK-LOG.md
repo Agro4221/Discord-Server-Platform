@@ -1012,6 +1012,15 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Qobuz playback remains a release-gate validation item.
 - Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
 
+## 2026-10-05 — Notifications feed Test delivery
+- Added a Dashboard Test action for individual notification feeds.
+- Test delivery fetches the latest feed entry, renders the saved message template and optional embed, and sends it immediately to the configured channel.
+- Test delivery does not advance lastItemKey or lastPolledAt, so it does not interfere with normal polling.
+- Management API records the test action in the audit trail and returns a useful failure reason when the feed/source/channel is invalid.
+- Fixed feed route regex escaping while adding the /feeds/:id/test endpoint.
+- Added regression coverage remains on embed rendering/normalization; live Discord delivery still requires the running self-hosted stack.
+- Source checkpoint: 92b19a7ca85eca2af048b809a29288ca0195896e.
+
 ## 2026-10-05 — Notifications rich feed embeds
 - Added persisted optional embed configuration to notification feeds via migration 98.
 - Feed notifications can now send a normal message template plus a Discord embed with title, description, URL, color, footer, image and thumbnail.
