@@ -882,3 +882,10 @@ Never write credentials, tokens or private user data here.
 - CI #2397 passed completely on e722a37cab679aada1ef3afd599c902a40bedd2a: dependency/audit, source/deployment contracts, bot typecheck, bot tests, domain build, bot build and Dashboard build.
 ### Next concrete work
 - Runtime measurement on the real Windows machine: capture Bot RSS/heap, PostgreSQL CPU/connection use and Lavalink RSS during idle, normal chat and Music playback before making any aggressive Discord.js cache/concurrency changes.
+
+
+## 2026-10-05 — Cleanup contract follow-up
+- CI #2399 caught three stale deployment-contract assumptions left behind by the cleanup: obsolete secondary identity env placeholders and the deleted legacy Dashboard file.
+- Updated `scripts/check-deployment-contract.mjs` to validate the active `page.tsx -> control-center.tsx` entrypoint, reject removed credential placeholders and assert that deleted legacy Dashboard/Vexa files stay absent.
+- This is a correctness fix for the CI contract only; no implemented bot feature was removed.
+- Fresh CI verification after this follow-up is required before treating the cleanup head as green.

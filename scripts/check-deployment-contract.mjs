@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 
 const migrationSource = await readFile("apps/bot/src/migrations.ts", "utf8");
 const versions = [...migrationSource.matchAll(/version:\s*(\d+)/g)]
@@ -23,8 +23,8 @@ for (const name of requiredEnv) {
   }
 }
 
-if (!envExample.includes("DISCORD_TOKEN_MUSIC2") || !envExample.includes("DISCORD_CLIENT_ID_MUSIC2")) {
-  throw new Error("Secondary Discord credential contract is not documented");
+if (envExample.includes("DISCORD_TOKEN_MUSIC2") || envExample.includes("DISCORD_CLIENT_ID_MUSIC2")) {
+  throw new Error("Obsolete secondary Discord credential placeholders must not remain in .env.example");
 }
 
 const localLauncher = await readFile("scripts/start-local.ps1", "utf8");
@@ -39,15 +39,49 @@ for (const contract of [
   }
 }
 
-const dashboardClient = await readFile("apps/dashboard/app/dashboard-client.tsx", "utf8");
+const dashboardEntry = await readFile("apps/dashboard/app/page.tsx", "utf8");
+if (!dashboardEntry.includes('from "./control-center"')) {
+  throw new Error("Dashboard entrypoint must use the active Control Center");
+}
+
+const controlCenter = await readFile("apps/dashboard/app/control-center.tsx", "utf8");
 for (const forbidden of [
   "async function logout",
   "/api/auth/logout",
   'window.location.href = "/login"',
-  ">Выйти<"
+  ">Выйти<",
+  "DASHBOARD_SESSION_SECRET",
+  "DASHBOARD_AUTH_REQUIRED"
 ]) {
-  if (dashboardClient.includes(forbidden)) {
+  if (controlCenter.includes(forbidden)) {
     throw new Error("Dashboard must not expose legacy end-user auth: " + forbidden);
+  }
+}
+
+for (const legacyPath of [
+  "apps/dashboard/app/dashboard-client.tsx",
+  "apps/dashboard/app/discord-admin.tsx"
+]) {
+  try {
+    await access(legacyPath);
+    throw new Error("Obsolete Dashboard file still exists: " + legacyPath);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") {
+      continue;
+    }
+    throw error;
+  }
+}
+
+for (const legacyDoc of ["docs/VEXA-ADMIN-BLUEPRINT.md"]) {
+  try {
+    await access(legacyDoc);
+    throw new Error("Obsolete design document still exists: " + legacyDoc);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") {
+      continue;
+    }
+    throw error;
   }
 }
 
