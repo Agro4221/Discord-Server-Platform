@@ -57,6 +57,14 @@ export function normalizeMusicPlaylistImportUrl(value: string): string | null {
   }
 }
 
+export function buildMusicPlaylistSnapshot<T>(current: T | null | undefined, queued: readonly T[], limit = MAX_PLAYLIST_TRACKS): T[] {
+  const safeLimit = Math.max(0, Math.min(MAX_PLAYLIST_TRACKS, Math.floor(limit)));
+  return [
+    ...(current === null || current === undefined ? [] : [current]),
+    ...queued
+  ].slice(0, safeLimit);
+}
+
 export function removeMusicPlaylistTrack<T>(tracks: T[], position: number): T[] | null {
   if (!Number.isInteger(position) || position < 1 || position > tracks.length) return null;
   const index = position - 1;
@@ -1336,10 +1344,7 @@ export class Music implements PlatformModule {
         return;
       }
 
-      const tracks = [
-        ...(player.queue.current ? [player.queue.current] : []),
-        ...player.queue.tracks
-      ].slice(0, MAX_PLAYLIST_TRACKS);
+      const tracks = buildMusicPlaylistSnapshot(player.queue.current, player.queue.tracks);
 
       if (!tracks.length) {
         await interaction.reply({ content: "Нечего сохранять: очередь пуста.", ephemeral: true });
@@ -3144,10 +3149,7 @@ export class Music implements PlatformModule {
         return;
       }
 
-      const tracks = [
-        ...(player.queue.current ? [player.queue.current] : []),
-        ...player.queue.tracks
-      ].slice(0, MAX_PLAYLIST_TRACKS);
+      const tracks = buildMusicPlaylistSnapshot(player.queue.current, player.queue.tracks);
 
       if (!tracks.length) {
         await interaction.reply({ content: "Нечего сохранять: очередь пуста.", ephemeral: true });
