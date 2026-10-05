@@ -542,7 +542,7 @@ try {
     Write-Host "Control Center: $dashboardUrl"
     if (-not $NoOpen) { Start-Process $dashboardUrl }
   } else {
-    Write-Host "Dashboard is OFF for low-overhead mode. Add -NoDashboard only when needed."
+    Write-Host "Dashboard is disabled by -NoDashboard. Bot + PostgreSQL + Lavalink are still running."
   }
 
   Write-Host ""
