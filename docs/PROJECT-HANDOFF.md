@@ -701,3 +701,9 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Native Dashboard binds to loopback and follows configured ports.
 - Resource caps and hardware tiers are documented in `docs/RESOURCE-REQUIREMENTS.md`.
 - Live Windows/runtime/resource validation is still pending; do not mark native acceptance complete from static inspection alone.
+
+## 2026-10-05 — Native Windows resource baseline
+- Current native entrypoints: start.bat, control-center.bat, stop.bat, native-status.bat.
+- The target default for a gaming PC is one Lavalink node and no Dashboard unless needed.
+- Hardware planning is documented in docs/RESOURCE-REQUIREMENTS.md; measured working-set data from the target PC should override estimates.
+- Do not reintroduce Docker Desktop as a prerequisite for everyday Windows use.
