@@ -42,6 +42,15 @@ export function normalizeMusicPlaylistVisibility(shared: boolean): MusicPlaylist
   return shared ? "shared" : "personal";
 }
 
+export function normalizeMusicPlaylistSearch(value: string): string | null {
+  const normalized = value.replace(/\\/g, "\\\\").trim().slice(0, 80);
+  return normalized ? normalized : null;
+}
+
+export function escapeMusicPlaylistLike(value: string): string {
+  return value.replace(/[\\%_]/g, (character) => "\\" + character);
+}
+
 export function removeMusicPlaylistTrack<T>(tracks: T[], position: number): T[] | null {
   if (!Number.isInteger(position) || position < 1 || position > tracks.length) return null;
   const index = position - 1;
@@ -1195,7 +1204,9 @@ export class Music implements PlatformModule {
   private async savedPlaylist(interaction: ChatInputCommandInteraction): Promise<void> {
     const action = interaction.options.getString("action", true);
     const name = interaction.options.getString("name")?.trim().slice(0, 80) ?? "";
+    const query = normalizeMusicPlaylistSearch(interaction.options.getString("query") ?? "");
     const shared = interaction.options.getBoolean("shared") === true;
+    const sharedOnly = interaction.options.getBoolean("shared-only") === true;
     const guildId = interaction.guild!.id;
 
     if (action === "list") {
@@ -1209,6 +1220,33 @@ export class Music implements PlatformModule {
       );
       await interaction.reply({
         content: lines.length ? "🎼 **Доступные плейлисты**\n" + lines.join("\n") : "🎼 Плейлистов пока нет.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (action === "search") {
+      if (!query) {
+        await interaction.reply({ content: "Укажи текст для поиска.", ephemeral: true });
+        return;
+      }
+      const pattern = "%" + escapeMusicPlaylistLike(query) + "%";
+      const result = await this.db.query<{
+        name: string;
+        tracks: unknown[];
+        visibility: MusicPlaylistVisibility;
+      }>(
+        "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') AND ($4=false OR visibility='shared') AND name ILIKE $3 ESCAPE '\\' ORDER BY visibility DESC,updated_at DESC LIMIT 25",
+        [guildId,interaction.user.id,pattern,sharedOnly]
+      );
+      const lines = result.rows.map((row, index) =>
+        (index + 1) + ". " + (row.visibility === "shared" ? "🌐" : "👤") + " **" + row.name + "** — " +
+        String(Array.isArray(row.tracks) ? row.tracks.length : 0) + " треков"
+      );
+      await interaction.reply({
+        content: lines.length
+          ? "🔎 **Результаты поиска: " + query + "**\n" + lines.join("\n")
+          : "🔎 Плейлисты по запросу **" + query + "** не найдены.",
         ephemeral: true
       });
       return;
