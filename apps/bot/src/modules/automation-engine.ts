@@ -1,3 +1,4 @@
+import { ChannelType } from "discord.js";
 import type {
   ChatInputCommandInteraction,
   GuildMember,
@@ -14,6 +15,7 @@ import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
+import type { Moderation } from "./moderation.js";
 
 type RuntimeEvent = {
   type: AutomationEvent;
@@ -54,7 +56,10 @@ export class AutomationEngine implements PlatformModule {
   private executionCounter = 0;
   private lastScheduleMinute: number | null = null;
 
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    private readonly moderation?: Moderation
+  ) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
@@ -799,6 +804,18 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
+        if (action.type === "warn") {
+          const userId = resolveUserReference(action.userId, event.userId);
+          if (userId) {
+            await this.moderation?.automationWarn(
+              event.guildId,
+              userId,
+              renderTemplate(action.reason, event)
+            );
+          }
+          continue;
+        }
+
         if (action.type === "timeout") {
           const guild = client?.guilds.cache.get(event.guildId);
           const userId = resolveUserReference(action.userId, event.userId);
@@ -833,6 +850,22 @@ export class AutomationEngine implements PlatformModule {
               else await message.unpin("Automation rule");
             }
           }
+          continue;
+        }
+
+        if (action.type === "create-channel") {
+          const guild = client?.guilds.cache.get(event.guildId);
+          if (!guild) continue;
+
+          const name = renderTemplate(action.name, event).trim().slice(0, 100);
+          if (!name) continue;
+
+          await guild.channels.create({
+            name,
+            type: action.channelType === "voice" ? ChannelType.GuildVoice : ChannelType.GuildText,
+            ...(action.parentId ? { parent: action.parentId } : {}),
+            reason: "Automation rule"
+          });
           continue;
         }
 
@@ -950,6 +983,16 @@ export function validateAutomationRule(
       case "dm-user":
         if (!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") throw new Error("invalid_dm_user");
         if (!action.content || action.content.length > 2000) throw new Error("invalid_dm_content");
+        break;
+      case "create-channel":
+        if (!action.name || action.name.length > 100) throw new Error("invalid_create_channel_name");
+        if (action.channelType !== "text" && action.channelType !== "voice") throw new Error("invalid_create_channel_type");
+        if (action.parentId !== null && !/^\d{17,20}$/.test(action.parentId)) throw new Error("invalid_create_channel_parent");
+        break;
+      case "warn":
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !action.reason || action.reason.length > 500) {
+          throw new Error("invalid_warn_action");
+        }
         break;
       case "add-role":
       case "remove-role":
