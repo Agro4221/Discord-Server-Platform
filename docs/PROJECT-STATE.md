@@ -10,8 +10,8 @@ Self-hosted Discord Server Platform: local-first, resilient, modular, no artific
 ## Current branch
 development
 
-## Current HEAD
-`80ee35ae005d356142f47d08da6ab998367386a2`
+## Cleanup baseline
+`78a14d4cbb6b15ade0e7111e266eeff970a674e4`
 
 ## Current phase
 Release candidate — functional development frozen for live acceptance. Current development HEAD is CI-verified; remaining release-gate work is live Discord/runtime validation. Broader feature expansion is post-RC work, not a reason to keep extending the release indefinitely.
@@ -54,7 +54,8 @@ The deeper AutoMod, Security and Automation catalogs and additional Music provid
 
 ## Verification
 - GitHub Actions CI runs on Node.js 24.17.
-- Current verified baseline before this cleanup: CI #2398 passed the full automated pipeline on `80ee35ae005d356142f47d08da6ab998367386a2`.
+- Pre-cleanup baseline: CI #2398 passed the full automated pipeline on `80ee35ae005d356142f47d08da6ab998367386a2`.
+- Cleanup baseline `78a14d4cbb6b15ade0e7111e266eeff970a674e4` contains no removed legacy Dashboard/Vexa files; fresh CI validation is the release gate for this cleanup tree.
 - Source secret hygiene, deployment and observability checks are active.
 - Unit regression tests cover Core, module contracts and key Dashboard/runtime behaviour.
 - Full dependency compilation is delegated to CI because this execution environment has Node.js 22.16.

@@ -896,3 +896,11 @@ Never write credentials, tokens or private user data here.
 - Replaced the invalid assertion with a normal JavaScript `error.code === "ENOENT"` check.
 - The active Dashboard remains `page.tsx -> control-center.tsx`; no feature behavior changed.
 - Final cleanup CI must validate this corrected contract on the latest head.
+
+
+## 2026-10-05 — Cleanup baseline finalized
+- Cleanup now ends at code baseline `78a14d4cbb6b15ade0e7111e266eeff970a674e4`.
+- The deployment contract validates the active `page.tsx -> control-center.tsx` entrypoint, rejects obsolete secondary credential placeholders and asserts that deleted legacy Dashboard/Vexa files remain absent.
+- CI #2399, #2400, #2401 and #2402 failed only in this stale deployment-contract layer while the cleanup was being reconciled; the exact JavaScript syntax issue found in #2402 has been removed from both legacy-file absence checks.
+- No implemented bot feature was removed by this cleanup; deleted Dashboard files were unused legacy implementations, while the active Control Center remains intact.
+- Fresh CI on the finalized cleanup baseline is the remaining automated verification step.

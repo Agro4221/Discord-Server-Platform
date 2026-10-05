@@ -6,7 +6,7 @@
 
 Repository: `Agro4221/Discord-Server-Platform`  
 Branch: `development`  
-Current HEAD: `80ee35ae005d356142f47d08da6ab998367386a2`  
+Latest cleanup baseline: `78a14d4cbb6b15ade0e7111e266eeff970a674e4`  
 Current phase: **Release candidate / live acceptance**  
 Primary local runtime: **native Windows**. Docker remains an optional deployment path.
 
@@ -85,7 +85,7 @@ Bot Fleet позволяет зарегистрировать Discord-бота �
 
 ## Текущий статус
 
-CI baseline до cleanup: **#2398 — success** на `80ee35ae005d356142f47d08da6ab998367386a2`. Для cleanup-коммита нужен новый CI проход.
+Pre-cleanup CI baseline: **#2398 — success** on `80ee35ae005d356142f47d08da6ab998367386a2`. Cleanup baseline is `78a14d4cbb6b15ade0e7111e266eeff970a674e4`; its fresh CI run is the verification gate.
 
 Последний подтверждённый performance pass:
 - кэширование hot-path module/config checks;
