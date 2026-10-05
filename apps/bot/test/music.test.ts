@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -182,6 +182,13 @@ test("music quick filter actions allow only known presets", async () => {
   }
 });
 
+
+test("Music playlist import URL accepts only HTTP(S)", () => {
+  assert.equal(normalizeMusicPlaylistImportUrl("https://example.com/playlist?id=42"), "https://example.com/playlist?id=42");
+  assert.equal(normalizeMusicPlaylistImportUrl(" http://example.com/list "), "http://example.com/list");
+  assert.equal(normalizeMusicPlaylistImportUrl("ftp://example.com/list"), null);
+  assert.equal(normalizeMusicPlaylistImportUrl("not a url"), null);
+});
 
 test("Music playlist search normalizes input", () => {
   assert.equal(normalizeMusicPlaylistSearch("  evening set  "), "evening set");
