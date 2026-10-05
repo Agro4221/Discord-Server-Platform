@@ -581,3 +581,10 @@ Feature Matrix полностью reconciled: все строки ✅.
 ### 2026-10-05 — Current Music checkpoint
 - Separate queue add/remove/move permissions are complete and CI-verified (#2063).
 - Before the next Music slice, re-audit remaining TODOs against actual code because several Matrix rows are historical/stale.
+
+### 2026-10-05 — Backup/restore hardening
+- `BackupService` guild-scoped APIs now reject malformed guild IDs before backup filesystem/remote access.
+- Added database-backed regression coverage for cross-guild read/restore/delete isolation and invalid backup filenames.
+- Source checkpoint: `9ca8b24d022ee4494873da651162ccba583d3f53`.
+- Fresh CI is not visible; do not mark this slice CI-verified yet.
+- Next engineering focus remains one bounded release-gate slice at a time, followed by live Discord/Lavalink/Windows/E2E/chaos/soak/clean-host validation.
