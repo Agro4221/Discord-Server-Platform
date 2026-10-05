@@ -247,7 +247,11 @@ export class Moderation implements PlatformModule {
         [guildId, channelId]
       );
       const previous = stored.rows[0]?.previous_send_messages ?? null;
-      await manageableChannel.permissionOverwrites.edit(everyone, { SendMessages: previous }, { reason: "Vexa Control Center channel unlock" });
+      await manageableChannel.permissionOverwrites.edit(everyone, { SendMessages: previous }, { reason: "Discord Server Platform Control Center channel unlock" });
+      await this.db.query(
+        "DELETE FROM moderation_channel_locks WHERE guild_id=$1 AND channel_id=$2",
+        [guildId, channelId]
+      );
       return { action, channelId };
     }
 
