@@ -98,7 +98,7 @@ test("utility info commands expose both prefix and slash entry points", () => {
 });
 
 
-test("Music play and search expose YouTube and Yandex Music providers", () => {
+test("Music play and search expose YouTube, Yandex Music and Spotify providers", () => {
   const commands = buildCommands().map((command) => command.toJSON());
 
   const topLevelPlay = commands.find((command) => command.name === "play");
@@ -108,7 +108,7 @@ test("Music play and search expose YouTube and Yandex Music providers", () => {
   );
   assert.deepEqual(
     topLevelPlay?.options?.find((option) => option.name === "provider")?.choices?.map((choice) => choice.value),
-    ["youtube", "yandex"]
+    ["youtube", "yandex", "spotify"]
   );
 
   const music = commands.find((command) => command.name === "music");
