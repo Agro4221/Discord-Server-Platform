@@ -978,6 +978,17 @@ Never write credentials, tokens or private user data here.
 - The previous Named effect profiles Music backlog item is removed: it is not a target parity feature and will not drive the next increment.
 - Next single backlog slice: Music provider parity — Yandex Music, a benchmarked Juniper-style provider target rather than another arbitrary Lavalink filter.
 
+## 2026-10-05 — Music Yandex Music provider parity
+- Added an explicit Yandex Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as Yandex use LavaSrc ymsearch; users can also use the explicit ymsearch: prefix from prefix/request-channel flows.
+- Direct Yandex Music HTTP(S) URLs continue through Lavalink URL resolution unchanged.
+- Approval-mode requests preserve the selected Yandex source across the moderation step.
+- Provider status now treats Yandex as configured only when both the LavaSrc switch and access token are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Official LavaSrc documents Yandex Music via ymsearch: and yandexmusic.accessToken; see current source documentation.
+- Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Yandex playback still requires the user's Lavalink credentials/runtime.
+- Source checkpoint: 5514371977eb7a13f5696ebabf34a159a40d7094.
+
 ## 2026-10-05 — Music Custom EQ editor
 - Completed the independent Custom EQ editor slice.
 - Added a top-level `/eq` command because the `/music` command remains constrained by Discord's subcommand limit.
