@@ -196,7 +196,7 @@
 | Per-user queued-track limit | ✅ | Per-user pending queue cap is configurable from 0 (unlimited) to 100 and enforced on manual add paths |
 | Fair queue / requester rotation | ✅ |
 | Max guild queue size | ✅ | Total pending queue size is persisted/configurable up to 500 and enforced on queue-add paths |
-| Optional approval/moderation mode for requests | 🟡 |
+| Optional approval/moderation mode for requests | ✅ | |
 
 #### Playlists / saved state
 
