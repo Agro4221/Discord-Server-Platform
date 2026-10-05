@@ -89,10 +89,15 @@ get_env() {
   printf "%s" "${value}"
 }
 
+is_blank() {
+  local value="$1"
+  [[ -z "${value//[[:space:]]/}" ]]
+}
+
 ensure_secret() {
   local key="$1" generated="$2" current
   current="$(get_env "${key}")"
-  if [[ -z "${current}" ]]; then
+  if is_blank "${current}"; then
     set_env "${key}" "${generated}"
   fi
 }
