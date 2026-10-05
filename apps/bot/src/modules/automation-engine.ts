@@ -805,9 +805,10 @@ export class AutomationEngine implements PlatformModule {
         }
 
         if (action.type === "warn") {
+          if (!this.moderation) throw new Error("automation_moderation_unavailable");
           const userId = resolveUserReference(action.userId, event.userId);
           if (userId) {
-            await this.moderation?.automationWarn(
+            await this.moderation.automationWarn(
               event.guildId,
               userId,
               renderTemplate(action.reason, event)
