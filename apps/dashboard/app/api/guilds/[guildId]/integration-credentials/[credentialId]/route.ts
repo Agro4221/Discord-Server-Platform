@@ -9,8 +9,9 @@ const headers = {
   "content-type": "application/json"
 };
 
-export async function POST(_request: Request, context: { params: Promise<{ guildId: string; credentialId: string }> }) {
+export async function POST(request: Request, context: { params: Promise<{ guildId: string; credentialId: string }> }) {
   if (!await currentSession()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  try { assertSameOrigin(request); } catch { return NextResponse.json({ error: "bad_origin" }, { status: 403 }); }
   const { guildId, credentialId } = await context.params;
   const response = await fetch(upstream("/api/guilds/" + encodeURIComponent(guildId) + "/integration-credentials/" + encodeURIComponent(credentialId) + "/test"), {
     method: "POST",
