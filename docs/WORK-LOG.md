@@ -849,3 +849,16 @@ Never write credentials, tokens or private user data here.
 - CI #2166 passed completely: source/deployment/observability contracts, Typecheck, 171 tests, domain build, bot build and Dashboard build.
 - Final source checkpoint for this slice: 36560ac76566f8eb6bc230feb684a81c9c1b3ed0.
 - Next single Music slice: **Radio mode by artist/genre/search seed**.
+
+
+## 2026-10-05 — Music Radio mode by artist / genre / search seed
+- Completed the persistent Music Radio mode.
+- Added /radio with Start, Stop and Status actions; the mode can be artist, genre or search, with a persistent seed.
+- Artist radio can use the currently playing artist when no explicit seed is supplied; genre and search radio require a seed.
+- Radio adds one next track when the queue ends, using the same current/queued/recent-track exclusion rules as Autoplay.
+- While Radio is enabled it takes priority over generic Autoplay at queue end, preventing the two modes from fighting over the next track.
+- Persistent radio settings were added to music_settings through migration 97: enabled flag, mode and seed.
+- Added unit coverage for radio mode normalization and query construction plus PostgreSQL coverage for persistent radio settings.
+- CI #2174 passed completely after fixing the Discord /music 25-subcommand limit by exposing Radio as a separate /radio command, and after normalizing the queue-end track type.
+- Final source checkpoint for this slice: e5e1596fae8aca47e7751d6e302c5752c35b45b3.
+- Next single Music slice: **Autoplay profile/settings in Dashboard**.
