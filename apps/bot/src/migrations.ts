@@ -1417,6 +1417,32 @@ const migrations = [
       "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS vote_skip_minimum integer NOT NULL DEFAULT 1 CHECK(vote_skip_minimum BETWEEN 1 AND 99);"
     ])
   },
+  {
+    version: 93,
+    name: "music_request_approvals",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS request_approval_mode text NOT NULL DEFAULT 'off' CHECK(request_approval_mode IN ('off','approval'));",
+      "CREATE TABLE IF NOT EXISTS music_request_approvals (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  requester_user_id text NOT NULL,",
+      "  requester_voice_channel_id text NOT NULL,",
+      "  source_channel_id text NOT NULL,",
+      "  approval_message_channel_id text,",
+      "  approval_message_id text,",
+      "  query text NOT NULL,",
+      "  track jsonb,",
+      "  status text NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','processing','approved','rejected','expired','failed')),",
+      "  expires_at timestamptz NOT NULL,",
+      "  resolved_by text,",
+      "  resolved_at timestamptz,",
+      "  result_title text,",
+      "  created_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_music_request_approvals_guild_status_created ON music_request_approvals(guild_id,status,created_at DESC);",
+      "CREATE INDEX IF NOT EXISTS idx_music_request_approvals_guild_requester ON music_request_approvals(guild_id,requester_user_id,created_at DESC);"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
