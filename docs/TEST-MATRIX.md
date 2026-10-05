@@ -304,3 +304,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-05 — VPS domain validation snapshot
 - Deployment contract now requires the upgrade path to reject a missing or malformed configured domain before HTTPS smoke probing.
 - Live release-gate case: corrupt `DOMAIN` in a disposable existing installation and verify the upgrade fails before service restart.
+
+### 2026-10-05 — Upgrade path regression snapshot
+- Deployment validation distinguishes local upgrades from VPS/Caddy upgrades; public `DOMAIN` is required only when the Caddy overlay exists.
+- Live regression case: run a local upgrade without `DOMAIN` and a VPS upgrade with valid `DOMAIN`/Basic Auth settings.
