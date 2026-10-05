@@ -622,3 +622,9 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Deployment contract currently covers migration continuity, Compose validity, VPS runtime smoke probes, installer secret preservation, upgrade secret checks and Caddy configuration checks.
 - Upgrade source checkpoint: `dcd9476f76a01995f532dc69e24185079ec93d42`.
 - The current PR head still reports zero GitHub check-runs in the available connector; do not mark these slices CI-verified.
+
+### 2026-10-05 — VPS Caddy reinstall safety
+- Installer-created Caddy configuration is now first-write-only: an existing `infrastructure/caddy/Caddyfile` is preserved across reruns.
+- This complements secret preservation and prevents an installer rerun from silently discarding deliberate Caddy configuration changes.
+- Deployment contract checks the preservation rule.
+- Source checkpoint: `3b2f0de1bd925a87059cc8bd740a076dec084083`.
