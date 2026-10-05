@@ -27,7 +27,7 @@ Install these on Windows:
 - Java 17+ for the repository's Lavalink 4 runtime;
 - a Lavalink JAR downloaded separately.
 
-Lavalink officially supports standalone JAR execution and requires Java 17 or higher. citeturn374577search2turn374577search4
+Lavalink officially supports standalone JAR execution and requires Java 17 or higher.
 
 Set `LAVALINK_JAR_PATH` in `.env`. The default is `./infrastructure/lavalink/lavalink.jar`.
 The repository does not commit a Lavalink JAR.
