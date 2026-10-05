@@ -577,3 +577,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Fixed the Docker networking contract: host MANAGEMENT_API_PORT may remain 39001 (or another published port), but the bot now listens on internal port 3002 and Dashboard uses bot:3002.
 - Removed all remaining change-me PostgreSQL/Lavalink fallbacks from docker-compose.yml.
 - Deployment contract protects both invariants.
+## 2026-10-05 — First-run health semantics
+- /health is now the control-plane liveness endpoint: it becomes 200 after the database is ready even if Discord credentials are absent and overall status is degraded.
+- /ready remains the strict readiness endpoint for a fully operational bot.
+- This removes the Docker first-run deadlock that could prevent Dashboard startup before Bot Fleet registration.
