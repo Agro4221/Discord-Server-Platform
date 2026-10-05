@@ -1001,6 +1001,17 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Yandex playback still requires the user's Lavalink credentials/runtime.
 - Source checkpoint: 5514371977eb7a13f5696ebabf34a159a40d7094.
 
+## 2026-10-05 — Music Deezer provider parity
+- Added an explicit Deezer Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as Deezer use LavaSrc dzsearch; users can also use the explicit dzsearch: prefix from prefix/request-channel flows.
+- Direct Deezer URLs continue through Lavalink/LavaSrc URL resolution.
+- Approval-mode requests preserve the selected Deezer source across the moderation step.
+- Provider status now treats Deezer as configured only when the LavaSrc switch and required Deezer credentials are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Current LavaSrc documentation identifies Deezer as direct playback and documents dzsearch plus Deezer playlist/album/track/artist URLs.
+- Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Deezer playback remains a release-gate validation item.
+- Source checkpoint: 1506f05970543b980f1005d6beb49e8da107fa1a.
+
 ## 2026-10-05 — Music Apple Music provider parity
 - Added an explicit Apple Music search provider to /play, /music play and /music search.
 - Non-URL searches selected as Apple Music use LavaSrc amsearch; users can also use the explicit amsearch: prefix from prefix/request-channel flows.
