@@ -1231,3 +1231,18 @@ Never write credentials, tokens or private user data here.
 - Added deterministic regression coverage for unavailable, non-resumable and valid failover candidates.
 - Source checkpoint: `3e854a4e158eaa332a625cfba1f375ca837411f7`.
 - Fresh CI for this checkpoint is not yet visible in the current connector session; do not mark this slice CI-verified until Actions confirms it.
+
+## 2026-10-05 — Music provider readiness consistency
+- Extended the unified provider readiness contract beyond Apple Music.
+- Dashboard Music state and `/music providers` now share credential-aware checks for Deezer, Yandex Music, VK Music, Tidal, Qobuz and JioSaavn.
+- This removes contradictory states where a provider could appear enabled in diagnostics while its required credential/token was absent.
+- Added deterministic regression coverage for required credential combinations.
+- Source checkpoint: `39f396e5444a52eadf084549231b965abef592a7`.
+- Fresh CI for this checkpoint is not visible yet; do not mark the slice CI-verified.
+
+## 2026-10-05 — Music Lavalink failover hardening
+- Unified failover target selection behind `selectMusicFailoverNodeId()`.
+- A candidate is eligible only when it has a non-empty ID, is connected and has a non-empty Lavalink session ID; the failed node is always excluded.
+- The same selector is now used for the initial availability check and immediately before `moveNode()`.
+- Added deterministic regression coverage for unavailable, non-resumable and valid failover candidates.
+- Source checkpoint: `3e854a4e158eaa332a625cfba1f375ca837411f7`.
