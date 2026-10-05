@@ -369,3 +369,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-05 — Native local acceptance gate
 - Static contract covers native launcher, loopback Dashboard, dynamic local API port, memory caps, log rotation and convenience entrypoints.
 - Live gate remains: clean Windows setup → start.bat → native Dashboard via control-center.bat → Bot Fleet registration → music/playback → native-status.bat measurements under game + OBS load.
+## 2026-10-05 — Single native launcher acceptance
+- Static contract verifies exactly one root BAT, native launcher parameters, automatic dependency bootstrap hooks and loopback Dashboard binding.
+- Live clean-PC gate: double-click start.bat on Windows with missing Node/PostgreSQL/Java/JAR and verify bootstrap, build, Control Center startup and Bot Fleet registration.
+- Live resource gate: measure the native DSP-only working set with start.bat -Status under idle and real Discord/Music workloads, without mixing unrelated applications into the DSP budget.
