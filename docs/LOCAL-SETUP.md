@@ -30,19 +30,31 @@ The default `start.bat` keeps Dashboard off to reduce background memory/CPU use.
 
 The Management API remains bound to loopback and is not intended to be exposed directly to the internet.
 
-## Useful launcher options
+## Useful native launcher options
 
-    powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1 -Rebuild
+Default gaming mode:
 
-Rebuild images before starting the stack.
+    start.bat
 
-    powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1 -NoOpen
+With Control Center:
 
-Start everything without opening the browser.
+    control-center.bat
 
-    powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1 -Down
+With a second Lavalink node:
 
-Stop the local stack.
+    start.bat -Lavalink2
+
+After source/dependency changes:
+
+    start.bat -Rebuild
+
+Stop native processes:
+
+    stop.bat
+
+Measure current native process memory:
+
+    native-status.bat
 
 ## What runs locally
 
