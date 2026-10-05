@@ -312,3 +312,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-05 — VPS reinstall configuration snapshot
 - Static deployment verification requires the installer to preserve an existing Caddyfile.
 - Live release-gate case: modify a disposable Caddyfile, rerun the installer, and verify the file remains intact while the stack upgrades successfully.
+
+### 2026-10-05 — Management API security snapshot
+- Configuration regression coverage now rejects empty and whitespace-only Management API keys before the server can start.
+- Live release-gate case: verify unauthenticated Management API requests still receive 401 and that the configured bearer key is required in local/VPS deployments.
