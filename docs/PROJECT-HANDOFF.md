@@ -707,3 +707,8 @@ Feature Matrix полностью reconciled: все строки ✅.
 - The target default for a gaming PC is one Lavalink node and no Dashboard unless needed.
 - Hardware planning is documented in docs/RESOURCE-REQUIREMENTS.md; measured working-set data from the target PC should override estimates.
 - Do not reintroduce Docker Desktop as a prerequisite for everyday Windows use.
+## 2026-10-05 — Launcher operating rule
+- Keep exactly one root batch file, start.bat. Do not add additional BAT launchers for Dashboard, stop, status or Docker.
+- All optional native operations must remain arguments to start.bat.
+- First-run dependency bootstrap is part of the native local contract; do not make Docker Desktop a prerequisite.
+- Resource guidance is for the Discord platform stack only, not the user's games/OBS/browser/etc.
