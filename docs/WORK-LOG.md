@@ -1286,3 +1286,9 @@ Never write credentials, tokens or private user data here.
 - The deployment contract checker was restored to a clean, single-pass structure and retains migration, Compose, runtime smoke, secret-preservation, upgrade-secret and Caddy-setting assertions.
 - Source checkpoint: `dcd9476f76a01995f532dc69e24185079ec93d42` (upgrade script); deployment contract restoration follows in branch history.
 - CI/check-runs are still absent for the current PR head; live deployment validation remains pending.
+
+## 2026-10-05 — VPS Caddy config preservation
+- `install-vps.sh` now creates `infrastructure/caddy/Caddyfile` only when it does not already exist; rerunning the installer no longer overwrites an existing Caddy configuration.
+- Deployment contract explicitly guards this preservation rule.
+- Source checkpoint: `3b2f0de1bd925a87059cc8bd740a076dec084083`.
+- Current PR head still has no visible GitHub Actions check-runs; clean-host reinstall remains the live validation gate.
