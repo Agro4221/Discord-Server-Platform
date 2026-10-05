@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -225,6 +225,14 @@ test("music playlist names normalize whitespace and reject blanks", async () => 
   assert.equal(normalizeMusicPlaylistName("x".repeat(100))?.length, 80);
 });
 
+
+test("Music playlist continuation batches preserve order and finish at the end", () => {
+  const order = [4, 1, 7, 2, 0];
+  assert.deepEqual(musicPlaylistContinuationBatch(order, 0, 2), { indexes: [4, 1], nextIndex: 2, done: false });
+  assert.deepEqual(musicPlaylistContinuationBatch(order, 2, 2), { indexes: [7, 2], nextIndex: 4, done: false });
+  assert.deepEqual(musicPlaylistContinuationBatch(order, 4, 2), { indexes: [0], nextIndex: 5, done: true });
+  assert.deepEqual(musicPlaylistContinuationBatch(order, 9, 2), { indexes: [], nextIndex: 5, done: true });
+});
 
 test("Music playlist pagination stays within page bounds", () => {
   assert.equal(MUSIC_PLAYLIST_PAGE_SIZE, 25);
