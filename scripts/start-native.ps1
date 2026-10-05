@@ -327,11 +327,16 @@ function Ensure-LavalinkJar {
   }
 
   $resolved = if ([System.IO.Path]::IsPathRooted($configured)) { $configured } else { Join-Path (Get-Location) $configured }
-  if (Test-Path $resolved -PathType Leaf) { return (Resolve-Path $resolved).Path }
 
   $version = "4.2.2"
   $downloadUrl = "https://github.com/lavalink-devs/Lavalink/releases/download/$version/Lavalink.jar"
   $expectedSha256 = "8CB801E591072C3689FAFD71CCF571A95A4EAD3CC35DF045E157D763D89119A"
+  if (Test-Path $resolved -PathType Leaf) {
+    $existingHash = (Get-FileHash -Path $resolved -Algorithm SHA256).Hash.ToUpperInvariant()
+    if ($existingHash -eq $expectedSha256) { return (Resolve-Path $resolved).Path }
+    Write-Host "Existing Lavalink JAR hash does not match pinned $version; replacing it."
+    Remove-Item $resolved -Force
+  }
   Write-Host "Downloading Lavalink $version..."
   try {
     $targetDir = Split-Path $resolved -Parent
