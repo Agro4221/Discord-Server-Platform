@@ -1,9 +1,11 @@
 [CmdletBinding()]
 param(
   [switch]$Dashboard,
+  [switch]$NoDashboard,
   [switch]$Lavalink2,
   [switch]$Rebuild,
   [switch]$NoOpen,
+  [switch]$Status,
   [switch]$Down
 )
 
@@ -151,9 +153,34 @@ function Wait-Tcp([string]$HostName, [int]$Port, [int]$Attempts, [int]$DelaySeco
   return $false
 }
 
+function Refresh-ProcessPath {
+  $machine = [Environment]::GetEnvironmentVariable("Path", "Machine")
+  $user = [Environment]::GetEnvironmentVariable("Path", "User")
+  $env:Path = @($machine, $user, $env:Path) -join ";"
+}
+
+function Invoke-WingetInstall([string]$PackageId, [string[]]$ExtraArguments = @()) {
+  $winget = Get-Command "winget.exe" -ErrorAction SilentlyContinue
+  if (-not $winget) {
+    throw "Windows App Installer (winget) was not found. Install App Installer from Microsoft Store, then run start.bat again."
+  }
+
+  Write-Host "Installing dependency: $PackageId"
+  & winget.exe install --id $PackageId --exact --source winget --silent --accept-source-agreements --accept-package-agreements --disable-interactivity @ExtraArguments
+  if ($LASTEXITCODE -ne 0) {
+    throw "winget failed to install $PackageId (exit code $LASTEXITCODE)."
+  }
+  Refresh-ProcessPath
+}
+
 function Ensure-Node {
+  Refresh-ProcessPath
   $node = Get-Command "node.exe" -ErrorAction SilentlyContinue
-  if (-not $node) { throw "Node.js was not found. Install Node.js 24.17+ for native mode." }
+  if (-not $node) {
+    Invoke-WingetInstall "OpenJS.NodeJS.LTS"
+    $node = Get-Command "node.exe" -ErrorAction SilentlyContinue
+  }
+  if (-not $node) { throw "Node.js installation completed but node.exe is still unavailable." }
 
   $versionText = (& node.exe --version).Trim().TrimStart("v")
   $parts = $versionText.Split(".")
@@ -170,10 +197,26 @@ function Ensure-Node {
 }
 
 function Ensure-NpmDependencies {
-  if (Test-Path "node_modules") { return }
-  Write-Host "Installing npm dependencies once (native mode)..."
-  & npm.cmd install
-  if ($LASTEXITCODE -ne 0) { throw "npm install failed." }
+  $marker = Join-Path $runtimeRoot "npm-install.marker"
+  $packageFiles = @(
+    "package.json",
+    "apps/bot/package.json",
+    "apps/dashboard/package.json",
+    "packages/domain/package.json"
+  )
+  $needsInstall = -not (Test-Path $marker)
+  if (-not $needsInstall) {
+    $markerTime = (Get-Item $marker).LastWriteTimeUtc
+    $needsInstall = @($packageFiles | Where-Object {
+      Test-Path $_ -PathType Leaf -and (Get-Item $_).LastWriteTimeUtc -gt $markerTime
+    }).Count -gt 0
+  }
+  if ($needsInstall) {
+    Write-Host "Installing/updating npm dependencies (first run or package change)..."
+    & npm.cmd install
+    if ($LASTEXITCODE -ne 0) { throw "npm install failed." }
+    Set-Content -Path $marker -Value (Get-Date).ToString("o") -Encoding ASCII
+  }
 }
 
 function Try-StartPostgresService {
@@ -193,16 +236,49 @@ function Try-StartPostgresService {
   return $false
 }
 
+function Add-PostgresToPath {
+  $root = Join-Path $env:ProgramFiles "PostgreSQL"
+  if (-not (Test-Path $root -PathType Container)) { return }
+  $dirs = @(Get-ChildItem $root -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending)
+  foreach ($dir in $dirs) {
+    $bin = Join-Path $dir.FullName "bin"
+    if (Test-Path (Join-Path $bin "pg_isready.exe")) {
+      if (-not (($env:Path -split ";") -contains $bin)) { $env:Path = "$bin;$env:Path" }
+      return
+    }
+  }
+}
+
+function Install-Postgres([string]$Password) {
+  $override = "--mode unattended --unattendedmodeui none --superpassword $Password --serverport 5432"
+  Invoke-WingetInstall "PostgreSQL.PostgreSQL.17" @("--override", $override)
+  Add-PostgresToPath
+}
+
 function Ensure-Postgres {
+  Refresh-ProcessPath
+  Add-PostgresToPath
   $pgIsReady = Get-Command "pg_isready.exe" -ErrorAction SilentlyContinue
   $psql = Get-Command "psql.exe" -ErrorAction SilentlyContinue
+  $postgresPassword = Get-EnvValue "POSTGRES_PASSWORD"
+  if ([string]::IsNullOrWhiteSpace($postgresPassword)) {
+    throw "POSTGRES_PASSWORD is required before PostgreSQL setup."
+  }
+
   if (-not $pgIsReady -or -not $psql) {
-    throw "PostgreSQL client tools were not found. Install PostgreSQL and add pg_isready.exe/psql.exe to PATH."
+    Install-Postgres $postgresPassword
+    Refresh-ProcessPath
+    Add-PostgresToPath
+    $pgIsReady = Get-Command "pg_isready.exe" -ErrorAction SilentlyContinue
+    $psql = Get-Command "psql.exe" -ErrorAction SilentlyContinue
+  }
+  if (-not $pgIsReady -or -not $psql) {
+    throw "PostgreSQL installation completed but pg_isready.exe/psql.exe are unavailable."
   }
 
   $dbUrl = Get-EnvValue "DATABASE_URL"
-  if ([string]::IsNullOrWhiteSpace($dbUrl)) {
-    $dbUrl = "postgresql://postgres:postgres@127.0.0.1:5432/discord_platform"
+  if ([string]::IsNullOrWhiteSpace($dbUrl) -or $dbUrl -match "://USER:PASSWORD@") {
+    $dbUrl = "postgresql://postgres:$postgresPassword@127.0.0.1:5432/discord_platform"
     Set-EnvValue "DATABASE_URL" $dbUrl
     $env:DATABASE_URL = $dbUrl
   }
@@ -238,19 +314,47 @@ function Ensure-LavalinkJar {
   }
 
   $resolved = if ([System.IO.Path]::IsPathRooted($configured)) { $configured } else { Join-Path (Get-Location) $configured }
-  if (-not (Test-Path $resolved -PathType Leaf)) {
-    $candidate = Read-Host "Lavalink JAR was not found at '$configured'. Enter the full path to Lavalink JAR (or press Enter to abort)"
-    if ([string]::IsNullOrWhiteSpace($candidate)) { throw "Lavalink JAR is required for native mode." }
-    if (-not (Test-Path $candidate -PathType Leaf)) { throw "The supplied Lavalink JAR does not exist: $candidate" }
-    $resolved = $candidate
-    Set-EnvValue "LAVALINK_JAR_PATH" $candidate
+  if (Test-Path $resolved -PathType Leaf) { return (Resolve-Path $resolved).Path }
+
+  $version = "4.2.2"
+  $downloadUrl = "https://github.com/lavalink-devs/Lavalink/releases/download/$version/Lavalink.jar"
+  $releaseApi = "https://api.github.com/repos/lavalink-devs/Lavalink/releases/tags/$version"
+  Write-Host "Downloading Lavalink $version..."
+  try {
+    $release = Invoke-RestMethod -Uri $releaseApi -Headers @{ "User-Agent" = "DiscordServerPlatform-native-installer" } -TimeoutSec 20
+    $asset = @($release.assets | Where-Object { $_.name -eq "Lavalink.jar" })[0]
+    $digest = if ($asset) { [string]$asset.digest } else { "" }
+    $targetDir = Split-Path $resolved -Parent
+    New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+    Invoke-WebRequest -Uri $downloadUrl -OutFile $resolved -UseBasicParsing
+    if ($digest -match "^sha256:([0-9a-fA-F]{64})$") {
+      $actual = (Get-FileHash -Path $resolved -Algorithm SHA256).Hash
+      if ($actual -ne $Matches[1].ToUpperInvariant()) {
+        Remove-Item $resolved -Force -ErrorAction SilentlyContinue
+        throw "Lavalink SHA-256 verification failed."
+      }
+    }
+  } catch {
+    Remove-Item $resolved -Force -ErrorAction SilentlyContinue
+    throw "Could not download/verify Lavalink $version: $($_.Exception.Message)"
   }
   return (Resolve-Path $resolved).Path
 }
 
 function Ensure-Java {
+  Refresh-ProcessPath
   $java = Get-Command "java.exe" -ErrorAction SilentlyContinue
-  if (-not $java) { throw "Java was not found. Install the Java runtime required by your Lavalink version and put java.exe in PATH." }
+  if (-not $java) {
+    Invoke-WingetInstall "Microsoft.OpenJDK.17"
+    Refresh-ProcessPath
+    $java = Get-Command "java.exe" -ErrorAction SilentlyContinue
+  }
+  if (-not $java) { throw "Java installation completed but java.exe is still unavailable." }
+
+  $versionText = (& java.exe -version 2>&1 | Select-Object -First 1).ToString()
+  if ($versionText -notmatch '"(1[7-9]|[2-9][0-9]).') {
+    throw "Java 17+ is required by the native Lavalink runtime. Detected: $versionText"
+  }
   return $java.Source
 }
 
@@ -260,6 +364,11 @@ function Ensure-Secret([string]$Name, [int]$Length) {
 }
 
 try {
+  if ($Status) {
+    & (Join-Path $PSScriptRoot "native-status.ps1")
+    exit $LASTEXITCODE
+  }
+
   if ($Down) {
     Stop-NativeProcess "dashboard"
     Stop-NativeProcess "bot"
@@ -384,7 +493,8 @@ try {
     throw "Bot health endpoint did not become ready: $healthUrl"
   }
 
-  if ($Dashboard) {
+  $runDashboard = $Dashboard -or -not $NoDashboard
+  if ($runDashboard) {
     $dashboardPort = Get-EnvValue "DASHBOARD_PORT"
     if ([string]::IsNullOrWhiteSpace($dashboardPort)) { $dashboardPort = "3000" }
 
