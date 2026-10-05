@@ -72,3 +72,69 @@ test("Moderation unban applies Discord action and records a case", async () => {
     ephemeral: true
   }]);
 });
+
+
+test("Moderation audit trail records notes and successful warnings", async () => {
+  const queries: string[] = [];
+  const auditEvents: Array<Record<string, unknown>> = [];
+  const db = {
+    async query<T>(text: string, _values: readonly unknown[] = []) {
+      queries.push(text);
+      if (text.includes("INSERT INTO moderation_notes")) {
+        return { rows: [{ id: "7" }] } as { rows: T[] };
+      }
+      if (text.includes("INSERT INTO moderation_cases")) {
+        return { rows: [{ id: "8" }] } as { rows: T[] };
+      }
+      return { rows: [] as T[] };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const moderation = new Moderation(db);
+  (moderation as unknown as {
+    auditLog: { record: (event: Record<string, unknown>) => Promise<void> };
+  }).auditLog = {
+    record: async (event) => {
+      auditEvents.push(event);
+    }
+  };
+
+  await moderation.addNote(
+    "234567890123456789",
+    "123456789012345678",
+    "345678901234567890",
+    "important note"
+  );
+
+  const target = {
+    id: "123456789012345678",
+    tag: "user#0001",
+    send: async () => undefined
+  } as never;
+
+  await (moderation as unknown as {
+    applyWarn: (
+      guildId: string,
+      moderatorUserId: string,
+      target: never,
+      reason: string
+    ) => Promise<void>;
+  }).applyWarn(
+    "234567890123456789",
+    "345678901234567890",
+    target,
+    "spam"
+  );
+
+  assert.ok(queries.some((query) => query.includes("INSERT INTO moderation_notes")));
+  assert.deepEqual(
+    auditEvents.map((event) => ({
+      action: event.action,
+      targetType: event.targetType
+    })),
+    [
+      { action: "moderation.note.added", targetType: "user" },
+      { action: "moderation.warn.applied", targetType: "user" }
+    ]
+  );
+});
