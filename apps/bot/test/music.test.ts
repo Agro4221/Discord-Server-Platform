@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, chunkMusicFilterActions, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicSearchProvider, resolveMusicSearchRequest, normalizeMusicPitch, normalizeMusicSpeed, normalizeMusicEqBand, normalizeMusicEqGain, MUSIC_EQ_BAND_COUNT, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, chunkMusicFilterActions, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicSearchProvider, resolveMusicSearchRequest, chunkMusicLyrics, musicLyricsPageCount, normalizeMusicLyricsPage, isValidMusicLyricsPage, normalizeMusicPitch, normalizeMusicSpeed, normalizeMusicEqBand, normalizeMusicEqGain, MUSIC_EQ_BAND_COUNT, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd, toggleMusicDistortion } from "../src/modules/music.js";
@@ -685,4 +685,24 @@ test("Music provider resolver routes Yandex and Spotify searches and preserves d
     query: "animals",
     source: "ytsearch"
   });
+});
+
+
+test("Music lyrics pagination keeps readable page boundaries and safe page indexes", () => {
+  const textValue = [
+    "Verse one line one",
+    "Verse one line two",
+    "Verse two line one",
+    "Verse two line two"
+  ].join("\n");
+
+  const chunks = chunkMusicLyrics(textValue, 30);
+  assert.equal(chunks.length > 1, true);
+  assert.equal(chunks.join("\n").replace(/\n+/g, "\n"), textValue);
+  assert.equal(musicLyricsPageCount(chunks), chunks.length);
+  assert.equal(normalizeMusicLyricsPage(-4, chunks.length), 0);
+  assert.equal(normalizeMusicLyricsPage(999, chunks.length), chunks.length - 1);
+  assert.equal(isValidMusicLyricsPage(0, chunks.length), true);
+  assert.equal(isValidMusicLyricsPage(chunks.length - 1, chunks.length), true);
+  assert.equal(isValidMusicLyricsPage(chunks.length, chunks.length), false);
 });
