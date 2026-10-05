@@ -588,3 +588,5 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Lavalink server password must be supplied explicitly through LAVALINK_SERVER_PASSWORD.
 ## 2026-10-05 — Config validator regression repaired
 - loadConfig() now consistently uses requiredNonBlank() for MANAGEMENT_API_KEY, DATABASE_URL and LAVALINK_PASSWORD.
+## 2026-10-05 — VPS secret validation
+- VPS install and upgrade flows now reject whitespace-only critical secrets consistently with bot runtime validation.
