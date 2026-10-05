@@ -1387,6 +1387,13 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_tickets_panel_id ON tickets(panel_id);"
     ])
   },
+  {
+    version: 89,
+    name: "music_queue_limits",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS max_queued_per_user integer NOT NULL DEFAULT 10 CHECK(max_queued_per_user BETWEEN 0 AND 100);"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
