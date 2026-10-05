@@ -179,7 +179,7 @@
 | Visual progress / elapsed time in controller | ✅ | Controller exposes current progress and elapsed position |
 | Previous / rewind / forward controls | ✅ |
 | Queue / lyrics / favorite controls | ✅ |
-| Filters / FX quick-access button | 🟡 |
+| Filters / FX quick-access button | ✅ | Music controller exposes a quick filter palette reusing the existing Lavalink preset/FX actions |
 | Save queue button | 🟡 |
 | Radio/autoplay button | 🟡 |
 | Controller state refresh after every action | ✅ | Music actions persist state and resync the controller message |
