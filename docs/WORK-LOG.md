@@ -937,5 +937,7 @@ Never write credentials, tokens or private user data here.
 - Added deterministic unit coverage for the distortion payload toggle and valid filter action.
 - Current Lavalink documentation exposes Distortion as a native player filter. citeturn177581search0turn177581search1
 - CI #2208 passed completely after fixing the optional-field TypeScript contract caught by CI #2207.
-- Final source checkpoint for this slice: `b542465c3d2f42be5f500b730a92edccdbae4f4c`.
+- Fixed the Music filter button palette so Discord Action Rows are chunked at five buttons maximum; added a regression test for the row-size contract.
+- CI #2211 passed completely with the palette fix.
+- Final source checkpoint for this slice: `7c4ad1e17d27b20e67c6129d2f1ace5b1de65ee0`.
 - Next single Music slice: **Low Pass audio effect**.
