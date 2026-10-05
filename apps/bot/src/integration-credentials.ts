@@ -151,6 +151,21 @@ export class IntegrationCredentialRepository {
     return { provider: row.provider, latencyMs: Math.max(0, Date.now() - startedAt) };
   }
 
+  async updateSecret(
+    guildId: string,
+    id: number,
+    provider: IntegrationCredentialProvider,
+    secret: ProviderCredentialSecret
+  ): Promise<boolean> {
+    normalizeSecret(provider, secret);
+    const ciphertext = this.encrypt(secret);
+    const result = await this.db.query(
+      "UPDATE integration_credentials SET secret_ciphertext=$1,updated_at=now() WHERE id=$2 AND guild_id=$3 AND provider=$4",
+      [ciphertext, id, guildId, provider]
+    );
+    return result.rowCount === 1;
+  }
+
   async delete(guildId: string, id: number): Promise<boolean> {
     if (!Number.isSafeInteger(id) || id < 1) throw new Error("invalid_integration_credential_id");
     const result = await this.db.query(
