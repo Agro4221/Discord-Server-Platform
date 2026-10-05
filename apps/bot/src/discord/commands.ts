@@ -105,6 +105,10 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
     new SlashCommandBuilder().setName("pause").setDescription("Pause music"),
     new SlashCommandBuilder().setName("resume").setDescription("Resume music"),
     new SlashCommandBuilder().setName("skip").setDescription("Skip the current track"),
+    new SlashCommandBuilder()
+      .setName("queue-limit")
+      .setDescription("Configure pending tracks limit per user")
+      .addIntegerOption((o) => o.setName("limit").setDescription("0 = unlimited, maximum 100").setMinValue(0).setMaxValue(100)),
     new SlashCommandBuilder().setName("vote-skip").setDescription("Vote to skip the current track"),
     new SlashCommandBuilder().setName("stop").setDescription("Stop music and clear the queue"),
     new SlashCommandBuilder().setName("shuffle").setDescription("Shuffle the queue"),
@@ -917,6 +921,10 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           { name: "Everyone", value: "everyone" },
           { name: "DJ only", value: "dj" }
         )))
+      .addSubcommand((sub) => sub
+        .setName("queue-limit")
+        .setDescription("Configure pending tracks limit per user")
+        .addIntegerOption((o) => o.setName("limit").setDescription("0 = unlimited, maximum 100").setMinValue(0).setMaxValue(100)))
       .addSubcommand((sub) =>
         sub
           .setName("seek")
