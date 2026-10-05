@@ -609,6 +609,7 @@ test("Music provider resolver routes Yandex and Spotify searches and preserves d
   assert.equal(normalizeMusicSearchProvider("youtube"), "youtube");
   assert.equal(normalizeMusicSearchProvider("yandex"), "yandex");
   assert.equal(normalizeMusicSearchProvider("spotify"), "spotify");
+  assert.equal(normalizeMusicSearchProvider("applemusic"), "applemusic");
   assert.equal(normalizeMusicSearchProvider("deezer"), null);
 
   assert.deepEqual(resolveMusicSearchRequest("animals", "yandex"), {
@@ -619,6 +620,10 @@ test("Music provider resolver routes Yandex and Spotify searches and preserves d
     query: "animals architects",
     source: "spsearch"
   });
+  assert.deepEqual(resolveMusicSearchRequest("animals architects", "applemusic"), {
+    query: "animals architects",
+    source: "amsearch"
+  });
   assert.deepEqual(resolveMusicSearchRequest("ymsearch:animals architects"), {
     query: "animals architects",
     source: "ymsearch"
@@ -627,11 +632,18 @@ test("Music provider resolver routes Yandex and Spotify searches and preserves d
     query: "animals architects",
     source: "spsearch"
   });
+  assert.deepEqual(resolveMusicSearchRequest("amsearch:animals architects"), {
+    query: "animals architects",
+    source: "amsearch"
+  });
   assert.deepEqual(resolveMusicSearchRequest("https://music.yandex.ru/track/71663565", "yandex"), {
     query: "https://music.yandex.ru/track/71663565"
   });
   assert.deepEqual(resolveMusicSearchRequest("https://open.spotify.com/track/0eG08cBeKk0mzykKjw4hcQ", "spotify"), {
     query: "https://open.spotify.com/track/0eG08cBeKk0mzykKjw4hcQ"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("https://music.apple.com/us/album/animals/1533388849?i=1533388859", "applemusic"), {
+    query: "https://music.apple.com/us/album/animals/1533388849?i=1533388859"
   });
   assert.deepEqual(resolveMusicSearchRequest("animals"), {
     query: "animals",
