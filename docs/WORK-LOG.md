@@ -1349,3 +1349,12 @@ Never write credentials, tokens or private user data here.
 - Added deterministic regression coverage for blank/whitespace/tab values and malformed custom-node secrets.
 - Source checkpoints: e99821d236617fc5144d40ae18f562a8d8a8bd5f (config), c12b224744e85d5eddefd62cc76721d27952b921 (tests).
 - Fresh CI is not visible yet.
+
+## 2026-10-05 — Docker Management API port reconciliation
+- Found a concrete Compose runtime mismatch: .env.example exposes MANAGEMENT_API_PORT=39001 for the host, while Dashboard talks to bot:3002 inside the Docker network.
+- Because bot inherited MANAGEMENT_API_PORT through env_file, the Management API could listen on 39001 inside the container and make Dashboard management requests fail.
+- Reconciled docker-compose.yml so the host port remains configurable through MANAGEMENT_API_PORT, while the container-internal API is explicitly fixed at 3002.
+- Also completed the previous secret hardening across every Compose occurrence: PostgreSQL, both Lavalink nodes and bot-side DATABASE_URL/LAVALINK_NODES no longer use change-me fallbacks.
+- Deployment contract now asserts the internal Management API port and rejects insecure fallbacks across the Compose file.
+- Source checkpoints: 2f318068f5ad4b1d06102a98b5b97cfce072395f (Compose), 8a5ee949145093fc53d72109670d8c2e5e6548dc (contract).
+- Fresh CI is not visible yet; local/VPS runtime smoke still needs live execution.
