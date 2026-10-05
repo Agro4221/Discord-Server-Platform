@@ -378,8 +378,11 @@ Premium parity = **совокупность сильных функций раз
 PR: **#3** — `feat: Discord platform expansion + Music v2`
 PR остаётся **draft**.
 
-Текущий source HEAD:
-`39f396e5444a52eadf084549231b965abef592a7`
+Текущий source checkpoint:
+`9ca8b24d022ee4494873da651162ccba583d3f53`
+
+Текущий branch HEAD (после continuity-doc updates):
+`4e97b46577113274cdc2721c77ca126ff2e72028`
 
 Последние bounded срезы:
 - исправлен Dashboard TikTok OAuth import blocker;
