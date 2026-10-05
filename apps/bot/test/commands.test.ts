@@ -96,3 +96,30 @@ test("utility info commands expose both prefix and slash entry points", () => {
     assert.equal(Boolean(command?.description), true);
   }
 });
+
+
+test("Music play and search expose YouTube and Yandex Music providers", () => {
+  const commands = buildCommands().map((command) => command.toJSON());
+
+  const topLevelPlay = commands.find((command) => command.name === "play");
+  assert.deepEqual(
+    topLevelPlay?.options?.map((option) => option.name),
+    ["query", "provider"]
+  );
+  assert.deepEqual(
+    topLevelPlay?.options?.find((option) => option.name === "provider")?.choices?.map((choice) => choice.value),
+    ["youtube", "yandex"]
+  );
+
+  const music = commands.find((command) => command.name === "music");
+  const play = music?.options?.find((option) => option.name === "play");
+  const search = music?.options?.find((option) => option.name === "search");
+  assert.deepEqual(
+    play?.options?.map((option) => option.name),
+    ["query", "provider"]
+  );
+  assert.deepEqual(
+    search?.options?.map((option) => option.name),
+    ["query", "provider"]
+  );
+});
