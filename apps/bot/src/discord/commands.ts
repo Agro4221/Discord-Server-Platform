@@ -994,6 +994,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
             ).setRequired(true)
           )
           .addStringOption((o) => o.setName("name").setDescription("Playlist name").setMaxLength(80))
+          .addBooleanOption((o) => o.setName("shuffle").setDescription("Shuffle tracks when loading the playlist"))
       ),
     new SlashCommandBuilder()
       .setName("automation")
