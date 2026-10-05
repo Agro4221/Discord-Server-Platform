@@ -862,3 +862,14 @@ Never write credentials, tokens or private user data here.
 - CI #2174 passed completely after fixing the Discord /music 25-subcommand limit by exposing Radio as a separate /radio command, and after normalizing the queue-end track type.
 - Final source checkpoint for this slice: e5e1596fae8aca47e7751d6e302c5752c35b45b3.
 - Next single Music slice: **Autoplay profile/settings in Dashboard**.
+
+
+## 2026-10-05 — Dashboard Autoplay / Radio profile
+- Completed the Music Autoplay / Radio settings slice in Dashboard.
+- Extended the existing Music settings schema with persistent Radio enabled/mode/seed fields.
+- The Music Dashboard now exposes Autoplay and Radio in one profile block, including artist/genre/search mode and a 200-character seed.
+- Artist mode may keep the seed empty so runtime Radio can derive the artist from the currently playing track.
+- Added schema-level test coverage for the Dashboard Music Autoplay / Radio profile.
+- CI #2179 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: a291fc5159c41601c80cd140019578a1b4461c50.
+- Next single Music slice: **Emoji controller / player message controls**.
