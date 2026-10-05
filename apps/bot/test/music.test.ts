@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -475,5 +475,38 @@ test("Music autoplay candidate skips current, queued and recent track identifier
   assert.equal(
     isMusicAutoplayCandidateAllowed({ info: { identifier: "new-id", uri: "https://music.example/new" } }, excludedIdentifiers, excludedUris),
     true
+  );
+});
+
+
+test("Music artist-aware autoplay prefers a different recent-safe track by the same artist", () => {
+  const excludedIdentifiers = new Set(["current"]);
+  const excludedUris = new Set<string>();
+  const tracks = [
+    { info: { identifier: "other-artist", author: "Other Artist", uri: "https://music.example/other" } },
+    { info: { identifier: "same-artist", author: "My Artist", uri: "https://music.example/same" } }
+  ];
+
+  assert.equal(normalizeMusicArtistName("  My   Artist "), "my artist");
+  assert.equal(
+    selectMusicArtistAwareAutoplayCandidate(tracks, "My Artist", excludedIdentifiers, excludedUris)?.info.identifier,
+    "same-artist"
+  );
+});
+
+test("Music artist-aware autoplay falls back to any allowed result when same-artist result is unavailable", () => {
+  const tracks = [
+    { info: { identifier: "other-artist", author: "Other Artist", uri: "https://music.example/other" } },
+    { info: { identifier: "blocked", author: "My Artist", uri: "https://music.example/blocked" } }
+  ];
+
+  assert.equal(
+    selectMusicArtistAwareAutoplayCandidate(
+      tracks,
+      "My Artist",
+      new Set(["blocked"]),
+      new Set()
+    )?.info.identifier,
+    "other-artist"
   );
 });
