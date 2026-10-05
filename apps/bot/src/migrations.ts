@@ -1501,6 +1501,15 @@ const migrations = [
     ])
   },
   {
+    version: 100,
+    name: "notification_tiktok_feed_filters",
+    sql: q([
+      "ALTER TABLE notification_tiktok_feeds ADD COLUMN IF NOT EXISTS message_template text NOT NULL DEFAULT '🎵 **Новый TikTok**\\n**{title}**\\n{url}';",
+      "ALTER TABLE notification_tiktok_feeds ADD COLUMN IF NOT EXISTS include_keywords text[] NOT NULL DEFAULT '{}';",
+      "ALTER TABLE notification_tiktok_feeds ADD COLUMN IF NOT EXISTS exclude_keywords text[] NOT NULL DEFAULT '{}';"
+    ])
+  },
+  {
     version: 98,
     name: "notification_feed_embeds",
     sql: q([
