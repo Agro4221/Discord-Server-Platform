@@ -1203,286 +1203,6 @@ export class Music implements PlatformModule {
     const player = this.manager?.players.get(interaction.guild!.id);
 
     if (action === "list") {
-      const result = await this.db.query<{ track: { info?: { title?: string; author?: string } } }>(
-        "SELECT track FROM music_favorites WHERE guild_id=$1 AND user_id=$2 ORDER BY created_at DESC LIMIT 25",
-        [interaction.guild!.id, interaction.user.id]
-      );
-      const lines = result.rows.map((row, index) =>
-        (index + 1) + ". **" + String(row.track?.info?.title ?? "Unknown track") + "** — " + String(row.track?.info?.author ?? "Unknown artist")
-      );
-      await interaction.reply({
-        content: lines.length ? "❤️ **Избранное**\n" + lines.join("\n") : "❤️ Избранное пока пусто.",
-        ephemeral: true
-      });
-      return;
-    }
-
-    if (action === "play") {
-      const position = interaction.options.getInteger("track");
-      if (position === null || !isValidMusicSavedPosition(position, 25)) {
-        await interaction.reply({ content: "Укажи номер трека из избранного от 1 до 25.", ephemeral: true });
-        return;
-      }
-
-      const result = await this.db.query<{
-        track: { info?: { uri?: string | null; identifier?: string; title?: string } };
-      }>(
-        "SELECT track FROM music_favorites WHERE guild_id=$1 AND user_id=$2 ORDER BY created_at DESC LIMIT 25 OFFSET $3",
-        [interaction.guild!.id,interaction.user.id,position - 1]
-      );
-      const saved = result.rows[0]?.track;
-      const query = String(saved?.info?.uri ?? saved?.info?.identifier ?? "");
-      if (!query) {
-        await interaction.reply({ content: "Не удалось восстановить выбранный трек.", ephemeral: true });
-        return;
-      }
-
-      const voice = (await interaction.guild!.members.fetch(interaction.user.id)).voice.channelId;
-      if (!voice) {
-        await interaction.reply({ content: "Сначала зайди в голосовой канал.", ephemeral: true });
-        return;
-      }
-
-      const cooldownKey = interaction.guild!.id + ":" + interaction.user.id;
-      const remaining = remainingMusicRequestCooldown(this.requestCooldownUntil.get(cooldownKey) ?? 0);
-      if (remaining > 0) {
-        await interaction.reply({ content: "⏳ Подожди ещё " + Math.ceil(remaining / 1000) + " сек. перед следующим запросом.", ephemeral: true });
-        return;
-      }
-
-      const queued = await this.queueQuery(
-        interaction.guild!.id,
-        voice,
-        interaction.channelId,
-        query,
-        interaction.user
-      );
-      this.requestCooldownUntil.set(cooldownKey, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
-
-      if (queued.pending) {
-        await interaction.reply({ content: "🕒 Избранный трек отправлен на подтверждение DJ или Manage Server.", ephemeral: true });
-        return;
-      }
-      if (!queued.added) {
-        await interaction.reply({
-          content: queued.limited ? "⛔ Лимит очереди уже достигнут." : "Не удалось добавить выбранный трек.",
-          ephemeral: true
-        });
-        return;
-      }
-      await interaction.reply({
-        content: "▶️ Запущен трек из избранного" + (queued.firstTitle ? ": **" + queued.firstTitle + "**" : "."),
-        ephemeral: true
-      });
-      return;
-    }
-
-    const track = player?.queue.current;
-    if (!track) {
-      await interaction.reply({ content: "Нужен текущий трек в плеере.", ephemeral: true });
-      return;
-    }
-
-    if (action === "add") {
-      await this.db.query(
-        "INSERT INTO music_favorites(guild_id,user_id,identifier,track) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT(guild_id,user_id,identifier) DO UPDATE SET track=EXCLUDED.track",
-        [interaction.guild!.id,interaction.user.id,track.info.identifier,JSON.stringify(this.serializedTrack(track))]
-      );
-      await interaction.reply({ content: "❤️ Трек сохранён в избранное.", ephemeral: true });
-      return;
-    }
-
-    if (action === "remove") {
-      const deleted = await this.db.query(
-        "DELETE FROM music_favorites WHERE guild_id=$1 AND user_id=$2 AND identifier=$3",
-        [interaction.guild!.id,interaction.user.id,track.info.identifier]
-      );
-      await interaction.reply({
-        content: deleted.rowCount ? "🗑️ Трек удалён из избранного." : "Этого трека нет в избранном.",
-        ephemeral: true
-      });
-      return;
-    }
-
-    await interaction.reply({ content: "Неизвестное действие favorite.", ephemeral: true });
-  }
-
-  private async savedPlaylist(interaction: ChatInputCommandInteraction): Promise<void> {
-    const action = interaction.options.getString("action", true);
-    const name = interaction.options.getString("name")?.trim().slice(0, 80) ?? "";
-    const query = normalizeMusicPlaylistSearch(interaction.options.getString("query") ?? "");
-    const shared = interaction.options.getBoolean("shared") === true;
-    const sharedOnly = interaction.options.getBoolean("shared-only") === true;
-    const guildId = interaction.guild!.id;
-
-    if (action === "import") {
-      const importUrl = normalizeMusicPlaylistImportUrl(interaction.options.getString("query") ?? "");
-      if (!importUrl) {
-        await interaction.reply({ content: "Укажи корректный HTTP(S) URL плейлисты.", ephemeral: true });
-        return;
-      }
-      if (!name) {
-        await interaction.reply({ content: "Укажи имя новой плейлисты.", ephemeral: true });
-        return;
-      }
-
-      const visibility = normalizeMusicPlaylistVisibility(shared);
-      if (visibility === "shared" && !await this.canManageMusicMember(
-        guildId,
-        await interaction.guild!.members.fetch(interaction.user.id).catch(() => null)
-      )) {
-        await interaction.reply({ content: "Импортировать shared-плейлисты могут только DJ или Manage Server.", ephemeral: true });
-        return;
-      }
-      if (!this.manager) throw new Error("music_manager_unavailable");
-
-      const voiceChannelId = (await interaction.guild!.members.fetch(interaction.user.id)).voice.channelId;
-      if (!voiceChannelId) {
-        await interaction.reply({ content: "Для импорта сначала зайди в голосовой канал, чтобы Music смогла получить список треков.", ephemeral: true });
-        return;
-      }
-
-      try {
-        const existing = this.manager.players.get(guildId);
-        const player = existing ?? await this.manager.createPlayer({
-          guildId,
-          voiceChannelId,
-          textChannelId: await this.preferredTextChannelId(guildId, interaction.channelId),
-          volume: await this.defaultVolume(guildId),
-          selfDeaf: true
-        });
-        if (player.voiceChannelId !== voiceChannelId) {
-          await interaction.reply({ content: "Музыкальный бот уже занят другим голосовым каналом.", ephemeral: true });
-          return;
-        }
-        if (!player.connected) await player.connect();
-
-        const result = await player.search({ query: importUrl }, interaction.user);
-        if (!result.tracks.length) {
-          await interaction.reply({ content: "По этому URL не удалось получить ни одного трека.", ephemeral: true });
-          return;
-        }
-
-        const seen = new Set<string>();
-        const imported = (result.tracks as Track[]).filter((track) => {
-          const identifier = String(track.info.identifier ?? track.info.uri ?? "");
-          if (!identifier || seen.has(identifier)) return false;
-          seen.add(identifier);
-          return true;
-        }).slice(0, MAX_PLAYLIST_TRACKS);
-
-        if (!imported.length) {
-          await interaction.reply({ content: "В импортируемой плейлисте не осталось уникальных треков.", ephemeral: true });
-          return;
-        }
-
-        try {
-          await this.db.query(
-            "INSERT INTO music_playlists(guild_id,user_id,name,visibility,tracks) VALUES($1,$2,$3,$4,$5::jsonb)",
-            [guildId,interaction.user.id,name,visibility,JSON.stringify(imported.map((track) => this.serializedTrack(track)))]
-          );
-        } catch {
-          await interaction.reply({
-            content: visibility === "shared"
-              ? "Shared-плейлист с таким именем уже существует."
-              : "Личный плейлист с таким именем уже существует.",
-            ephemeral: true
-          });
-          return;
-        }
-
-        const limited = result.tracks.length > imported.length;
-        await interaction.reply({
-          content: "📥 " + (visibility === "shared" ? "Shared-плейлист" : "Плейлист") + " **" + name + "** импортирован: **" +
-            imported.length + "** треков" + (limited ? " (лишние/дубликаты отброшены)" : "") + ".",
-          ephemeral: true
-        });
-      } catch (error) {
-        logger.warn("Music playlist URL import failed", {
-          guildId,
-          userId: interaction.user.id,
-          error: String(error)
-        });
-        await interaction.reply({ content: "Не удалось импортировать плейлист по этому URL.", ephemeral: true });
-      }
-      return;
-    }
-
-    if (action === "save-queue") {
-      const player = this.manager?.players.get(guildId);
-      if (!player) {
-        await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
-        return;
-      }
-
-      const member = await interaction.guild!.members.fetch(interaction.user.id).catch(() => null);
-      if (!canControlMusic(
-        member?.voice.channelId ?? null,
-        player.voiceChannelId,
-        member?.permissions.has("ManageGuild") ?? false
-      )) {
-        await interaction.reply({ content: "Сохранять очередь можно из того же голосового канала.", ephemeral: true });
-        return;
-      }
-
-      if (!name) {
-        await interaction.reply({ content: "Укажи имя плейлиста.", ephemeral: true });
-        return;
-      }
-
-      const visibility = normalizeMusicPlaylistVisibility(shared);
-      if (visibility === "shared" && !await this.canManageMusicMember(guildId, member)) {
-        await interaction.reply({ content: "Создавать shared-плейлисты могут только DJ или Manage Server.", ephemeral: true });
-        return;
-      }
-
-      const tracks = buildMusicPlaylistSnapshot(player.queue.current, player.queue.tracks);
-
-      if (!tracks.length) {
-        await interaction.reply({ content: "Нечего сохранять: очередь пуста.", ephemeral: true });
-        return;
-      }
-
-      try {
-        await this.db.query(
-          "INSERT INTO music_playlists(guild_id,user_id,name,visibility,tracks) VALUES($1,$2,$3,$4,$5::jsonb)",
-          [
-            guildId,
-            interaction.user.id,
-            name,
-            visibility,
-            JSON.stringify(tracks.map((track) => this.serializedTrack(track)))
-          ]
-        );
-      } catch (error) {
-        if (/unique|duplicate|23505/i.test(String(error))) {
-          await interaction.reply({
-            content: (visibility === "shared" ? "Shared-плейлист" : "Плейлист") + " **" + name + "** уже существует. Выбери другое имя.",
-            ephemeral: true
-          });
-          return;
-        }
-        logger.warn("Music queue playlist save failed", {
-          guildId,
-          userId: interaction.user.id,
-          error: String(error)
-        });
-        await interaction.reply({ content: "Не удалось сохранить текущую очередь.", ephemeral: true });
-        return;
-      }
-
-      await interaction.reply({
-        content: "💾 Очередь сохранена в " + (visibility === "shared" ? "shared-плейлист" : "личный плейлист") + " **" + name + "**: **" + tracks.length + "** трек(ов).",
-        ephemeral: true
-      });
-      return;
-    }
-
-    if (action === "list") {
-      const result = await this.db.query<{ name: string; tracks: unknown[]; visibility: MusicPlaylistVisibility }>(
-        "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') ORDER BY visibility DESC,updated_at DESC LIMIT 25",
-        [guildId,interaction.user.id]
-      );
       const token = this.createMusicPlaylistPaginationSession({
         guildId,
         userId: interaction.user.id,
@@ -1497,15 +1217,6 @@ export class Music implements PlatformModule {
         await interaction.reply({ content: "Укажи текст для поиска.", ephemeral: true });
         return;
       }
-      const pattern = "%" + query + "%";
-      const result = await this.db.query<{
-        name: string;
-        tracks: unknown[];
-        visibility: MusicPlaylistVisibility;
-      }>(
-        "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') AND ($4=false OR visibility='shared') AND name ILIKE $3 ORDER BY visibility DESC,updated_at DESC LIMIT 25",
-        [guildId,interaction.user.id,pattern,sharedOnly]
-      );
       const token = this.createMusicPlaylistPaginationSession({
         guildId,
         userId: interaction.user.id,
@@ -3467,6 +3178,28 @@ export class Music implements PlatformModule {
       return;
     }
 
+
+    if (interaction.isButton() && interaction.customId.startsWith("dsp:music:playlist-page:") && interaction.guild) {
+      const parts = interaction.customId.split(":");
+      const token = parts[4] ?? "";
+      const page = Number(parts[5]);
+      const session = this.playlistPaginationSessions.get(token);
+      if (
+        !session ||
+        session.guildId !== interaction.guild.id ||
+        session.userId !== interaction.user.id ||
+        session.expiresAt < Date.now() ||
+        !isValidMusicPlaylistPage(page, session.action === "view" ? 1 : Number.MAX_SAFE_INTEGER)
+      ) {
+        await interaction.update({ content: "Эта навигация устарела. Выполни команду ещё раз.", components: [] });
+        return;
+      }
+      if (session.expiresAt < Date.now()) {
+        this.playlistPaginationSessions.delete(token);
+      }
+      await this.renderMusicPlaylistPagination(interaction,token,session,page);
+      return;
+    }
 
     if (!interaction.isButton() || !interaction.customId.startsWith("dsp:music:") || !interaction.guild) return;
 
