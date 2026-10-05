@@ -96,3 +96,52 @@ test("command policy blocks disabled controller action", async () => {
     false
   );
 });
+
+
+test("Music queue mutation policies are distinct and configurable", async () => {
+  const rows = new Map<string, unknown>([
+    ["queue-remove", {
+      enabled: true,
+      prefix_enabled: false,
+      slash_enabled: false,
+      cooldown_seconds: 0,
+      allowed_role_ids: ["123456789012345679"],
+      denied_role_ids: [],
+      allowed_channel_ids: [],
+      denied_channel_ids: [],
+      help_visible: true
+    }],
+    ["queue-move", {
+      enabled: true,
+      prefix_enabled: false,
+      slash_enabled: false,
+      cooldown_seconds: 0,
+      allowed_role_ids: ["123456789012345679"],
+      denied_role_ids: [],
+      allowed_channel_ids: [],
+      denied_channel_ids: [],
+      help_visible: true
+    }]
+  ]);
+  const db = {
+    query: async (sql: string, params: unknown[] = []) => {
+      if (sql.includes("SELECT 1 FROM command_policies")) {
+        return { rows: rows.has(String(params[1])) ? [{}] : [] };
+      }
+      return { rows: rows.has(String(params[1])) ? [rows.get(String(params[1]))] : [] };
+    }
+  } as never;
+
+  const policy = new CommandPolicyService(db);
+  const scopedMember = member(["123456789012345679"]);
+  assert.equal(await policy.hasStoredPolicy("123456789012345678", "queue-remove"), true);
+  assert.equal(await policy.hasStoredPolicy("123456789012345678", "queue-move"), true);
+  assert.equal(
+    await policy.checkMemberAction("123456789012345678", "queue-remove", scopedMember, "123456789012345680"),
+    true
+  );
+  assert.equal(
+    await policy.checkMemberAction("123456789012345678", "queue-move", scopedMember, "123456789012345680"),
+    true
+  );
+});
