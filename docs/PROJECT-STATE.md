@@ -475,3 +475,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - The selector is covered by deterministic tests and is used consistently by the runtime failover path.
 - Source checkpoint: `3e854a4e158eaa332a625cfba1f375ca837411f7`.
 - Fresh CI is pending/not visible yet.
+
+## 2026-10-05 — Music provider readiness consistency
+- Consolidated provider readiness checks across Dashboard diagnostics and `/music providers` for the configured external Music providers.
+- Required credentials/tokens are now part of the readiness signal rather than only the LavaSrc feature toggle.
+- Source checkpoint: `39f396e5444a52eadf084549231b965abef592a7`.
+- CI verification is pending.
