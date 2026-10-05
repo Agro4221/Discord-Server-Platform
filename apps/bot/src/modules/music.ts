@@ -1499,6 +1499,332 @@ export class Music implements PlatformModule {
     };
   }
 
+  private async createMusicRequestApproval(input: {
+    guildId: string;
+    requesterUserId: string;
+    requesterVoiceChannelId: string;
+    sourceChannelId: string;
+    query: string;
+    track: MusicQueueTrackLike | null;
+    source: "query" | "search";
+  }): Promise<string> {
+    const expiresAt = new Date(Date.now() + MUSIC_REQUEST_APPROVAL_TTL_MS).toISOString();
+    const inserted = await this.db.query<{ id: string }>(
+      \`INSERT INTO music_request_approvals(
+        guild_id,requester_user_id,requester_voice_channel_id,source_channel_id,query,track,expires_at
+      ) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7)
+      RETURNING id\`,
+      [
+        input.guildId,
+        input.requesterUserId,
+        input.requesterVoiceChannelId,
+        input.sourceChannelId,
+        input.query,
+        input.track ? JSON.stringify(this.serializedTrack(input.track)) : null,
+        expiresAt
+      ]
+    );
+
+    const id = String(inserted.rows[0]?.id ?? "");
+    if (!id) throw new Error("music_approval_create_failed");
+
+    const approvalChannelId = await this.requestChannelId(input.guildId) ?? input.sourceChannelId;
+    const channel = this.client?.channels.cache.get(approvalChannelId);
+    if (!channel?.isTextBased() || !("send" in channel)) {
+      await this.db.query("DELETE FROM music_request_approvals WHERE id=$1", [id]);
+      throw new Error("music_approval_channel_unavailable");
+    }
+
+    try {
+      const sent = await channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle("🎵 Запрос на музыку")
+            .setDescription(
+              "**Запрос:** " + input.query.slice(0, 1000) +
+              "\n**Пользователь:** <@" + input.requesterUserId + ">" +
+              "\n\nТребуется подтверждение DJ или Manage Server."
+            )
+        ],
+        components: [this.musicRequestApprovalComponents(id)]
+      });
+
+      await this.db.query(
+        \`UPDATE music_request_approvals
+            SET approval_message_channel_id=$1,approval_message_id=$2
+          WHERE id=$3\`,
+        [approvalChannelId, sent.id, id]
+      );
+    } catch (error) {
+      await this.db.query("DELETE FROM music_request_approvals WHERE id=$1", [id]).catch(() => undefined);
+      throw new Error("music_approval_publish_failed:" + String(error));
+    }
+
+    try {
+      await this.auditLog?.record({
+        guildId: input.guildId,
+        actorUserId: input.requesterUserId,
+        source: "discord",
+        action: "music.request.created",
+        targetType: "music_request_approval",
+        targetId: id,
+        metadata: { source: input.source, query: input.query.slice(0, 200) }
+      });
+    } catch (error) {
+      logger.warn("Music request approval audit failed", {
+        guildId: input.guildId,
+        requestId: id,
+        error: String(error)
+      });
+    }
+
+    return id;
+  }
+
+  private musicRequestApprovalComponents(id: string, disabled = false): ActionRowBuilder<ButtonBuilder> {
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId("dsp:music:request:approve:" + id)
+        .setLabel("Одобрить")
+        .setEmoji("✅")
+        .setStyle(ButtonStyle.Success)
+        .setDisabled(disabled),
+      new ButtonBuilder()
+        .setCustomId("dsp:music:request:reject:" + id)
+        .setLabel("Отклонить")
+        .setEmoji("❌")
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(disabled)
+    );
+  }
+
+  private async updateMusicRequestApprovalMessage(
+    interaction: ButtonInteraction,
+    status: "approved" | "rejected" | "expired" | "failed",
+    requestId: string,
+    detail: string
+  ): Promise<void> {
+    const title =
+      status === "approved" ? "✅ Музыкальный запрос одобрен" :
+      status === "rejected" ? "❌ Музыкальный запрос отклонён" :
+      status === "expired" ? "⌛ Музыкальный запрос истёк" :
+      "⚠️ Музыкальный запрос не обработан";
+
+    await interaction.message.edit({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(title)
+          .setDescription(detail)
+          .setFooter({ text: "Request #" + requestId })
+      ],
+      components: [this.musicRequestApprovalComponents(requestId, true)]
+    }).catch(() => undefined);
+  }
+
+  private async handleMusicRequestApproval(interaction: ButtonInteraction): Promise<void> {
+    const parts = interaction.customId.split(":");
+    const action = parts[3];
+    const requestId = parts[4];
+    if ((action !== "approve" && action !== "reject") || !requestId) {
+      await interaction.reply({ content: "Некорректный запрос.", ephemeral: true });
+      return;
+    }
+
+    const member = await interaction.guild!.members.fetch(interaction.user.id).catch(() => null);
+    if (!await this.canManageMusicMember(interaction.guild!.id, member)) {
+      await interaction.reply({ content: "Подтверждать музыкальные запросы могут только DJ или Manage Server.", ephemeral: true });
+      return;
+    }
+
+    await interaction.deferUpdate();
+
+    const claim = await this.db.query<{
+      id: string;
+      guild_id: string;
+      requester_user_id: string;
+      requester_voice_channel_id: string;
+      source_channel_id: string;
+      query: string;
+      track: unknown;
+      expires_at: string;
+    }>(
+      \`UPDATE music_request_approvals
+          SET status='processing'
+        WHERE id=$1 AND status='pending' AND expires_at > now()
+      RETURNING id,guild_id,requester_user_id,requester_voice_channel_id,source_channel_id,query,track,expires_at\`,
+      [requestId]
+    );
+    const request = claim.rows[0];
+
+    if (!request) {
+      const current = await this.db.query<{ status: string }>(
+        "SELECT status FROM music_request_approvals WHERE id=$1",
+        [requestId]
+      );
+      if (current.rows[0]?.status === "pending") {
+        await this.db.query(
+          "UPDATE music_request_approvals SET status='expired',resolved_by=$1,resolved_at=now() WHERE id=$2 AND status='pending'",
+          [interaction.user.id, requestId]
+        );
+        await this.updateMusicRequestApprovalMessage(interaction, "expired", requestId, "Этот запрос больше нельзя обработать.");
+      } else {
+        await this.updateMusicRequestApprovalMessage(
+          interaction,
+          "failed",
+          requestId,
+          current.rows[0] ? "Запрос уже обработан: **" + current.rows[0].status + "**." : "Запрос не найден."
+        );
+      }
+      return;
+    }
+
+    if (action === "reject") {
+      await this.db.query(
+        \`UPDATE music_request_approvals
+            SET status='rejected',resolved_by=$1,resolved_at=now()
+          WHERE id=$2\`,
+        [interaction.user.id, requestId]
+      );
+      try {
+        await this.auditLog?.record({
+          guildId: request.guild_id,
+          actorUserId: interaction.user.id,
+          source: "discord",
+          action: "music.request.rejected",
+          targetType: "music_request_approval",
+          targetId: requestId,
+          metadata: { requesterUserId: request.requester_user_id }
+        });
+      } catch {}
+      await this.updateMusicRequestApprovalMessage(interaction, "rejected", requestId, "Модератор: <@" + interaction.user.id + ">.");
+      return;
+    }
+
+    try {
+      const queued = request.track && typeof request.track === "object"
+        ? await this.enqueueApprovedStoredTrack(request, member.user)
+        : await this.queueQuery(
+            request.guild_id,
+            request.requester_voice_channel_id,
+            request.source_channel_id,
+            request.query,
+            member.user,
+            true,
+            true
+          );
+
+      if (!queued.added) {
+        throw new Error(queued.limited ? "music_request_queue_full" : "music_request_track_not_found");
+      }
+
+      await this.db.query(
+        \`UPDATE music_request_approvals
+            SET status='approved',resolved_by=$1,resolved_at=now(),result_title=$2
+          WHERE id=$3\`,
+        [interaction.user.id, queued.firstTitle, requestId]
+      );
+
+      try {
+        await this.auditLog?.record({
+          guildId: request.guild_id,
+          actorUserId: interaction.user.id,
+          source: "discord",
+          action: "music.request.approved",
+          targetType: "music_request_approval",
+          targetId: requestId,
+          metadata: { requesterUserId: request.requester_user_id, title: queued.firstTitle }
+        });
+      } catch {}
+
+      await this.updateMusicRequestApprovalMessage(
+        interaction,
+        "approved",
+        requestId,
+        "Одобрил: <@" + interaction.user.id + ">\nДобавлено треков: **" + queued.added + "**."
+      );
+    } catch (error) {
+      await this.db.query(
+        "UPDATE music_request_approvals SET status='pending' WHERE id=$1 AND status='processing'",
+        [requestId]
+      ).catch(() => undefined);
+
+      try {
+        await this.auditLog?.record({
+          guildId: request.guild_id,
+          actorUserId: interaction.user.id,
+          source: "discord",
+          action: "music.request.failed",
+          targetType: "music_request_approval",
+          targetId: requestId,
+          metadata: { requesterUserId: request.requester_user_id, error: String(error).slice(0, 300) }
+        });
+      } catch {}
+
+      await interaction.followUp({
+        content: String(error).includes("music_request_queue_full")
+          ? "Очередь заполнена. Запрос оставлен ожидающим — попробуй одобрить позже."
+          : "Не удалось выполнить запрос. Он оставлен ожидающим.",
+        ephemeral: true
+      }).catch(() => undefined);
+    }
+  }
+
+  private async enqueueApprovedStoredTrack(
+    request: {
+      guild_id: string;
+      requester_user_id: string;
+      requester_voice_channel_id: string;
+      source_channel_id: string;
+      query: string;
+      track: unknown;
+    },
+    requester: import("discord.js").User
+  ): Promise<{ added: number; firstTitle: string; firstAuthor: string; limited: boolean }> {
+    if (!this.manager) throw new Error("music_manager_unavailable");
+
+    const owner = await this.identities.musicVoiceOwner(request.guild_id, request.requester_voice_channel_id);
+    if (owner && owner !== this.config.botIdentityId) throw new Error("music_voice_assigned_elsewhere");
+    if (!owner && this.config.botIdentityId !== "primary") throw new Error("music_voice_not_assigned");
+
+    const settings = await this.musicSettings(request.guild_id);
+    const player = this.manager.players.get(request.guild_id) ?? await this.manager.createPlayer({
+      guildId: request.guild_id,
+      voiceChannelId: request.requester_voice_channel_id,
+      textChannelId: await this.preferredTextChannelId(request.guild_id, request.source_channel_id),
+      volume: await this.defaultVolume(request.guild_id),
+      selfDeaf: true
+    });
+
+    if (player.voiceChannelId !== request.requester_voice_channel_id) throw new Error("music_player_in_other_voice");
+    if (!player.connected) await player.connect();
+
+    const queuedByUser = countMusicQueuedByUser(player.queue.tracks, request.requester_user_id);
+    const remainingUserSlots = remainingMusicQueueSlots(queuedByUser, settings.maxQueuedPerUser);
+    const remainingGuildSlots = remainingMusicGuildQueueSlots(player.queue.tracks.length, settings.maxQueueSize);
+    if (remainingUserSlots === 0 || remainingGuildSlots === 0) {
+      return { added: 0, firstTitle: "", firstAuthor: "", limited: true };
+    }
+
+    const built = this.manager.utils.buildTrack(
+      request.track as Parameters<LavalinkManager["utils"]["buildTrack"]>[0],
+      requester
+    );
+    if (!built) return { added: 0, firstTitle: "", firstAuthor: "", limited: false };
+
+    player.queue.add(built);
+    await this.applyFairQueue(player, settings.fairQueueEnabled);
+    if (!player.playing) await player.play();
+    await this.persistPlayer(player);
+    await this.syncController(player);
+
+    return {
+      added: 1,
+      firstTitle: built.info.title,
+      firstAuthor: built.info.author ?? "Unknown artist",
+      limited: false
+    };
+  }
+
   private async onRequestMessage(message: Message): Promise<void> {
     if (!message.guild || message.author.bot || message.webhookId) return;
     if (!await moduleEnabled(this.db, message.guild.id, "music", false)) return;
