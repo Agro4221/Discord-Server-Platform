@@ -45,6 +45,14 @@ for required_secret in MANAGEMENT_API_KEY POSTGRES_PASSWORD LAVALINK_PASSWORD; d
     exit 1
   fi
 done
+if [[ -f infrastructure/caddy/Caddyfile ]]; then
+  for required_caddy_value in DOMAIN DASHBOARD_BASIC_AUTH_USER DASHBOARD_BASIC_AUTH_HASH; do
+    if [[ -z "$(get_env "${required_caddy_value}")" ]]; then
+      echo "Required Caddy setting is missing from .env: ${required_caddy_value}" >&2
+      exit 1
+    fi
+  done
+fi
 
 docker compose "${COMPOSE_ARGS[@]}" config >/dev/null
 docker compose "${COMPOSE_ARGS[@]}" up -d --build
