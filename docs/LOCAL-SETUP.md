@@ -1,113 +1,61 @@
 # Local Setup
 
-This project is local-first. The supported everyday setup is native Windows; Docker is optional and intended mainly for reproducible deployments/VPS scenarios.
+The supported everyday local mode is native Windows, without Docker Desktop. Docker is optional for reproducible deployment/VPS scenarios.
 
-## Native Windows mode
+## One-click Windows startup
 
-For a gaming/streaming PC, Docker Desktop is optional. Use the native launcher:
-
-    .\start-native.bat
-
-The default native mode starts one Lavalink node and the compiled bot. The Dashboard is off until you add -Dashboard. See docs/NATIVE-SETUP.md for PostgreSQL, Java and Lavalink JAR prerequisites.
-
-Use -Lavalink2 only when you explicitly need a second Lavalink node for redundancy.
-
-## Windows: one-command local start
-
-Docker is not required for the everyday gaming setup. Clone the repository and use:
+There is exactly one root launcher:
 
     start.bat
 
-For the Control Center:
+Normal first launch and all later launches use that same file. The default mode starts PostgreSQL, one Lavalink node, the Discord bot and the local Control Center.
 
-    control-center.bat
+The launcher automatically prepares missing local dependencies on first run when WinGet is available: Node.js LTS, PostgreSQL 17, Microsoft OpenJDK 17, npm dependencies and the pinned Lavalink 4.2.2 JAR.
 
-On the first launch the script creates `.env` and generates the local management/database/Lavalink secrets. Discord credentials and user login are not requested by the launcher; register the bot in Control Center → Bot Fleet.
+The first run creates .env, generates local secrets, prepares the default PostgreSQL database, builds the project and opens the Control Center. Discord credentials are not requested before startup; register the bot in Control Center -> Bot Fleet.
 
-The default `start.bat` keeps Dashboard off to reduce background memory/CPU use. `control-center.bat` starts it and opens:
+Useful options, still through the same start.bat:
 
-    http://127.0.0.1:3000/
-
-The Management API remains bound to loopback and is not intended to be exposed directly to the internet.
-
-## Useful native launcher options
-
-Default gaming mode:
-
-    start.bat
-
-With Control Center:
-
-    control-center.bat
-
-With a second Lavalink node:
-
+    start.bat -NoDashboard
     start.bat -Lavalink2
-
-After source/dependency changes:
-
     start.bat -Rebuild
+    start.bat -Down
+    start.bat -Status
 
-Stop native processes:
+For details see docs/NATIVE-SETUP.md.
 
-    stop.bat
+## Resource requirements
 
-Measure current native process memory:
+See docs/RESOURCE-REQUIREMENTS.md.
 
-    native-status.bat
+The resource tiers there describe only Discord Server Platform itself: PostgreSQL + one Lavalink + bot + local Control Center. Games, OBS, streaming software, browsers and other applications are intentionally excluded.
 
-## What runs locally
-
-Native mode starts PostgreSQL as an existing Windows installation, one Lavalink node and the bot. Dashboard and the second Lavalink node are opt-in. Runtime logs/PIDs live under `.native-runtime/`.
-
-The bot exposes health and Management API ports only on `127.0.0.1`. The Dashboard is also loopback-only by default.
+The practical target for a normal self-hosted installation is 8 GB RAM. 4 GB is the lower practical floor; 16 GB+ is headroom for much larger deployments and additional Lavalink/bot identities.
 
 ## First Discord setup
 
-Create a Discord application and bot in the Discord Developer Portal. Open Control Center → Bot Fleet and enter the bot Application / Client ID and Bot Token; the token is stored encrypted locally and is never returned to the Dashboard. Enable the Gateway intents required by the bot, then invite the bot to the test server with the permissions needed by the modules you plan to use.
+Create a Discord application and bot in the Discord Developer Portal. Open Control Center -> Bot Fleet and enter the Application / Client ID and Bot Token. The token is encrypted locally and is never returned to the Dashboard.
 
-For command development, set `DISCORD_TEST_GUILD_ID` in `.env` so slash commands register to the test guild instead of waiting for global propagation.
+Enable the Gateway intents required by the bot and invite it to the test server with the permissions required by the modules you plan to use.
 
-## Troubleshooting
+For command development, set DISCORD_TEST_GUILD_ID in .env so slash commands register to the test guild instead of waiting for global propagation.
 
-For native runtime status:
+## Runtime files
 
-    native-status.bat
+Native PID files and logs live under .native-runtime/, which is ignored by Git.
 
-Logs are under `.native-runtime/logs/`. Stop native processes with:
+The launcher can report the tracked native process working set with:
 
-    stop.bat
+    start.bat -Status
 
-Docker troubleshooting remains available through `scripts/start-local.ps1` only when Docker mode is intentionally selected.
+## Docker
 
-Do not commit `.env`. Secrets stay in the local environment.
+Docker Compose remains supported as an optional deployment/reproducibility path. It is not required for the everyday Windows setup.
 
 ## VPS
 
-VPS deployment uses the same application architecture. See `scripts/install-vps.sh` and `scripts/upgrade.sh` for the Docker-based deployment path.
-
-
-## VPS deployment with protected public Dashboard
-
-For a VPS deployment, use the installer from a clean Ubuntu/Debian-style host:
+VPS deployment continues to use the Docker-based path:
 
     sudo bash scripts/install-vps.sh
 
-The installer creates Docker configuration, generates database/Lavalink/Management API secrets, asks for the Dashboard domain and a dedicated Basic Auth credential, generates a Caddy password hash and starts the VPS Compose overlay.
-
-The installer does not ask for the Discord bot token. After the Dashboard is available at https://<your-domain>/, authenticate with the Basic Auth credential and register the bot through Control Center -> Bot Fleet. The bot token remains encrypted by the application and is not returned to the browser.
-
-The VPS overlay exposes only Caddy on ports 80/443. Bot health, Management API and the direct Dashboard port remain private.
-
-For upgrades:
-
-    sudo bash scripts/upgrade.sh
-
-The upgrade script detects the generated infrastructure/caddy/Caddyfile and automatically uses docker-compose.vps.yml.
-
-Before deployment, make sure the DNS A/AAAA record for the chosen domain points to the VPS and that ports 80/443 are reachable so Caddy can obtain and renew TLS certificates.
-
-
-## Resource planning
-
-See `docs/RESOURCE-REQUIREMENTS.md` for minimum/recommended/heavy PC tiers and the measured-runtime procedure. The default gaming mode intentionally uses one Lavalink node and no Dashboard.
+See scripts/install-vps.sh and scripts/upgrade.sh for the VPS deployment flow.
