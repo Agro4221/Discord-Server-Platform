@@ -41,6 +41,7 @@ type ApiOptions = {
   backups: BackupService;
   identities?: BotIdentityRepository;
   botSetup?: {
+    test: (input: { clientId: string; token: string }) => Promise<unknown>;
     get: () => Promise<unknown>;
     update: (input: {
       clientId: string;
@@ -416,6 +417,34 @@ export class ManagementApiServer {
           const scopedGuild = path.match(/^\/api\/guilds\/([^/]+)/);
           if (scopedGuild && this.options.guildAccess && !this.options.guildAccess(scopedGuild[1] ?? "")) {
             this.json(res, 404, { error: "guild_not_found" });
+            return;
+          }
+
+          if (method === "POST" && path === "/api/bot/test") {
+            if (!this.options.botSetup) {
+              this.json(res, 500, { error: "bot_setup_unavailable" });
+              return;
+            }
+            const body = await readJson(req, 1024 * 1024);
+            if (typeof body.clientId !== "string" || typeof body.token !== "string") {
+              throw new RequestInputError("invalid_bot_credential_test", 400);
+            }
+            try {
+              const result = await this.options.botSetup.test({
+                clientId: body.clientId,
+                token: body.token
+              });
+              await this.options.auditLog.record({
+                source: "dashboard",
+                action: "bot.credentials.tested",
+                targetType: "bot-identity",
+                targetId: String((result as { id?: string }).id ?? body.clientId),
+                metadata: { clientId: body.clientId }
+              });
+              this.json(res, 200, { ok: true, bot: result });
+            } catch (error) {
+              this.json(res, 400, { error: String(error).replace(/^Error:\s*/, "") });
+            }
             return;
           }
 
