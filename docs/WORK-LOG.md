@@ -759,3 +759,13 @@ Never write credentials, tokens or private user data here.
 - CI #2114 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
 - Final source checkpoint: `a7a2bb3a9325ebe0fb7c04feed9558f66cad2330`.
 - Next single Music slice: **Save queue as playlist improvements**.
+
+## 2026-10-05 — Music save queue as playlist improvements
+- Completed the broader Save Queue → Playlist flow for Music.
+- Added `Save current queue` to the `/music playlist` command, alongside the existing controller `💾` action.
+- Queue saving can now target either a personal playlist or a server-shared playlist; shared creation uses the existing DJ / Manage Server permission gate.
+- Both slash-command and controller queue saving use the same queue snapshot helper, preserving the current track first and capping the stored playlist at the existing 500-track capacity.
+- Added regression coverage proving the snapshot keeps order, does not mutate the source queue and caps oversized queues at 500 tracks.
+- CI #2119 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `383453f3d99a4417a57f0a0a9ff3885f66cad2330`.
+- Next single Music slice: **Play favorites / play playlist shortcuts**.
