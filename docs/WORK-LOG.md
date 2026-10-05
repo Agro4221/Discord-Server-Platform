@@ -941,3 +941,15 @@ Never write credentials, tokens or private user data here.
 - CI #2211 passed completely with the palette fix.
 - Final source checkpoint for this slice: `7c4ad1e17d27b20e67c6129d2f1ace5b1de65ee0`.
 - Next single Music slice: **Low Pass audio effect**.
+
+
+## 2026-10-05 — Music Low Pass audio effect
+- Completed the independent Low Pass audio effect slice.
+- Added `lowpass` to the Music filter command and quick-filter palette.
+- Uses the native Lavalink client `toggleLowPass()` API with the existing filter manager path and default smoothing value.
+- Kept the same controller resync, player persistence and Lavalink error handling path as the other Music effects.
+- Added regression coverage for the Low Pass action and preserved the palette five-button-per-row contract.
+- Current `lavalink-client` exposes Low Pass as a native filter and its `toggleLowPass()` helper applies the filter through the standard player filter update path.
+- CI #2213 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: `ec7ba9c027b7ce581a47f9875d5c5374efbdc920`.
+- Next single Music slice: **Channel Mix audio effect**.
