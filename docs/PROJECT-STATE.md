@@ -537,3 +537,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - The existing `ManagementApiServer` delegates to this helper; no endpoint permissions or local Dashboard login behavior were changed.
 - Source checkpoint: `3211e31ed8e07d0b41b0d25995a81e45ebef5f91`.
 - CI verification remains pending/unavailable.
+
+## 2026-10-05 — Dashboard API mutation security
+- All audited Dashboard mutation routes now pass the shared `assertSameOrigin()` CSRF/origin check.
+- Fixed concrete gaps in Help Pages deletion, Moderation Presets mutation and Role Automation creation.
+- Added a CI scanner (`scripts/check-dashboard-route-security.mjs`) to enforce the contract for future mutation routes.
+- Current CI workflow checkpoint: `6f5cb19d2f38f46606a422c7b5b0fec167562b04`.
+- CI has not yet reported a run for the current branch head.
