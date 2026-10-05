@@ -716,3 +716,15 @@ Never write credentials, tokens or private user data here.
 - CI #2093 passed completely: deployment contract, Typecheck, Test bot, domain build, bot build and Dashboard build.
 - Final code checkpoint: `9b412a48945a1c24693aa4bb60dfce5384ad6368`.
 - Next single Music slice: **Server/shared playlists**.
+
+## 2026-10-05 — Music Server / shared playlists
+- Completed server-shared Music playlists on top of the existing `music_playlists` storage.
+- Added persisted `visibility` with `personal` and `shared` modes plus a guild-wide unique name constraint for shared playlists.
+- Shared playlists are visible to all members of the guild; personal playlists remain visible only to their owner.
+- Creating a shared playlist and editing/deleting a shared playlist created by another user require DJ or Manage Server; loading shared playlists remains available to regular queue users under the existing Music queue policy.
+- Existing personal playlist behavior was preserved, including current-track additions, 500-track cap and optional shuffle on load.
+- Added command support through the existing `/music playlist` flow with a `shared` creation option.
+- Added deterministic visibility normalization, migration smoke coverage and PostgreSQL scope regression tests.
+- CI #2098 passed completely: deployment contract, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `e512c4f57fd23df31934cefd192cd46fe7ffbe5d`.
+- Next single Music slice: **Playlist add/remove/reorder individual tracks**.
