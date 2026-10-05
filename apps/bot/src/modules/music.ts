@@ -1370,7 +1370,8 @@ export class Music implements PlatformModule {
       return { added: 0, truncated: false, firstTitle: "", firstAuthor: "" };
     }
 
-    const tracks = result.tracks.slice(0, MAX_PLAYLIST_TRACKS);
+    const maxTracks = remainingSlots === null ? MAX_PLAYLIST_TRACKS : Math.min(MAX_PLAYLIST_TRACKS, remainingSlots);
+    const tracks = result.tracks.slice(0, maxTracks);
     for (const track of tracks) player.queue.add(track);
     if (!player.playing) await player.play();
 
@@ -2628,8 +2629,8 @@ export class Music implements PlatformModule {
     return result.rows[0]?.autoplay ?? false;
   }
 
-  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number; twentyFourSeven: boolean; queueAccess: "everyone" | "dj" }> {
-    const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number; twenty_four_seven: boolean; queue_access: "everyone" | "dj" }>(
+  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number; twentyFourSeven: boolean; queueAccess: "everyone" | "dj"; maxQueuedPerUser: number }> {
+    const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number; twenty_four_seven: boolean; queue_access: "everyone" | "dj"; max_queued_per_user: number }>(
       "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds,twenty_four_seven,queue_access,max_queued_per_user FROM music_settings WHERE guild_id=$1",
       [guildId]
     );
