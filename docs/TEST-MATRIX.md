@@ -273,3 +273,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-05 — Community Hub automated gate
 - CI #1964 passed: typecheck, tests, domain build, bot build and Dashboard production build.
 - Live browser freshness and live Discord-backed community data remain environment-dependent validation items.
+
+
+## 2026-10-05 — Music controller permission gate
+- CI #2056 passed: typecheck, tests, domain build, bot build and Dashboard build.
+- Live validation remains for real Discord role/channel policy behavior on controller buttons.
