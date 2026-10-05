@@ -434,3 +434,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - CI #2020 is green.
 - Per-user request cooldown is complete and CI-verified.
 - Next high-value slice: Per-user queued-track limit.
+
+
+## 2026-10-05 — Per-user queue limit verified
+- Source checkpoint: c18f1de1a0a404531f1686e363cfa060c6232293.
+- CI #2034 is green.
+- Per-user pending queue limit is complete and CI-verified.
+- Next high-value slice: Max guild queue size.
