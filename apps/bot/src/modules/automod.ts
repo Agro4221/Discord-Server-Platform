@@ -237,8 +237,8 @@ export class AutoMod implements PlatformModule {
   ): Promise<void> {
     const detector = input.detector.trim().toLowerCase();
     const supported = new Set([
-      "bad-words","links","invites","scam","repeated-text","caps","emotes",
-      "mentions","zalgo","honeypot","line-length","link-count","mention-count","emoji-count"
+      "bad-words","links","invites","scam","repeated-text","spam-burst","caps","emotes",
+      "mentions","zalgo","honeypot","image-only","youtube-only","line-length","link-count","mention-count","emoji-count"
     ]);
     if (!supported.has(detector)) throw new Error("unsupported_automod_detector");
 
@@ -777,6 +777,24 @@ export function detectorMatches(
       return /[\u0300-\u036f]{4,}/u.test(content);
     case "honeypot":
       return true;
+    case "spam-burst": {
+      const effectiveWindowSeconds = clampAutoModWindowSeconds(rule.windowSeconds ?? config?.repeatedWindowSeconds ?? 10);
+      const cutoff = Date.now() - effectiveWindowSeconds * 1000;
+      return recentMessages.filter((item) => item.timestamp >= cutoff).length >= Number(rule.threshold ?? 5);
+    }
+    case "image-only": {
+      const hasImage = [...message.attachments.values()].some((attachment) =>
+        attachment.contentType?.startsWith("image/") ||
+        /\.(?:png|jpe?g|gif|webp|bmp|avif)(?:$|\?)/i.test(attachment.url)
+      );
+      return hasImage && normalized.trim().length === 0;
+    }
+    case "youtube-only": {
+      const trimmed = content.trim();
+      if (!trimmed) return false;
+      const tokens = trimmed.split(/\s+/);
+      return tokens.length === 1 && /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/|youtu\.be\/)/i.test(tokens[0]!);
+    }
     case "repeated-text": {
       const configuredWindow = clampAutoModWindowSeconds(config?.repeatedWindowSeconds ?? 10);
       const effectiveWindowSeconds = clampAutoModWindowSeconds(rule.windowSeconds ?? configuredWindow);
