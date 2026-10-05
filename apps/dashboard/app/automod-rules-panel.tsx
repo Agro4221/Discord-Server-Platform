@@ -14,8 +14,9 @@ type Rule = {
 
 const DETECTORS = [
   ["bad-words", "Запрещённые слова"], ["links", "Ссылки"], ["invites", "Discord invites"],
-  ["scam", "Scam patterns"], ["repeated-text", "Повторы"], ["caps", "CAPS"],
+  ["scam", "Scam patterns"], ["repeated-text", "Повторы"], ["spam-burst", "Burst spam"], ["caps", "CAPS"],
   ["emotes", "Эмоты"], ["mentions", "Упоминания"], ["zalgo", "Zalgo"], ["honeypot", "Honeypot"],
+  ["image-only", "Только изображения"], ["youtube-only", "Только YouTube"],
   ["line-length", "Длина строки"], ["link-count", "Количество ссылок"],
   ["mention-count", "Количество упоминаний"], ["emoji-count", "Количество эмодзи"]
 ];
