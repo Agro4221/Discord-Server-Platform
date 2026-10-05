@@ -876,8 +876,8 @@ export class ManagementApiServer {
           }
 
           const feedsMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds$/);
-          const feedTestMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds\/(\\d+)\/test$/);
-          const feedItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds\/(\\d+)$/);
+          const feedTestMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds\/(\d+)\/test$/);
+          const feedItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds\/(\d+)$/);
 
           if (method === "POST" && feedTestMatch) {
             if (!this.options.notifications) {
@@ -1027,7 +1027,7 @@ export class ManagementApiServer {
           }
 
           const integrationCredentialsMatch = path.match(/^\/api\/guilds\/([^/]+)\/integration-credentials$/);
-          const integrationCredentialItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/integration-credentials\/(\\d+)$/);
+          const integrationCredentialItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/integration-credentials\/(\d+)$/);
           if ((integrationCredentialsMatch || integrationCredentialItemMatch) && !this.options.integrationCredentials) {
             this.json(res, 500, { error: "integration_credentials_unavailable" });
             return;
@@ -1120,7 +1120,7 @@ export class ManagementApiServer {
           }
 
           const streamAlertsMatch = path.match(/^\/api\/guilds\/([^/]+)\/stream-alerts$/);
-          const streamAlertItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/stream-alerts\/(\\d+)$/);
+          const streamAlertItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/stream-alerts\/(\d+)$/);
 
           if ((streamAlertsMatch || streamAlertItemMatch) && !this.options.streamAlerts) {
             this.json(res, 500, { error: "stream_alerts_unavailable" });
