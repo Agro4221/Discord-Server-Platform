@@ -1321,3 +1321,11 @@ Never write credentials, tokens or private user data here.
 - Source checkpoints: route fix 60b3a4ab7fd455fbe61bdcff6575c268f551666c; finalized checker 9fa32baf9c9522485b829c68a36675d191681492.
 - Fresh CI is not visible yet; the new checker must pass on the branch before this slice is considered CI-verified.
 - Next concrete work remains another bounded release-gate audit, not a broad refactor.
+
+## 2026-10-05 — Backup configuration drift cleanup
+- Audited the advertised backup security configuration and found BACKUP_ENCRYPTION_KEY present in .env.example but unused by BackupService/ConfigTransferService.
+- Config exports intentionally omit integration-credential ciphertext and bot tokens, while configured S3 backups already request S3-side AES256 server-side encryption.
+- Removed the dead BACKUP_ENCRYPTION_KEY entry instead of implying local backup encryption that the runtime does not implement.
+- Source checkpoint: b54754910ebfced9712a4a7fa4061d343e8d32bf.
+- No runtime behavior changed; this is a configuration-contract cleanup.
+- Fresh CI is not visible yet; backup local/remote recovery remains an environment-dependent release-gate item.
