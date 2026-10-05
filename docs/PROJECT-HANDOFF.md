@@ -670,3 +670,7 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Keep critical startup configuration strict: DATABASE_URL and Lavalink passwords must contain non-whitespace content.
 - Custom Lavalink node passwords must also be non-blank.
 - Do not loosen these checks back to truthiness-only validation.
+## 2026-10-05 — Docker port/secret follow-up
+- Preserve the split between host-published Management API port and container-internal port: external mapping is configurable, internal bot/Dashboard port is 3002.
+- Do not reintroduce change-me credential fallbacks into any Compose service.
+- This is runtime/recovery hardening; no new user-facing feature is being introduced.
