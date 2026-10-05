@@ -348,3 +348,6 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-05 — Docker runtime contract snapshot
 - Static deployment coverage now verifies that all Compose secret fallbacks are removed and the container-internal Management API remains on port 3002.
 - Live release-gate case: start from the standard .env.example flow with MANAGEMENT_API_PORT=39001, then confirm Dashboard management requests reach the bot successfully through bot:3002.
+## 2026-10-05 — First-run Control Center snapshot
+- Automated health tests now cover the distinction between control-plane liveness and full bot readiness.
+- Live release-gate case: fresh local/VPS deployment with empty Discord credentials must bring up Dashboard and Bot Fleet registration; after credentials are added, /ready should become 200.
