@@ -651,3 +651,13 @@ Never write credentials, tokens or private user data here.
 - CI #2012 passed completely.
 - Final source checkpoint: a87bc7803d200b371332b136e7bfe732b03bbdfe.
 - Next single Music slice: Per-user request cooldown.
+
+
+## 2026-10-05 — Music per-user request cooldown
+- Added a five-second per-user/server cooldown after successful queue additions.
+- Applied consistently to slash /play and the configured text request channel.
+- Cooldown is in-memory, cleared on module shutdown and does not punish empty/failed searches.
+- Added a deterministic remaining-time helper test.
+- CI #2020 passed completely.
+- Final source checkpoint: 04cb2828e9b112ec1212c09972582992b1dd9d4f.
+- Next single Music slice: Per-user queued-track limit.
