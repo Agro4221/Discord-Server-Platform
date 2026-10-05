@@ -338,7 +338,7 @@ Music должен стремиться к функциональности си
 | Import/export с корректным resource remapping | ✅ / расширять |
 | Multi-server / fleet administration | ✅ / расширять |
 | Configurable bot identity (name/avatar/status/banner где разрешено) | ✅ / расширять | Fleet registration now supports optional username, presence and local avatar/banner uploads with live Discord application; Discord rate limits remain an external constraint |
-| Local bot registration / runtime credentials | ✅ | Dedicated Bot Setup panel uses the existing bot management contract for Client ID, token, enable/disable, username and presence; token is write-only in the Dashboard |
+| Local bot registration / runtime credentials | ✅ | Dedicated Bot Setup panel uses the existing bot management contract for Client ID, token, enable/disable, username and presence; token is write-only in the Dashboard; pre-save credential verification is available |
 
 #### Moderation / AutoMod / Security
 | Функция | План |
