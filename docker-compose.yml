@@ -33,6 +33,7 @@ services:
 
   lavalink2:
     image: ghcr.io/lavalink-devs/lavalink:4.2.2
+    profiles: ["failover"]
     restart: unless-stopped
     environment:
       _JAVA_OPTIONS: "-Xms${LAVALINK_JAVA_XMS:-128m} -Xmx${LAVALINK_JAVA_XMX:-512m}"
@@ -59,7 +60,7 @@ services:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change-me-postgres}@postgres:5432/discord_platform
       LAVALINK_HOST: lavalink
       LAVALINK_PORT: 2333
-      LAVALINK_NODES: '[{"id":"local","host":"lavalink","port":2333,"password":"${LAVALINK_PASSWORD:-change-me-local}"},{"id":"local-2","host":"lavalink2","port":2334,"password":"${LAVALINK_PASSWORD:-change-me-local}"}]'
+      LAVALINK_NODES: '${LAVALINK_NODES:-[{"id":"local","host":"lavalink","port":2333,"password":"${LAVALINK_PASSWORD:-change-me-local}"}]}'
       HEALTH_HOST: 0.0.0.0
       MANAGEMENT_API_HOST: 0.0.0.0
       DSP_CONTAINERIZED: "true"
@@ -73,8 +74,6 @@ services:
       postgres:
         condition: service_healthy
       lavalink:
-        condition: service_healthy
-      lavalink2:
         condition: service_healthy
     ports:
       - "127.0.0.1:${HEALTH_PORT:-3001}:3001"
