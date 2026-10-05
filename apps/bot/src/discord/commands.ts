@@ -104,7 +104,9 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .addStringOption((o) => o.setName("query").setDescription("Song, URL or playlist").setMaxLength(2000).setRequired(true))
       .addStringOption((o) => o.setName("provider").setDescription("Search provider").addChoices(
         { name: "YouTube", value: "youtube" },
-        { name: "Yandex Music", value: "yandex" }
+        { name: "Yandex Music", value: "yandex" },
+        { name: "Spotify", value: "spotify" },
+        { name: "Apple Music", value: "applemusic" }
       )),
     new SlashCommandBuilder().setName("pause").setDescription("Pause music"),
     new SlashCommandBuilder().setName("resume").setDescription("Resume music"),
