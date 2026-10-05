@@ -210,7 +210,8 @@
 | Save queue as playlist | ✅ | |
 | Play favorites / play playlist shortcuts | ✅ | |
 | Playlist pagination and richer management UI | ✅ |
-| Playlist duplicate handling / merge | ✅ | |
+| Playlist duplicate handling / merge | ✅ |
+| Playlist continuation stale-state safety | ✅ | |
 
 #### Audio effects
 
