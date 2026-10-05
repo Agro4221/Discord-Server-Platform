@@ -188,3 +188,13 @@ test("music playlist shuffle returns a copy without mutating source", async () =
   assert.deepEqual(source, [1, 2, 3, 4, 5]);
   assert.deepEqual([...shuffled].sort((a, b) => a - b), source);
 });
+
+
+test("music vote skip threshold scales with human listeners", async () => {
+  const { voteSkipThreshold } = await import("../src/modules/music.js");
+  assert.equal(voteSkipThreshold(1), 1);
+  assert.equal(voteSkipThreshold(2), 2);
+  assert.equal(voteSkipThreshold(3), 2);
+  assert.equal(voteSkipThreshold(5), 3);
+  assert.equal(voteSkipThreshold(10), 6);
+});
