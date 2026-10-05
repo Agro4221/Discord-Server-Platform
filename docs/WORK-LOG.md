@@ -1335,3 +1335,10 @@ Never write credentials, tokens or private user data here.
 - Added a static regression guard that rejects insecure Compose secret fallbacks if they are reintroduced.
 - Source checkpoints: Compose 770f139aeaecbba5e6e719803c6aa14fed293257; CI bb4f08977245ae201ad84baecabf581b6282e98e; deployment gate 3eb90819746f17a8dd9bac56acd4c68024042a3f.
 - Fresh CI is not visible yet; local/VPS runtime execution remains environment-dependent.
+
+## 2026-10-05 — Source hygiene scanner repair
+- Found a concrete false-negative in scripts/check-source-hygiene.mjs: regex literals contained double-escaped word boundaries, so token patterns were not matching as intended.
+- Repaired the existing token patterns and added detection for github_pat_* and AWS access-key IDs (AKIA...).
+- Validated the scanner independently with a temporary safe fixture (passes) and a synthetic GitHub token fixture (correctly fails).
+- Source checkpoint: 498cf355d3933fa8af12e286d46e070c9837fa6f.
+- Fresh CI is not visible yet; the scanner still needs the branch CI run.
