@@ -381,8 +381,7 @@ PR остаётся **draft**.
 Текущий source checkpoint:
 `9ca8b24d022ee4494873da651162ccba583d3f53`
 
-Текущий branch HEAD (после continuity-doc updates):
-`435dfd36049bb07afc57e90d1d2f2d9bd8619d87`
+Branch HEAD is tracked by the PR/branch ref; the source checkpoint above identifies the last code-changing commit.
 
 Последние bounded срезы:
 - исправлен Dashboard TikTok OAuth import blocker;
