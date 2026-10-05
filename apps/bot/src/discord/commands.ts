@@ -908,7 +908,9 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addStringOption((o) => o.setName("query").setDescription("Song, artist, URL or playlist").setMaxLength(2000).setRequired(true))
            .addStringOption((o) => o.setName("provider").setDescription("Search provider").addChoices(
              { name: "YouTube", value: "youtube" },
-             { name: "Yandex Music", value: "yandex" }
+             { name: "Yandex Music", value: "yandex" },
+             { name: "Spotify", value: "spotify" },
+             { name: "Apple Music", value: "applemusic" }
            ))
       )
       .addSubcommand((sub) =>
@@ -918,7 +920,9 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addStringOption((o) => o.setName("query").setDescription("Search query").setMaxLength(2000).setRequired(true))
            .addStringOption((o) => o.setName("provider").setDescription("Search provider").addChoices(
              { name: "YouTube", value: "youtube" },
-             { name: "Yandex Music", value: "yandex" }
+             { name: "Yandex Music", value: "yandex" },
+             { name: "Spotify", value: "spotify" },
+             { name: "Apple Music", value: "applemusic" }
            ))
       )
       .addSubcommand((sub) => sub.setName("resume").setDescription("Resume playback"))
