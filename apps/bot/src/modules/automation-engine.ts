@@ -44,6 +44,7 @@ export class AutomationEngine implements PlatformModule {
   readonly name = "automation";
   private unsubscribe?: () => void;
   private readonly rules = new Map<string, AutomationRuleRecord[]>();
+  private readonly ruleGuilds = new Set<string>();
   private client?: import("discord.js").Client;
   private readonly cooldowns = new Map<string, number>();
   private readonly keyedCooldowns = new Map<string, number>();
@@ -264,6 +265,7 @@ export class AutomationEngine implements PlatformModule {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.rules.clear();
+    this.ruleGuilds.clear();
     this.cooldowns.clear();
     this.keyedCooldowns.clear();
     this.executionWindows.clear();
@@ -409,10 +411,10 @@ export class AutomationEngine implements PlatformModule {
     );
 
     this.rules.clear();
+    this.ruleGuilds.clear();
 
     for (const row of result.rows) {
-      const list = this.rules.get(row.guild_id) ?? [];
-      list.push({
+      const rule: AutomationRuleRecord = {
         id: row.id,
         guildId: row.guild_id,
         name: row.name,
@@ -422,8 +424,12 @@ export class AutomationEngine implements PlatformModule {
         event: row.event,
         actions: row.actions ?? [],
         cooldownSeconds: row.cooldown_seconds
-      });
-      this.rules.set(row.guild_id, list);
+      };
+      const key = `${row.guild_id}:${row.event}`;
+      const list = this.rules.get(key) ?? [];
+      list.push(rule);
+      this.rules.set(key, list);
+      this.ruleGuilds.add(row.guild_id);
     }
   }
 
@@ -568,10 +574,9 @@ export class AutomationEngine implements PlatformModule {
   private async execute(event: RuntimeEvent): Promise<void> {
     if (!await moduleEnabled(this.db, event.guildId, "automation", false)) return;
 
-    const rules = this.rules.get(event.guildId) ?? [];
+    const rules = this.rules.get(`${event.guildId}:${event.type}`) ?? [];
 
     for (const rule of rules) {
-      if (rule.event !== event.type) continue;
       if (!await this.conditionsMatch(rule.all, event)) continue;
       if (rule.any.length > 0 && !await this.conditionsAnyMatch(rule.any, event)) continue;
 
