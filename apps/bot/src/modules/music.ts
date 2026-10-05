@@ -3328,7 +3328,11 @@ export class Music implements PlatformModule {
       return;
     }
 
-    const pitch = Math.round(value * 100) / 100;
+    const pitch = normalizeMusicPitch(value);
+    if (pitch === null) {
+      await interaction.reply({ content: "Pitch должен быть от 0.5 до 2.0.", ephemeral: true });
+      return;
+    }
     try {
       await player.filterManager.setPitch(pitch);
       await this.persistPlayer(player);
@@ -3604,11 +3608,11 @@ export class Music implements PlatformModule {
         await message.reply("🎚️ Pitch: " + currentPitch.toFixed(2) + "×");
         return true;
       }
-      if (!Number.isFinite(value) || value < 0.5 || value > 2 || !(manageGuild || dj)) {
+      const pitch = normalizeMusicPitch(value);
+      if (pitch === null || !(manageGuild || dj)) {
         await message.reply("Pitch требует DJ / Manage Server и значение от 0.5 до 2.0. Значение 1.0 — норма.");
         return true;
       }
-      const pitch = Math.round(value * 100) / 100;
       try {
         await player.filterManager.setPitch(pitch);
         await this.persistPlayer(player);
@@ -4769,6 +4773,11 @@ export type MusicRadioMode = "artist" | "genre" | "search";
 
 export function normalizeMusicRadioMode(value: string | null | undefined): MusicRadioMode | null {
   return value === "artist" || value === "genre" || value === "search" ? value : null;
+}
+
+export function normalizeMusicPitch(value: number): number | null {
+  if (!Number.isFinite(value) || value < 0.5 || value > 2) return null;
+  return Math.round(value * 100) / 100;
 }
 
 export function buildMusicRadioQuery(mode: MusicRadioMode, seed: string): string {
