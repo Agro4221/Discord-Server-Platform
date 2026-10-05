@@ -35,8 +35,8 @@ export function BotSetupPanel() {
   const [token, setToken] = useState("");
   const [presenceName, setPresenceName] = useState("");
   const [username, setUsername] = useState("");
-  const [avatarData, setAvatarData] = useState<string | null>(null);
-  const [bannerData, setBannerData] = useState<string | null>(null);
+  const [avatarData, setAvatarData] = useState<string | null | undefined>(undefined);
+  const [bannerData, setBannerData] = useState<string | null | undefined>(undefined);
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -88,7 +88,7 @@ export function BotSetupPanel() {
     });
   }
 
-  async function pickImage(file: File | undefined, setter: (value: string | null) => void) {
+  async function pickImage(file: File | undefined, setter: (value: string | null | undefined) => void) {
     if (!file) {
       setter(null);
       return;
@@ -152,13 +152,15 @@ export function BotSetupPanel() {
           enabled,
           presenceName: presenceName.trim() || null,
           ...(username.trim() ? { username: username.trim() } : {}),
-          ...(avatarData !== null ? { avatarData } : {}),
-          ...(bannerData !== null ? { bannerData } : {})
+          ...(avatarData !== undefined ? { avatarData } : {}),
+          ...(bannerData !== undefined ? { bannerData } : {})
         })
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? "bot_registration_failed");
       setToken("");
+      setAvatarData(undefined);
+      setBannerData(undefined);
       setMessage("Настройки бота сохранены. При включении бот переподключается с новыми credentials.");
       const next = body.bot as BotSetup | undefined;
       if (next) {
@@ -252,7 +254,10 @@ export function BotSetupPanel() {
               disabled={loading || saving}
               style={{ ...inputStyle, padding: "7px 8px" }}
             />
-            <span style={{ opacity: 0.42 }}>Оставь пустым, чтобы не менять. До 3 MB.</span>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <button type="button" onClick={() => setAvatarData(null)} disabled={loading || saving} style={{ ...inputStyle, width: "auto", padding: "6px 8px", fontSize: 10 }}>Сбросить</button>
+              <span style={{ opacity: 0.42 }}>Оставь файл пустым, чтобы не менять. До 3 MB.</span>
+            </div>
           </label>
           <label style={{ display: "grid", gap: 5, fontSize: 10 }}>
             Banner
@@ -263,7 +268,10 @@ export function BotSetupPanel() {
               disabled={loading || saving}
               style={{ ...inputStyle, padding: "7px 8px" }}
             />
-            <span style={{ opacity: 0.42 }}>Оставь пустым, чтобы не менять. До 3 MB.</span>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <button type="button" onClick={() => setBannerData(null)} disabled={loading || saving} style={{ ...inputStyle, width: "auto", padding: "6px 8px", fontSize: 10 }}>Сбросить</button>
+              <span style={{ opacity: 0.42 }}>Оставь файл пустым, чтобы не менять. До 3 MB.</span>
+            </div>
           </label>
         </div>
 
