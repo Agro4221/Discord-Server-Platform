@@ -1471,6 +1471,16 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_music_history_guild_identifier_recent ON music_history(guild_id,bot_identity_id,identifier,played_at DESC,id DESC) WHERE identifier IS NOT NULL;"
     ])
   },
+  {
+    version: 97,
+    name: "music_radio_mode",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS radio_enabled boolean NOT NULL DEFAULT false;",
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS radio_mode text NOT NULL DEFAULT 'artist' CHECK(radio_mode IN ('artist','genre','search'));",
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS radio_seed text;",
+      "CREATE INDEX IF NOT EXISTS idx_music_settings_radio_enabled ON music_settings(radio_enabled) WHERE radio_enabled=true;"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
