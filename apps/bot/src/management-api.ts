@@ -1049,7 +1049,7 @@ export class ManagementApiServer {
             }
             const body = await readJson(req);
             const provider = body.provider;
-            if (typeof provider !== "string" || !["twitch","youtube","kick"].includes(provider) || typeof body.label !== "string") {
+            if (typeof provider !== "string" || !["twitch","youtube","kick","tiktok"].includes(provider) || typeof body.label !== "string") {
               throw new RequestInputError("invalid_integration_credential", 400);
             }
             const credential = await this.options.integrationCredentials!.save(guildId, {
@@ -1057,7 +1057,13 @@ export class ManagementApiServer {
               label: body.label,
               clientId: typeof body.clientId === "string" ? body.clientId : undefined,
               clientSecret: typeof body.clientSecret === "string" ? body.clientSecret : undefined,
-              apiKey: typeof body.apiKey === "string" ? body.apiKey : undefined
+              apiKey: typeof body.apiKey === "string" ? body.apiKey : undefined,
+              accessToken: typeof body.accessToken === "string" ? body.accessToken : undefined,
+              refreshToken: typeof body.refreshToken === "string" ? body.refreshToken : undefined,
+              openId: typeof body.openId === "string" ? body.openId : undefined,
+              expiresAt: typeof body.expiresAt === "number" ? body.expiresAt : undefined,
+              refreshExpiresAt: typeof body.refreshExpiresAt === "number" ? body.refreshExpiresAt : undefined,
+              scope: typeof body.scope === "string" ? body.scope : undefined
             });
             await this.options.auditLog.record({
               guildId, source: "dashboard", action: "integration.credential.saved",
