@@ -590,3 +590,10 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Source checkpoint: `9ca8b24d022ee4494873da651162ccba583d3f53`.
 - Fresh CI is not visible; do not mark this slice CI-verified yet.
 - Next engineering focus remains one bounded release-gate slice at a time, followed by live Discord/Lavalink/Windows/E2E/chaos/soak/clean-host validation.
+
+### 2026-10-05 — VPS runtime smoke-gate hardening
+- VPS install/upgrade success criteria now cover bot health, direct Dashboard readiness and public Caddy Basic Auth protection rather than checking only the bot.
+- The Caddy edge smoke test targets the configured domain through loopback with SNI/Host resolution and expects HTTP 401 without credentials.
+- Deployment CI contract requires the smoke-check probes to remain present.
+- Source checkpoint: `95877c00ac9fff5d1615d519f202a316ba403783`.
+- Fresh CI is still not visible; live DNS/TLS and actual clean-host execution are release-gate tasks.
