@@ -123,7 +123,7 @@
 | Reddit / TikTok / Kick adapters | 🟡 |
 | GitHub notifications | ✅ | `/feed github` для releases и commits через существующий RSS/Atom worker |
 | Twitch / YouTube / VK stream alerts | ✅ | Dashboard + persistent polling |
-| Kick stream alerts | 🟡 | Реализовано, но интеграция сознательно не является приоритетом следующего Music/Discord инкремента |
+| Kick stream alerts | ✅ | Kick OAuth client-credentials flow, channel lookup, live-state polling and credential routing are implemented and covered by target-normalization tests |
 | Secure feed validation / SSRF protection | ✅ |
 
 ## Music
