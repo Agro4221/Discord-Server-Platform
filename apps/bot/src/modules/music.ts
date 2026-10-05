@@ -1479,10 +1479,6 @@ export class Music implements PlatformModule {
     }
 
     if (action === "list") {
-      const result = await this.db.query<{ name: string; tracks: unknown[]; visibility: MusicPlaylistVisibility }>(
-        "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') ORDER BY visibility DESC,updated_at DESC LIMIT 25",
-        [guildId,interaction.user.id]
-      );
       const token = this.createMusicPlaylistPaginationSession({
         guildId,
         userId: interaction.user.id,
@@ -1497,15 +1493,6 @@ export class Music implements PlatformModule {
         await interaction.reply({ content: "Укажи текст для поиска.", ephemeral: true });
         return;
       }
-      const pattern = "%" + query + "%";
-      const result = await this.db.query<{
-        name: string;
-        tracks: unknown[];
-        visibility: MusicPlaylistVisibility;
-      }>(
-        "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') AND ($4=false OR visibility='shared') AND name ILIKE $3 ORDER BY visibility DESC,updated_at DESC LIMIT 25",
-        [guildId,interaction.user.id,pattern,sharedOnly]
-      );
       const token = this.createMusicPlaylistPaginationSession({
         guildId,
         userId: interaction.user.id,
@@ -1586,10 +1573,6 @@ export class Music implements PlatformModule {
     const stored = Array.isArray(row.tracks) ? [...row.tracks] : [];
 
     if (action === "view") {
-      if (stored.length === 0) {
-        await interaction.reply({ content: "🎼 Плейлист **" + name + "** пуст.", ephemeral: true });
-        return;
-      }
       const token = this.createMusicPlaylistPaginationSession({
         guildId,
         userId: interaction.user.id,
