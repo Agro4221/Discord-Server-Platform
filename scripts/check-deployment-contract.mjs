@@ -33,6 +33,15 @@ const vpsCompose = await readFile("docker-compose.vps.yml", "utf8");
 const caddyExample = await readFile("infrastructure/caddy/Caddyfile.example", "utf8");
 const gitignore = await readFile(".gitignore", "utf8");
 const dockerCompose = await readFile("docker-compose.yml", "utf8");
+const healthSource = await readFile("apps/bot/src/health.ts", "utf8");
+if (
+  !healthSource.includes('path === "/health"') ||
+  !healthSource.includes('path === "/ready"') ||
+  !healthSource.includes('state.database === "ready"')
+) {
+  throw new Error("Health liveness/readiness contract is missing");
+}
+
 if (!dockerCompose.includes("MANAGEMENT_API_PORT: 3002") || !dockerCompose.includes('MANAGEMENT_API_URL: http://bot:3002')) {
   throw new Error("Container-internal Management API port contract is missing");
 }
