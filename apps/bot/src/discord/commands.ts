@@ -171,7 +171,9 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
         { name: "Auto", value: "auto" },
         { name: "YouTube", value: "youtube" },
         { name: "YouTube Music", value: "youtube_music" },
-        { name: "SoundCloud", value: "soundcloud" }
+        { name: "SoundCloud", value: "soundcloud" },
+        { name: "Spotify", value: "spotify" },
+        { name: "Яндекс Музыка", value: "yandex_music" }
       )),
     new SlashCommandBuilder().setName("pause").setDescription("Pause music"),
     new SlashCommandBuilder().setName("resume").setDescription("Resume music"),
@@ -664,7 +666,9 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
         { name: "Auto", value: "auto" },
         { name: "YouTube", value: "youtube" },
         { name: "YouTube Music", value: "youtube_music" },
-        { name: "SoundCloud", value: "soundcloud" }
+        { name: "SoundCloud", value: "soundcloud" },
+        { name: "Spotify", value: "spotify" },
+        { name: "Яндекс Музыка", value: "yandex_music" }
       ))
       )
       .addSubcommand((sub) => sub.setName("pause").setDescription("Pause playback"))
