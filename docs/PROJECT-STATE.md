@@ -494,3 +494,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Added deployment-contract assertions for the runtime probe strings/status expectations.
 - Source checkpoint: `95877c00ac9fff5d1615d519f202a316ba403783`.
 - CI verification is pending/unavailable in the current connector session; clean-host execution remains environment-dependent.
+
+## 2026-10-05 — VPS reinstall safety hardening
+- `install-vps.sh` now preserves existing Management API, PostgreSQL and Lavalink secrets across reruns, preventing a reinstall from invalidating the running database credentials or Dashboard API access.
+- Missing secrets are generated only when the existing `.env` value is empty.
+- Static deployment verification requires the preservation helpers to remain in the installer.
+- Source checkpoint: `73e5ebdf792f38ae2ab29fb0ba0adba7f224154f`.
+- CI is pending/unavailable; actual reinstall on an existing Docker volume remains environment-dependent.
