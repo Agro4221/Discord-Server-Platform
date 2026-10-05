@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 type VoiceChannel = { id: string; name: string; type?: number };
 type Track = { title: string; author: string; durationMs: number };
-type MusicProvider = "auto" | "youtube" | "youtube_music" | "soundcloud";
+type MusicProvider = "auto" | "youtube" | "youtube_music" | "soundcloud" | "spotify" | "yandex_music";
 type MusicFilter = "off" | "nightcore" | "vaporwave" | "karaoke" | "rotation" | "tremolo" | "vibrato" | "lowpass";
 type MusicState = {
   enabled: boolean;
@@ -185,6 +185,8 @@ export function MusicPanel({
             <option value="youtube">YouTube</option>
             <option value="youtube_music">YouTube Music</option>
             <option value="soundcloud">SoundCloud</option>
+            <option value="spotify">Spotify</option>
+            <option value="yandex_music">Яндекс Музыка</option>
           </select>
           <select value={voiceChannelId} onChange={(event) => setVoiceChannelId(event.target.value)} style={inputStyle}>
             <option value="">Voice-канал…</option>
