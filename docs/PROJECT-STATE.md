@@ -567,3 +567,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Repaired the source secret scanner regexes so its existing token/private-key checks actually match.
 - Added github_pat and AWS access-key patterns; validated positive and negative fixtures outside the repository.
 - Source checkpoint: 498cf355d3933fa8af12e286d46e070c9837fa6f.
+
+## 2026-10-05 — Critical config validation
+- DATABASE_URL and LAVALINK_PASSWORD now use non-blank validation.
+- Custom Lavalink node passwords reject whitespace-only values.
+- Regression tests cover empty, spaces and tabs.
