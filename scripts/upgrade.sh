@@ -30,6 +30,22 @@ git fetch origin "${BRANCH}"
 git checkout "${BRANCH}"
 git pull --ff-only origin "${BRANCH}"
 
+get_env() {
+  local key="$1" line value
+  line="$(grep -E "^${key}=" .env | tail -n1 || true)"
+  value="${line#*=}"
+  value="${value#\'}"
+  value="${value%\'}"
+  printf "%s" "${value}"
+}
+
+for required_secret in MANAGEMENT_API_KEY POSTGRES_PASSWORD LAVALINK_PASSWORD; do
+  if [[ -z "$(get_env "${required_secret}")" ]]; then
+    echo "Required secret is missing from .env: ${required_secret}" >&2
+    exit 1
+  fi
+done
+
 docker compose "${COMPOSE_ARGS[@]}" config >/dev/null
 docker compose "${COMPOSE_ARGS[@]}" up -d --build
 
