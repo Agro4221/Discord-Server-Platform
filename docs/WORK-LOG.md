@@ -911,3 +911,9 @@ Never write credentials, tokens or private user data here.
 - VPS bootstrap now matches the current local architecture: Discord credentials are entered, Management API and Bot credential secrets are generated, and the local Control Center uses no end-user login.
 - Installer documentation output now points to the loopback Control Center after the health check.
 - Existing Docker/VPS feature set is preserved; this change only removes dead authentication state.
+
+## 2026-10-05 — Docker Lavalink footprint cleanup
+- Docker keeps the second Lavalink service behind the `failover` Compose profile instead of starting it on every normal launch.
+- The default Docker Music topology remains functional with one Lavalink node; `start-local.bat -Lavalink2` explicitly enables the second node and passes both nodes into `LAVALINK_NODES`.
+- Docker release-gate now checks only the primary node by default and validates the second node when `-RequireLavalink2` is requested.
+- The two-node failover capability is preserved; the normal local runtime no longer starts an unnecessary second JVM.
