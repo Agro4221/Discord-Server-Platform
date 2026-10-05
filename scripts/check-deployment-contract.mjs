@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 
 const migrationSource = await readFile("apps/bot/src/migrations.ts", "utf8");
@@ -155,11 +155,17 @@ for (const caddyUpgradeContract of [
   }
 }
 
+const rootFiles = await readdir(".");
+const rootBatchFiles = rootFiles.filter((name) => name.toLowerCase().endsWith(".bat"));
+if (rootBatchFiles.length !== 1 || rootBatchFiles[0]?.toLowerCase() !== "start.bat") {
+  throw new Error("Native Windows must expose exactly one root .bat launcher: start.bat");
+}
+
 const nativeLauncher = await readFile("scripts/start-native.ps1", "utf8");
 const nativeEntry = await readFile("start.bat", "utf8");
 const nativeDashboardEntry = await readFile("control-center.bat", "utf8");
 const nativeStopEntry = await readFile("stop.bat", "utf8");
-const nativeStatusEntry = await readFile("native-status.bat", "utf8");
+
 for (const contract of [
   "Control Center -> Bot Fleet can register them",
   "MANAGEMENT_API_URL = \"http://127.0.0.1:$managementApiPort\"",
@@ -167,7 +173,12 @@ for (const contract of [
   "BOT_NODE_MAX_OLD_SPACE_MB",
   "DASHBOARD_NODE_MAX_OLD_SPACE_MB",
   "start:native",
-  "127.0.0.1"
+  "127.0.0.1",
+  "Invoke-WingetInstall",
+  "OpenJS.NodeJS.LTS",
+  "PostgreSQL.PostgreSQL.17",
+  "Microsoft.OpenJDK.17",
+  "Lavalink.jar"
 ]) {
   if (!nativeLauncher.includes(contract)) {
     throw new Error("Native launcher contract missing: " + contract);
@@ -179,7 +190,7 @@ if (nativeLauncher.includes('Read-Host "Discord bot token"') || nativeLauncher.i
 if (nativeEntry.includes("docker") || !nativeEntry.includes("start-native.bat")) {
   throw new Error("start.bat must be a native launcher alias");
 }
-if (!nativeDashboardEntry.includes("-Dashboard") || !nativeStopEntry.includes("-Down") || !nativeStatusEntry.includes("native-status.ps1")) {
+if (!nativeDashboardEntry.includes("-Dashboard") || !nativeStopEntry.includes("-Down")) {
   throw new Error("Native convenience entrypoints are incomplete");
 }
 const localLauncher = await readFile("scripts/start-local.ps1", "utf8");
