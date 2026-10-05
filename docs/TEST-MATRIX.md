@@ -341,3 +341,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Repaired secret-scanner regex boundaries and added GitHub fine-grained token/AWS access-key patterns.
 - Positive/negative synthetic fixtures passed locally against the scanner logic.
 - CI verification remains pending for the branch head.
+
+## 2026-10-05 — Configuration validation snapshot
+- Added automated negative coverage for blank/whitespace critical DB and Lavalink configuration plus custom Lavalink node passwords.
+- Live deployment still needs a disposable startup test with malformed .env values to confirm fail-fast behavior.
