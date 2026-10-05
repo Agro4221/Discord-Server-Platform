@@ -288,3 +288,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Database integration coverage now exercises BackupService guild-ID validation plus cross-guild isolation for read/restore/delete operations.
 - Invalid backup filenames are rejected before filesystem access.
 - Live remote-S3 failure/recovery behavior and clean-host restore remain environment-dependent release-gate checks.
+
+### 2026-10-05 — VPS deployment smoke snapshot
+- Static deployment verification now requires installer/upgrade runtime probes for bot health, Dashboard readiness and Caddy Basic Auth edge behavior.
+- Actual VPS install/upgrade on a clean host, DNS/TLS issuance and external client access remain live release-gate cases.
