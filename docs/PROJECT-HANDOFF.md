@@ -379,18 +379,18 @@ PR: **#3** — `feat: Discord platform expansion + Music v2`
 PR остаётся **draft**.
 
 Текущий source HEAD:
-`53008d169a1b4a12659656c665e97125f2ca182e`
+`3e854a4e158eaa332a625cfba1f375ca837411f7`
 
 За последний проход:
 - исправлен Dashboard production build blocker в TikTok OAuth route;
-- добавлен `scripts/check-dashboard-imports.mjs` и CI-контракт локальных Dashboard imports;
-- исправлена дублирующаяся запись Apple Music в Music diagnostics;
-- Dashboard state и `/music providers` теперь используют единый token-aware критерий Apple Music;
-- добавлен regression test на readiness-конфигурацию.
+- добавлен CI contract для локальных Dashboard imports;
+- исправлена дублирующаяся Apple Music provider диагностика и добавлена regression coverage;
+- усилен Music/Lavalink failover: target selector требует connected + non-empty sessionId, исключает failed node и используется непосредственно перед move;
+- добавлена regression coverage failover eligibility.
 
-Последний доступный CI **#2369** был запущен до TikTok route fix/hardening: 196/196 bot tests, typecheck, domain build и bot build прошли; Dashboard build упал на неверном относительном импорте TikTok route. После исправлений свежий Actions run для текущего HEAD в доступном состоянии не появился, поэтому текущий срез **не считать CI-verified**.
+Последний доступный CI #2369 был до этих фиксов; новый CI для текущего HEAD в доступном состоянии пока не появился, поэтому текущий кодовый срез **не считать CI-verified**.
 
-Feature Matrix полностью reconciled: все строки ✅. Дальше приоритет — release-gate hardening и environment-dependent acceptance, а не искусственное добавление новых feature rows.
+Feature Matrix полностью reconciled: все строки ✅. Основной оставшийся инженерный слой — release-gate hardening и environment-dependent acceptance.
 
 Live validation:
 - реальный Discord;
