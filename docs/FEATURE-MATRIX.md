@@ -261,7 +261,7 @@
 | Apple Music | ✅ | LavaSrc source + Apple Music API token + explicit amsearch / provider selection in Music play/search; playback is mirror-based and live provider validation remains a release-gate check |
 | Deezer | ✅ | LavaSrc direct source + Deezer credentials + explicit dzsearch / provider selection in Music play/search; live provider validation remains a release-gate check |
 | **Yandex Music** | ✅ | LavaSrc source + access-token wiring + explicit ymsearch / provider selection in Music play/search; live provider playback still belongs to release-gate validation |
-| VK Music | 🟡 |
+| VK Music | ✅ | LavaSrc direct source + VK user token + explicit vksearch / provider selection in Music play/search; regional availability and live playback remain release-gate checks |
 | Tidal | 🟡 |
 | Qobuz | 🟡 |
 | yt-dlp | 🟡 |
