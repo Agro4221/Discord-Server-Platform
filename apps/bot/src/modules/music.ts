@@ -76,6 +76,18 @@ export function buildMusicPlaylistSnapshot<T>(current: T | null | undefined, que
   ].slice(0, safeLimit);
 }
 
+export function musicPlaylistContinuationBatch(
+  order: readonly number[],
+  nextIndex: number,
+  limit: number
+): { indexes: number[]; nextIndex: number; done: boolean } {
+  const start = Math.max(0, Math.min(order.length, Math.floor(nextIndex)));
+  const size = Math.max(1, Math.min(MAX_PLAYLIST_TRACKS, Math.floor(limit)));
+  const indexes = [...order.slice(start,start + size)];
+  const newIndex = start + indexes.length;
+  return { indexes, nextIndex: newIndex, done: newIndex >= order.length };
+}
+
 export function removeMusicPlaylistTrack<T>(tracks: T[], position: number): T[] | null {
   if (!Number.isInteger(position) || position < 1 || position > tracks.length) return null;
   const index = position - 1;
@@ -3953,7 +3965,8 @@ export class Music implements PlatformModule {
       ...(remainingUserSlots === null ? [] : [remainingUserSlots]),
       ...(remainingGuildSlots === null ? [] : [remainingGuildSlots])
     );
-    const indexes = order.slice(startIndex,startIndex + loadLimit);
+    const batch = musicPlaylistContinuationBatch(order,startIndex,loadLimit);
+    const indexes = batch.indexes;
     const requester = await this.client?.users.fetch(continuation.requesterUserId).catch(() => null) ?? this.client?.user;
     if (!requester) {
       logger.warn("Music playlist continuation requester unavailable", {
@@ -3984,8 +3997,8 @@ export class Music implements PlatformModule {
       }
     }
 
-    const nextIndex = startIndex + indexes.length;
-    if (nextIndex >= order.length) {
+    const nextIndex = batch.nextIndex;
+    if (batch.done) {
       this.playlistContinuations.delete(player.guildId);
     } else {
       this.playlistContinuations.set(player.guildId, {
