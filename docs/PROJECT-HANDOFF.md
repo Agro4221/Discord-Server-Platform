@@ -584,3 +584,8 @@ Live validation, требующая пользовательского окру�
 - Controller permissions now honor the shared Command Policy; Autoplay has a persistent quick toggle.
 - Next single module: **separate queue add/remove/move permissions**.
 - Do not reopen completed controller permission/autoplay work.
+
+
+### 2026-10-05 — Current Music checkpoint
+- Separate queue add/remove/move permissions are complete and CI-verified (#2063).
+- Before the next Music slice, re-audit remaining TODOs against actual code because several Matrix rows are historical/stale.
