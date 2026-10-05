@@ -656,3 +656,7 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Do not treat the platform as locally encrypted-backup capable; the current backup implementation provides filesystem permissions and optional S3 AES256 server-side encryption.
 - Config export intentionally does not include bot/integration credential ciphertext.
 - Continue with the next bounded release-gate audit; avoid turning this cleanup into a broad backup-format rewrite.
+## 2026-10-05 — Compose secret hardening
+- Direct Docker Compose startup no longer has predictable change-me fallbacks for PostgreSQL/Lavalink credentials.
+- The supported local path remains scripts/start-local.ps1, which generates persistent secrets before Compose startup; CI uses ephemeral values only for static Compose validation.
+- Treat this as release-gate hardening, not a new runtime feature.
