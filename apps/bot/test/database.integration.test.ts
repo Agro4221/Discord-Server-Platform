@@ -55,7 +55,10 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='music_history' AND column_name = ANY($1)",
       [["guild_id","bot_identity_id","title","played_at"]]
     );
-    assert.equal(musicHistoryColumns.rows.length, 4);
+    assert.equal(musicHistoryColumns.rows.length, 4);    const musicPlaylistVisibility = await db.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='music_playlists' AND column_name='visibility'"
+    );
+    assert.equal(musicPlaylistVisibility.rows.length, 1);
     const approvalColumns = await db.query(
       "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='music_settings' AND column_name = ANY($1)",
       [["request_approval_mode","max_queued_per_user","max_queue_size","fair_queue_enabled"]]
@@ -64,6 +67,42 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
     assert.equal(Number(version), Number(first.rows[0]?.count));
     assert.equal(Number(second.rows[0]?.count), Number(version));
   } finally {
+    await db.close();
+  }
+});
+
+test("music shared playlists are guild-visible while personal playlists stay private", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345734";
+  try {
+    await migrate(db);
+    await db.query("DELETE FROM music_playlists WHERE guild_id=$1", [guildId]);
+
+    await db.query(
+      "INSERT INTO music_playlists(guild_id,user_id,name,visibility,tracks) VALUES($1,$2,$3,'shared','[]'::jsonb)",
+      [guildId,"234567890123456789","Server Mix"]
+    );
+    await db.query(
+      "INSERT INTO music_playlists(guild_id,user_id,name,visibility,tracks) VALUES($1,$2,$3,'personal','[]'::jsonb)",
+      [guildId,"234567890123456790","Private Mix"]
+    );
+
+    const otherUser = await db.query<{ name: string; visibility: string }>(
+      "SELECT name,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') ORDER BY name",
+      [guildId,"234567890123456791"]
+    );
+    assert.deepEqual(otherUser.rows, [{ name: "Server Mix", visibility: "shared" }]);
+
+    const owner = await db.query<{ name: string; visibility: string }>(
+      "SELECT name,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') ORDER BY name",
+      [guildId,"234567890123456790"]
+    );
+    assert.deepEqual(owner.rows, [
+      { name: "Private Mix", visibility: "personal" },
+      { name: "Server Mix", visibility: "shared" }
+    ]);
+  } finally {
+    await db.query("DELETE FROM music_playlists WHERE guild_id=$1", [guildId]).catch(() => undefined);
     await db.close();
   }
 });
