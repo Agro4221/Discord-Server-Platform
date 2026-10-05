@@ -1207,6 +1207,11 @@ export class Music implements PlatformModule {
         return;
       }
 
+      if (!await this.canQueueMusic(guildId, interaction.user.id, interaction.channelId)) {
+        await interaction.reply({ content: "Добавление в очередь запрещено политикой Music.", ephemeral: true });
+        return;
+      }
+
       const player = current ?? await this.getOrCreatePlayer(interaction, voice);
       if (player.voiceChannelId !== voice) {
         await interaction.reply({ content: "Музыкальный бот уже занят другим голосовым каналом.", ephemeral: true });
@@ -1363,7 +1368,7 @@ export class Music implements PlatformModule {
     requester: import("discord.js").User
   ): Promise<{ added: number; truncated: boolean; limited: boolean; firstTitle: string; firstAuthor: string }> {
     if (!this.manager) throw new Error("music_manager_unavailable");
-    if (!await this.canQueueMusic(guildId, requester.id)) throw new Error("music_queue_permission_denied");
+    if (!await this.canQueueMusic(guildId, requester.id, textChannelId)) throw new Error("music_queue_permission_denied");
 
     const existing = this.manager.players.get(guildId);
     const settings = await this.musicSettings(guildId);
@@ -1753,10 +1758,33 @@ export class Music implements PlatformModule {
     return result.rows[0]?.queue_access === "dj" ? "dj" : "everyone";
   }
 
-  private async canQueueMusic(guildId: string, userId: string): Promise<boolean> {
-    if (await this.queueAccess(guildId) === "everyone") return true;
+  private async canQueueMusic(guildId: string, userId: string, channelId: string): Promise<boolean> {
     const guild = this.client?.guilds.cache.get(guildId);
     const member = guild ? await guild.members.fetch(userId).catch(() => null) : null;
+    if (!member) return false;
+
+    if (this.commandPolicy && !await this.commandPolicy.checkMemberAction(guildId, "queue-add", member, channelId)) {
+      return false;
+    }
+
+    if (await this.queueAccess(guildId) === "everyone") return true;
+    return this.canManageMusicMember(guildId, member);
+  }
+
+  private async queueMutationAllowed(
+    guildId: string,
+    userId: string,
+    channelId: string,
+    policyName: "queue-remove" | "queue-move"
+  ): Promise<boolean> {
+    const guild = this.client?.guilds.cache.get(guildId);
+    const member = guild ? await guild.members.fetch(userId).catch(() => null) : null;
+    if (!member) return false;
+
+    if (this.commandPolicy && await this.commandPolicy.hasStoredPolicy(guildId, policyName)) {
+      return this.commandPolicy.checkMemberAction(guildId, policyName, member, channelId);
+    }
+
     return this.canManageMusicMember(guildId, member);
   }
 
@@ -1946,8 +1974,9 @@ export class Music implements PlatformModule {
     }
     if (action !== "view") {
       const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
-      if (!await this.canManageMusicMember(interaction.guildId!, member)) {
-        await interaction.reply({ content: "Изменять очередь могут пользователи с DJ-ролью или Manage Server.", ephemeral: true });
+      const mutationPolicy = action === "move" || action === "front" ? "queue-move" : "queue-remove";
+      if (!await this.queueMutationAllowed(interaction.guildId!, interaction.user.id, interaction.channelId, mutationPolicy)) {
+        await interaction.reply({ content: "Это изменение очереди запрещено политикой Music.", ephemeral: true });
         return;
       }
       const queue = player.queue.tracks;
@@ -2401,6 +2430,10 @@ export class Music implements PlatformModule {
       }
 
       const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+      if (!await this.canQueueMusic(interaction.guild.id, interaction.user.id, interaction.channelId)) {
+        await interaction.reply({ content: "Добавление в очередь запрещено политикой Music.", ephemeral: true });
+        return;
+      }
       const player = this.manager?.players.get(interaction.guild.id);
       if (!player || !canControlMusic(member?.voice.channelId ?? null, player.voiceChannelId, interaction.memberPermissions?.has("ManageGuild") ?? false)) {
         await interaction.reply({ content: "Выбор результата нужно подтверждать из того же голосового канала.", ephemeral: true });
