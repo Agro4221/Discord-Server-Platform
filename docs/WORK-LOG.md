@@ -976,7 +976,7 @@ Never write credentials, tokens or private user data here.
 - CI verification for this source/test increment is pending connector visibility; the PR head is the feature branch commit below.
 - Source checkpoint: 8b3fc2964b910d2de8196ad56e0062ea4593f96a.
 - The previous Named effect profiles Music backlog item is removed: it is not a target parity feature and will not drive the next increment.
-- Next single backlog slice: Music provider parity — Yandex Music, a benchmarked Juniper-style provider target rather than another arbitrary Lavalink filter.
+- Next single parity slice: Music provider parity — Spotify.
 
 ## 2026-10-05 — Music Custom EQ editor
 - Completed the independent Custom EQ editor slice.
@@ -988,7 +988,7 @@ Never write credentials, tokens or private user data here.
 - Added deterministic unit coverage for the 15-band boundary and Lavalink EQ gain range.
 - CI #2218 caught a misplaced prefix handler during Typecheck; the handler was moved into the correct `handlePrefixCommand` scope and CI #2219 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
 - Final source checkpoint for this slice: `7ee7f9cc7477497c49d416f90f6352c433aa34e1`.
-- Next single parity slice: **Spotify Music provider**.
+- Next completed provider after this checkpoint: Yandex Music; subsequent provider slices are tracked below.
 
 ## 2026-10-05 — Music Yandex Music provider parity
 - Added an explicit Yandex Music search provider to /play, /music play and /music search.
@@ -1011,6 +1011,8 @@ Never write credentials, tokens or private user data here.
 - Current LavaSrc documentation identifies Tidal playback as mirror-based and documents tdsearch plus track/album/playlist/artist URLs.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Tidal playback remains a release-gate validation item.
 - Source checkpoint: 593061182db741fe3da9c3f27f51418efcdaaee6.
+- Next single parity slice: Music provider parity — Qobuz.
+
 
 ## 2026-10-05 — Music VK Music provider parity
 - Added an explicit VK Music search provider to /play, /music play and /music search.
