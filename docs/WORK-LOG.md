@@ -1365,3 +1365,7 @@ Never write credentials, tokens or private user data here.
 - Added health regression coverage for database-ready/no-Discord, database-starting, strict /ready and unknown paths.
 - Source checkpoints: eab7ee52df98991aee358600dd59358cf28553f1 (health implementation), fbf987fb95606f0ce4c3266e1e574f6b3b7011bf (tests).
 - Fresh CI is not visible yet; live first-run Docker startup remains a release-gate check.
+## 2026-10-05 — Health deployment contract protection
+- Deployment contract now statically verifies that /health uses database readiness for control-plane liveness while /ready keeps strict full-readiness semantics.
+- Source checkpoint: fbb3ba0e5aa93ff5431a03af65a6b46b41d8bf9c.
+- Container-side smoke execution could not be run in this environment because outbound DNS/network access is unavailable; CI remains the authoritative automated gate.
