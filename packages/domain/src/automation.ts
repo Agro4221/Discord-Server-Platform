@@ -43,10 +43,12 @@ export type AutomationCondition =
 
 export type AutomationAction =
   | { type: "send-message"; channelId: string; content: string }
+  | { type: "create-channel"; name: string; channelType: "text" | "voice"; parentId: string | null }
   | { type: "dm-user"; userId: string; content: string }
   | { type: "add-role"; userId: string; roleId: string }
   | { type: "remove-role"; userId: string; roleId: string }
   | { type: "timeout"; userId: string; durationSeconds: number; reason: string }
+  | { type: "warn"; userId: string; reason: string }
   | { type: "ban"; userId: string; reason: string }
   | { type: "kick"; userId: string; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
