@@ -2299,7 +2299,9 @@ export class Music implements PlatformModule {
           ? "ymsearch:" + query
           : provider === "spotify" && !/^https?:\/\//i.test(query)
             ? "spsearch:" + query
-            : query,
+            : provider === "applemusic" && !/^https?:\/\//i.test(query)
+              ? "amsearch:" + query
+              : query,
         track: null,
         source: "query"
       });
