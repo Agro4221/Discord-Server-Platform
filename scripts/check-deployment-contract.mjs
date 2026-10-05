@@ -163,8 +163,6 @@ if (rootBatchFiles.length !== 1 || rootBatchFiles[0]?.toLowerCase() !== "start.b
 
 const nativeLauncher = await readFile("scripts/start-native.ps1", "utf8");
 const nativeEntry = await readFile("start.bat", "utf8");
-const nativeDashboardEntry = await readFile("control-center.bat", "utf8");
-const nativeStopEntry = await readFile("stop.bat", "utf8");
 
 for (const contract of [
   "Control Center -> Bot Fleet can register them",
@@ -190,8 +188,10 @@ if (nativeLauncher.includes('Read-Host "Discord bot token"') || nativeLauncher.i
 if (nativeEntry.includes("docker") || !nativeEntry.includes("start-native.bat")) {
   throw new Error("start.bat must be a native launcher alias");
 }
-if (!nativeDashboardEntry.includes("-Dashboard") || !nativeStopEntry.includes("-Down")) {
-  throw new Error("Native convenience entrypoints are incomplete");
+for (const nativeArgument of ["-Dashboard", "-Down", "-Status", "-NoDashboard", "-Lavalink2", "-Rebuild"]) {
+  if (!nativeLauncher.includes(nativeArgument)) {
+    throw new Error("Native launcher argument contract missing: " + nativeArgument);
+  }
 }
 const localLauncher = await readFile("scripts/start-local.ps1", "utf8");
 for (const contract of [
