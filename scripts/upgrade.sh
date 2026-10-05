@@ -57,15 +57,15 @@ fi
 docker compose "${COMPOSE_ARGS[@]}" config >/dev/null
 docker compose "${COMPOSE_ARGS[@]}" up -d --build
 
-DOMAIN="$(grep -E '^DOMAIN=' .env | tail -n1 | cut -d= -f2-)"
-DOMAIN="${DOMAIN#\'}"
-DOMAIN="${DOMAIN%\'}"
-
-if [[ -z "${DOMAIN}" || ! "${DOMAIN}" =~ ^[A-Za-z0-9.-]+$ || "${DOMAIN}" != *.* ]]; then
-  echo "DOMAIN is missing or invalid in .env." >&2
-  exit 1
+if [[ -f infrastructure/caddy/Caddyfile ]]; then
+  DOMAIN="$(grep -E '^DOMAIN=' .env | tail -n1 | cut -d= -f2-)"
+  DOMAIN="${DOMAIN#\'}"
+  DOMAIN="${DOMAIN%\'}"
+  if [[ -z "${DOMAIN}" || ! "${DOMAIN}" =~ ^[A-Za-z0-9.-]+$ || "${DOMAIN}" != *.* ]]; then
+    echo "DOMAIN is missing or invalid in .env." >&2
+    exit 1
+  fi
 fi
-
 for _ in $(seq 1 60); do
   if curl -fsS "http://127.0.0.1:${HEALTH_PORT:-3001}/health" >/dev/null; then
     dashboard_code="$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:${DASHBOARD_PORT:-3000}/" || true)"
