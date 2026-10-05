@@ -98,6 +98,7 @@ type ApiOptions = {
       }
     ) => Promise<boolean>;
     delete: (guildId: string, feedId: number) => Promise<boolean>;
+    testFeed: (guildId: string, feedId: number) => Promise<{ title: string; url: string }>;
   };
   streamAlerts?: {
     list: (guildId: string) => Promise<unknown[]>;
@@ -875,7 +876,36 @@ export class ManagementApiServer {
           }
 
           const feedsMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds$/);
+          const feedTestMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds\/(\\d+)\/test$/);
           const feedItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/feeds\/(\\d+)$/);
+
+          if (method === "POST" && feedTestMatch) {
+            if (!this.options.notifications) {
+              this.json(res, 500, { error: "notifications_unavailable" });
+              return;
+            }
+            const guildId = feedTestMatch[1] ?? "";
+            const feedId = Number(feedTestMatch[2]);
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !Number.isSafeInteger(feedId)) {
+              this.json(res, 404, { error: "guild_or_feed_not_found" });
+              return;
+            }
+            try {
+              const result = await this.options.notifications.testFeed(guildId, feedId);
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "feed.test",
+                targetType: "feed",
+                targetId: String(feedId),
+                metadata: { title: result.title.slice(0, 200) }
+              });
+              this.json(res, 200, { ok: true, result });
+            } catch (error) {
+              this.json(res, 400, { error: String(error).replace(/^Error:\s*/, "") });
+            }
+            return;
+          }
 
           if ((feedsMatch || feedItemMatch) && !this.options.notifications) {
             this.json(res, 500, { error: "notifications_unavailable" });
