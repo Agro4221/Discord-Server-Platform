@@ -64,6 +64,11 @@ jobs:
 
       - name: Check deployment contract
         run: node scripts/check-deployment-contract.mjs
+      - name: Check native launcher syntax
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          [scriptblock]::Create((Get-Content -Raw scripts/start-native.ps1)) | Out-Null
 
       - name: Typecheck bot
         run: npm run typecheck
