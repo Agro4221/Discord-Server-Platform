@@ -692,3 +692,14 @@ Never write credentials, tokens or private user data here.
 - Control Center Command Policy can configure these scopes without a second permission store.
 - CI #2063 passed completely.
 - Source checkpoint for this slice: `cb859ef8abd6f44c8e34510f4c2db6ebcf77f512`.
+
+## 2026-10-05 — Music Fair Queue / requester rotation
+- Completed Fair Queue requester rotation for Music v2.
+- Added deterministic round-robin balancing that preserves each requester's own FIFO order and groups unknown requesters together.
+- Fair Queue is applied after manual queue additions, search-picker selection and saved-playlist loading when the persisted guild setting is enabled.
+- Dashboard already exposes the persisted `fairQueueEnabled` setting; no second configuration store was introduced.
+- Added regression coverage for multiple requesters, a single requester and unknown requesters.
+- Repaired the migration tail while closing this slice: guild queue size is migration 90, Fair Queue is migration 91, and the previously missing vote-skip settings schema is migration 92.
+- CI #2081 passed completely: deployment contract, typecheck, 155 tests, domain build, bot build and Dashboard build.
+- Final source checkpoint: `c83d17491ce47aea11cabf214d4383032f5c3404`.
+- Next single Music slice: **Optional approval/moderation mode for requests**.
