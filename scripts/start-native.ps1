@@ -17,7 +17,9 @@ try {
 
 $runtimeRoot = Join-Path (Get-Location) ".native-runtime"
 $logRoot = Join-Path $runtimeRoot "logs"
-New-Item -ItemType Directory -Force -Path $runtimeRoot, $logRoot | Out-Null
+$nativeToolsRoot = Join-Path (Get-Location) "tools"
+$bundledPostgresBin = Join-Path $nativeToolsRoot "pgsql\\bin"
+New-Item -ItemType Directory -Force -Path $runtimeRoot, $logRoot, $nativeToolsRoot | Out-Null
 
 function Get-EnvValue([string]$Name) {
   if (-not (Test-Path ".env")) { return $null }
@@ -142,9 +144,7 @@ function Wait-Tcp([string]$HostName, [int]$Port, [int]$Attempts, [int]$DelaySeco
 
 function Ensure-Node {
   $node = Get-Command "node.exe" -ErrorAction SilentlyContinue
-  if (-not $node) { throw "Node.js was not found. Install Node.js 24.17+ for native mode." }
-
-  $versionText = (& node.exe --version).Trim().TrimStart("v")
+  $versionText = if ($node) { (& node.exe --version).Trim().TrimStart("v") } else { "0.0.0" }
   $parts = $versionText.Split(".")
   $major = 0
   $minor = 0
@@ -153,7 +153,21 @@ function Ensure-Node {
     $minor = [int]$parts[1]
   }
   if ($major -lt 24 -or ($major -eq 24 -and $minor -lt 17)) {
-    throw "Native mode requires Node.js 24.17+. Detected $versionText."
+    $winget = Get-Command "winget.exe" -ErrorAction SilentlyContinue
+    if (-not $winget) { throw "Node.js 24.17+ is required for native mode and winget was not found for automatic installation." }
+    Write-Host "Node.js 24.21.0+ is missing. Installing the required Node.js LTS version..."
+    & $winget install --id OpenJS.NodeJS.LTS --exact --version 24.21.0 --silent --accept-package-agreements --accept-source-agreements
+    if ($LASTEXITCODE -ne 0) { throw "Automatic Node.js 24.21.0 installation failed." }
+    $node = Get-Command "node.exe" -ErrorAction SilentlyContinue
+    $versionText = if ($node) { (& node.exe --version).Trim().TrimStart("v") } else { "" }
+    $parts = $versionText.Split(".")
+    if ($parts.Count -ge 2) {
+      $major = [int]$parts[0]
+      $minor = [int]$parts[1]
+    }
+  }
+  if ($major -lt 24 -or ($major -eq 24 -and $minor -lt 17)) {
+    throw "Native mode requires Node.js 24.17+. Detected $versionText. Open a new terminal after automatic installation and retry."
   }
   Write-Host "Node.js: $versionText"
 }
@@ -166,33 +180,101 @@ function Ensure-NpmDependencies {
 }
 
 function Ensure-Postgres {
+  if (Test-Path (Join-Path $bundledPostgresBin "pg_ctl.exe")) {
+    if (-not (($env:Path -split ";" | Where-Object { $_ -eq $bundledPostgresBin }).Count)) {
+      $env:Path = "$bundledPostgresBin;$env:Path"
+    }
+  }
+
   $pgIsReady = Get-Command "pg_isready.exe" -ErrorAction SilentlyContinue
   $psql = Get-Command "psql.exe" -ErrorAction SilentlyContinue
-  if (-not $pgIsReady -or -not $psql) {
-    throw "PostgreSQL client tools were not found. Install PostgreSQL and add pg_isready.exe/psql.exe to PATH."
+  $initdb = Get-Command "initdb.exe" -ErrorAction SilentlyContinue
+  $pgCtl = Get-Command "pg_ctl.exe" -ErrorAction SilentlyContinue
+
+  if (-not $pgIsReady -or -not $psql -or -not $initdb -or -not $pgCtl) {
+    Write-Host "Portable PostgreSQL is missing. Downloading PostgreSQL 18.6 binaries..."
+    $zipRoot = Join-Path $runtimeRoot "downloads"
+    $extractRoot = Join-Path $runtimeRoot "postgres-extract"
+    $zipPath = Join-Path $zipRoot "postgresql-18.6-5-windows-x64-binaries.zip"
+    New-Item -ItemType Directory -Force -Path $zipRoot | Out-Null
+    if (-not (Test-Path $zipPath)) {
+      Invoke-WebRequest -Uri "https://get.enterprisedb.com/postgresql/postgresql-18.6-5-windows-x64-binaries.zip" -OutFile $zipPath -UseBasicParsing
+    }
+    if (Test-Path $extractRoot) { Remove-Item -Recurse -Force $extractRoot }
+    Expand-Archive -LiteralPath $zipPath -DestinationPath $extractRoot -Force
+    $source = Join-Path $extractRoot "pgsql"
+    if (-not (Test-Path (Join-Path $source "bin\pg_ctl.exe"))) {
+      throw "Downloaded PostgreSQL archive did not contain the expected pgsql\bin runtime."
+    }
+    $target = Join-Path $nativeToolsRoot "pgsql"
+    if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+    Move-Item -Path $source -Destination $target
+    $env:Path = "$bundledPostgresBin;$env:Path"
+    $pgIsReady = Get-Command "pg_isready.exe" -ErrorAction SilentlyContinue
+    $psql = Get-Command "psql.exe" -ErrorAction SilentlyContinue
+    $initdb = Get-Command "initdb.exe" -ErrorAction SilentlyContinue
+    $pgCtl = Get-Command "pg_ctl.exe" -ErrorAction SilentlyContinue
   }
 
   $dbUrl = Get-EnvValue "DATABASE_URL"
-  if ([string]::IsNullOrWhiteSpace($dbUrl)) {
-    $dbUrl = "postgresql://postgres:postgres@127.0.0.1:5432/discord_platform"
+  if ([string]::IsNullOrWhiteSpace($dbUrl) -or $dbUrl -match "postgresql://USER:PASSWORD@") {
+    $dbPassword = New-Secret 32
+    $dbUrl = "postgresql://postgres:$dbPassword@127.0.0.1:5432/discord_platform"
     Set-EnvValue "DATABASE_URL" $dbUrl
-    $env:DATABASE_URL = $dbUrl
+    Set-EnvValue "POSTGRES_PASSWORD" $dbPassword
   }
+  $env:DATABASE_URL = $dbUrl
+  Import-EnvFile
 
-  & pg_isready.exe -d $dbUrl *> $null
-  if ($LASTEXITCODE -ne 0) {
-    $candidate = Read-Host "PostgreSQL is not reachable. Enter DATABASE_URL (or press Enter to abort)"
-    if ([string]::IsNullOrWhiteSpace($candidate)) {
-      throw "PostgreSQL is not reachable at the configured DATABASE_URL."
+  $dataRoot = Join-Path (Get-Location) ".postgres-data"
+  if (-not (Test-Path (Join-Path $dataRoot "PG_VERSION"))) {
+    Write-Host "Initializing local PostgreSQL cluster..."
+    New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
+    $uri = [Uri]$env:DATABASE_URL
+    $userinfo = $uri.UserInfo.Split(":", 2)
+    $dbPassword = if ($userinfo.Count -eq 2) { [Uri]::UnescapeDataString($userinfo[1]) } else { New-Secret 32 }
+    $pwFile = Join-Path $runtimeRoot "postgres-password.tmp"
+    Set-Content -Path $pwFile -Value $dbPassword -NoNewline -Encoding ASCII
+    try {
+      & $initdb -D $dataRoot -U postgres --pwfile=$pwFile --encoding=UTF8 --auth-local=trust --auth-host=scram-sha-256
+      if ($LASTEXITCODE -ne 0) { throw "PostgreSQL cluster initialization failed." }
+    } finally {
+      Remove-Item $pwFile -Force -ErrorAction SilentlyContinue
     }
-    Set-EnvValue "DATABASE_URL" $candidate
-    Import-EnvFile
-    & pg_isready.exe -d $env:DATABASE_URL *> $null
-    if ($LASTEXITCODE -ne 0) { throw "PostgreSQL is still not reachable at the supplied DATABASE_URL." }
   }
 
-  & psql.exe $env:DATABASE_URL -c "SELECT 1;" *> $null
-  if ($LASTEXITCODE -ne 0) { throw "PostgreSQL accepted no connection for DATABASE_URL." }
+  & $pgIsReady -h 127.0.0.1 -p 5432 *> $null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "Starting local PostgreSQL..."
+    & $pgCtl -D $dataRoot -l (Join-Path $logRoot "postgres.log") -o "-h 127.0.0.1 -p 5432" start *> $null
+    if ($LASTEXITCODE -ne 0) {
+      Get-Content (Join-Path $logRoot "postgres.log") -Tail 80 -ErrorAction SilentlyContinue
+      throw "Local PostgreSQL could not be started."
+    }
+  }
+
+  $ready = $false
+  for ($attempt = 1; $attempt -le 20; $attempt++) {
+    & $pgIsReady -h 127.0.0.1 -p 5432 *> $null
+    if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+    Start-Sleep -Seconds 1
+  }
+  if (-not $ready) { throw "Local PostgreSQL did not become ready on 127.0.0.1:5432." }
+
+  & $psql $env:DATABASE_URL -c "SELECT 1;" *> $null
+  if ($LASTEXITCODE -ne 0) {
+    & $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c "SELECT 1;" *> $null
+    if ($LASTEXITCODE -ne 0) { throw "PostgreSQL rejected the configured DATABASE_URL." }
+  }
+
+  $databaseExists = (& $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='discord_platform';" 2>$null | Select-String -Quiet "1")
+  if (-not $databaseExists) {
+    & $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c "CREATE DATABASE discord_platform;" *> $null
+    if ($LASTEXITCODE -ne 0) { throw "Could not create the discord_platform database." }
+  }
+
+  & $psql $env:DATABASE_URL -c "SELECT 1;" *> $null
+  if ($LASTEXITCODE -ne 0) { throw "PostgreSQL accepted the server connection but rejected DATABASE_URL." }
 
   Write-Host "PostgreSQL: ready"
 }
@@ -206,19 +288,44 @@ function Ensure-LavalinkJar {
 
   $resolved = if ([System.IO.Path]::IsPathRooted($configured)) { $configured } else { Join-Path (Get-Location) $configured }
   if (-not (Test-Path $resolved -PathType Leaf)) {
-    $candidate = Read-Host "Lavalink JAR was not found at '$configured'. Enter the full path to Lavalink JAR (or press Enter to abort)"
-    if ([string]::IsNullOrWhiteSpace($candidate)) { throw "Lavalink JAR is required for native mode." }
-    if (-not (Test-Path $candidate -PathType Leaf)) { throw "The supplied Lavalink JAR does not exist: $candidate" }
-    $resolved = $candidate
-    Set-EnvValue "LAVALINK_JAR_PATH" $candidate
+    Write-Host "Lavalink JAR is missing. Downloading Lavalink 4.2.2..."
+    $downloadRoot = Join-Path $runtimeRoot "downloads"
+    New-Item -ItemType Directory -Force -Path $downloadRoot | Out-Null
+    $downloaded = Join-Path $downloadRoot "Lavalink-4.2.2.jar"
+    if (-not (Test-Path $downloaded)) {
+      Invoke-WebRequest -Uri "https://github.com/lavalink-devs/Lavalink/releases/download/4.2.2/Lavalink.jar" -OutFile $downloaded -UseBasicParsing
+    }
+    $target = Join-Path (Get-Location) "infrastructure\lavalink\lavalink.jar"
+    Copy-Item $downloaded $target -Force
+    $resolved = $target
   }
   return (Resolve-Path $resolved).Path
 }
 
-function Ensure-Java {
+function Find-Java {
   $java = Get-Command "java.exe" -ErrorAction SilentlyContinue
-  if (-not $java) { throw "Java was not found. Install the Java runtime required by your Lavalink version and put java.exe in PATH." }
-  return $java.Source
+  if ($java) { return $java.Source }
+  $candidates = @(Get-ChildItem "C:\Program Files\Eclipse Adoptium\jdk-21*" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+    Join-Path $_ "bin\java.exe"
+  })
+  foreach ($candidate in $candidates) {
+    if (Test-Path $candidate) { return (Resolve-Path $candidate).Path }
+  }
+  return $null
+}
+
+function Ensure-Java {
+  $javaPath = Find-Java
+  if (-not $javaPath) {
+    $winget = Get-Command "winget.exe" -ErrorAction SilentlyContinue
+    if (-not $winget) { throw "Java 17+ is required for native mode and winget was not found for automatic installation." }
+    Write-Host "Java 21 is missing. Installing Eclipse Temurin 21..."
+    & $winget install --id EclipseAdoptium.Temurin.21.JDK --exact --silent --accept-package-agreements --accept-source-agreements
+    if ($LASTEXITCODE -ne 0) { throw "Automatic Java 21 installation failed." }
+    $javaPath = Find-Java
+  }
+  if (-not $javaPath) { throw "Java 21 was installed but java.exe could not be located. Open a new terminal and retry." }
+  return $javaPath
 }
 
 function Ensure-Secret([string]$Name, [int]$Length) {
