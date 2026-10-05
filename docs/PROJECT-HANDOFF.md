@@ -553,3 +553,8 @@ Live validation, требующая пользовательского окру�
 ### 2026-10-05 — Current checkpoint after Music Filters
 - Filters / FX quick-access is complete and CI-verified (#1990).
 - Next single module: Save queue button.
+
+
+### 2026-10-05 — Current checkpoint after Save Queue
+- Save Queue / Save current queue as playlist are complete and CI-verified (#1997).
+- Next single module: Load playlist with optional shuffle.
