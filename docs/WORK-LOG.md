@@ -738,3 +738,13 @@ Never write credentials, tokens or private user data here.
 - CI #2103 passed completely: deployment/observability contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
 - Final source checkpoint: `ba9114b24b5c759237623a8a4d028402fc0b8a62`.
 - Next single Music slice: **Playlist search/filtering**.
+
+## 2026-10-05 — Music playlist search / filtering
+- Completed Music playlist search and filtering.
+- Added `Search` to the existing `/music playlist` command with normalized text search, up to 25 displayed matches and a `shared-only` filter.
+- Search respects the existing personal/shared visibility rules, so personal playlists remain private and shared playlists remain guild-visible.
+- Playlist capacity remains `MAX_PLAYLIST_TRACKS = 500`; the 25-result limit only bounds Discord's displayed search/view output.
+- Added unit coverage for search normalization and PostgreSQL coverage for personal/shared search scope.
+- CI #2110 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `0244df329476e9ed9f0922d9b6ec98473d8dff57`.
+- Next single Music slice: **Import playlists from supported URLs**.
