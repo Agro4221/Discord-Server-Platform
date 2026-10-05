@@ -1708,7 +1708,10 @@ export class Music implements PlatformModule {
         ...(remainingUserSlots === null ? [] : [remainingUserSlots]),
         ...(remainingGuildSlots === null ? [] : [remainingGuildSlots])
       );
-      const itemsToLoad = (shouldShuffle ? shuffleMusicItems(stored) : stored).slice(0, loadLimit);
+      const playlistOrder = shouldShuffle
+        ? shuffleMusicItems(stored.map((_, index) => index))
+        : stored.map((_, index) => index);
+      const itemsToLoad = playlistOrder.slice(0, loadLimit).map((index) => stored[index]).filter((item): item is unknown => item !== undefined);
       const builtTracks: Track[] = [];
       for (const item of itemsToLoad) {
         try {
@@ -1741,10 +1744,7 @@ export class Music implements PlatformModule {
         this.playlistContinuations.set(guildId, {
           playlistId: row.id,
           nextIndex: itemsToLoad.length,
-          order: shouldShuffle ? itemsToLoad.map((_, index) => {
-            const shuffledIndexes = shuffleMusicItems(stored.map((_, sourceIndex) => sourceIndex));
-            return shuffledIndexes[index] ?? index;
-          }) : null,
+          order: shouldShuffle ? playlistOrder : null,
           requesterUserId: interaction.user.id
         });
       } else {
