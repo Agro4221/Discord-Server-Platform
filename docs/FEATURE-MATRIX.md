@@ -234,7 +234,7 @@
 | Функция | План |
 |---|---|
 | Current simple autoplay | ✅ |
-| Duplicate/recent-track avoidance | 🟡 |
+| Duplicate/recent-track avoidance | ✅ |
 | Artist-aware / similar-track autoplay | 🟡 |
 | Radio mode by artist/genre/search seed | 🟡 |
 | Playlist continuation after queue end | ✅ | |
