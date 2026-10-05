@@ -169,3 +169,12 @@ test("music quick filter actions allow only known presets", async () => {
     assert.equal(isMusicFilterAction(action), false, action);
   }
 });
+
+
+test("music playlist names normalize whitespace and reject blanks", async () => {
+  const { normalizeMusicPlaylistName } = await import("../src/modules/music.js");
+  assert.equal(normalizeMusicPlaylistName("  Evening   Set  "), "Evening Set");
+  assert.equal(normalizeMusicPlaylistName(""), null);
+  assert.equal(normalizeMusicPlaylistName("   "), null);
+  assert.equal(normalizeMusicPlaylistName("x".repeat(100))?.length, 80);
+});
