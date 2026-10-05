@@ -505,13 +505,23 @@ export class AutomationEngine implements PlatformModule {
   }
 
   private async emitSchedules(): Promise<void> {
-    await this.reload();
     const now = new Date();
     const minute = Math.floor(now.getTime() / 60_000);
     if (this.lastScheduleMinute === minute) return;
-    this.lastScheduleMinute = minute;
 
-    for (const guildId of this.rules.keys()) {
+    try {
+      await this.reload();
+    } catch (error) {
+      logger.warn("Automation schedule reload failed", {
+        identityId: this.identityId,
+        error: String(error)
+      });
+      return;
+    }
+
+    this.lastScheduleMinute = minute;
+    const guildIds = [...this.rules.keys()];
+    for (const guildId of guildIds) {
       await this.execute({
         type: "schedule",
         guildId,
