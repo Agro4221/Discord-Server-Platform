@@ -160,7 +160,10 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "autoplay", label: "Autoplay", type: "boolean", description: "После окончания очереди искать следующий трек автоматически." },
       { key: "autoLeaveSeconds", label: "Автовыход из voice после простоя, сек.", type: "number", min: 0, max: 86400 },
       { key: "twentyFourSeven", label: "24/7 режим", type: "boolean", description: "Не выходить из voice при пустой очереди." },
-      { key: "queueAccess", label: "Кто может добавлять треки", type: "text", description: "everyone или dj — режим DJ ограничивает добавление очереди DJ-ролью/Manage Server." }
+      { key: "queueAccess", label: "Кто может добавлять треки", type: "text", description: "everyone или dj — режим DJ ограничивает добавление очереди DJ-ролью/Manage Server." },
+      { key: "voteSkipEnabled", label: "Vote-to-skip", type: "boolean" },
+      { key: "voteSkipPercent", label: "Vote-to-skip доля слушателей", type: "number", min: 0.1, max: 1, step: 0.05 },
+      { key: "voteSkipMinimum", label: "Vote-to-skip минимум голосов", type: "number", min: 1, max: 99 }
     ]
   }
 ];
@@ -293,7 +296,10 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       autoplay: "autoplay",
       autoLeaveSeconds: "auto_leave_seconds",
       twentyFourSeven: "twenty_four_seven",
-      queueAccess: "queue_access"
+      queueAccess: "queue_access",
+      voteSkipEnabled: "vote_skip_enabled",
+      voteSkipPercent: "vote_skip_percent",
+      voteSkipMinimum: "vote_skip_minimum"
     }
   }
 };
