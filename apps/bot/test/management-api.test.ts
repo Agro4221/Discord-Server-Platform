@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { isManagementApiAuthorized, managementApiRateAllows, validateAutomationPayload } from "../src/management-api.js";
+import { isManagementApiAuthorized, managementApiRateAllows, ManagementApiServer, validateAutomationPayload } from "../src/management-api.js";
 
 function fakeClient() {
   const channel = { id: "123456789012345678", type: 0, isTextBased: () => true };
@@ -34,6 +34,98 @@ test("Management API rate limit allows exactly the configured number of requests
   assert.equal(managementApiRateAllows(windows, "client", 3, now + 3), false);
   assert.equal(managementApiRateAllows(windows, "client-2", 3, now + 3), true);
   assert.equal(managementApiRateAllows(windows, "client", 3, now + 60_001), true);
+});
+
+test("Management API rejects unauthenticated requests before route handling", async () => {
+  const api = new ManagementApiServer({
+    host: "127.0.0.1",
+    port: 0,
+    apiKey: "secret",
+    client: fakeClient(),
+    moduleSettings: {} as never,
+    auditLog: {} as never,
+    settings: {} as never,
+    transfer: {} as never,
+    backups: {} as never,
+    actions: {}
+  });
+  await api.start();
+  try {
+    const server = (api as unknown as { server?: { address: () => { port?: number } | null } }).server;
+    const port = server?.address()?.port;
+    assert.equal(typeof port, "number");
+    const response = await fetch(`http://127.0.0.1:${port}/api/guilds/999999999999999999/modules`);
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), { error: "unauthorized" });
+  } finally {
+    await api.stop();
+  }
+});
+
+test("Management API enforces the guild access boundary after authentication", async () => {
+  const api = new ManagementApiServer({
+    host: "127.0.0.1",
+    port: 0,
+    apiKey: "secret",
+    client: fakeClient(),
+    moduleSettings: {} as never,
+    auditLog: {} as never,
+    settings: {} as never,
+    transfer: {} as never,
+    backups: {} as never,
+    actions: {},
+    guildAccess: () => false
+  });
+  await api.start();
+  try {
+    const server = (api as unknown as { server?: { address: () => { port?: number } | null } }).server;
+    const port = server?.address()?.port;
+    assert.equal(typeof port, "number");
+    const response = await fetch(`http://127.0.0.1:${port}/api/guilds/999999999999999999/modules`, {
+      headers: { Authorization: "Bearer secret" }
+    });
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { error: "guild_not_found" });
+  } finally {
+    await api.stop();
+  }
+});
+
+test("Management API uses a stricter rate limit for Bot Identity registration", async () => {
+  const api = new ManagementApiServer({
+    host: "127.0.0.1",
+    port: 0,
+    apiKey: "secret",
+    client: fakeClient(),
+    moduleSettings: {} as never,
+    auditLog: {} as never,
+    settings: {} as never,
+    transfer: {} as never,
+    backups: {} as never,
+    actions: {}
+  });
+  await api.start();
+  try {
+    const server = (api as unknown as { server?: { address: () => { port?: number } | null } }).server;
+    const port = server?.address()?.port;
+    assert.equal(typeof port, "number");
+    const statuses: number[] = [];
+    for (let i = 0; i < 11; i += 1) {
+      const response = await fetch(`http://127.0.0.1:${port}/api/fleet/register`, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer secret",
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ identityId: "test", token: "x".repeat(24) })
+      });
+      statuses.push(response.status);
+    }
+    assert.deepEqual(statuses.slice(0, 10), Array.from({ length: 10 }, () => 500));
+    assert.equal(statuses[10], 429);
+  } finally {
+    await api.stop();
+  }
 });
 
 test("Management API accepts the full current Automation builder catalog", () => {
