@@ -4,7 +4,11 @@ import { CommandPolicyService } from "../src/command-policy.js";
 
 function member(roleIds: string[] = [], permissions: string[] = []) {
   return {
-    roles: { cache: new Map(roleIds.map((id) => [id, { id }])) },
+    roles: {
+      cache: {
+        map: <T>(mapper: (role: { id: string }) => T) => roleIds.map((id) => mapper({ id }))
+      }
+    },
     permissions: { has: (permission: string) => permissions.includes(permission) }
   } as never;
 }
