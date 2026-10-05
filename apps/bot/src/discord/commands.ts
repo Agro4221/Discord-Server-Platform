@@ -1006,11 +1006,16 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
               { name: "Create", value: "create" },
               { name: "Delete", value: "delete" },
               { name: "List", value: "list" },
+              { name: "View tracks", value: "view" },
               { name: "Add current", value: "add" },
+              { name: "Remove track", value: "remove" },
+              { name: "Move track", value: "move" },
               { name: "Load", value: "load" }
             ).setRequired(true)
           )
           .addStringOption((o) => o.setName("name").setDescription("Playlist name").setMaxLength(80))
+          .addIntegerOption((o) => o.setName("track").setDescription("Track number (1-based)").setMinValue(1).setMaxValue(500))
+          .addIntegerOption((o) => o.setName("to").setDescription("New position for the track (1-based)").setMinValue(1).setMaxValue(500))
           .addBooleanOption((o) => o.setName("shuffle").setDescription("Shuffle tracks when loading the playlist"))
           .addBooleanOption((o) => o.setName("shared").setDescription("Create or update this playlist as a server-shared playlist"))
       ),
