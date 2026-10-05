@@ -1308,6 +1308,79 @@ export class Music implements PlatformModule {
       return;
     }
 
+    if (action === "save-queue") {
+      const player = this.manager?.players.get(guildId);
+      if (!player) {
+        await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+        return;
+      }
+
+      const member = await interaction.guild!.members.fetch(interaction.user.id).catch(() => null);
+      if (!canControlMusic(
+        member?.voice.channelId ?? null,
+        player.voiceChannelId,
+        member?.permissions.has("ManageGuild") ?? false
+      )) {
+        await interaction.reply({ content: "Сохранять очередь можно из того же голосового канала.", ephemeral: true });
+        return;
+      }
+
+      if (!name) {
+        await interaction.reply({ content: "Укажи имя плейлиста.", ephemeral: true });
+        return;
+      }
+
+      const visibility = normalizeMusicPlaylistVisibility(shared);
+      if (visibility === "shared" && !await this.canManageMusicMember(guildId, member)) {
+        await interaction.reply({ content: "Создавать shared-плейлисты могут только DJ или Manage Server.", ephemeral: true });
+        return;
+      }
+
+      const tracks = [
+        ...(player.queue.current ? [player.queue.current] : []),
+        ...player.queue.tracks
+      ].slice(0, MAX_PLAYLIST_TRACKS);
+
+      if (!tracks.length) {
+        await interaction.reply({ content: "Нечего сохранять: очередь пуста.", ephemeral: true });
+        return;
+      }
+
+      try {
+        await this.db.query(
+          "INSERT INTO music_playlists(guild_id,user_id,name,visibility,tracks) VALUES($1,$2,$3,$4,$5::jsonb)",
+          [
+            guildId,
+            interaction.user.id,
+            name,
+            visibility,
+            JSON.stringify(tracks.map((track) => this.serializedTrack(track)))
+          ]
+        );
+      } catch (error) {
+        if (/unique|duplicate|23505/i.test(String(error))) {
+          await interaction.reply({
+            content: (visibility === "shared" ? "Shared-плейлист" : "Плейлист") + " **" + name + "** уже существует. Выбери другое имя.",
+            ephemeral: true
+          });
+          return;
+        }
+        logger.warn("Music queue playlist save failed", {
+          guildId,
+          userId: interaction.user.id,
+          error: String(error)
+        });
+        await interaction.reply({ content: "Не удалось сохранить текущую очередь.", ephemeral: true });
+        return;
+      }
+
+      await interaction.reply({
+        content: "💾 Очередь сохранена в " + (visibility === "shared" ? "shared-плейлист" : "личный плейлист") + " **" + name + "**: **" + tracks.length + "** трек(ов).",
+        ephemeral: true
+      });
+      return;
+    }
+
     if (action === "list") {
       const result = await this.db.query<{ name: string; tracks: unknown[]; visibility: MusicPlaylistVisibility }>(
         "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') ORDER BY visibility DESC,updated_at DESC LIMIT 25",
