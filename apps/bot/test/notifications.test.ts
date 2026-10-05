@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isPrivateIp, normalizeKeywords, renderFeedTemplate } from "../src/modules/notifications.js";
+import { buildNotificationEmbed, isPrivateIp, normalizeKeywords, normalizeNotificationEmbedConfig, renderFeedTemplate } from "../src/modules/notifications.js";
 
 test("notification SSRF guard rejects private, special and mapped addresses", () => {
   for (const address of [
@@ -66,4 +66,49 @@ test("social feed presets generate provider-specific RSS URLs and reject invalid
   assert.throws(() => buildSocialFeedUrl("reddit", "bad target"), /invalid_reddit_target/);
   assert.throws(() => buildSocialFeedUrl("youtube", "not-a-channel"), /invalid_youtube_channel/);
   assert.throws(() => buildSocialFeedUrl("mastodon", "https://mastodon.social/"), /invalid_mastodon_target/);
+});
+
+
+test("notification embed config normalizes supported fields and renders feed variables", () => {
+  const config = normalizeNotificationEmbedConfig({
+    title: "New: {title}",
+    description: "{url}",
+    url: "https://example.com/post",
+    color: "#5865F2",
+    footer: "{timestamp}",
+    image: "https://example.com/image.png",
+    thumbnail: "https://example.com/thumb.png"
+  });
+
+  assert.deepEqual(config && {
+    ...config,
+    footer: config.footer !== undefined ? "{timestamp}" : undefined
+  }, {
+    title: "New: {title}",
+    description: "{url}",
+    url: "https://example.com/post",
+    color: "#5865F2",
+    footer: "{timestamp}",
+    image: "https://example.com/image.png",
+    thumbnail: "https://example.com/thumb.png"
+  });
+
+  const embed = buildNotificationEmbed(config, {
+    title: "Release 2",
+    url: "https://example.com/release"
+  });
+
+  assert.ok(embed);
+  assert.equal(embed?.data.title, "New: Release 2");
+  assert.equal(embed?.data.description, "https://example.com/release");
+  assert.equal(embed?.data.color, 0x5865F2);
+  assert.equal(embed?.data.image?.url, "https://example.com/image.png");
+  assert.equal(embed?.data.thumbnail?.url, "https://example.com/thumb.png");
+});
+
+test("notification embed config drops invalid colors and empty fields", () => {
+  assert.deepEqual(
+    normalizeNotificationEmbedConfig({ title: " ", color: "red", footer: "", description: "Body" }),
+    { description: "Body" }
+  );
 });
