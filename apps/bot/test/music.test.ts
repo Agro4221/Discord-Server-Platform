@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicPitch, normalizeMusicSpeed, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, chunkMusicFilterActions, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicPitch, normalizeMusicSpeed, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd, toggleMusicDistortion } from "../src/modules/music.js";
@@ -186,6 +186,29 @@ test("music quick filter actions allow only known presets", async () => {
   }
 });
 
+
+test("Music filter palette keeps every Discord action row at five buttons or fewer", () => {
+  const chunks = chunkMusicFilterActions([
+    "clear",
+    "bassboost-low",
+    "bassboost-medium",
+    "bassboost-high",
+    "rock",
+    "classic",
+    "pop",
+    "electronic",
+    "fullsound",
+    "karaoke",
+    "tremolo",
+    "vibrato",
+    "distortion",
+    "gaming",
+    "nightcore",
+    "8d"
+  ]);
+  assert.deepEqual(chunks.map((chunk) => chunk.length), [5, 5, 5, 1]);
+  assert.equal(chunks.every((chunk) => chunk.length <= 5), true);
+});
 
 test("Music distortion toggle produces a Lavalink-compatible distortion payload", () => {
   const enabled = toggleMusicDistortion(undefined);
