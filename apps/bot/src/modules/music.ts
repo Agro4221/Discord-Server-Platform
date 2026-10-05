@@ -211,10 +211,28 @@ export function normalizeMusicRequestApprovalMode(value: string): MusicRequestAp
 
 const MUSIC_FILTER_ACTIONS = [
   "clear", "bassboost-low", "bassboost-medium", "bassboost-high",
-  "rock", "classic", "pop", "electronic", "fullsound", "karaoke", "tremolo", "vibrato", "distortion", "lowpass", "gaming", "nightcore", "8d"
+  "rock", "classic", "pop", "electronic", "fullsound", "karaoke", "tremolo", "vibrato", "distortion", "lowpass", "channelmix", "gaming", "nightcore", "8d"
 ] as const;
 
 type MusicFilterAction = (typeof MUSIC_FILTER_ACTIONS)[number];
+
+type MusicChannelMixData = {
+  leftToLeft?: number;
+  leftToRight?: number;
+  rightToLeft?: number;
+  rightToRight?: number;
+};
+
+export function nextMusicChannelMixOutput(
+  current: MusicChannelMixData | null | undefined
+): "mono" | "stereo" {
+  const isMono =
+    current?.leftToLeft === 0.5 &&
+    current?.leftToRight === 0.5 &&
+    current?.rightToLeft === 0.5 &&
+    current?.rightToRight === 0.5;
+  return isMono ? "stereo" : "mono";
+}
 
 type MusicDistortionSettings = {
   sinOffset?: number;
@@ -1335,6 +1353,11 @@ export class Music implements PlatformModule {
       case "lowpass":
         await player.filterManager.toggleLowPass();
         break;
+      case "channelmix":
+        await player.filterManager.setAudioOutput(
+          nextMusicChannelMixOutput(player.filterManager.data?.channelMix)
+        );
+        break;
       case "gaming":
         await player.filterManager.setEQPreset("Gaming");
         break;
@@ -1363,6 +1386,7 @@ export class Music implements PlatformModule {
       vibrato: "Vibrato",
       distortion: "Distortion",
       lowpass: "Low Pass",
+      channelmix: "Channel Mix",
       gaming: "Gaming",
       nightcore: "Nightcore",
       "8d": "8D"

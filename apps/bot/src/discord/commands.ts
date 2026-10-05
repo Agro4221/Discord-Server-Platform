@@ -1006,6 +1006,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
               { name: "Vibrato", value: "vibrato" },
               { name: "Distortion", value: "distortion" },
               { name: "Low pass", value: "lowpass" },
+              { name: "Channel mix", value: "channelmix" },
               { name: "Gaming", value: "gaming" },
               { name: "Nightcore", value: "nightcore" },
               { name: "8D rotation", value: "8d" }

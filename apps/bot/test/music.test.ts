@@ -176,6 +176,7 @@ test("music quick filter actions allow only known presets", async () => {
     "vibrato",
     "distortion",
     "lowpass",
+    "channelmix",
     "gaming",
     "nightcore",
     "8d"
@@ -208,7 +209,7 @@ test("Music filter palette keeps every Discord action row at five buttons or few
     "nightcore",
     "8d"
   ]);
-  assert.deepEqual(chunks.map((chunk) => chunk.length), [5, 5, 5, 2]);
+  assert.deepEqual(chunks.map((chunk) => chunk.length), [5, 5, 5, 3]);
   assert.equal(chunks.every((chunk) => chunk.length <= 5), true);
 });
 
