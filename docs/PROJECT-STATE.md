@@ -427,3 +427,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - CI #2012 is green.
 - Vote Skip is complete and CI-verified.
 - Next high-value slice: Per-user request cooldown.
+
+
+## 2026-10-05 — Request cooldown verified
+- Source checkpoint: 04cb2828e9b112ec1212c09972582992b1dd9d4f.
+- CI #2020 is green.
+- Per-user request cooldown is complete and CI-verified.
+- Next high-value slice: Per-user queued-track limit.
