@@ -1203,3 +1203,15 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Spotify playback remains a release-gate validation item.
 - Source checkpoint: fec5532f3b6679f439f610947c76318b1beed97e.
 
+## 2026-10-05 — CI Dashboard build repair
+- CI #2369 on source checkpoint `cd47b8fa37f7dbde2b386e9fe476cd716bde5ba5` passed dependency install/audit, source/deployment/observability checks, bot typecheck, all 196 bot tests, domain build and bot build.
+- Dashboard production build alone failed because the base-branch TikTok OAuth route `apps/dashboard/app/api/guilds/[guildId]/tiktok/oauth/start/route.ts` imported `lib/auth` with one directory too few in the relative path.
+- The route was added to `feature/music-v2` with the corrected `../../../../../../../lib/auth` import. No authentication behavior was changed; the existing local Control Center/no-login contract remains intact.
+- Source checkpoint after the repair: `45d0877a5e1353ef06ff1e891e480b7b29d70b2c`.
+
+## 2026-10-05 — Dashboard local-import hardening
+- Added `scripts/check-dashboard-imports.mjs`, which recursively checks Dashboard source files for unresolved relative imports and understands extensionless imports plus TypeScript/JavaScript extension mapping.
+- CI now runs this contract before the build, so a missing local Dashboard module is caught earlier and reported with file/line/specifier context.
+- Hardened the scanner to support multiline imports and to require actual files rather than accepting directories as resolved modules.
+- Source checkpoint: `35442a31c3161421576b96e89ebe3fd1b2d73e08`.
+- The new source commits are not yet covered by a fresh Actions run in the current connector session; the last available run remains #2369 on the pre-hardening checkpoint.
