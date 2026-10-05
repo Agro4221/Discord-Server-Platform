@@ -29,6 +29,7 @@ export class Analytics implements PlatformModule {
     totals: Record<string, number>;
     points: Array<{ bucketStart: string; eventType: string; count: number }>;
   }> {
+    await this.flush();
     const boundedHours = Math.min(Math.max(Math.trunc(hours), 1), 168);
     const result = await this.db.query<{
       event_type: string;
