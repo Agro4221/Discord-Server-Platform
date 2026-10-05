@@ -872,4 +872,15 @@ Never write credentials, tokens or private user data here.
 - Added schema-level test coverage for the Dashboard Music Autoplay / Radio profile.
 - CI #2179 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
 - Final source checkpoint for this slice: a291fc5159c41601c80cd140019578a1b4461c50.
-- Next single Music slice: **Emoji controller / player message controls**.
+- Next single Music slice: **Karaoke audio effect**.
+
+
+## 2026-10-05 — Music Karaoke audio effect
+- Completed the Karaoke audio effect on top of the existing Lavalink filter subsystem.
+- Added `karaoke` to the Music filter command and quick-filter palette.
+- Karaoke toggles through the existing filter manager and therefore follows the same controller resync, persistence and Lavalink error handling as the other effects.
+- Added unit coverage confirming Karaoke is accepted as a valid quick-filter action.
+- Current Lavalink documentation exposes Karaoke as a native filter with vocal-reduction parameters; the implementation uses the client filter manager rather than inventing a custom DSP path. citeturn910755search0turn905425search0
+- CI #2184 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: 3560b4fdbcdabe787c8fd74068e3ddac76537121.
+- Next single Music slice: **Pitch control**.
