@@ -525,3 +525,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Deployment contract requires the preservation condition.
 - Source checkpoint: `3b2f0de1bd925a87059cc8bd740a076dec084083`.
 - Automated CI remains unavailable for the current branch head; live reinstall validation is still required.
+
+## 2026-10-05 — Management API secret validation
+- `loadConfig()` now requires a non-blank `MANAGEMENT_API_KEY` rather than merely a present environment variable.
+- Regression tests cover empty and whitespace-only values.
+- Source checkpoint: `333ce7ca164fa0e0dd7c0ba776bc5315c0217924`.
+- CI verification remains pending/unavailable.
