@@ -1143,9 +1143,8 @@ export class Music implements PlatformModule {
   private async failoverPlayersFromNode(failedNodeId: string): Promise<void> {
     if (!this.manager || !this.initialized) return;
 
-    const available = this.manager.nodeManager.leastUsedNodes("playingPlayers")
-      .filter((node) => node.id !== failedNodeId && node.connected && Boolean(node.sessionId));
-    if (!canFailoverMusicNode(failedNodeId, available.map((node) => node.id))) {
+    const candidates = this.manager.nodeManager.leastUsedNodes("playingPlayers");
+    if (!selectMusicFailoverNodeId(failedNodeId, candidates)) {
       logger.warn("Music node failover unavailable", {
         identity: this.config.botIdentityId,
         failedNode: failedNodeId
@@ -1164,18 +1163,19 @@ export class Music implements PlatformModule {
         const current = this.manager?.players.get(player.guildId);
         if (!current || current.node.id !== failedNodeId) continue;
 
-        const target = this.manager?.nodeManager
-          .leastUsedNodes("playingPlayers")
-          .find((node) => node.id !== failedNodeId && node.connected && Boolean(node.sessionId));
-        if (!target) continue;
+        const targetId = selectMusicFailoverNodeId(
+          failedNodeId,
+          this.manager.nodeManager.leastUsedNodes("playingPlayers")
+        );
+        if (!targetId) continue;
 
-        await current.moveNode(target.id);
+        await current.moveNode(targetId);
         await this.persistPlayer(current);
         logger.warn("Music player failed over to another Lavalink node", {
           identity: this.config.botIdentityId,
           guildId: current.guildId,
           fromNode: failedNodeId,
-          toNode: current.node.id
+          toNode: targetId
         });
       } catch (error) {
         logger.warn("Music player failover failed", {
@@ -5480,11 +5480,34 @@ export function shouldAutoplayAfterQueueEnd(
   return autoplayEnabled && repeatMode === "off" && queuedTrackCount === 0;
 }
 
+export type MusicFailoverNodeLike = {
+  id: string;
+  connected?: boolean;
+  sessionId?: string | null;
+};
+
+export function selectMusicFailoverNodeId(
+  failedNodeId: string,
+  candidates: readonly MusicFailoverNodeLike[]
+): string | null {
+  for (const candidate of candidates) {
+    const id = candidate.id.trim();
+    if (!id || id === failedNodeId) continue;
+    if (candidate.connected !== true) continue;
+    if (!candidate.sessionId?.trim()) continue;
+    return id;
+  }
+  return null;
+}
+
 export function canFailoverMusicNode(
   failedNodeId: string,
   connectedNodeIds: readonly string[]
 ): boolean {
-  return connectedNodeIds.some((nodeId) => nodeId !== failedNodeId);
+  return selectMusicFailoverNodeId(
+    failedNodeId,
+    connectedNodeIds.map((id) => ({ id, connected: true, sessionId: id }))
+  ) !== null;
 }
 
 export function musicNodeHealth(connectedNodeCount: number): "ready" | "degraded" {
