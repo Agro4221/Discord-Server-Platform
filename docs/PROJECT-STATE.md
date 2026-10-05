@@ -581,3 +581,5 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - /health is now the control-plane liveness endpoint: it becomes 200 after the database is ready even if Discord credentials are absent and overall status is degraded.
 - /ready remains the strict readiness endpoint for a fully operational bot.
 - This removes the Docker first-run deadlock that could prevent Dashboard startup before Bot Fleet registration.
+## 2026-10-05 — Health contract guard
+- Deployment validation explicitly protects the split between /health control-plane liveness and /ready full bot readiness.
