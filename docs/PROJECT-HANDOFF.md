@@ -665,3 +665,8 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Source hygiene was found to have a regex false-negative; keep the repaired patterns intact.
 - The scanner now covers the existing token/private-key forms plus github_pat and AWS access-key IDs.
 - Do not treat source hygiene as fully release-verified until CI runs against the current branch head.
+
+## 2026-10-05 — Runtime secret validation follow-up
+- Keep critical startup configuration strict: DATABASE_URL and Lavalink passwords must contain non-whitespace content.
+- Custom Lavalink node passwords must also be non-blank.
+- Do not loosen these checks back to truthiness-only validation.
