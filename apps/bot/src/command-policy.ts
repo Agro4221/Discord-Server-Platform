@@ -99,6 +99,9 @@ export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
   { name: "seek", label: "Seek", module: "music", prefix: true, slash: true },
   { name: "volume", label: "Volume", module: "music", prefix: true, slash: true },
   { name: "autoplay", label: "Autoplay", module: "music", prefix: true, slash: true },
+  { name: "queue-add", label: "Music queue — add", module: "music", prefix: false, slash: false },
+  { name: "queue-remove", label: "Music queue — remove", module: "music", prefix: false, slash: false },
+  { name: "queue-move", label: "Music queue — move", module: "music", prefix: false, slash: false },
   { name: "balance", label: "Balance", module: "economy", prefix: true, slash: false },
   { name: "daily", label: "Daily", module: "economy", prefix: true, slash: false },
   { name: "leaderboard", label: "Economy leaderboard", module: "economy", prefix: true, slash: false },
@@ -256,6 +259,14 @@ export class CommandPolicyService {
     }
 
     return this.acquireCooldown(policy, interaction.guildId!, interaction.user.id);
+  }
+
+  async hasStoredPolicy(guildId: string, commandName: string): Promise<boolean> {
+    const result = await this.db.query(
+      "SELECT 1 FROM command_policies WHERE guild_id=$1 AND command_name=$2 LIMIT 1",
+      [guildId, commandName]
+    );
+    return result.rows.length > 0;
   }
 
   async checkMemberAction(
