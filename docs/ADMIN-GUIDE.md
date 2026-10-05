@@ -375,4 +375,4 @@ Dashboard является основным способом редактиро�
 
 После регистрации зашифрованный credential в PostgreSQL является источником истины при запуске выбранной identity. Значения Discord credentials из .env используются только как bootstrap, когда для этой identity ещё нет сохранённого credential. Поэтому старый токен в .env больше не перезаписывает токен, который был обновлён через Control Center.
 
-Важно: текущая архитектура запускает один Node-процесс на одну BOT_IDENTITY_ID. Регистрация дополнительной identity не создаёт отдельный процесс автоматически; запуск нескольких Discord clients из одного локального Control Center — следующий модуль Fleet orchestration.
+Важно: каждая BOT_IDENTITY_ID работает в отдельном Node-процессе. Регистрация secondary identity выполняется через Control Center, а локальный Fleet supervisor автоматически запускает/перезапускает включённые, credentialed identities. Само сохранение identity не выполняет синхронный запуск процесса внутри Dashboard request.
