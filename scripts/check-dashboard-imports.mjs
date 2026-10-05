@@ -5,10 +5,9 @@ const root = resolve("apps/dashboard");
 const ignored = new Set(["node_modules", ".next", "dist", "build"]);
 const sourceExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 
-async function exists(path) {
+async function isFile(path) {
   try {
-    await stat(path);
-    return true;
+    return (await stat(path)).isFile();
   } catch {
     return false;
   }
@@ -43,12 +42,12 @@ async function resolveLocalImport(file, specifier) {
   }
 
   for (const candidate of candidates) {
-    if (await exists(candidate)) return candidate;
+    if (await isFile(candidate)) return candidate;
   }
 
   for (const extensionCandidate of [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]) {
     const candidate = join(base, "index" + extensionCandidate);
-    if (await exists(candidate)) return candidate;
+    if (await isFile(candidate)) return candidate;
   }
 
   return null;
