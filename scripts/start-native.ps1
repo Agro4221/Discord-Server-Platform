@@ -142,9 +142,22 @@ function Wait-Tcp([string]$HostName, [int]$Port, [int]$Attempts, [int]$DelaySeco
   return $false
 }
 
-function Ensure-Node {
+function Find-Node {
   $node = Get-Command "node.exe" -ErrorAction SilentlyContinue
-  $versionText = if ($node) { (& node.exe --version).Trim().TrimStart("v") } else { "0.0.0" }
+  if ($node) { return $node.Source }
+  $candidates = @(
+    "C:\Program Files\nodejs\node.exe",
+    (Join-Path $env:LOCALAPPDATA "Programs\nodejs\node.exe")
+  )
+  foreach ($candidate in $candidates) {
+    if (Test-Path $candidate) { return (Resolve-Path $candidate).Path }
+  }
+  return $null
+}
+
+function Ensure-Node {
+  $nodePath = Find-Node
+  $versionText = if ($nodePath) { (& $nodePath --version).Trim().TrimStart("v") } else { "0.0.0" }
   $parts = $versionText.Split(".")
   $major = 0
   $minor = 0
@@ -158,8 +171,8 @@ function Ensure-Node {
     Write-Host "Node.js 24.21.0+ is missing. Installing the required Node.js LTS version..."
     & $winget install --id OpenJS.NodeJS.LTS --exact --version 24.21.0 --silent --accept-package-agreements --accept-source-agreements
     if ($LASTEXITCODE -ne 0) { throw "Automatic Node.js 24.21.0 installation failed." }
-    $node = Get-Command "node.exe" -ErrorAction SilentlyContinue
-    $versionText = if ($node) { (& node.exe --version).Trim().TrimStart("v") } else { "" }
+    $nodePath = Find-Node
+    $versionText = if ($nodePath) { (& $nodePath --version).Trim().TrimStart("v") } else { "" }
     $parts = $versionText.Split(".")
     if ($parts.Count -ge 2) {
       $major = [int]$parts[0]
@@ -167,7 +180,11 @@ function Ensure-Node {
     }
   }
   if ($major -lt 24 -or ($major -eq 24 -and $minor -lt 17)) {
-    throw "Native mode requires Node.js 24.17+. Detected $versionText. Open a new terminal after automatic installation and retry."
+    throw "Native mode requires Node.js 24.17+. Detected $versionText."
+  }
+  $nodeDir = Split-Path $nodePath -Parent
+  if (-not (($env:Path -split ";" | Where-Object { $_ -eq $nodeDir }).Count)) {
+    $env:Path = "$nodeDir;$env:Path"
   }
   Write-Host "Node.js: $versionText"
 }
