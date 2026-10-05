@@ -1,3 +1,14 @@
+
+
+## 2026-10-06 — Native first-run bootstrap correction
+
+- Fixed `scripts/start-native.ps1` so native mode automatically discovers the bundled PostgreSQL runtime under `tools\\pgsql\\bin`, starts the local `.postgres-data` cluster when stopped, initializes a missing cluster as UTF-8, and creates `discord_platform` when absent.
+- Added automatic download of PostgreSQL 18.6 portable binaries when the bundled runtime is missing.
+- Added automatic Lavalink 4.2.2 JAR bootstrap when `infrastructure/lavalink/lavalink.jar` is missing.
+- Added automatic Java 21 / Node.js 24.21.0 bootstrap through WinGet when the required runtime is missing.
+- Removed native launcher prompts for manually supplying a PostgreSQL connection string or Lavalink JAR path during normal first-run bootstrap.
+- Updated `docs/NATIVE-SETUP.md` to describe the one-command native bootstrap contract.
+
 # Engineering Work Log
 
 This file is the persistent continuity record for development across chats.
