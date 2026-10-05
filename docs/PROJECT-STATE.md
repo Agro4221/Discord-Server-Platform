@@ -562,3 +562,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - docker-compose.yml now fails configuration resolution when POSTGRES_PASSWORD or LAVALINK_PASSWORD is absent instead of silently using change-me defaults.
 - CI and check-deployment-contract provide ephemeral validation values only for config parsing.
 - Regression guard prevents the insecure defaults from returning.
+
+## 2026-10-05 — Source hygiene gate repair
+- Repaired the source secret scanner regexes so its existing token/private-key checks actually match.
+- Added github_pat and AWS access-key patterns; validated positive and negative fixtures outside the repository.
+- Source checkpoint: 498cf355d3933fa8af12e286d46e070c9837fa6f.
