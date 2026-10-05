@@ -258,6 +258,23 @@ export class CommandPolicyService {
     return this.acquireCooldown(policy, interaction.guildId!, interaction.user.id);
   }
 
+  async checkMemberAction(
+    guildId: string,
+    commandName: string,
+    member: import("discord.js").GuildMember,
+    channelId: string
+  ): Promise<boolean> {
+    const policy = await this.get(guildId, commandName);
+    if (!policy.enabled) return false;
+
+    const definition = COMMAND_DEFINITIONS.find((item) => item.name === commandName);
+    if (definition?.requiredPermission && !member.permissions.has(definition.requiredPermission)) {
+      return false;
+    }
+
+    return passesScope(policy, member.roles.cache.map((role) => role.id), channelId);
+  }
+
   async checkMessage(message: Message, commandName: string): Promise<boolean> {
     if (!message.guild || message.author.bot) return false;
     const policy = await this.get(message.guild.id, commandName);
