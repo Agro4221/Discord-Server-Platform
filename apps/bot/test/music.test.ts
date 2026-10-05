@@ -226,10 +226,13 @@ test("music playlist names normalize whitespace and reject blanks", async () => 
 });
 
 
-test("favorite and playlist play shortcuts expose bounded positions", () => {
-  assert.equal(1 <= 25, true);
-  assert.equal(25 <= 25, true);
-  assert.equal(26 <= 25, false);
+test("favorite play shortcut validates 1-based positions within the visible 25 favorites", () => {
+  assert.equal(isValidMusicSavedPosition(1, 25), true);
+  assert.equal(isValidMusicSavedPosition(25, 25), true);
+  assert.equal(isValidMusicSavedPosition(26, 25), false);
+  assert.equal(isValidMusicSavedPosition(0, 25), false);
+  assert.equal(isValidMusicSavedPosition(1.5, 25), false);
+  assert.equal(isValidMusicSavedPosition(3, 2), false);
 });
 
 test("music playlist shuffle returns a copy without mutating source", async () => {
