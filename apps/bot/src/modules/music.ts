@@ -1510,10 +1510,10 @@ export class Music implements PlatformModule {
   }): Promise<string> {
     const expiresAt = new Date(Date.now() + MUSIC_REQUEST_APPROVAL_TTL_MS).toISOString();
     const inserted = await this.db.query<{ id: string }>(
-      \`INSERT INTO music_request_approvals(
+      `INSERT INTO music_request_approvals(
         guild_id,requester_user_id,requester_voice_channel_id,source_channel_id,query,track,expires_at
       ) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7)
-      RETURNING id\`,
+      RETURNING id`,
       [
         input.guildId,
         input.requesterUserId,
@@ -1550,9 +1550,9 @@ export class Music implements PlatformModule {
       });
 
       await this.db.query(
-        \`UPDATE music_request_approvals
+        `UPDATE music_request_approvals
             SET approval_message_channel_id=$1,approval_message_id=$2
-          WHERE id=$3\`,
+          WHERE id=$3`,
         [approvalChannelId, sent.id, id]
       );
     } catch (error) {
@@ -1648,10 +1648,10 @@ export class Music implements PlatformModule {
       track: unknown;
       expires_at: string;
     }>(
-      \`UPDATE music_request_approvals
+      `UPDATE music_request_approvals
           SET status='processing'
         WHERE id=$1 AND status='pending' AND expires_at > now()
-      RETURNING id,guild_id,requester_user_id,requester_voice_channel_id,source_channel_id,query,track,expires_at\`,
+      RETURNING id,guild_id,requester_user_id,requester_voice_channel_id,source_channel_id,query,track,expires_at`,
       [requestId]
     );
     const request = claim.rows[0];
@@ -1695,9 +1695,9 @@ export class Music implements PlatformModule {
 
     if (action === "reject") {
       await this.db.query(
-        \`UPDATE music_request_approvals
+        `UPDATE music_request_approvals
             SET status='rejected',resolved_by=$1,resolved_at=now()
-          WHERE id=$2\`,
+          WHERE id=$2`,
         [interaction.user.id, requestId]
       );
       try {
@@ -1733,9 +1733,9 @@ export class Music implements PlatformModule {
       }
 
       await this.db.query(
-        \`UPDATE music_request_approvals
+        `UPDATE music_request_approvals
             SET status='approved',resolved_by=$1,resolved_at=now(),result_title=$2
-          WHERE id=$3\`,
+          WHERE id=$3`,
         [interaction.user.id, queued.firstTitle, requestId]
       );
 
