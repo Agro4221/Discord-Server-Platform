@@ -41,7 +41,9 @@ git pull --ff-only origin "${BRANCH}"
 
 [[ -f .env ]] || cp .env.example .env
 mkdir -p infrastructure/caddy
-cp infrastructure/caddy/Caddyfile.example infrastructure/caddy/Caddyfile
+if [[ ! -f infrastructure/caddy/Caddyfile ]]; then
+  cp infrastructure/caddy/Caddyfile.example infrastructure/caddy/Caddyfile
+fi
 
 read -r -p "Dashboard domain (DNS A/AAAA must point to this VPS): " DOMAIN
 if [[ ! "${DOMAIN}" =~ ^[A-Za-z0-9.-]+$ || "${DOMAIN}" != *.* ]]; then
