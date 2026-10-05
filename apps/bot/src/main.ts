@@ -486,7 +486,7 @@ async function main(): Promise<void> {
         error: String(error)
       }));
     })();
-  }, 15_000);
+  }, 30_000);
   fleetTimer.unref();
 
   events.on("interaction.command", (interaction) => {
