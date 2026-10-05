@@ -177,12 +177,12 @@ export class ManagementApiServer {
           const isFleetRegistration = requestPath === "/api/fleet/register";
           const requestRateLimit = isFleetRegistration ? 10 : 120;
           const rateKey = isFleetRegistration ? ip + ":fleet-register" : ip;
-          if (!this.allowedRate(rateKey, requestRateLimit)) {
+          if (!managementApiRateAllows(this.rateWindows, rateKey, requestRateLimit)) {
             this.json(res, 429, { error: "rate_limited" });
             return;
           }
 
-          if (!this.authorized(req.headers.authorization)) {
+          if (!isManagementApiAuthorized(req.headers.authorization, this.options.apiKey)) {
             this.json(res, 401, { error: "unauthorized" });
             return;
           }
@@ -2288,26 +2288,6 @@ export class ManagementApiServer {
     });
   }
 
-  private authorized(header: string | undefined): boolean {
-    if (!header?.startsWith("Bearer ")) return false;
-    const received = Buffer.from(header.slice("Bearer ".length));
-    const expected = Buffer.from(this.options.apiKey);
-    return received.length === expected.length && timingSafeEqual(received, expected);
-  }
-
-  private allowedRate(key: string, limit = 120): boolean {
-    const now = Date.now();
-    const window = this.rateWindows.get(key);
-
-    if (!window || now - window.startedAt >= 60_000) {
-      this.rateWindows.set(key, { startedAt: now, count: 1 });
-      return true;
-    }
-
-    window.count += 1;
-    return window.count <= limit;
-  }
-
   private json(res: ServerResponse, status: number, body: unknown): void {
     res.writeHead(status, {
       "content-type": "application/json; charset=utf-8",
@@ -2325,6 +2305,28 @@ class RequestInputError extends Error {
   ) {
     super(code);
   }
+}
+
+export function isManagementApiAuthorized(header: string | undefined, apiKey: string): boolean {
+  if (!header?.startsWith("Bearer ")) return false;
+  const received = Buffer.from(header.slice("Bearer ".length));
+  const expected = Buffer.from(apiKey);
+  return received.length === expected.length && timingSafeEqual(received, expected);
+}
+
+export function managementApiRateAllows(
+  windows: Map<string, RateWindow>,
+  key: string,
+  limit = 120,
+  now = Date.now()
+): boolean {
+  const window = windows.get(key);
+  if (!window || now - window.startedAt >= 60_000) {
+    windows.set(key, { startedAt: now, count: 1 });
+    return true;
+  }
+  window.count += 1;
+  return window.count <= limit;
 }
 
 export function validateAutomationPayload(
