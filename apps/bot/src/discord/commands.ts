@@ -875,7 +875,6 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .setDescription("Search tracks and choose a result")
           .addStringOption((o) => o.setName("query").setDescription("Search query").setMaxLength(2000).setRequired(true))
       )
-      .addSubcommand((sub) => sub.setName("pause").setDescription("Pause playback"))
       .addSubcommand((sub) => sub.setName("resume").setDescription("Resume playback"))
       .addSubcommand((sub) => sub.setName("previous").setDescription("Play previous track"))
       .addSubcommand((sub) => sub.setName("lyrics").setDescription("Show lyrics for the current track"))
