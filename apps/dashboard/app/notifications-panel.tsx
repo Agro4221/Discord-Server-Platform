@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 type Resource = { id: string; name: string };
 type SocialProvider = "reddit" | "youtube" | "mastodon";
+type EmbedConfig = { title: string; description: string; url: string; color: string; footer: string; image: string; thumbnail: string };
 type Feed = {
   id: number;
   channelId: string;
@@ -14,6 +15,7 @@ type Feed = {
   messageTemplate: string;
   includeKeywords: string[];
   excludeKeywords: string[];
+  embedConfig: Partial<EmbedConfig> | null;
 };
 
 export function NotificationsPanel({
@@ -34,10 +36,20 @@ export function NotificationsPanel({
   const [messageTemplate, setMessageTemplate] = useState("📡 **Новая запись из feed**\\n**{title}**\\n{url}");
   const [includeKeywords, setIncludeKeywords] = useState("");
   const [excludeKeywords, setExcludeKeywords] = useState("");
+  const [embedTitle, setEmbedTitle] = useState("");
+  const [embedDescription, setEmbedDescription] = useState("");
+  const [embedUrl, setEmbedUrl] = useState("");
+  const [embedColor, setEmbedColor] = useState("#5865F2");
+  const [embedFooter, setEmbedFooter] = useState("");
+  const [embedImage, setEmbedImage] = useState("");
+  const [embedThumbnail, setEmbedThumbnail] = useState("");
   const [editingFeedId, setEditingFeedId] = useState<number | null>(null);
   const [editingTemplate, setEditingTemplate] = useState("");
   const [editingInclude, setEditingInclude] = useState("");
   const [editingExclude, setEditingExclude] = useState("");
+  const [editingEmbed, setEditingEmbed] = useState<EmbedConfig>({
+    title: "", description: "", url: "", color: "#5865F2", footer: "", image: "", thumbnail: ""
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -70,7 +82,11 @@ export function NotificationsPanel({
           intervalSeconds: interval,
           messageTemplate,
           includeKeywords: includeKeywords.split(",").map((value) => value.trim()).filter(Boolean),
-          excludeKeywords: excludeKeywords.split(",").map((value) => value.trim()).filter(Boolean)
+          excludeKeywords: excludeKeywords.split(",").map((value) => value.trim()).filter(Boolean),
+          embedConfig: {
+            title: embedTitle, description: embedDescription, url: embedUrl,
+            color: embedColor, footer: embedFooter, image: embedImage, thumbnail: embedThumbnail
+          }
         })
       });
       const body = await response.json().catch(() => ({}));
@@ -103,7 +119,11 @@ export function NotificationsPanel({
           intervalSeconds: interval,
           messageTemplate,
           includeKeywords: includeKeywords.split(",").map((value) => value.trim()).filter(Boolean),
-          excludeKeywords: excludeKeywords.split(",").map((value) => value.trim()).filter(Boolean)
+          excludeKeywords: excludeKeywords.split(",").map((value) => value.trim()).filter(Boolean),
+          embedConfig: {
+            title: embedTitle, description: embedDescription, url: embedUrl,
+            color: embedColor, footer: embedFooter, image: embedImage, thumbnail: embedThumbnail
+          }
         })
       });
       const body = await response.json().catch(() => ({}));
@@ -128,7 +148,8 @@ export function NotificationsPanel({
         body: JSON.stringify({
           messageTemplate: editingTemplate,
           includeKeywords: editingInclude.split(",").map((value) => value.trim()).filter(Boolean),
-          excludeKeywords: editingExclude.split(",").map((value) => value.trim()).filter(Boolean)
+          excludeKeywords: editingExclude.split(",").map((value) => value.trim()).filter(Boolean),
+          embedConfig: editingEmbed
         })
       });
       const body = await response.json().catch(() => ({}));
@@ -230,6 +251,16 @@ export function NotificationsPanel({
           <input value={includeKeywords} onChange={(e) => setIncludeKeywords(e.target.value)} placeholder="Include keywords, через запятую" style={inputStyle} />
           <input value={excludeKeywords} onChange={(e) => setExcludeKeywords(e.target.value)} placeholder="Exclude keywords, через запятую" style={inputStyle} />
         </div>
+        <div style={{ marginTop: 2, fontSize: 11, opacity: 0.45 }}>Optional Embed</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <input value={embedTitle} maxLength={256} onChange={(e) => setEmbedTitle(e.target.value)} placeholder="Embed title" style={inputStyle} />
+          <input value={embedColor} maxLength={7} onChange={(e) => setEmbedColor(e.target.value)} placeholder="#5865F2" style={inputStyle} />
+          <input value={embedUrl} maxLength={2000} onChange={(e) => setEmbedUrl(e.target.value)} placeholder="Embed URL (https://...)" style={inputStyle} />
+          <input value={embedFooter} maxLength={2048} onChange={(e) => setEmbedFooter(e.target.value)} placeholder="Embed footer" style={inputStyle} />
+          <input value={embedImage} maxLength={2000} onChange={(e) => setEmbedImage(e.target.value)} placeholder="Image URL" style={inputStyle} />
+          <input value={embedThumbnail} maxLength={2000} onChange={(e) => setEmbedThumbnail(e.target.value)} placeholder="Thumbnail URL" style={inputStyle} />
+          <textarea value={embedDescription} maxLength={4096} onChange={(e) => setEmbedDescription(e.target.value)} placeholder="Embed description ({title} {url} {timestamp})" rows={4} style={{ ...inputStyle, gridColumn: "1 / -1" }} />
+        </div>
       </div>
 
       {feeds.length === 0 ? (
@@ -251,6 +282,15 @@ export function NotificationsPanel({
                 setEditingTemplate(feed.messageTemplate);
                 setEditingInclude(feed.includeKeywords.join(", "));
                 setEditingExclude(feed.excludeKeywords.join(", "));
+                setEditingEmbed({
+                  title: feed.embedConfig?.title ?? "",
+                  description: feed.embedConfig?.description ?? "",
+                  url: feed.embedConfig?.url ?? "",
+                  color: feed.embedConfig?.color ?? "#5865F2",
+                  footer: feed.embedConfig?.footer ?? "",
+                  image: feed.embedConfig?.image ?? "",
+                  thumbnail: feed.embedConfig?.thumbnail ?? ""
+                });
               }}
               style={buttonStyle("secondary")}
             >
@@ -265,6 +305,16 @@ export function NotificationsPanel({
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
                 <input value={editingInclude} onChange={(e) => setEditingInclude(e.target.value)} placeholder="Include keywords" style={inputStyle} />
                 <input value={editingExclude} onChange={(e) => setEditingExclude(e.target.value)} placeholder="Exclude keywords" style={inputStyle} />
+              </div>
+              <div style={{ fontSize: 10, opacity: 0.45 }}>Optional Embed</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+                <input value={editingEmbed.title} maxLength={256} onChange={(e) => setEditingEmbed({ ...editingEmbed, title: e.target.value })} placeholder="Embed title" style={inputStyle} />
+                <input value={editingEmbed.color} maxLength={7} onChange={(e) => setEditingEmbed({ ...editingEmbed, color: e.target.value })} placeholder="#5865F2" style={inputStyle} />
+                <input value={editingEmbed.url} maxLength={2000} onChange={(e) => setEditingEmbed({ ...editingEmbed, url: e.target.value })} placeholder="Embed URL" style={inputStyle} />
+                <input value={editingEmbed.footer} maxLength={2048} onChange={(e) => setEditingEmbed({ ...editingEmbed, footer: e.target.value })} placeholder="Embed footer" style={inputStyle} />
+                <input value={editingEmbed.image} maxLength={2000} onChange={(e) => setEditingEmbed({ ...editingEmbed, image: e.target.value })} placeholder="Image URL" style={inputStyle} />
+                <input value={editingEmbed.thumbnail} maxLength={2000} onChange={(e) => setEditingEmbed({ ...editingEmbed, thumbnail: e.target.value })} placeholder="Thumbnail URL" style={inputStyle} />
+                <textarea value={editingEmbed.description} maxLength={4096} onChange={(e) => setEditingEmbed({ ...editingEmbed, description: e.target.value })} placeholder="Embed description" rows={4} style={{ ...inputStyle, gridColumn: "1 / -1" }} />
               </div>
               <button type="button" disabled={busy} onClick={() => void saveFeedSettings(feed)} style={buttonStyle("primary")}>Сохранить настройки</button>
             </div>
