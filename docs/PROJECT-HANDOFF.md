@@ -616,3 +616,9 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Invalid/missing domain configuration fails early and explicitly.
 - Deployment CI contract preserves this guard.
 - Source checkpoint: `83f7e61bb7b9cfc25902effc011023ff8b5af288`.
+
+### 2026-10-05 — Deployment guard reconciliation
+- Keep VPS-specific domain and Caddy validation conditional on the actual Caddy overlay; do not impose VPS settings on the normal local upgrade path.
+- Deployment contract currently covers migration continuity, Compose validity, VPS runtime smoke probes, installer secret preservation, upgrade secret checks and Caddy configuration checks.
+- Upgrade source checkpoint: `dcd9476f76a01995f532dc69e24185079ec93d42`.
+- The current PR head still reports zero GitHub check-runs in the available connector; do not mark these slices CI-verified.
