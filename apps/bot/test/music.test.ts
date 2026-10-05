@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, chunkMusicFilterActions, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicPitch, normalizeMusicSpeed, normalizeMusicEqBand, normalizeMusicEqGain, MUSIC_EQ_BAND_COUNT, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, chunkMusicFilterActions, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicSearchProvider, resolveMusicSearchRequest, normalizeMusicPitch, normalizeMusicSpeed, normalizeMusicEqBand, normalizeMusicEqGain, MUSIC_EQ_BAND_COUNT, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd, toggleMusicDistortion } from "../src/modules/music.js";
@@ -602,4 +602,27 @@ test("Music speed normalization accepts the supported range and rounds to cents"
   assert.equal(normalizeMusicSpeed(0.49), null);
   assert.equal(normalizeMusicSpeed(2.01), null);
   assert.equal(normalizeMusicSpeed(Number.NaN), null);
+});
+
+
+test("Music provider resolver routes Yandex search to ymsearch and preserves direct URLs", () => {
+  assert.equal(normalizeMusicSearchProvider("youtube"), "youtube");
+  assert.equal(normalizeMusicSearchProvider("yandex"), "yandex");
+  assert.equal(normalizeMusicSearchProvider("spotify"), null);
+
+  assert.deepEqual(resolveMusicSearchRequest("animals", "yandex"), {
+    query: "animals",
+    source: "ymsearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("ymsearch:animals architects"), {
+    query: "animals architects",
+    source: "ymsearch"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("https://music.yandex.ru/track/71663565", "yandex"), {
+    query: "https://music.yandex.ru/track/71663565"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("animals"), {
+    query: "animals",
+    source: "ytsearch"
+  });
 });
