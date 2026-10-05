@@ -183,7 +183,7 @@ export class IntegrationCredentialRepository {
   }
 }
 
-function normalizeCredentialInput(input: IntegrationCredentialInput): { provider: IntegrationCredentialProvider; label: string; secret: ProviderCredentialSecret } {
+export function normalizeCredentialInput(input: IntegrationCredentialInput): { provider: IntegrationCredentialProvider; label: string; secret: ProviderCredentialSecret } {
   if (!["twitch", "youtube", "kick", "tiktok"].includes(input.provider)) throw new Error("invalid_integration_credential_provider");
   const label = input.label.trim().replace(/\s+/g, " ");
   if (!label || label.length > 80) throw new Error("invalid_integration_credential_label");
