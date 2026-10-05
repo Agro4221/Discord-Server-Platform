@@ -109,7 +109,8 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
         { name: "Apple Music", value: "applemusic" },
         { name: "Deezer", value: "deezer" },
         { name: "VK Music", value: "vkmusic" },
-        { name: "Tidal", value: "tidal" }
+        { name: "Tidal", value: "tidal" },
+        { name: "Qobuz", value: "qobuz" }
       )),
     new SlashCommandBuilder().setName("pause").setDescription("Pause music"),
     new SlashCommandBuilder().setName("resume").setDescription("Resume music"),
@@ -916,7 +917,8 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
              { name: "Apple Music", value: "applemusic" },
              { name: "Deezer", value: "deezer" },
              { name: "VK Music", value: "vkmusic" },
-             { name: "Tidal", value: "tidal" }
+             { name: "Tidal", value: "tidal" },
+             { name: "Qobuz", value: "qobuz" }
            ))
       )
       .addSubcommand((sub) =>
@@ -931,7 +933,8 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
              { name: "Apple Music", value: "applemusic" },
              { name: "Deezer", value: "deezer" },
              { name: "VK Music", value: "vkmusic" },
-             { name: "Tidal", value: "tidal" }
+             { name: "Tidal", value: "tidal" },
+             { name: "Qobuz", value: "qobuz" }
            ))
       )
       .addSubcommand((sub) => sub.setName("resume").setDescription("Resume playback"))
