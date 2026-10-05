@@ -628,3 +628,8 @@ Feature Matrix полностью reconciled: все строки ✅.
 - This complements secret preservation and prevents an installer rerun from silently discarding deliberate Caddy configuration changes.
 - Deployment contract checks the preservation rule.
 - Source checkpoint: `3b2f0de1bd925a87059cc8bd740a076dec084083`.
+
+### 2026-10-05 — Management API secret guard
+- The application still intentionally has no end-user Dashboard login, but its Management API cannot start with an empty or whitespace-only API key.
+- `MANAGEMENT_API_KEY` is validated as non-blank during config loading and is covered by regression tests.
+- Source checkpoint: `333ce7ca164fa0e0dd7c0ba776bc5315c0217924`.
