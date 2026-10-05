@@ -13,9 +13,11 @@ type Condition =
 
 type Action =
   | { type: "send-message"; channelId: string; content: string }
+  | { type: "create-channel"; name: string; channelType: "text" | "voice"; parentId: string | null }
   | { type: "dm-user"; userId: string; content: string }
   | { type: "add-role" | "remove-role"; userId: string; roleId: string }
   | { type: "timeout"; userId: string; durationSeconds: number; reason: string }
+  | { type: "warn"; userId: string; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
   | { type: "add-reaction" | "remove-reaction"; channelId: string; messageId: string; emoji: string }
   | { type: "pin-message" | "unpin-message"; channelId: string; messageId: string }
@@ -196,9 +198,11 @@ export function AutomationPanel({
   function replaceAction(index: number, type: Action["type"]) {
     const next: Action =
       type === "send-message" ? { type, channelId: "", content: "" } :
+      type === "create-channel" ? { type, name: "", channelType: "text", parentId: null } :
       type === "dm-user" ? { type, userId: "@event", content: "" } :
       type === "add-role" || type === "remove-role" ? { type, userId: "@event", roleId: "" } :
       type === "timeout" ? { type, userId: "@event", durationSeconds: 60, reason: "" } :
+      type === "warn" ? { type, userId: "@event", reason: "" } :
       type === "delete-message" ? { type, channelId: "@event", messageId: "@event" } :
       type === "add-reaction" || type === "remove-reaction" ? { type, channelId: "@event", messageId: "@event", emoji: "👍" } :
       type === "pin-message" || type === "unpin-message" ? { type, channelId: "@event", messageId: "@event" } :
@@ -393,6 +397,7 @@ export function AutomationPanel({
           <div key={index} style={{ display: "grid", gridTemplateColumns: "minmax(150px,180px) minmax(0,1fr) auto", gap: 8 }}>
             <select value={action.type} onChange={(e) => replaceAction(index, e.target.value as Action["type"])} style={inputStyle}>
               <option value="send-message">send-message</option>
+              <option value="create-channel">create-channel</option>
               <option value="dm-user">dm-user</option>
               <option value="add-role">add-role</option>
               <option value="remove-role">remove-role</option>
@@ -446,6 +451,13 @@ export function AutomationPanel({
                 <input value={action.userId} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event или user ID" style={inputStyle} />
                 <input type="number" min={1} max={2419200} value={action.durationSeconds} onChange={(e) => updateAction(index, { durationSeconds: Number(e.target.value) })} style={inputStyle} />
                 <input value={action.reason} maxLength={500} onChange={(e) => updateAction(index, { reason: e.target.value })} placeholder="Причина" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "warn" && (
+              <div style={actionGrid}>
+                <input value={action.userId} maxLength={20} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event или User ID" style={inputStyle} />
+                <input value={action.reason} maxLength={500} onChange={(e) => updateAction(index, { reason: e.target.value })} placeholder="Причина предупреждения" style={inputStyle} />
               </div>
             )}
 
