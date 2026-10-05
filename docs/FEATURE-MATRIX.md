@@ -120,7 +120,7 @@
 | VK Video Live alerts | ✅ |
 | Stream alert templates | ✅ |
 | Multiple provider credentials per guild | ✅ | Encrypted per-guild Twitch/YouTube/Kick credentials are selectable per Stream Alert |
-| Reddit / TikTok / Kick adapters | 🟡 |
+| Reddit / TikTok / Kick adapters | 🟡 | Reddit и Kick уже реализованы; для TikTok добавлен официальный Display API client и зашифрованные OAuth credentials, но полноценный creator feed/OAuth UI ещё в работе |
 | GitHub notifications | ✅ | `/feed github` для releases и commits через существующий RSS/Atom worker |
 | Twitch / YouTube / VK stream alerts | ✅ | Dashboard + persistent polling |
 | Kick stream alerts | ✅ | Kick OAuth client-credentials flow, channel lookup, live-state polling and credential routing are implemented and covered by target-normalization tests |
