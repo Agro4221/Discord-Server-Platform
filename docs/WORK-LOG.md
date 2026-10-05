@@ -1223,3 +1223,11 @@ Never write credentials, tokens or private user data here.
 - Added regression coverage for disabled, missing-token, whitespace-token and valid-token cases.
 - Source checkpoint after the fix: `53008d169a1b4a12659656c665e97125f2ca182e`.
 - No fresh GitHub Actions run is currently visible for this checkpoint; do not mark this slice CI-verified yet.
+## 2026-10-05 — Music Lavalink failover hardening
+- Unified failover target selection behind `selectMusicFailoverNodeId()`.
+- A candidate is eligible only when it has a non-empty ID, is connected and has a non-empty Lavalink session ID; the failed node is always excluded.
+- The same selector is now used for the initial availability check and immediately before `moveNode()`, avoiding stale pre-check state/race assumptions.
+- Failover logging now records the actual selected target node ID instead of reading the player node after migration.
+- Added deterministic regression coverage for unavailable, non-resumable and valid failover candidates.
+- Source checkpoint: `3e854a4e158eaa332a625cfba1f375ca837411f7`.
+- Fresh CI for this checkpoint is not yet visible in the current connector session; do not mark this slice CI-verified until Actions confirms it.
