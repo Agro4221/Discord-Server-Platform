@@ -6,6 +6,7 @@ type BotSetup = {
   id?: string;
   enabled: boolean;
   clientId: string;
+  tokenConfigured: boolean;
   username: string | null;
   presenceName: string | null;
   avatarUrl: string | null;
@@ -27,6 +28,7 @@ export function BotSetupPanel() {
   const [setup, setSetup] = useState<BotSetup>({
     enabled: false,
     clientId: "",
+    tokenConfigured: false,
     username: null,
     presenceName: null,
     avatarUrl: null,
@@ -134,8 +136,8 @@ export function BotSetupPanel() {
       setError("Client ID должен быть Discord Application ID.");
       return;
     }
-    if (!token && !setup.clientId) {
-      setError("Добавь Discord bot token.");
+    if (!token && !setup.tokenConfigured) {
+      setError("Для первой регистрации нужен Discord bot token.");
       return;
     }
 
@@ -291,6 +293,7 @@ export function BotSetupPanel() {
           <div>Статус: {loading ? "…" : enabled ? "включён" : "выключен"}</div>
           <div>Username: {setup.username ?? "—"}</div>
           <div>Client ID: {setup.clientId || "—"}</div>
+          <div>Token: {setup.tokenConfigured ? "настроен" : "не настроен"}</div>
           <div>Avatar: {setup.avatarUrl ? "настроен" : "—"}</div>
           <div>Banner: {setup.bannerUrl ? "настроен" : "—"}</div>
         </div>
