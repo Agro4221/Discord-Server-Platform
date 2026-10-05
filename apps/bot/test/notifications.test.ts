@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isPrivateIp } from "../src/modules/notifications.js";
+import { assertSafeFeedUrl, isPrivateIp } from "../src/modules/notifications.js";
 
 test("notification SSRF guard rejects private, special and mapped addresses", () => {
   for (const address of [
@@ -31,4 +31,14 @@ test("notification SSRF guard rejects private, special and mapped addresses", ()
   ]) {
     assert.equal(isPrivateIp(address), false, address);
   }
+});
+
+
+test("notification feed URL policy rejects unsafe URL forms before DNS resolution", async () => {
+  await assert.rejects(() => assertSafeFeedUrl("http://example.com/feed"), /feed_must_use_https/);
+  await assert.rejects(() => assertSafeFeedUrl("https://user:pass@example.com/feed"), /feed_credentials_not_allowed/);
+  await assert.rejects(() => assertSafeFeedUrl("https://localhost/feed"), /private_hostname_not_allowed/);
+  await assert.rejects(() => assertSafeFeedUrl("https://service.internal/feed"), /private_hostname_not_allowed/);
+  await assert.rejects(() => assertSafeFeedUrl("https://127.0.0.1/feed"), /private_ip_not_allowed/);
+  await assert.rejects(() => assertSafeFeedUrl("https://8.8.8.8/feed"), /literal_ip_not_allowed/);
 });
