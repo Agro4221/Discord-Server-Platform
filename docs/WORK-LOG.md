@@ -1012,6 +1012,16 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Qobuz playback remains a release-gate validation item.
 - Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
 
+## 2026-10-05 — Notifications rich feed embeds
+- Added persisted optional embed configuration to notification feeds via migration 98.
+- Feed notifications can now send a normal message template plus a Discord embed with title, description, URL, color, footer, image and thumbnail.
+- Embed fields support the same {title}, {url} and {timestamp} template variables.
+- Management API accepts and normalizes embed configuration for both generic and social feeds.
+- Dashboard Notifications editor exposes the embed fields for creation and existing-feed editing.
+- Empty embed fields stay truly optional; saving an ordinary feed does not create a blank embed.
+- Added regression coverage for embed normalization and rendered Discord embed payloads.
+- Source checkpoints: 2bd5787b8bc9b208bf3645f902050cf4b8009b5f and b39328fe6dcca47ebfd8d9761b2106cfa47d3d43.
+
 ## 2026-10-05 — Notifications Kick alert parity reconciliation
 - Reconciled the stale Kick stream-alert Matrix row against the existing implementation.
 - Kick support includes per-guild credentials, OAuth client-credentials token acquisition with caching, channel lookup and live-state polling.
