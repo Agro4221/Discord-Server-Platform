@@ -612,3 +612,13 @@ Never write credentials, tokens or private user data here.
 - Reconciled Feature Matrix rows that were stale versus the actual Music implementation: search picker, queue remove/range/move/front/clear, skip-to, history, requester display, export/share, compact controls, Loop One, progress and controller refresh.
 - Final source checkpoint: cd08f1b967030663d735da3b8f9d7c41cd5bbd17.
 - Next single Music slice: Filters / FX quick-access button.
+
+
+## 2026-10-05 — Music Filters / FX quick-access
+- Added a dedicated Filters button to the Music controller.
+- Quick palette reuses the existing filter manager: Clear, Bassboost presets, Rock, Classic, Pop, Electronic, Full Sound, Gaming, Nightcore and 8D.
+- Filter actions enforce the same Music control permissions, persist state and refresh the controller.
+- Added a whitelist contract test for filter actions.
+- CI #1990 passed completely.
+- Final source checkpoint: 6952f255a82af69702fe11e2ce11535052776192.
+- Next single Music slice: Save queue button.
