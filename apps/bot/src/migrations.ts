@@ -1452,6 +1452,17 @@ const migrations = [
       "CREATE UNIQUE INDEX IF NOT EXISTS idx_music_playlists_shared_name ON music_playlists(guild_id,name) WHERE visibility='shared';"
     ])
   },
+  {
+    version: 95,
+    name: "music_playlist_continuation",
+    sql: q([
+      "ALTER TABLE music_players ADD COLUMN IF NOT EXISTS playlist_id bigint REFERENCES music_playlists(id) ON DELETE SET NULL;",
+      "ALTER TABLE music_players ADD COLUMN IF NOT EXISTS playlist_next_index integer NOT NULL DEFAULT 0 CHECK(playlist_next_index >= 0);",
+      "ALTER TABLE music_players ADD COLUMN IF NOT EXISTS playlist_order jsonb;",
+      "ALTER TABLE music_players ADD COLUMN IF NOT EXISTS playlist_requester_user_id text;",
+      "CREATE INDEX IF NOT EXISTS idx_music_players_playlist_id ON music_players(playlist_id);"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
