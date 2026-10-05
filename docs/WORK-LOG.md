@@ -1012,6 +1012,15 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Qobuz playback remains a release-gate validation item.
 - Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
 
+## 2026-10-05 — Local Bot Setup / registration panel
+- Reconciled the existing bot registration backend with the local Dashboard.
+- Added a dedicated **Bot Setup** system section to DiscordAdmin.
+- Panel supports Discord Application/Client ID, write-only bot token, enable/disable, username and presence.
+- Saving uses the existing bot management contract, so enabling a changed token reconnects the bot through the current Connection Supervisor path.
+- The saved token is never returned to the Dashboard after load/save; an empty token field means keep current token.
+- Existing Dashboard authentication is already intentionally disabled for this self-hosted local panel; no login layer was reintroduced.
+- The Management API continues to require its server-side API key, and Dashboard mutations use same-origin protection.
+- Source checkpoint: b229c0680f753d5295716a63686bff501a17977b.
 ## 2026-10-05 — TikTok creator feed + OAuth
 - Completed the TikTok notification adapter on top of the official Display API.
 - Added migration 99 for dedicated TikTok creator feed storage and migration 100 for include/exclude filters.
