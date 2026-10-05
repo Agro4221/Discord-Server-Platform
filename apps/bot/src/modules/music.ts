@@ -902,7 +902,7 @@ export class Music implements PlatformModule {
       providers: [
         { name: "YouTube", enabled: true, mode: "direct" },
         { name: "SoundCloud", enabled: true, mode: "direct" },
-        { name: "Spotify", enabled: process.env.LAVASRC_SPOTIFY_ENABLED === "true", mode: "mirror" },
+        { name: "Spotify", enabled: process.env.LAVASRC_SPOTIFY_ENABLED === "true" && Boolean(process.env.SPOTIFY_CLIENT_ID?.trim()) && Boolean(process.env.SPOTIFY_CLIENT_SECRET?.trim()), mode: "mirror" },
         { name: "Apple Music", enabled: process.env.LAVASRC_APPLEMUSIC_ENABLED === "true", mode: "mirror" },
         { name: "Deezer", enabled: process.env.LAVASRC_DEEZER_ENABLED === "true", mode: "direct" },
         { name: "Yandex Music", enabled: process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true", mode: "direct" },
@@ -2290,7 +2290,11 @@ export class Music implements PlatformModule {
         requesterUserId: requester.id,
         requesterVoiceChannelId: voiceChannelId,
         sourceChannelId: textChannelId,
-        query: provider === "yandex" && !/^https?:\/\//i.test(query) ? "ymsearch:" + query : query,
+        query: provider === "yandex" && !/^https?:\/\//i.test(query)
+          ? "ymsearch:" + query
+          : provider === "spotify" && !/^https?:\/\//i.test(query)
+            ? "spsearch:" + query
+            : query,
         track: null,
         source: "query"
       });
