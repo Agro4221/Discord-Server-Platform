@@ -586,3 +586,5 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-05 — Lavalink secret contract
 - infrastructure/lavalink/application.yml no longer contains a predictable password fallback.
 - Lavalink server password must be supplied explicitly through LAVALINK_SERVER_PASSWORD.
+## 2026-10-05 — Config validator regression repaired
+- loadConfig() now consistently uses requiredNonBlank() for MANAGEMENT_API_KEY, DATABASE_URL and LAVALINK_PASSWORD.
