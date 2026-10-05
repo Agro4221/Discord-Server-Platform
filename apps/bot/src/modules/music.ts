@@ -49,17 +49,17 @@ export function normalizeMusicPlaylistVisibility(shared: boolean): MusicPlaylist
   return shared ? "shared" : "personal";
 }
 
-export type MusicSearchProvider = "youtube" | "yandex" | "spotify" | "applemusic" | "deezer";
+export type MusicSearchProvider = "youtube" | "yandex" | "spotify" | "applemusic" | "deezer" | "vkmusic";
 
 export function normalizeMusicSearchProvider(value: string | null | undefined): MusicSearchProvider | null {
-  if (value === "youtube" || value === "yandex" || value === "spotify" || value === "applemusic" || value === "deezer") return value;
+  if (value === "youtube" || value === "yandex" || value === "spotify" || value === "applemusic" || value === "deezer" || value === "vkmusic") return value;
   return null;
 }
 
 export function resolveMusicSearchRequest(
   query: string,
   provider?: MusicSearchProvider | null
-): { query: string; source?: "ytsearch" | "ymsearch" | "spsearch" | "amsearch" | "dzsearch" } {
+): { query: string; source?: "ytsearch" | "ymsearch" | "spsearch" | "amsearch" | "dzsearch" | "vksearch" } {
   const normalized = query.trim();
   if (/^https?:\/\//i.test(normalized)) return { query: normalized };
   if (/^ymsearch:/i.test(normalized)) {
@@ -74,6 +74,9 @@ export function resolveMusicSearchRequest(
   if (/^dzsearch:/i.test(normalized)) {
     return { query: normalized.replace(/^dzsearch:\s*/i, ""), source: "dzsearch" };
   }
+  if (/^vksearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^vksearch:\s*/i, ""), source: "vksearch" };
+  }
   if (/^ytsearch:/i.test(normalized)) {
     return { query: normalized.replace(/^ytsearch:\s*/i, ""), source: "ytsearch" };
   }
@@ -81,6 +84,7 @@ export function resolveMusicSearchRequest(
   if (provider === "spotify") return { query: normalized, source: "spsearch" };
   if (provider === "applemusic") return { query: normalized, source: "amsearch" };
   if (provider === "deezer") return { query: normalized, source: "dzsearch" };
+  if (provider === "vkmusic") return { query: normalized, source: "vksearch" };
   return { query: normalized, source: "ytsearch" };
 }
 
@@ -915,7 +919,7 @@ export class Music implements PlatformModule {
         { name: "Apple Music", enabled: process.env.LAVASRC_APPLEMUSIC_ENABLED === "true", mode: "mirror" },
         { name: "Deezer", enabled: process.env.LAVASRC_DEEZER_ENABLED === "true" && Boolean(process.env.DEEZER_ARL?.trim()) && Boolean(process.env.DEEZER_MASTER_DECRYPTION_KEY?.trim()), mode: "direct" },
         { name: "Yandex Music", enabled: process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true", mode: "direct" },
-        { name: "VK Music", enabled: process.env.LAVASRC_VKMUSIC_ENABLED === "true", mode: "direct" },
+        { name: "VK Music", enabled: process.env.LAVASRC_VKMUSIC_ENABLED === "true" && Boolean(process.env.VK_MUSIC_USER_TOKEN?.trim()), mode: "direct" },
         { name: "Tidal", enabled: process.env.LAVASRC_TIDAL_ENABLED === "true", mode: "mirror" },
         { name: "Qobuz", enabled: process.env.LAVASRC_QOBUZ_ENABLED === "true", mode: "direct" },
         { name: "yt-dlp", enabled: process.env.LAVASRC_YTDLP_ENABLED === "true", mode: "direct" },
