@@ -1395,3 +1395,14 @@ Never write credentials, tokens or private user data here.
 - Native stdout/stderr logs rotate at 10 MiB.
 - Native launcher attempts to start a stopped local PostgreSQL Windows service before asking for a replacement DATABASE_URL.
 - Added docs/RESOURCE-REQUIREMENTS.md with minimum/recommended/comfortable/heavy PC tiers and a measurement procedure.
+## 2026-10-05 — Native Windows launcher/resource control pass
+- Native Windows is now the explicit primary local operating mode for the gaming/streaming PC; Docker is optional.
+- Added root one-click entrypoints: start.bat, control-center.bat, stop.bat and native-status.bat.
+- Fixed native first-run so Discord token/client ID are optional until Control Center → Bot Fleet registration.
+- Fixed native Management API URL to follow MANAGEMENT_API_PORT instead of a hard-coded 3002.
+- Added a native-only Dashboard start script bound to 127.0.0.1; configurable Dashboard port is passed to Next.js.
+- Added default Node.js memory ceilings for bot (768 MiB) and Dashboard (512 MiB), plus Lavalink Java defaults of 128m/512m.
+- Added native log rotation at 10 MiB and automatic attempt to start a stopped local PostgreSQL Windows service.
+- Added docs/RESOURCE-REQUIREMENTS.md and native-status.bat for PC tier planning and real working-set measurement.
+- Native launcher/resource contract is protected by scripts/check-deployment-contract.mjs.
+- Live Windows acceptance remains required; PowerShell/Docker smoke execution was not possible in this environment because external DNS/network access is unavailable.
