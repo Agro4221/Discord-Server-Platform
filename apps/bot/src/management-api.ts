@@ -283,6 +283,16 @@ type ApiOptions = {
 
 type RateWindow = { startedAt: number; count: number };
 
+export function isManagementApiAuthorizationValid(
+  header: string | undefined,
+  apiKey: string
+): boolean {
+  if (!apiKey.trim() || !header?.startsWith("Bearer ")) return false;
+  const received = Buffer.from(header.slice("Bearer ".length));
+  const expected = Buffer.from(apiKey);
+  return received.length === expected.length && timingSafeEqual(received, expected);
+}
+
 export class ManagementApiServer {
   private server?: Server;
   private readonly rateWindows = new Map<string, RateWindow>();
@@ -3907,10 +3917,7 @@ export class ManagementApiServer {
   }
 
   private authorized(header: string | undefined): boolean {
-    if (!header?.startsWith("Bearer ")) return false;
-    const received = Buffer.from(header.slice("Bearer ".length));
-    const expected = Buffer.from(this.options.apiKey);
-    return received.length === expected.length && timingSafeEqual(received, expected);
+    return isManagementApiAuthorizationValid(header, this.options.apiKey);
   }
 
   private allowedRate(key: string): boolean {
