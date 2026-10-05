@@ -143,6 +143,16 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .setDescription("Show or change playback speed")
       .addNumberOption((o) => o.setName("value").setDescription("0.5-2.0, 1.0 = normal").setMinValue(0.5).setMaxValue(2).setRequired(false)),
     new SlashCommandBuilder()
+      .setName("eq")
+      .setDescription("Show or edit the 15-band equalizer")
+      .addStringOption((o) => o.setName("action").setDescription("EQ action").addChoices(
+        { name: "Show", value: "show" },
+        { name: "Set band", value: "set" },
+        { name: "Reset", value: "reset" }
+      ).setRequired(true))
+      .addIntegerOption((o) => o.setName("band").setDescription("EQ band 0-14").setMinValue(0).setMaxValue(14))
+      .addNumberOption((o) => o.setName("gain").setDescription("Gain -0.25 to 1.00").setMinValue(-0.25).setMaxValue(1)),
+    new SlashCommandBuilder()
       .setName("autoplay")
       .setDescription("Show or change autoplay")
       .addBooleanOption((o) => o.setName("enabled").setDescription("Autoplay state")),

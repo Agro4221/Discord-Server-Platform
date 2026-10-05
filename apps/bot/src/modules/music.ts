@@ -961,6 +961,52 @@ export class Music implements PlatformModule {
       const value = Number(input.value);
       if (!Number.isInteger(value) || value < 0 || value > 200) throw new Error("invalid_volume");
       await player.setVolume(value);
+    } else if (action === "eq") {
+      const mode = (args[0] ?? "show").toLowerCase();
+      if (mode === "show") {
+        const lines = Array.from({ length: MUSIC_EQ_BAND_COUNT }, (_, band) => {
+          const gain = Number(player.filterManager.equalizerBands[band]?.gain ?? 0);
+          return "Band " + band + ": **" + gain.toFixed(3) + "**";
+        });
+        await message.reply("🎚️ **Custom EQ**\nДиапазон gain: **-0.25…1.00**\n\n" + lines.join("\n"));
+        return true;
+      }
+      if (!(manageGuild || dj)) {
+        await message.reply("Редактировать EQ могут пользователи с DJ-ролью или Manage Server.");
+        return true;
+      }
+      if (mode === "reset") {
+        try {
+          await player.filterManager.clearEQ();
+          await this.persistPlayer(player);
+          await this.syncController(player);
+          await message.reply("🎚️ Custom EQ сброшен.");
+        } catch (error) {
+          logger.warn("Music prefix custom EQ reset failed", { guildId: message.guild.id, error: String(error) });
+          await message.reply("Не удалось сбросить Custom EQ на текущем Lavalink node.");
+        }
+        return true;
+      }
+      if (mode !== "set") {
+        await message.reply("Использование: !eq show | !eq set <band 0-14> <gain -0.25..1.00> | !eq reset.");
+        return true;
+      }
+      const band = normalizeMusicEqBand(Number(args[1] ?? ""));
+      const gain = normalizeMusicEqGain(Number(args[2] ?? ""));
+      if (band === null || gain === null) {
+        await message.reply("Использование: !eq set <band 0-14> <gain -0.25..1.00>.");
+        return true;
+      }
+      try {
+        await player.filterManager.setEQ([{ band, gain }]);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await message.reply("🎚️ EQ band " + band + ": gain " + gain.toFixed(3) + ".");
+      } catch (error) {
+        logger.warn("Music prefix custom EQ set failed", { guildId: message.guild.id, band, gain, error: String(error) });
+        await message.reply("Не удалось изменить Custom EQ на текущем Lavalink node.");
+      }
+      return true;
     } else if (action === "autoplay") {
       if (typeof input.enabled !== "boolean") throw new Error("invalid_autoplay");
       await this.setAutoplay(guildId, input.enabled);
@@ -1027,7 +1073,7 @@ export class Music implements PlatformModule {
     if (!interaction.inGuild()) return;
     const directAliases = new Set([
       "play", "search", "pause", "resume", "previous", "skip", "vote-skip", "stop", "shuffle",
-      "playlist", "favorite", "filter", "queue-policy", "queue-limit", "queue-size", "queue", "repeat", "seek", "volume", "pitch", "speed", "autoplay", "radio", "247", "providers", "nowplaying", "lyrics"
+      "playlist", "favorite", "filter", "queue-policy", "queue-limit", "queue-size", "queue", "repeat", "seek", "volume", "pitch", "speed", "eq", "autoplay", "radio", "247", "providers", "nowplaying", "lyrics"
     ]);
     if (interaction.commandName !== "music" && !directAliases.has(interaction.commandName)) return;
 
@@ -1131,6 +1177,9 @@ export class Music implements PlatformModule {
         break;
       case "speed":
         await this.speed(interaction);
+        break;
+      case "eq":
+        await this.eq(interaction);
         break;
       case "nowplaying":
         await this.nowPlaying(interaction);
@@ -3472,6 +3521,78 @@ export class Music implements PlatformModule {
     }
   }
 
+  private async eq(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+
+    const action = interaction.options.getString("action", true);
+    if (action === "show") {
+      const lines = Array.from({ length: MUSIC_EQ_BAND_COUNT }, (_, band) => {
+        const gain = Number(player.filterManager.equalizerBands[band]?.gain ?? 0);
+        return `Band ${band}: **${gain.toFixed(3)}**`;
+      });
+      await interaction.reply({
+        content: "🎚️ **Custom EQ**\nДиапазон gain: **-0.25…1.00**\n\n" + lines.join("\n"),
+        ephemeral: true
+      });
+      return;
+    }
+
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Редактировать EQ могут пользователи с DJ-ролью или Manage Server.", ephemeral: true });
+      return;
+    }
+
+    try {
+      if (action === "reset") {
+        await player.filterManager.clearEQ();
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await interaction.reply({ content: "🎚️ Custom EQ сброшен.", ephemeral: true });
+        return;
+      }
+
+      const bandValue = interaction.options.getInteger("band");
+      const gainValue = interaction.options.getNumber("gain");
+      if (bandValue === null || gainValue === null) {
+        await interaction.reply({
+          content: "Для **set** укажи band (0–14) и gain (-0.25…1.00).",
+          ephemeral: true
+        });
+        return;
+      }
+
+      const band = normalizeMusicEqBand(bandValue);
+      const gain = normalizeMusicEqGain(gainValue);
+      if (band === null || gain === null) {
+        await interaction.reply({
+          content: "Band должен быть 0–14, gain — от -0.25 до 1.00.",
+          ephemeral: true
+        });
+        return;
+      }
+
+      await player.filterManager.setEQ([{ band, gain }]);
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await interaction.reply({
+        content: "🎚️ EQ band **" + band + "**: gain **" + gain.toFixed(3) + "**.",
+        ephemeral: true
+      });
+    } catch (error) {
+      logger.warn("Music custom EQ operation failed", {
+        guildId: interaction.guildId!,
+        action,
+        error: String(error)
+      });
+      await interaction.reply({ content: "Не удалось изменить Custom EQ на текущем Lavalink node.", ephemeral: true });
+    }
+  }
+
   private async nowPlaying(interaction: ChatInputCommandInteraction): Promise<void> {
     const player = this.manager?.players.get(interaction.guildId!);
     const track = player?.queue.current;
@@ -3518,7 +3639,7 @@ export class Music implements PlatformModule {
     const action = aliases[commandName] ?? commandName;
     const supported = new Set([
       "play", "pause", "resume", "previous", "skip", "skip-to", "history", "stop", "shuffle",
-      "queue", "nowplaying", "lyrics", "repeat", "seek", "volume", "pitch", "speed", "autoplay"
+      "queue", "nowplaying", "lyrics", "repeat", "seek", "volume", "pitch", "speed", "eq", "autoplay"
     ]);
     if (!supported.has(action)) return false;
 
@@ -4925,6 +5046,18 @@ export function normalizeMusicPitch(value: number): number | null {
 export function normalizeMusicSpeed(value: number): number | null {
   if (!Number.isFinite(value) || value < 0.5 || value > 2) return null;
   return Math.round(value * 100) / 100;
+}
+
+export const MUSIC_EQ_BAND_COUNT = 15;
+
+export function normalizeMusicEqBand(value: number): number | null {
+  if (!Number.isInteger(value) || value < 0 || value >= MUSIC_EQ_BAND_COUNT) return null;
+  return value;
+}
+
+export function normalizeMusicEqGain(value: number): number | null {
+  if (!Number.isFinite(value) || value < -0.25 || value > 1) return null;
+  return Math.round(value * 1000) / 1000;
 }
 
 export function buildMusicRadioQuery(mode: MusicRadioMode, seed: string): string {

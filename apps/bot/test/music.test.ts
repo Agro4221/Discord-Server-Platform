@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, chunkMusicFilterActions, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicPitch, normalizeMusicSpeed, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, chunkMusicFilterActions, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicPitch, normalizeMusicSpeed, normalizeMusicEqBand, normalizeMusicEqGain, MUSIC_EQ_BAND_COUNT, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd, toggleMusicDistortion } from "../src/modules/music.js";
@@ -188,6 +188,19 @@ test("music quick filter actions allow only known presets", async () => {
   }
 });
 
+
+test("Music Custom EQ normalizes a 15-band range and Lavalink gain bounds", () => {
+  assert.equal(MUSIC_EQ_BAND_COUNT, 15);
+  assert.equal(normalizeMusicEqBand(0), 0);
+  assert.equal(normalizeMusicEqBand(14), 14);
+  assert.equal(normalizeMusicEqBand(-1), null);
+  assert.equal(normalizeMusicEqBand(15), null);
+  assert.equal(normalizeMusicEqGain(-0.25), -0.25);
+  assert.equal(normalizeMusicEqGain(1), 1);
+  assert.equal(normalizeMusicEqGain(0.12349), 0.123);
+  assert.equal(normalizeMusicEqGain(-0.251), null);
+  assert.equal(normalizeMusicEqGain(1.001), null);
+});
 
 test("Music filter palette keeps every Discord action row at five buttons or fewer", () => {
   const chunks = chunkMusicFilterActions([

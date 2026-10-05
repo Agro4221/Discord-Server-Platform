@@ -17,7 +17,7 @@ const BUILTIN_PREFIX_COMMANDS = new Set([
   "ban", "unban", "kick", "timeout", "warn", "history", "clear", "slowmode", "lock", "unlock",
   "serverinfo", "userinfo", "roleinfo", "channelinfo",
   "play", "pause", "resume", "skip", "stop", "shuffle",
-  "playlist", "queue", "nowplaying", "repeat", "seek", "volume", "autoplay",
+  "playlist", "queue", "nowplaying", "repeat", "seek", "volume", "eq", "autoplay",
   "balance", "daily", "leaderboard", "pay", "shop", "buy", "remind", "afk", "ticket", "roles", "giveaway"
 ]);
 
