@@ -47,6 +47,10 @@ export function normalizeMusicPlaylistSearch(value: string): string | null {
   return normalized ? normalized : null;
 }
 
+export function isValidMusicSavedPosition(position: number, length: number): boolean {
+  return Number.isInteger(position) && position >= 1 && position <= Math.min(length, 25);
+}
+
 export function normalizeMusicPlaylistImportUrl(value: string): string | null {
   try {
     const url = new URL(value.trim());
@@ -1187,8 +1191,8 @@ export class Music implements PlatformModule {
 
     if (action === "play") {
       const position = interaction.options.getInteger("track");
-      if (position === null) {
-        await interaction.reply({ content: "Укажи номер трека из избранного.", ephemeral: true });
+      if (position === null || !isValidMusicSavedPosition(position, 25)) {
+        await interaction.reply({ content: "Укажи номер трека из избранного от 1 до 25.", ephemeral: true });
         return;
       }
 
