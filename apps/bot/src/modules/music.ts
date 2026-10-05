@@ -1483,14 +1483,12 @@ export class Music implements PlatformModule {
         "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') ORDER BY visibility DESC,updated_at DESC LIMIT 25",
         [guildId,interaction.user.id]
       );
-      const lines = result.rows.map((row, index) =>
-        (index + 1) + ". " + (row.visibility === "shared" ? "🌐" : "👤") + " **" + row.name + "** — " +
-        String(Array.isArray(row.tracks) ? row.tracks.length : 0) + " треков"
-      );
-      await interaction.reply({
-        content: lines.length ? "🎼 **Доступные плейлисты**\n" + lines.join("\n") : "🎼 Плейлистов пока нет.",
-        ephemeral: true
+      const token = this.createMusicPlaylistPaginationSession({
+        guildId,
+        userId: interaction.user.id,
+        action: "list"
       });
+      await this.renderMusicPlaylistPagination(interaction,token,this.playlistPaginationSessions.get(token)!,0);
       return;
     }
 
@@ -1508,16 +1506,14 @@ export class Music implements PlatformModule {
         "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') AND ($4=false OR visibility='shared') AND name ILIKE $3 ORDER BY visibility DESC,updated_at DESC LIMIT 25",
         [guildId,interaction.user.id,pattern,sharedOnly]
       );
-      const lines = result.rows.map((row, index) =>
-        (index + 1) + ". " + (row.visibility === "shared" ? "🌐" : "👤") + " **" + row.name + "** — " +
-        String(Array.isArray(row.tracks) ? row.tracks.length : 0) + " треков"
-      );
-      await interaction.reply({
-        content: lines.length
-          ? "🔎 **Результаты поиска: " + query + "**\n" + lines.join("\n")
-          : "🔎 Плейлисты по запросу **" + query + "** не найдены.",
-        ephemeral: true
+      const token = this.createMusicPlaylistPaginationSession({
+        guildId,
+        userId: interaction.user.id,
+        action: "search",
+        query,
+        sharedOnly
       });
+      await this.renderMusicPlaylistPagination(interaction,token,this.playlistPaginationSessions.get(token)!,0);
       return;
     }
 
@@ -1594,20 +1590,13 @@ export class Music implements PlatformModule {
         await interaction.reply({ content: "🎼 Плейлист **" + name + "** пуст.", ephemeral: true });
         return;
       }
-      const lines: string[] = [];
-      for (let index = 0; index < stored.length && lines.length < 25; index += 1) {
-        const obj = stored[index] as { info?: { title?: string; author?: string } };
-        const title = String(obj.info?.title ?? "Unknown track");
-        const author = String(obj.info?.author ?? "Unknown artist");
-        const line = (index + 1) + ". **" + title + "** — " + author;
-        if ((lines.join("\n") + (lines.length ? "\n" : "") + line).length > 1700) break;
-        lines.push(line);
-      }
-      const suffix = stored.length > lines.length ? "\n… и ещё **" + (stored.length - lines.length) + "** треков." : "";
-      await interaction.reply({
-        content: "🎼 **" + name + "** (" + (row.visibility === "shared" ? "🌐 shared" : "👤 личный") + ")\n" + lines.join("\n") + suffix,
-        ephemeral: true
+      const token = this.createMusicPlaylistPaginationSession({
+        guildId,
+        userId: interaction.user.id,
+        action: "view",
+        name,
       });
+      await this.renderMusicPlaylistPagination(interaction,token,this.playlistPaginationSessions.get(token)!,0);
       return;
     }
 
@@ -1805,6 +1794,7 @@ export class Music implements PlatformModule {
 
   private async renderMusicPlaylistPagination(
     interaction: ChatInputCommandInteraction | ButtonInteraction,
+    token: string,
     session: {
       guildId: string;
       userId: string;
@@ -1823,27 +1813,28 @@ export class Music implements PlatformModule {
       );
       const row = result.rows[0];
       if (!row) {
-        await interaction[interaction.isButton() ? "update" : "reply"]({ content: "Плейлист больше недоступен.", ephemeral: true });
+        if (interaction.isButton()) {
+          await interaction.update({ content: "Плейлист больше недоступен.", components: [] });
+        } else {
+          await interaction.reply({ content: "Плейлист больше недоступен.", ephemeral: true });
+        }
         return;
       }
+
       const tracks = Array.isArray(row.tracks) ? row.tracks : [];
       const totalPages = musicPlaylistPageCount(tracks.length);
       const currentPage = normalizeMusicPlaylistPage(page,totalPages);
-      const start = currentPage * MUSIC_PLAYLIST_PAGE_SIZE;
-      const visible = tracks.slice(start,start + MUSIC_PLAYLIST_PAGE_SIZE);
+      const offset = currentPage * MUSIC_PLAYLIST_PAGE_SIZE;
+      const visible = tracks.slice(offset,offset + MUSIC_PLAYLIST_PAGE_SIZE);
       const lines = visible.map((item,index) => {
         const obj = item as { info?: { title?: string; author?: string } };
-        return (start + index + 1) + ". **" + String(obj.info?.title ?? "Unknown track") + "** — " + String(obj.info?.author ?? "Unknown artist");
+        return (offset + index + 1) + ". **" + String(obj.info?.title ?? "Unknown track") + "** — " + String(obj.info?.author ?? "Unknown artist");
       });
       const content = "🎼 **" + session.name + "** (" + (row.visibility === "shared" ? "🌐 shared" : "👤 личный") + ") · страница " +
         (currentPage + 1) + "/" + totalPages + "\n" + (lines.length ? lines.join("\n") : "Плейлист пуст.");
-      const payload = { content, components: this.musicPlaylistPaginationComponents(
-        [...this.playlistPaginationSessions.entries()].find(([,value]) => value === session)?.[0] ?? "",
-        currentPage,
-        totalPages
-      ), ephemeral: true };
-      if (interaction.isButton()) await interaction.update(payload);
-      else await interaction.reply(payload);
+      const components = this.musicPlaylistPaginationComponents(token,currentPage,totalPages);
+      if (interaction.isButton()) await interaction.update({ content,components });
+      else await interaction.reply({ content,components,ephemeral: true });
       return;
     }
 
@@ -1852,22 +1843,26 @@ export class Music implements PlatformModule {
     const where = session.action === "search"
       ? " AND ($4=false OR visibility='shared') AND name ILIKE $3"
       : "";
+    const countArgs = session.action === "search"
+      ? [session.guildId,session.userId,pattern,Boolean(session.sharedOnly)]
+      : [session.guildId,session.userId];
     const count = await this.db.query<{ total: number }>(
       "SELECT COUNT(*)::int AS total FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared')" + where,
-      session.action === "search"
-        ? [session.guildId,session.userId,pattern,Boolean(session.sharedOnly)]
-        : [session.guildId,session.userId]
+      countArgs
     );
     const totalItems = Number(count.rows[0]?.total ?? 0);
     const totalPages = musicPlaylistPageCount(totalItems);
     const currentPage = normalizeMusicPlaylistPage(page,totalPages);
     const offset = currentPage * MUSIC_PLAYLIST_PAGE_SIZE;
+    const selectSql = session.action === "search"
+      ? "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') AND ($4=false OR visibility='shared') AND name ILIKE $3 ORDER BY visibility DESC,updated_at DESC LIMIT $5 OFFSET $6"
+      : "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') ORDER BY visibility DESC,updated_at DESC LIMIT $3 OFFSET $4";
+    const selectArgs = session.action === "search"
+      ? [session.guildId,session.userId,pattern,Boolean(session.sharedOnly),MUSIC_PLAYLIST_PAGE_SIZE,offset]
+      : [session.guildId,session.userId,MUSIC_PLAYLIST_PAGE_SIZE,offset];
     const result = await this.db.query<{ name: string; tracks: unknown[]; visibility: MusicPlaylistVisibility }>(
-      "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared')" + where +
-      " ORDER BY visibility DESC,updated_at DESC LIMIT $5 OFFSET $6",
-      session.action === "search"
-        ? [session.guildId,session.userId,pattern,Boolean(session.sharedOnly),MUSIC_PLAYLIST_PAGE_SIZE,offset]
-        : [session.guildId,session.userId,MUSIC_PLAYLIST_PAGE_SIZE,offset]
+      selectSql,
+      selectArgs
     );
     const lines = result.rows.map((row,index) =>
       (offset + index + 1) + ". " + (row.visibility === "shared" ? "🌐" : "👤") + " **" + row.name + "** — " +
@@ -1876,14 +1871,9 @@ export class Music implements PlatformModule {
     const heading = session.action === "search" ? "🔎 **Результаты поиска: " + queryText + "**" : "🎼 **Доступные плейлисты**";
     const content = heading + " · страница " + (currentPage + 1) + "/" + totalPages + "\n" +
       (lines.length ? lines.join("\n") : "Плейлистов не найдено.");
-    const tokenEntry = [...this.playlistPaginationSessions.entries()].find(([,value]) => value === session);
-    const payload = {
-      content,
-      components: this.musicPlaylistPaginationComponents(tokenEntry?.[0] ?? "",currentPage,totalPages),
-      ephemeral: true
-    };
-    if (interaction.isButton()) await interaction.update(payload);
-    else await interaction.reply(payload);
+    const components = this.musicPlaylistPaginationComponents(token,currentPage,totalPages);
+    if (interaction.isButton()) await interaction.update({ content,components });
+    else await interaction.reply({ content,components,ephemeral: true });
   }
 
   private async previous(interaction: ChatInputCommandInteraction): Promise<void> {
