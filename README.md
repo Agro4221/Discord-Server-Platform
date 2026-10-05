@@ -160,47 +160,29 @@ sequenceDiagram
 
 ## 🚀 Быстрый старт
 
-Для твоего обычного Windows-ПК основной сценарий — **нативный, без Docker Desktop**:
+Для обычного Windows-ПК основной сценарий — **нативный, без Docker Desktop**.
 
 ~~~bat
 start.bat
 ~~~
 
-Это поднимает PostgreSQL, один Lavalink и Discord-бот. Dashboard специально выключен по умолчанию, чтобы не держать лишний процесс во время игр/стрима.
+Это единственный корневой BAT-файл. При первом запуске launcher при необходимости устанавливает Node.js, PostgreSQL, OpenJDK и npm-зависимости, скачивает проверенный Lavalink JAR, готовит базу, собирает проект и запускает Control Center.
 
-Для Control Center:
+Discord credentials заранее не требуются: после запуска бот регистрируется через Control Center → Bot Fleet.
 
-~~~bat
-control-center.bat
-~~~
-
-Остановка:
+Параметры, если они когда-нибудь понадобятся, идут через тот же файл:
 
 ~~~bat
-stop.bat
+start.bat -NoDashboard
+start.bat -Lavalink2
+start.bat -Rebuild
+start.bat -Down
+start.bat -Status
 ~~~
 
-Статус и фактическое потребление памяти отслеживаемых native-процессов:
+Ресурсные требования самого DSP-стека находятся в `docs/RESOURCE-REQUIREMENTS.md`; игры, OBS, браузер и прочие программы в эти оценки не входят.
 
-~~~bat
-native-status.bat
-~~~
-
-Docker остаётся отдельным опциональным сценарием для воспроизводимых deployment/VPS-задач.
-
-Перед первым live-запуском необходимо подготовить собственные Discord credentials и локальное окружение. Рекомендуется сначала пройти автоматические проверки, затем выполнить live-проверку на тестовом сервере.
-
-## 🖥️ Local Windows startup
-
-For the everyday gaming/streaming PC the primary path is native Windows, without Docker Desktop:
-
-    start.bat
-
-This starts PostgreSQL as an existing local installation, one Lavalink node and the bot. Dashboard is off by default to keep the background footprint low.
-
-Use `control-center.bat` when the web Control Center is needed. Use `start.bat -Lavalink2` only when a second Lavalink node is actually required for redundancy. Docker remains supported as an optional deployment/reproducibility path.
-
-Resource tiers are documented in `docs/RESOURCE-REQUIREMENTS.md`.
+Docker остаётся отдельным опциональным сценарием для deployment/VPS и воспроизводимого окружения.
 
 ## 🧪 Проверка
 
