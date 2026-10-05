@@ -969,7 +969,7 @@ export class Music implements PlatformModule {
     if (!interaction.inGuild()) return;
     const directAliases = new Set([
       "play", "search", "pause", "resume", "previous", "skip", "vote-skip", "stop", "shuffle",
-      "playlist", "favorite", "filter", "queue-policy", "queue-limit", "queue-size", "queue", "repeat", "seek", "volume", "autoplay", "radio", "247", "providers", "nowplaying", "lyrics"
+      "playlist", "favorite", "filter", "queue-policy", "queue-limit", "queue-size", "queue", "repeat", "seek", "volume", "pitch", "autoplay", "radio", "247", "providers", "nowplaying", "lyrics"
     ]);
     if (interaction.commandName !== "music" && !directAliases.has(interaction.commandName)) return;
 
@@ -1067,6 +1067,9 @@ export class Music implements PlatformModule {
         break;
       case "volume":
         await this.volume(interaction);
+        break;
+      case "pitch":
+        await this.pitch(interaction);
         break;
       case "nowplaying":
         await this.nowPlaying(interaction);
@@ -3305,6 +3308,45 @@ export class Music implements PlatformModule {
     await interaction.reply({ content: `🔊 Громкость: **${value}**`, ephemeral: true });
   }
 
+  private async pitch(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+
+    const value = interaction.options.getNumber("value");
+    const currentPitch = Number((player.filterManager.data?.timescale as { pitch?: number } | undefined)?.pitch ?? 1);
+    if (value === null) {
+      await interaction.reply({ content: "🎚️ Pitch: **" + currentPitch.toFixed(2) + "×**", ephemeral: true });
+      return;
+    }
+
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Менять pitch могут пользователи с DJ-ролью или Manage Server.", ephemeral: true });
+      return;
+    }
+
+    const pitch = Math.round(value * 100) / 100;
+    try {
+      await player.filterManager.setPitch(pitch);
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await interaction.reply({
+        content: "🎚️ Pitch: **" + pitch.toFixed(2) + "×**" + (pitch === 1 ? " (норма)" : ""),
+        ephemeral: true
+      });
+    } catch (error) {
+      logger.warn("Music pitch operation failed", {
+        guildId: interaction.guildId!,
+        pitch,
+        error: String(error)
+      });
+      await interaction.reply({ content: "Не удалось изменить pitch на текущем Lavalink node.", ephemeral: true });
+    }
+  }
+
   private async nowPlaying(interaction: ChatInputCommandInteraction): Promise<void> {
     const player = this.manager?.players.get(interaction.guildId!);
     const track = player?.queue.current;
@@ -3351,7 +3393,7 @@ export class Music implements PlatformModule {
     const action = aliases[commandName] ?? commandName;
     const supported = new Set([
       "play", "pause", "resume", "previous", "skip", "skip-to", "history", "stop", "shuffle",
-      "queue", "nowplaying", "lyrics", "repeat", "seek", "volume", "autoplay"
+      "queue", "nowplaying", "lyrics", "repeat", "seek", "volume", "pitch", "autoplay"
     ]);
     if (!supported.has(action)) return false;
 
@@ -3555,6 +3597,27 @@ export class Music implements PlatformModule {
       }
       await player.setVolume(value);
       await message.reply("🔊 Громкость: " + value);
+    } else if (action === "pitch") {
+      const value = args.length ? Number(args[0]) : null;
+      if (value === null) {
+        const currentPitch = Number((player.filterManager.data?.timescale as { pitch?: number } | undefined)?.pitch ?? 1);
+        await message.reply("🎚️ Pitch: " + currentPitch.toFixed(2) + "×");
+        return true;
+      }
+      if (!Number.isFinite(value) || value < 0.5 || value > 2 || !(manageGuild || dj)) {
+        await message.reply("Pitch требует DJ / Manage Server и значение от 0.5 до 2.0. Значение 1.0 — норма.");
+        return true;
+      }
+      const pitch = Math.round(value * 100) / 100;
+      try {
+        await player.filterManager.setPitch(pitch);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await message.reply("🎚️ Pitch: " + pitch.toFixed(2) + "×");
+      } catch (error) {
+        logger.warn("Music prefix pitch operation failed", { guildId: message.guild.id, pitch, error: String(error) });
+        await message.reply("Не удалось изменить pitch на текущем Lavalink node.");
+      }
     } else if (action === "autoplay") {
       if (!(manageGuild || dj)) {
         await message.reply("Autoplay настраивается пользователями с DJ-ролью или Manage Server.");
