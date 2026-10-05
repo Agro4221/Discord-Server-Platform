@@ -1012,6 +1012,15 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Qobuz playback remains a release-gate validation item.
 - Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
 
+## 2026-10-05 — Music live synced lyrics
+- Added /music lyrics action=sync for tracks that provide timestamped lyrics lines.
+- The view highlights the current line and refreshes the ephemeral response every two seconds using the player's live position.
+- Sync stops automatically when the track changes, the final lyric line is reached, or the message can no longer be edited.
+- The sync session is cleaned up on player destruction and module shutdown.
+- Added deterministic tests for timestamp normalization, active-line selection and focused rendering.
+- LavaLyrics documents timestamped Lyrics Line objects and live LyricsLineEvent support. citeturn532814search0
+- Source checkpoint: 49776f17679971187a451c90787c9bd8d28fddea.
+
 ## 2026-10-05 — Music lyrics source diagnostics
 - Extended /music lyrics with a status action for the configured LavaLyrics sources.
 - Status reports whether the Music/Lavalink node is currently available and lists the configured YouTube, Spotify, Deezer and Yandex Music lyrics sources.
