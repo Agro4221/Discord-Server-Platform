@@ -39,6 +39,13 @@ type MusicRepeatMode = "off" | "track" | "queue";
 
 const MAX_PLAYLIST_TRACKS = 500;
 export const MUSIC_REQUEST_COOLDOWN_MS = 5_000;
+export const MUSIC_REQUEST_APPROVAL_TTL_MS = 15 * 60_000;
+
+type MusicRequestApprovalMode = "off" | "approval";
+
+export function normalizeMusicRequestApprovalMode(value: string): MusicRequestApprovalMode | null {
+  return value === "off" || value === "approval" ? value : null;
+}
 
 const MUSIC_FILTER_ACTIONS = [
   "clear", "bassboost-low", "bassboost-medium", "bassboost-high",
@@ -290,6 +297,7 @@ export class Music implements PlatformModule {
   private readonly searchSessions = new Map<string, { guildId: string; userId: string; tracks: Track[]; expiresAt: number }>();
   private searchSequence = 0;
   private commandPolicy?: CommandPolicyService;
+  private auditLog?: ModuleContext["auditLog"];
 
   constructor(
     private readonly db: Database,
@@ -302,6 +310,7 @@ export class Music implements PlatformModule {
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
+    this.auditLog = context.auditLog;
     this.setModuleHealth = context.setModuleHealth;
     this.connectedNodes.clear();
     this.lastPlayedTracks.clear();
@@ -560,6 +569,7 @@ export class Music implements PlatformModule {
     this.manager = undefined;
     this.client = undefined;
     this.setModuleHealth = undefined;
+    this.auditLog = undefined;
     this.initialized = false;
   }
 
@@ -955,6 +965,12 @@ export class Music implements PlatformModule {
       query,
       interaction.user
     );
+
+    if (queued.pending) {
+      this.requestCooldownUntil.set(cooldownKey, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
+      await interaction.reply({ content: "🕒 Запрос отправлен на подтверждение DJ или Manage Server.", ephemeral: true });
+      return;
+    }
 
     if (!queued.added) {
       await interaction.reply({
@@ -1403,19 +1419,37 @@ export class Music implements PlatformModule {
     voiceChannelId: string,
     textChannelId: string,
     query: string,
-    requester: import("discord.js").User
-  ): Promise<{ added: number; truncated: boolean; limited: boolean; firstTitle: string; firstAuthor: string }> {
+    requester: import("discord.js").User,
+    bypassApproval = false,
+    bypassPolicy = false
+  ): Promise<{ added: number; truncated: boolean; limited: boolean; pending: boolean; approvalId: string | null; firstTitle: string; firstAuthor: string }> {
     if (!this.manager) throw new Error("music_manager_unavailable");
-    if (!await this.canQueueMusic(guildId, requester.id, textChannelId)) throw new Error("music_queue_permission_denied");
+
+    const settings = await this.musicSettings(guildId);
+    if (!bypassApproval && settings.requestApprovalMode === "approval") {
+      const approvalId = await this.createMusicRequestApproval({
+        guildId,
+        requesterUserId: requester.id,
+        requesterVoiceChannelId: voiceChannelId,
+        sourceChannelId: textChannelId,
+        query,
+        track: null,
+        source: "query"
+      });
+      return { added: 0, truncated: false, limited: false, pending: true, approvalId, firstTitle: "", firstAuthor: "" };
+    }
+
+    if (!bypassPolicy && !await this.canQueueMusic(guildId, requester.id, textChannelId)) {
+      throw new Error("music_queue_permission_denied");
+    }
 
     const existing = this.manager.players.get(guildId);
-    const settings = await this.musicSettings(guildId);
     const queued = existing?.queue.tracks ?? [];
     const queuedByUser = countMusicQueuedByUser(queued, requester.id);
     const remainingUserSlots = remainingMusicQueueSlots(queuedByUser, settings.maxQueuedPerUser);
     const remainingGuildSlots = remainingMusicGuildQueueSlots(queued.length, settings.maxQueueSize);
     if (remainingUserSlots === 0 || remainingGuildSlots === 0) {
-      return { added: 0, truncated: false, limited: true, firstTitle: "", firstAuthor: "" };
+      return { added: 0, truncated: false, limited: true, pending: false, approvalId: null, firstTitle: "", firstAuthor: "" };
     }
     const player = existing ?? await this.manager.createPlayer({
       guildId,
@@ -1437,7 +1471,7 @@ export class Music implements PlatformModule {
     );
 
     if (!result.tracks.length) {
-      return { added: 0, truncated: false, limited: false, firstTitle: "", firstAuthor: "" };
+      return { added: 0, truncated: false, limited: false, pending: false, approvalId: null, firstTitle: "", firstAuthor: "" };
     }
 
     const maxTracks = Math.min(
@@ -1458,6 +1492,8 @@ export class Music implements PlatformModule {
       added: tracks.length,
       truncated: result.tracks.length > tracks.length && remainingUserSlots === null && remainingGuildSlots === null,
       limited: (remainingUserSlots !== null || remainingGuildSlots !== null) && result.tracks.length > tracks.length,
+      pending: false,
+      approvalId: null,
       firstTitle: first.info.title,
       firstAuthor: first.info.author ?? "Unknown artist"
     };
@@ -1510,6 +1546,11 @@ export class Music implements PlatformModule {
         query,
         message.author
       );
+      if (queued.pending) {
+        this.requestCooldownUntil.set(key, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
+        await message.reply("🕒 Запрос отправлен на подтверждение DJ или Manage Server.").catch(() => undefined);
+        return;
+      }
       if (!queued.added) {
         await message.reply("🔎 Ничего не найдено.").catch(() => undefined);
         return;
@@ -2204,6 +2245,10 @@ export class Music implements PlatformModule {
           query,
           message.author
         );
+        if (queued.pending) {
+          await message.reply("🕒 Запрос отправлен на подтверждение DJ или Manage Server.");
+          return true;
+        }
         if (!queued.added) {
           await message.reply("Ничего не найдено.");
           return true;
@@ -2393,6 +2438,11 @@ export class Music implements PlatformModule {
   }
 
   private async onInteraction(interaction: Interaction): Promise<void> {
+    if (interaction.isButton() && interaction.customId.startsWith("dsp:music:request:") && interaction.guild) {
+      await this.handleMusicRequestApproval(interaction);
+      return;
+    }
+
     if (interaction.isModalSubmit() && interaction.customId === "dsp:music:save-queue" && interaction.guild) {
       const player = this.manager?.players.get(interaction.guild.id);
       if (!player) {
@@ -2485,6 +2535,28 @@ export class Music implements PlatformModule {
         return;
       }
       const settings = await this.musicSettings(interaction.guild.id);
+      if (settings.requestApprovalMode === "approval") {
+        const approvalId = await this.createMusicRequestApproval({
+          guildId: interaction.guild.id,
+          requesterUserId: interaction.user.id,
+          requesterVoiceChannelId: player.voiceChannelId,
+          sourceChannelId: interaction.channelId,
+          query: selected.info.title,
+          track: selected,
+          source: "search"
+        });
+        this.searchSessions.delete(token);
+        await interaction.update({
+          content: "🕒 Запрос отправлен на подтверждение DJ или Manage Server. Request #" + approvalId,
+          embeds: [],
+          components: []
+        });
+        return;
+      }
+      if (!await this.canQueueMusic(interaction.guild.id, interaction.user.id, interaction.channelId)) {
+        await interaction.reply({ content: "Добавление в очередь запрещено политикой Music.", ephemeral: true });
+        return;
+      }
       const queuedByUser = countMusicQueuedByUser(player.queue.tracks, interaction.user.id);
       const remainingUserSlots = remainingMusicQueueSlots(queuedByUser, settings.maxQueuedPerUser);
       const remainingGuildSlots = remainingMusicGuildQueueSlots(player.queue.tracks.length, settings.maxQueueSize);
@@ -2800,9 +2872,9 @@ export class Music implements PlatformModule {
     return result.rows[0]?.autoplay ?? false;
   }
 
-  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number; twentyFourSeven: boolean; queueAccess: "everyone" | "dj"; maxQueuedPerUser: number; maxQueueSize: number; fairQueueEnabled: boolean }> {
-    const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number; twenty_four_seven: boolean; queue_access: "everyone" | "dj"; max_queued_per_user: number; max_queue_size: number; fair_queue_enabled: boolean }>(
-      "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds,twenty_four_seven,queue_access,max_queued_per_user,max_queue_size,fair_queue_enabled FROM music_settings WHERE guild_id=$1",
+  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number; twentyFourSeven: boolean; queueAccess: "everyone" | "dj"; maxQueuedPerUser: number; maxQueueSize: number; fairQueueEnabled: boolean; requestApprovalMode: MusicRequestApprovalMode }> {
+    const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number; twenty_four_seven: boolean; queue_access: "everyone" | "dj"; max_queued_per_user: number; max_queue_size: number; fair_queue_enabled: boolean; request_approval_mode: string }>(
+      "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds,twenty_four_seven,queue_access,max_queued_per_user,max_queue_size,fair_queue_enabled,request_approval_mode FROM music_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -2816,7 +2888,8 @@ export class Music implements PlatformModule {
       queueAccess: row?.queue_access === "dj" ? "dj" : "everyone",
       maxQueuedPerUser: normalizeMusicQueueLimit(Number(row?.max_queued_per_user ?? 10)),
       maxQueueSize: Math.min(500, Math.max(0, Math.trunc(Number(row?.max_queue_size ?? 100)))),
-      fairQueueEnabled: row?.fair_queue_enabled ?? false
+      fairQueueEnabled: row?.fair_queue_enabled ?? false,
+      requestApprovalMode: normalizeMusicRequestApprovalMode(row?.request_approval_mode ?? "off") ?? "off"
     };
   }
 
