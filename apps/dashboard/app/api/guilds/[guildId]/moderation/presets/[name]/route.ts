@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { currentSession } from "../../../../../../../lib/auth";
+import { assertSameOrigin, currentSession } from "../../../../../../../lib/auth";
 
 function upstream(path: string): string {
   return new URL(path, process.env.MANAGEMENT_API_URL ?? "http://127.0.0.1:3002").toString();
@@ -7,6 +7,7 @@ function upstream(path: string): string {
 
 export async function POST(request: Request, context: { params: Promise<{ guildId: string; name: string }> }) {
   if (!await currentSession()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  try { assertSameOrigin(request); } catch { return NextResponse.json({ error: "bad_origin" }, { status: 403 }); }
   const { guildId, name } = await context.params;
   const response = await fetch(upstream("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/presets/" + encodeURIComponent(name)), {
     method: "POST",
@@ -18,6 +19,7 @@ export async function POST(request: Request, context: { params: Promise<{ guildI
 
 export async function DELETE(request: Request, context: { params: Promise<{ guildId: string; name: string }> }) {
   if (!await currentSession()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  try { assertSameOrigin(request); } catch { return NextResponse.json({ error: "bad_origin" }, { status: 403 }); }
   const { guildId, name } = await context.params;
   const response = await fetch(upstream("/api/guilds/" + encodeURIComponent(guildId) + "/moderation/presets/" + encodeURIComponent(name)), {
     method: "DELETE",
