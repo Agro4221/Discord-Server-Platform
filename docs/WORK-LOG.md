@@ -769,3 +769,12 @@ Never write credentials, tokens or private user data here.
 - CI #2119 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
 - Final source checkpoint: `383453f3d99a4417a57f0a0a9ff3885f66cad2330`.
 - Next single Music slice: **Play favorites / play playlist shortcuts**.
+
+## 2026-10-05 — Music play favorites / playlist shortcuts
+- Completed quick playback shortcuts for saved Music state.
+- Added `Play` to `/music favorite`, using a 1-based favorite position (1–25) and the existing Music queue path so request cooldowns, queue policy and optional approval mode continue to apply.
+- Added explicit `Play` to `/music playlist`; it reuses the existing saved-playlist loading path and therefore supports personal/shared visibility, shuffle and queue limits without duplicating playback logic.
+- Added runtime validation for favorite positions and regression coverage for the visible 25-item favorite range.
+- CI #2125 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `81a484619fd88aea937d85b7c2fe04db82c26da1`.
+- Next single Music slice: **Playlist pagination and richer management UI**.
