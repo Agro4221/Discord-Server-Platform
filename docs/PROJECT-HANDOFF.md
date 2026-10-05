@@ -378,29 +378,26 @@ Premium parity = **совокупность сильных функций раз
 PR: **#3** — `feat: Discord platform expansion + Music v2`  
 PR остаётся **draft**.
 
-Последний известный HEAD после документационного обновления:
-`8764ce29e240c5813c6adf3e9388610ae2b26dfb`
+Текущий кодовый checkpoint перед документационными коммитами:
+`35442a31c3161421576b96e89ebe3fd1b2d73e08`
 
-Последний ранее подтверждённый полный CI на кодовом HEAD до текущего документционного прохода:
-- dependency audit;
-- source hygiene;
-- deployment/observability checks;
-- bot typecheck;
-- bot tests: 66/66;
-- domain build;
-- bot build;
-- Dashboard build;
-- post checks — успешно.
+За последний проход:
+- исправлен production Dashboard build blocker в TikTok OAuth route: скорректирован относительный импорт `apps/dashboard/lib/auth.ts`;
+- добавлен `scripts/check-dashboard-imports.mjs`, проверяющий локальные относительные imports Dashboard до production build;
+- CI теперь запускает этот import contract перед `next build`;
+- сохраняется продуктовый контракт: локальный Control Center без пользовательской авторизации, регистрация/секреты Discord-бота через Fleet, без artificial Premium wall.
 
-Последующие изменения в основном были документационными, поэтому перед новым кодовым release-gate нужно дождаться/проверить новый CI.
+Последний доступный CI **#2369** был запущен на предыдущем checkpoint `cd47b8fa37f7dbde2b386e9fe476cd716bde5ba5`: dependency/audit/source/deployment/observability checks, bot typecheck, **196/196 bot tests**, domain build и bot build прошли; Dashboard production build упал на найденном TikTok import blocker. После фикса новый Actions run для текущего checkpoint пока не появился в доступном состоянии, поэтому slice **не считать CI-verified**.
 
-Live validation, требующая пользовательского окружения:
+Feature Matrix сейчас полностью reconciled: все строки имеют ✅. Это означает, что дальше работа должна концентрироваться на release-gate hardening и environment-dependent acceptance, а не на искусственном добавлении новых checkbox features.
+
+Остаётся live validation:
 - реальный Discord;
-- Lavalink voice playback;
-- multi-node outage/failover drill;
-- Windows runtime UX;
-- E2E/chaos/soak;
-- clean-host/VPS acceptance.
+- Lavalink voice playback и multi-node failover;
+- Windows local runtime UX;
+- E2E/chaos/soak/security;
+- clean-host/VPS acceptance;
+- реальная проверка внешних Music/social providers.
 
 ## 10. Как продолжать в новом чате
 
