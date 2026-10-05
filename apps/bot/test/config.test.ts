@@ -32,6 +32,38 @@ function baseEnv(): Record<string, string> {
   };
 }
 
+test("Lavalink config falls back to the primary node when LAVALINK_NODES is empty", () => {
+  withEnv({
+    ...baseEnv(),
+    LAVALINK_NODES: undefined,
+    LAVALINK_HOST: "127.0.0.1",
+    LAVALINK_PORT: "2333"
+  }, () => {
+    const config = loadConfig();
+    assert.deepEqual(config.lavalinkNodes, [{
+      id: "local",
+      host: "127.0.0.1",
+      port: 2333,
+      password: "lavalink-password"
+    }]);
+  });
+});
+
+test("Lavalink config accepts an explicit two-node failover definition", () => {
+  withEnv({
+    ...baseEnv(),
+    LAVALINK_NODES: JSON.stringify([
+      { id: "local", host: "lavalink", port: 2333, password: "one" },
+      { id: "local-2", host: "lavalink2", port: 2334, password: "two" }
+    ])
+  }, () => {
+    const config = loadConfig();
+    assert.equal(config.lavalinkNodes.length, 2);
+    assert.equal(config.lavalinkNodes[1]?.id, "local-2");
+    assert.equal(config.lavalinkNodes[1]?.port, 2334);
+  });
+});
+
 test("production rejects a public Management API bind", () => {
   withEnv({
     ...baseEnv(),
