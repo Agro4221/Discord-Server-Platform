@@ -16,6 +16,25 @@ function extractFunctionBody(content, method) {
   return content.slice(bodyStart, bodyEnd);
 }
 
+function hasOriginProtectedHelper(content, methodBody) {
+  if (/assertSameOrigin\s*\(/.test(methodBody)) return true;
+
+  const localFunctions = [...content.matchAll(
+    /(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{[\s\S]*?\n\}/g
+  )];
+
+  for (const match of methodBody.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) {
+    const name = match[1];
+    const helper = localFunctions.find((candidate) => candidate[1] === name);
+    if (helper) {
+      const helperBody = helper[0];
+      if (/assertSameOrigin\s*\(/.test(helperBody)) return true;
+    }
+  }
+
+  return false;
+}
+
 async function walk(dir) {
   let entries;
   try {
@@ -43,8 +62,8 @@ async function walk(dir) {
 
     for (const method of mutatingMethods) {
       const body = extractFunctionBody(content, method);
-      if (!body || !/assertSameOrigin\s*\(/.test(body)) {
-        failures.push(relative(process.cwd(), path) + ": " + method + " route is missing assertSameOrigin");
+      if (!body || !hasOriginProtectedHelper(content, body)) {
+        failures.push(relative(process.cwd(), path) + ": " + method + " route is missing assertSameOrigin protection");
       }
     }
   }
