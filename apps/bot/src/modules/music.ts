@@ -898,14 +898,19 @@ export class Music implements PlatformModule {
     );
 
     if (!queued.added) {
-      await interaction.reply({ content: "Ничего не найдено.", ephemeral: true });
+      await interaction.reply({
+        content: queued.limited ? "Лимит ожидающих треков для тебя уже достигнут." : "Ничего не найдено.",
+        ephemeral: true
+      });
       return;
     }
 
     this.requestCooldownUntil.set(cooldownKey, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
-    const suffix = queued.truncated
-      ? ` (добавлены первые ${MAX_PLAYLIST_TRACKS} треков)`
-      : "";
+    const suffix = queued.limited
+      ? " (добавлено только в пределах твоего лимита)"
+      : queued.truncated
+        ? ` (добавлены первые ${MAX_PLAYLIST_TRACKS} треков)`
+        : "";
     await interaction.reply({
       content: `Добавлено в очередь: **${queued.added}** трек(ов)${suffix}. Первый: **${queued.firstTitle}** — ${queued.firstAuthor}`,
       ephemeral: true
