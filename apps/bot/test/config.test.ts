@@ -103,3 +103,34 @@ test("first startup can load without Discord credentials for Control Center regi
     assert.equal(config.discordClientId, "");
   });
 });
+
+test("blank Lavalink password is rejected", () => {
+  for (const value of ["", "   ", "\t"]) {
+    withEnv({
+      ...baseEnv(),
+      LAVALINK_PASSWORD: value
+    }, () => {
+      assert.throws(() => loadConfig(), /Missing required environment variable: LAVALINK_PASSWORD/);
+    });
+  }
+});
+
+test("blank Lavalink node passwords are rejected", () => {
+  withEnv({
+    ...baseEnv(),
+    LAVALINK_NODES: JSON.stringify([
+      { id: "node-a", host: "127.0.0.1", port: 2333, password: "   " }
+    ])
+  }, () => {
+    assert.throws(() => loadConfig(), /Invalid Lavalink node at index 0/);
+  });
+});
+
+test("blank database URL is rejected", () => {
+  withEnv({
+    ...baseEnv(),
+    DATABASE_URL: "   "
+  }, () => {
+    assert.throws(() => loadConfig(), /Missing required environment variable: DATABASE_URL/);
+  });
+});
