@@ -782,6 +782,53 @@ test("config transfer and local backup round-trip preserve guild configuration",
 });
 
 
+
+test("backup APIs enforce valid guild IDs and cross-guild isolation", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const directory = await mkdtemp(join(tmpdir(), "dsp-backup-scope-"));
+  const guildA = "123456789012345760";
+  const guildB = "123456789012345761";
+  try {
+    await migrate(db);
+    const backups = new BackupService(db, directory, 5);
+
+    await assert.rejects(
+      backups.listBackups("123"),
+      /invalid_guild_id/
+    );
+    await assert.rejects(
+      backups.createGuildBackup("../123456789012345760"),
+      /invalid_guild_id/
+    );
+
+    const path = await backups.createGuildBackup(guildA);
+    const name = path.split("/").pop()!;
+
+    await assert.rejects(
+      backups.readBackup(name, guildB),
+      /backup_guild_mismatch/
+    );
+    await assert.rejects(
+      backups.restoreGuildBackup(guildB, name),
+      /backup_guild_mismatch/
+    );
+    await assert.rejects(
+      backups.deleteBackup(name, guildB),
+      /backup_guild_mismatch/
+    );
+    await assert.rejects(
+      backups.readBackup("not-a-backup", guildA),
+      /invalid_backup_name/
+    );
+
+    assert.deepEqual(await backups.listBackups(guildA), [name]);
+  } finally {
+    await db.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+
 test("economy transfers lock accounts in deterministic order", { skip: !enabled }, async () => {
   const db = new Database(process.env.DATABASE_URL!);
   const guildId = "123456789012345710";
