@@ -19,7 +19,7 @@ export class Analytics implements PlatformModule {
   readonly name = "analytics";
   private unsubscribe?: () => void;
   private timer?: NodeJS.Timeout;
-  private flushing = false;
+  private flushPromise?: Promise<void>;
   private readonly pending = new Map<string, PendingAnalytics>();
 
   constructor(private readonly db: Database) {}
@@ -113,46 +113,51 @@ export class Analytics implements PlatformModule {
   }
 
   private async flush(): Promise<void> {
-    if (this.flushing || this.pending.size === 0) return;
-    this.flushing = true;
+    if (this.flushPromise) return this.flushPromise;
+    if (this.pending.size === 0) return;
 
     const batch = [...this.pending.values()];
     this.pending.clear();
 
-    try {
-      const values: unknown[] = [];
-      const placeholders = batch.map((item, index) => {
-        const base = index * 4;
-        values.push(item.guildId, item.eventType, item.bucketStart, item.count);
-        return `($${base + 1},$${base + 2},$${base + 3},$${base + 4})`;
-      }).join(",");
+    const work = (async (): Promise<void> => {
+      try {
+        const values: unknown[] = [];
+        const placeholders = batch.map((item, index) => {
+          const base = index * 4;
+          values.push(item.guildId, item.eventType, item.bucketStart, item.count);
+          return `($${base + 1},$${base + 2},$${base + 3},$${base + 4})`;
+        }).join(",");
 
-      await this.db.query(
-        `INSERT INTO analytics_events(guild_id,event_type,bucket_start,count)
-         VALUES ${placeholders}
-         ON CONFLICT(guild_id,event_type,bucket_start)
-         DO UPDATE SET count=analytics_events.count+EXCLUDED.count`,
-        values
-      );
-    } catch (error) {
-      for (const item of batch) {
-        const key = `${item.guildId}:${item.eventType}:${item.bucketStart.getTime()}`;
-        const existing = this.pending.get(key);
-        if (existing) existing.count += item.count;
-        else this.pending.set(key, item);
+        await this.db.query(
+          `INSERT INTO analytics_events(guild_id,event_type,bucket_start,count)
+           VALUES ${placeholders}
+           ON CONFLICT(guild_id,event_type,bucket_start)
+           DO UPDATE SET count=analytics_events.count+EXCLUDED.count`,
+          values
+        );
+      } catch (error) {
+        for (const item of batch) {
+          const key = `${item.guildId}:${item.eventType}:${item.bucketStart.getTime()}`;
+          const existing = this.pending.get(key);
+          if (existing) existing.count += item.count;
+          else this.pending.set(key, item);
+        }
+        logger.warn("Analytics batch flush failed; counts retained in memory", {
+          batchKeys: batch.length,
+          pendingKeys: this.pending.size,
+          error: String(error)
+        });
       }
-      logger.warn("Analytics batch flush failed; counts retained in memory", {
-        batchKeys: batch.length,
-        pendingKeys: this.pending.size,
-        error: String(error)
-      });
-    } finally {
-      this.flushing = false;
-    }
+    })();
 
-    if (this.pending.size >= FLUSH_BATCH_LIMIT) {
-      void this.flush();
-    }
+    this.flushPromise = work.finally(() => {
+      this.flushPromise = undefined;
+      if (this.pending.size >= FLUSH_BATCH_LIMIT) {
+        void this.flush();
+      }
+    });
+
+    return this.flushPromise;
   }
 
   async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
