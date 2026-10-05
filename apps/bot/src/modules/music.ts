@@ -524,8 +524,9 @@ export class Music implements PlatformModule {
       void this.syncController(player);
       void (async () => {
         try {
+          const continued = await this.continueMusicPlaylist(player);
           const autoplay = await this.autoplayEnabled(player.guildId);
-          if (lastTrack && shouldAutoplayAfterQueueEnd(
+          if (!continued && lastTrack && shouldAutoplayAfterQueueEnd(
             autoplay,
             player.repeatMode,
             player.queue.tracks.length
@@ -1733,6 +1734,23 @@ export class Music implements PlatformModule {
 
       await this.applyFairQueue(player, settings.fairQueueEnabled);
       if (!player.playing && added > 0) await player.play();
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      const continuationRemaining = itemsToLoad.length < stored.length;
+      if (continuationRemaining) {
+        this.playlistContinuations.set(guildId, {
+          playlistId: row.id,
+          nextIndex: itemsToLoad.length,
+          order: shouldShuffle ? itemsToLoad.map((_, index) => {
+            const shuffledIndexes = shuffleMusicItems(stored.map((_, sourceIndex) => sourceIndex));
+            return shuffledIndexes[index] ?? index;
+          }) : null,
+          requesterUserId: interaction.user.id
+        });
+      } else {
+        this.playlistContinuations.delete(guildId);
+      }
+
       await this.persistPlayer(player);
       await this.syncController(player);
       const limitedSuffix =
