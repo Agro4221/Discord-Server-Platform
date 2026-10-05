@@ -978,6 +978,18 @@ Never write credentials, tokens or private user data here.
 - The previous Named effect profiles Music backlog item is removed: it is not a target parity feature and will not drive the next increment.
 - Next single backlog slice: Music provider parity — Yandex Music, a benchmarked Juniper-style provider target rather than another arbitrary Lavalink filter.
 
+## 2026-10-05 — Music Custom EQ editor
+- Completed the independent Custom EQ editor slice.
+- Added a top-level `/eq` command because the `/music` command remains constrained by Discord's subcommand limit.
+- `/eq show` renders all 15 EQ bands; `/eq set` edits one band with gain validation; `/eq reset` clears the custom EQ.
+- Added prefix support: `!eq show`, `!eq set <band 0-14> <gain -0.25..1.00>`, `!eq reset`.
+- EQ changes require DJ / Manage Server; read-only show remains available.
+- The editor uses the native Lavalink client `setEQ()` / `clearEQ()` path and reuses existing player persistence and controller resync.
+- Added deterministic unit coverage for the 15-band boundary and Lavalink EQ gain range.
+- CI #2218 caught a misplaced prefix handler during Typecheck; the handler was moved into the correct `handlePrefixCommand` scope and CI #2219 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: `7ee7f9cc7477497c49d416f90f6352c433aa34e1`.
+- Next single parity slice: **Spotify Music provider**.
+
 ## 2026-10-05 — Music Yandex Music provider parity
 - Added an explicit Yandex Music search provider to /play, /music play and /music search.
 - Non-URL searches selected as Yandex use LavaSrc ymsearch; users can also use the explicit ymsearch: prefix from prefix/request-channel flows.
@@ -989,14 +1001,14 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Yandex playback still requires the user's Lavalink credentials/runtime.
 - Source checkpoint: 5514371977eb7a13f5696ebabf34a159a40d7094.
 
-## 2026-10-05 — Music Custom EQ editor
-- Completed the independent Custom EQ editor slice.
-- Added a top-level `/eq` command because the `/music` command remains constrained by Discord's subcommand limit.
-- `/eq show` renders all 15 EQ bands; `/eq set` edits one band with gain validation; `/eq reset` clears the custom EQ.
-- Added prefix support: `!eq show`, `!eq set <band 0-14> <gain -0.25..1.00>`, `!eq reset`.
-- EQ changes require DJ / Manage Server; read-only show remains available.
-- The editor uses the native Lavalink client `setEQ()` / `clearEQ()` path and reuses existing player persistence and controller resync.
-- Added deterministic unit coverage for the 15-band boundary and Lavalink EQ gain range.
-- CI #2218 caught a misplaced prefix handler during Typecheck; the handler was moved into the correct `handlePrefixCommand` scope and CI #2219 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
-- Final source checkpoint for this slice: `7ee7f9cc7477497c49d416f90f6352c433aa34e1`.
-- Next single Music slice: **Named effect profiles**.
+## 2026-10-05 — Music Spotify provider parity
+- Added an explicit Spotify Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as Spotify use LavaSrc spsearch; users can also use the explicit spsearch: prefix from prefix/request-channel flows.
+- Direct open.spotify.com URLs continue through Lavalink/LavaSrc URL resolution, including track, album, playlist and artist URLs.
+- Approval-mode requests preserve the selected Spotify source across the moderation step.
+- Provider status now treats Spotify as configured only when the LavaSrc switch and Spotify client ID/secret are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Current LavaSrc documentation identifies Spotify playback as mirror-based and documents spsearch plus Spotify URLs/playlists.
+- Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Spotify playback remains a release-gate validation item.
+- Source checkpoint: fec5532f3b6679f439f610947c76318b1beed97e.
+
