@@ -1012,6 +1012,18 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Qobuz playback remains a release-gate validation item.
 - Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
 
+## 2026-10-05 — TikTok creator feed + OAuth
+- Completed the TikTok notification adapter on top of the official Display API.
+- Added migration 99 for dedicated TikTok creator feed storage and migration 100 for include/exclude filters.
+- Added feed create/list, ON/OFF, delete and Test delivery APIs plus Dashboard proxies/UI.
+- Added official OAuth start and authorization-code exchange flow; state is generated server-side and expires after ten minutes.
+- OAuth tokens are stored only as encrypted integration credentials; access tokens are refreshable and newly issued token pairs are persisted.
+- TikTok polling is scoped to guild bot assignments, supports message templates, keyword filters and optional embeds, and does not interfere with the existing RSS/Atom poller.
+- Added Dashboard integration-credential proxy routes so TikTok and existing provider credentials are reachable through the authenticated UI.
+- Database provider CHECK constraint was updated to allow the new TikTok credential provider.
+- Current official TikTok docs require Login Kit authorization and video.list for public video access; live operation still depends on TikTok developer-app approval/configuration and valid creator consent. citeturn588211search0turn679457search2
+- Source checkpoints: 4661790bc12083c6ec8783e403f4de5ad3925d44, 5d4b9d6b38cd78a2f37652f1cdf511691c84fc12.
+
 ## 2026-10-05 — TikTok Display integration foundation
 - Added TikTok as an encrypted integration-credential provider with client key/secret, access token, refresh token, open_id, scopes and token expiration metadata.
 - Management API accepts and validates TikTok OAuth credentials without exposing secret values in list responses.
