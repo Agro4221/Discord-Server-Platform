@@ -513,3 +513,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Static deployment verification requires the domain guard.
 - Source checkpoint: `83f7e61bb7b9cfc25902effc011023ff8b5af288`.
 - CI verification remains pending/unavailable; live upgrade validation is still required.
+
+## 2026-10-05 — Deployment contract reconciliation
+- VPS `DOMAIN` validation is conditional on the presence of `infrastructure/caddy/Caddyfile`; local/non-VPS upgrades continue without a public domain requirement.
+- `check-deployment-contract.mjs` was reconciled to one clean contract flow after the new guards were added.
+- Current upgrade source checkpoint: `dcd9476f76a01995f532dc69e24185079ec93d42`.
+- Current PR still has no check-runs; automated verification remains pending.
