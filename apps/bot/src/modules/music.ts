@@ -42,6 +42,30 @@ export function normalizeMusicPlaylistVisibility(shared: boolean): MusicPlaylist
   return shared ? "shared" : "personal";
 }
 
+export function removeMusicPlaylistTrack<T>(tracks: T[], position: number): T[] | null {
+  if (!Number.isInteger(position) || position < 1 || position > tracks.length) return null;
+  const index = position - 1;
+  return [...tracks.slice(0, index), ...tracks.slice(index + 1)];
+}
+
+export function moveMusicPlaylistTrack<T>(tracks: T[], from: number, to: number): T[] | null {
+  if (
+    !Number.isInteger(from) ||
+    !Number.isInteger(to) ||
+    from < 1 ||
+    from > tracks.length ||
+    to < 1 ||
+    to > tracks.length
+  ) {
+    return null;
+  }
+  const result = [...tracks];
+  const [item] = result.splice(from - 1, 1);
+  if (item === undefined) return null;
+  result.splice(to - 1, 0, item);
+  return result;
+}
+
 const MAX_PLAYLIST_TRACKS = 500;
 export const MUSIC_REQUEST_COOLDOWN_MS = 5_000;
 export const MUSIC_REQUEST_APPROVAL_TTL_MS = 15 * 60_000;
@@ -1257,8 +1281,71 @@ export class Music implements PlatformModule {
     }
 
     const stored = Array.isArray(row.tracks) ? [...row.tracks] : [];
+
+    if (action === "view") {
+      if (stored.length === 0) {
+        await interaction.reply({ content: "🎼 Плейлист **" + name + "** пуст.", ephemeral: true });
+        return;
+      }
+      const lines = stored.slice(0, 50).map((item, index) => {
+        const obj = item as { info?: { title?: string; author?: string } };
+        const title = String(obj.info?.title ?? "Unknown track");
+        const author = String(obj.info?.author ?? "Unknown artist");
+        return (index + 1) + ". **" + title + "** — " + author;
+      });
+      const suffix = stored.length > lines.length ? "\n… и ещё **" + (stored.length - lines.length) + "** треков." : "";
+      await interaction.reply({
+        content: "🎼 **" + name + "** (" + (row.visibility === "shared" ? "🌐 shared" : "👤 личный") + ")\n" + lines.join("\n") + suffix,
+        ephemeral: true
+      });
+      return;
+    }
+
     const current = this.manager?.players.get(guildId);
     const shouldShuffle = action === "load" && interaction.options.getBoolean("shuffle") === true;
+
+    const trackPosition = interaction.options.getInteger("track");
+    const targetPosition = interaction.options.getInteger("to");
+
+    if (action === "remove" || action === "move") {
+      if (!canEdit) {
+        await interaction.reply({ content: "Изменять этот плейлист могут только его создатель, DJ или Manage Server.", ephemeral: true });
+        return;
+      }
+      if (trackPosition === null || (action === "move" && targetPosition === null)) {
+        await interaction.reply({
+          content: action === "move" ? "Для перемещения укажи номер трека и новую позицию." : "Укажи номер трека.",
+          ephemeral: true
+        });
+        return;
+      }
+
+      const updated = action === "remove"
+        ? removeMusicPlaylistTrack(stored, trackPosition)
+        : moveMusicPlaylistTrack(stored, trackPosition, targetPosition!);
+
+      if (!updated) {
+        await interaction.reply({ content: "Такого номера трека/позиции в плейлисте нет.", ephemeral: true });
+        return;
+      }
+
+      if (action === "move" && trackPosition === targetPosition) {
+        await interaction.reply({ content: "Трек уже находится на этой позиции.", ephemeral: true });
+        return;
+      }
+
+      await this.db.query(
+        "UPDATE music_playlists SET tracks=$1::jsonb,updated_at=now() WHERE id=$2",
+        [JSON.stringify(updated),row.id]
+      );
+      await interaction.reply({
+        content: action === "remove"
+          ? "🗑️ Трек №" + trackPosition + " удалён из **" + name + "**."
+          : "↕️ Трек №" + trackPosition + " перемещён на позицию №" + targetPosition + " в **" + name + "**.",
+        ephemeral: true
+      });
+      return;
+    }
 
     if (action === "add") {
       if (!canEdit) {
