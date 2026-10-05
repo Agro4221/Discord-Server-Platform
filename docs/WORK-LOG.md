@@ -1329,3 +1329,9 @@ Never write credentials, tokens or private user data here.
 - Source checkpoint: b54754910ebfced9712a4a7fa4061d343e8d32bf.
 - No runtime behavior changed; this is a configuration-contract cleanup.
 - Fresh CI is not visible yet; backup local/remote recovery remains an environment-dependent release-gate item.
+## 2026-10-05 — Backup runtime gate hardening
+- Hardened docker-compose.yml so PostgreSQL and Lavalink secrets are required explicitly; the old change-me-* fallbacks are gone.
+- CI and the deployment contract now inject ephemeral validation-only secrets when running docker compose config, preserving deterministic bootstrap checks without storing credentials.
+- Added a static regression guard that rejects insecure Compose secret fallbacks if they are reintroduced.
+- Source checkpoints: Compose 770f139aeaecbba5e6e719803c6aa14fed293257; CI bb4f08977245ae201ad84baecabf581b6282e98e; deployment gate 3eb90819746f17a8dd9bac56acd4c68024042a3f.
+- Fresh CI is not visible yet; local/VPS runtime execution remains environment-dependent.
