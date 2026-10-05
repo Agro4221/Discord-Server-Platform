@@ -69,6 +69,11 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       [["request_approval_mode","max_queued_per_user","max_queue_size","fair_queue_enabled"]]
     );
     assert.equal(approvalColumns.rows.length, 4);
+    const radioColumns = await db.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='music_settings' AND column_name = ANY($1)",
+      [["radio_enabled","radio_mode","radio_seed"]]
+    );
+    assert.equal(radioColumns.rows.length, 3);
     assert.equal(Number(version), Number(first.rows[0]?.count));
     assert.equal(Number(second.rows[0]?.count), Number(version));
   } finally {
@@ -1122,6 +1127,32 @@ test("moderation presets persist a complete profile payload", { skip: !enabled }
     assert.deepEqual(result.rows[0]?.payload,payload);
   } finally {
     await db.query("DELETE FROM moderation_presets WHERE guild_id=$1",[guildId]).catch(() => undefined);
+    await db.close();
+  }
+});
+
+
+test("music radio settings persist mode and seed", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345737";
+  try {
+    await migrate(db);
+    await db.query("DELETE FROM music_settings WHERE guild_id=$1", [guildId]);
+    await db.query(
+      "INSERT INTO music_settings(guild_id,radio_enabled,radio_mode,radio_seed) VALUES($1,true,'genre',$2)",
+      [guildId,"liquid drum and bass"]
+    );
+    const row = await db.query<{ radio_enabled: boolean; radio_mode: string; radio_seed: string | null }>(
+      "SELECT radio_enabled,radio_mode,radio_seed FROM music_settings WHERE guild_id=$1",
+      [guildId]
+    );
+    assert.deepEqual(row.rows[0], {
+      radio_enabled: true,
+      radio_mode: "genre",
+      radio_seed: "liquid drum and bass"
+    });
+  } finally {
+    await db.query("DELETE FROM music_settings WHERE guild_id=$1", [guildId]).catch(() => undefined);
     await db.close();
   }
 });
