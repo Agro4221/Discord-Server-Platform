@@ -209,7 +209,8 @@
 | Import playlists from supported URLs | ✅ | |
 | Save queue as playlist | ✅ | |
 | Play favorites / play playlist shortcuts | ✅ | |
-| Playlist pagination and richer management UI | ✅ | |
+| Playlist pagination and richer management UI | ✅ |
+| Playlist duplicate handling / merge | ✅ | |
 
 #### Audio effects
 
