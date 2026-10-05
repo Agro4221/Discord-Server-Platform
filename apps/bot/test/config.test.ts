@@ -31,6 +31,17 @@ function baseEnv(): Record<string, string> {
   };
 }
 
+test("blank Management API keys are rejected", () => {
+  for (const value of ["", "   ", "\t"]) {
+    withEnv({
+      ...baseEnv(),
+      MANAGEMENT_API_KEY: value
+    }, () => {
+      assert.throws(() => loadConfig(), /Missing required environment variable: MANAGEMENT_API_KEY/);
+    });
+  }
+});
+
 test("production rejects a public Management API bind", () => {
   withEnv({
     ...baseEnv(),
