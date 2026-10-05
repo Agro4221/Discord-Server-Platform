@@ -225,7 +225,7 @@
 | Pitch control | ✅ |
 | Speed control | ✅ |
 | Tremolo / Vibrato / Distortion / Low Pass / Channel Mix / rotation / other Lavalink effects | 🟡 | Core effects covered: Tremolo ✅, Vibrato ✅, Distortion ✅, Low Pass ✅, Channel Mix ✅, 8D rotation ✅; remaining work is higher-level effect tooling and any non-core/plugin-specific filters
-| Custom EQ editor | 🟡 |
+| Custom EQ editor | ✅ | `/eq show`, `/eq set`, `/eq reset` and `!eq` equivalents |
 | Named effect profiles | 🟡 | e.g. Gaming / Anime / Chill / Party |
 | Persist and restore effect state | 🟡 |
 

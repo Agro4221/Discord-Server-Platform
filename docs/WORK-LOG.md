@@ -964,3 +964,16 @@ Never write credentials, tokens or private user data here.
 - CI #2215 initially caught a test-fixture omission for the new action; the fixture was corrected and CI #2216 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
 - Final source checkpoint for this slice: `722a8866d30753a77bbe51fbe72ccd687eb19e49`.
 - Next single Music slice: **Custom EQ editor**.
+
+
+## 2026-10-05 — Music Custom EQ editor
+- Completed the independent Custom EQ editor slice.
+- Added a top-level `/eq` command because the `/music` command remains constrained by Discord's subcommand limit.
+- `/eq show` renders all 15 EQ bands; `/eq set` edits one band with gain validation; `/eq reset` clears the custom EQ.
+- Added prefix support: `!eq show`, `!eq set <band 0-14> <gain -0.25..1.00>`, `!eq reset`.
+- EQ changes require DJ / Manage Server; read-only show remains available.
+- The editor uses the native Lavalink client `setEQ()` / `clearEQ()` path and reuses existing player persistence and controller resync.
+- Added deterministic unit coverage for the 15-band boundary and Lavalink EQ gain range.
+- CI #2218 caught a misplaced prefix handler during Typecheck; the handler was moved into the correct `handlePrefixCommand` scope and CI #2219 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: `7ee7f9cc7477497c49d416f90f6352c433aa34e1`.
+- Next single Music slice: **Named effect profiles**.
