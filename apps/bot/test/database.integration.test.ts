@@ -53,9 +53,9 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
     assert.equal(analyticsSettingsColumns.rows.length, 2);
     const musicHistoryColumns = await db.query(
       "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='music_history' AND column_name = ANY($1)",
-      [["guild_id","bot_identity_id","title","played_at"]]
+      [["guild_id","bot_identity_id","identifier","title","played_at"]]
     );
-    assert.equal(musicHistoryColumns.rows.length, 4);    const musicPlaylistVisibility = await db.query(
+    assert.equal(musicHistoryColumns.rows.length, 5);    const musicPlaylistVisibility = await db.query(
       "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='music_playlists' AND column_name='visibility'"
     );
     assert.equal(musicPlaylistVisibility.rows.length, 1);
