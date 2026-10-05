@@ -1012,6 +1012,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           )
           .addStringOption((o) => o.setName("name").setDescription("Playlist name").setMaxLength(80))
           .addBooleanOption((o) => o.setName("shuffle").setDescription("Shuffle tracks when loading the playlist"))
+          .addBooleanOption((o) => o.setName("shared").setDescription("Create or update this playlist as a server-shared playlist"))
       ),
     new SlashCommandBuilder()
       .setName("automation")
