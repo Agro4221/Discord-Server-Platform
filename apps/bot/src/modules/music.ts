@@ -43,7 +43,7 @@ export function normalizeMusicPlaylistVisibility(shared: boolean): MusicPlaylist
 }
 
 export function normalizeMusicPlaylistSearch(value: string): string | null {
-  const normalized = value.replace(/\\/g, "\\\\").trim().slice(0, 80);
+  const normalized = value.trim().slice(0, 80);
   return normalized ? normalized : null;
 }
 
