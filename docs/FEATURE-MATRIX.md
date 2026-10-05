@@ -246,7 +246,7 @@
 | Current-track lyrics lookup | ✅ |
 | Paginated lyrics UI | ✅ | Lyrics are split into Discord-safe pages with readable line boundaries and page counters |
 | Lyrics navigation buttons | ✅ | Back/next buttons are bound to the requesting user/session and expire safely |
-| Synced lyrics when source provides timing | 🟡 |
+| Synced lyrics when source provides timing | ✅ | /music lyrics action=sync renders timestamped lines, highlights the current line and refreshes the ephemeral view every 2s until track change/end; falls back cleanly when timing is unavailable |
 | Lyrics source/status diagnostics | ✅ | /music lyrics action=status shows LavaLyrics node availability and configured lyrics sources; missing lyrics on an individual track is reported separately |
 
 ### Music provider expansion
