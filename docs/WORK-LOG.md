@@ -1001,6 +1001,17 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Yandex playback still requires the user's Lavalink credentials/runtime.
 - Source checkpoint: 5514371977eb7a13f5696ebabf34a159a40d7094.
 
+## 2026-10-05 — Music Apple Music provider parity
+- Added an explicit Apple Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as Apple Music use LavaSrc amsearch; users can also use the explicit amsearch: prefix from prefix/request-channel flows.
+- Direct music.apple.com URLs continue through Lavalink/LavaSrc URL resolution, including track, album, playlist and artist URLs.
+- Approval-mode requests preserve the selected Apple Music source across the moderation step.
+- Provider status now treats Apple Music as configured only when the LavaSrc switch and Apple Music API token are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Current LavaSrc documentation identifies Apple Music playback as mirror-based and documents amsearch plus Apple Music URLs/playlists.
+- Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Apple Music playback remains a release-gate validation item.
+- Source checkpoint: a1b3d6c050e4200af2283e3d0e9135dbb5f9d255.
+
 ## 2026-10-05 — Music Spotify provider parity
 - Added an explicit Spotify Music search provider to /play, /music play and /music search.
 - Non-URL searches selected as Spotify use LavaSrc spsearch; users can also use the explicit spsearch: prefix from prefix/request-channel flows.
