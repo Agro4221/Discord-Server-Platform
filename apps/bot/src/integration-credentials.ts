@@ -1,13 +1,19 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import type { Database } from "./database.js";
 
-export type IntegrationCredentialProvider = "twitch" | "youtube" | "kick";
+export type IntegrationCredentialProvider = "twitch" | "youtube" | "kick" | "tiktok";
 export type IntegrationCredentialInput = {
   provider: IntegrationCredentialProvider;
   label: string;
   clientId?: string;
   clientSecret?: string;
   apiKey?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  openId?: string;
+  expiresAt?: number;
+  refreshExpiresAt?: number;
+  scope?: string;
 };
 export type IntegrationCredentialRecord = {
   id: number;
@@ -97,6 +103,14 @@ export class IntegrationCredentialRepository {
     normalizeSecret(row.provider, secret);
     const startedAt = Date.now();
 
+    if (row.provider === "tiktok") {
+      const response = await this.fetcher("https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name", {
+        headers: { Authorization: "Bearer " + secret.accessToken }
+      });
+      if (!response.ok) throw new Error("integration_credential_test_http_" + response.status);
+      return { provider: row.provider, latencyMs: Math.max(0, Date.now() - startedAt) };
+    }
+
     if (row.provider === "twitch" || row.provider === "kick") {
       const clientId = secret.clientId!;
       const clientSecret = secret.clientSecret!;
@@ -170,19 +184,35 @@ export class IntegrationCredentialRepository {
 }
 
 function normalizeCredentialInput(input: IntegrationCredentialInput): { provider: IntegrationCredentialProvider; label: string; secret: ProviderCredentialSecret } {
-  if (!["twitch", "youtube", "kick"].includes(input.provider)) throw new Error("invalid_integration_credential_provider");
+  if (!["twitch", "youtube", "kick", "tiktok"].includes(input.provider)) throw new Error("invalid_integration_credential_provider");
   const label = input.label.trim().replace(/\s+/g, " ");
   if (!label || label.length > 80) throw new Error("invalid_integration_credential_label");
   const secret: ProviderCredentialSecret = {
     ...(input.clientId !== undefined ? { clientId: input.clientId.trim() } : {}),
     ...(input.clientSecret !== undefined ? { clientSecret: input.clientSecret } : {}),
-    ...(input.apiKey !== undefined ? { apiKey: input.apiKey.trim() } : {})
+    ...(input.apiKey !== undefined ? { apiKey: input.apiKey.trim() } : {}),
+    ...(input.accessToken !== undefined ? { accessToken: input.accessToken.trim() } : {}),
+    ...(input.refreshToken !== undefined ? { refreshToken: input.refreshToken.trim() } : {}),
+    ...(input.openId !== undefined ? { openId: input.openId.trim() } : {}),
+    ...(input.expiresAt !== undefined ? { expiresAt: Number(input.expiresAt) } : {}),
+    ...(input.refreshExpiresAt !== undefined ? { refreshExpiresAt: Number(input.refreshExpiresAt) } : {}),
+    ...(input.scope !== undefined ? { scope: input.scope.trim() } : {})
   };
   normalizeSecret(input.provider, secret);
   return { provider: input.provider, label, secret };
 }
 
 function normalizeSecret(provider: IntegrationCredentialProvider, secret: ProviderCredentialSecret): void {
+  if (provider === "tiktok") {
+    if (!secret.clientId || !secret.clientSecret || secret.clientId.length > 256 || secret.clientSecret.length > 512) {
+      throw new Error("invalid_tiktok_client_credentials");
+    }
+    if (!secret.accessToken || secret.accessToken.length > 4096) throw new Error("invalid_tiktok_access_token");
+    if (!secret.refreshToken || secret.refreshToken.length > 4096) throw new Error("invalid_tiktok_refresh_token");
+    if (secret.openId !== undefined && secret.openId.length > 256) throw new Error("invalid_tiktok_open_id");
+    if (secret.scope !== undefined && secret.scope.length > 1024) throw new Error("invalid_tiktok_scope");
+    return;
+  }
   if (provider === "youtube") {
     if (!secret.apiKey || secret.apiKey.length > 512) throw new Error("invalid_youtube_api_key");
     return;
