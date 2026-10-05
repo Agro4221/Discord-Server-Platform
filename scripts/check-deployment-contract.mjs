@@ -33,6 +33,13 @@ const vpsCompose = await readFile("docker-compose.vps.yml", "utf8");
 const caddyExample = await readFile("infrastructure/caddy/Caddyfile.example", "utf8");
 const gitignore = await readFile(".gitignore", "utf8");
 const dockerCompose = await readFile("docker-compose.yml", "utf8");
+const lavalinkConfig = await readFile("infrastructure/lavalink/application.yml", "utf8");
+if (
+  lavalinkConfig.includes("change-me-local") ||
+  !lavalinkConfig.includes('password: "${LAVALINK_SERVER_PASSWORD}"')
+) {
+  throw new Error("Lavalink password must come from the explicit environment secret");
+}
 const healthSource = await readFile("apps/bot/src/health.ts", "utf8");
 if (
   !healthSource.includes('path === "/health"') ||
