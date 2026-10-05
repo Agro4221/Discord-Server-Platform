@@ -164,6 +164,25 @@ export function NotificationsPanel({
     }
   }
 
+  async function testFeed(feed: Feed) {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/feeds/" + feed.id + "/test", {
+        method: "POST",
+        headers: { "content-type": "application/json" }
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "feed_test_failed");
+      setError("");
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось протестировать feed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function patch(feed: Feed, enabled: boolean) {
     setBusy(true);
     setError("");
@@ -274,6 +293,7 @@ export function NotificationsPanel({
             </div>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
+            <button type="button" disabled={busy} onClick={() => void testFeed(feed)} style={buttonStyle("secondary")}>Test</button>
             <button
               type="button"
               disabled={busy}
