@@ -342,7 +342,7 @@ Dashboard является основным способом редактиро�
 
 Проект уже объединяет основные категории, ради которых обычно используют несколько multipurpose Discord bots: moderation, AutoMod, role panels, welcome/verification, leveling, tickets, giveaways, feeds, starboard, economy, reminders, automation, analytics и music.
 
-При этом это ещё не буквальная feature-parity со всеми зрелыми ботами. Отдельно остаются более глубокие custom commands, расширенный logging, richer AutoMod policies, расширенный Automation catalog, более широкий Music provider/failover слой и fleet failover automation.
+При этом это не обещание буквальной feature-parity со всеми зрелыми ботами. Наш согласованный scope закрывает собственные административные и пользовательские функции; дальнейшие улучшения сверх него идут как отдельные feature-slice.
 
 Главная архитектурная цель уже соблюдена: локальный self-hosted Core + PostgreSQL + Dashboard + Lavalink, без необходимости покупать premium-функции у внешнего bot provider. Сравнение с другими ботами нужно понимать как набор заимствованных продуктовых идей и UX-паттернов, а не как обещание полной копии каждого сервиса.## 2026-10-03 — Utility commands / AFK
 - The Community area now includes a Utility module for lightweight everyday server operations:
@@ -376,3 +376,8 @@ Dashboard является основным способом редактиро�
 После регистрации зашифрованный credential в PostgreSQL является источником истины при запуске выбранной identity. Значения Discord credentials из .env используются только как bootstrap, когда для этой identity ещё нет сохранённого credential. Поэтому старый токен в .env больше не перезаписывает токен, который был обновлён через Control Center.
 
 Важно: каждая BOT_IDENTITY_ID работает в отдельном Node-процессе. Регистрация secondary identity выполняется через Control Center, а локальный Fleet supervisor автоматически запускает/перезапускает включённые, credentialed identities. Само сохранение identity не выполняет синхронный запуск процесса внутри Dashboard request.
+
+
+## Music providers
+
+Music поддерживает автоматический поиск и явный выбор YouTube, YouTube Music, SoundCloud, Spotify и Яндекс Музыки. Spotify/Yandex работают через LavaSrc; для них можно включить соответствующие флаги и credentials в `.env`. Прямые ссылки на поддерживаемые сервисы передаются в Lavalink без преобразования на стороне Dashboard.
