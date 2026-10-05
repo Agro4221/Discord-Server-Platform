@@ -130,7 +130,7 @@ export function BotSetupPanel() {
   }
 
   async function save() {
-    if (!/^d{17,20}$/.test(setup.clientId)) {
+    if (!/^\d{17,20}$/.test(setup.clientId)) {
       setError("Client ID должен быть Discord Application ID.");
       return;
     }
