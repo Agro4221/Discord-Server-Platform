@@ -81,6 +81,18 @@ for (const runtimeContract of [
   }
 }
 
+for (const secretContract of [
+  "get_env()",
+  "ensure_secret()",
+  "ensure_secret MANAGEMENT_API_KEY",
+  "ensure_secret POSTGRES_PASSWORD",
+  "ensure_secret LAVALINK_PASSWORD"
+]) {
+  if (!vpsInstaller.includes(secretContract)) {
+    throw new Error("VPS secret-preservation contract missing: " + secretContract);
+  }
+}
+
 const localLauncher = await readFile("scripts/start-local.ps1", "utf8");
 for (const contract of [
   "docker compose up -d",
