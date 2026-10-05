@@ -1463,6 +1463,14 @@ const migrations = [
       "CREATE INDEX IF NOT EXISTS idx_music_players_playlist_id ON music_players(playlist_id);"
     ])
   },
+  {
+    version: 96,
+    name: "music_history_identifier",
+    sql: q([
+      "ALTER TABLE music_history ADD COLUMN IF NOT EXISTS identifier text;",
+      "CREATE INDEX IF NOT EXISTS idx_music_history_guild_identifier_recent ON music_history(guild_id,bot_identity_id,identifier,played_at DESC,id DESC) WHERE identifier IS NOT NULL;"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
