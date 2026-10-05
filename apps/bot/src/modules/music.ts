@@ -49,28 +49,31 @@ export function normalizeMusicPlaylistVisibility(shared: boolean): MusicPlaylist
   return shared ? "shared" : "personal";
 }
 
-export type MusicSearchProvider = "youtube" | "yandex";
+export type MusicSearchProvider = "youtube" | "yandex" | "spotify";
 
 export function normalizeMusicSearchProvider(value: string | null | undefined): MusicSearchProvider | null {
-  if (value === "youtube" || value === "yandex") return value;
+  if (value === "youtube" || value === "yandex" || value === "spotify") return value;
   return null;
 }
 
 export function resolveMusicSearchRequest(
   query: string,
   provider?: MusicSearchProvider | null
-): { query: string; source?: "ytsearch" | "ymsearch" } {
+): { query: string; source?: "ytsearch" | "ymsearch" | "spsearch" } {
   const normalized = query.trim();
   if (/^https?:\/\//i.test(normalized)) return { query: normalized };
   if (/^ymsearch:/i.test(normalized)) {
     return { query: normalized.replace(/^ymsearch:\s*/i, ""), source: "ymsearch" };
   }
+  if (/^spsearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^spsearch:\s*/i, ""), source: "spsearch" };
+  }
   if (/^ytsearch:/i.test(normalized)) {
     return { query: normalized.replace(/^ytsearch:\s*/i, ""), source: "ytsearch" };
   }
-  return provider === "yandex"
-    ? { query: normalized, source: "ymsearch" }
-    : { query: normalized, source: "ytsearch" };
+  if (provider === "yandex") return { query: normalized, source: "ymsearch" };
+  if (provider === "spotify") return { query: normalized, source: "spsearch" };
+  return { query: normalized, source: "ytsearch" };
 }
 
 export function normalizeMusicPlaylistSearch(value: string): string | null {
@@ -2912,7 +2915,7 @@ export class Music implements PlatformModule {
     const providers: Array<[string,string,boolean]> = [
       ["YouTube","yt",true],
       ["SoundCloud","Lavalink",true],
-      ["Spotify","LavaSrc",process.env.LAVASRC_SPOTIFY_ENABLED === "true"],
+      ["Spotify","LavaSrc",process.env.LAVASRC_SPOTIFY_ENABLED === "true" && Boolean(process.env.SPOTIFY_CLIENT_ID?.trim()) && Boolean(process.env.SPOTIFY_CLIENT_SECRET?.trim())],
       ["Apple Music","LavaSrc",process.env.LAVASRC_APPLEMUSIC_ENABLED === "true"],
       ["Deezer","LavaSrc",process.env.LAVASRC_DEEZER_ENABLED === "true"],
       ["Yandex Music","LavaSrc",process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true" && Boolean(process.env.YANDEX_MUSIC_ACCESS_TOKEN?.trim())],
