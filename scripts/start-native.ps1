@@ -318,21 +318,16 @@ function Ensure-LavalinkJar {
 
   $version = "4.2.2"
   $downloadUrl = "https://github.com/lavalink-devs/Lavalink/releases/download/$version/Lavalink.jar"
-  $releaseApi = "https://api.github.com/repos/lavalink-devs/Lavalink/releases/tags/$version"
+  $expectedSha256 = "8CB801E591072C3689FAFD71CCF571A95A4EAD3CC35DF045E157D763D89119A"
   Write-Host "Downloading Lavalink $version..."
   try {
-    $release = Invoke-RestMethod -Uri $releaseApi -Headers @{ "User-Agent" = "DiscordServerPlatform-native-installer" } -TimeoutSec 20
-    $asset = @($release.assets | Where-Object { $_.name -eq "Lavalink.jar" })[0]
-    $digest = if ($asset) { [string]$asset.digest } else { "" }
     $targetDir = Split-Path $resolved -Parent
     New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
     Invoke-WebRequest -Uri $downloadUrl -OutFile $resolved -UseBasicParsing
-    if ($digest -match "^sha256:([0-9a-fA-F]{64})$") {
-      $actual = (Get-FileHash -Path $resolved -Algorithm SHA256).Hash
-      if ($actual -ne $Matches[1].ToUpperInvariant()) {
-        Remove-Item $resolved -Force -ErrorAction SilentlyContinue
-        throw "Lavalink SHA-256 verification failed."
-      }
+    $actual = (Get-FileHash -Path $resolved -Algorithm SHA256).Hash.ToUpperInvariant()
+    if ($actual -ne $expectedSha256) {
+      Remove-Item $resolved -Force -ErrorAction SilentlyContinue
+      throw "Lavalink SHA-256 verification failed."
     }
   } catch {
     Remove-Item $resolved -Force -ErrorAction SilentlyContinue
