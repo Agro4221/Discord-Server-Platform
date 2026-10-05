@@ -442,7 +442,7 @@ export function buildNotificationEmbed(
   if (config.title) embed.setTitle(replace(config.title));
   if (config.description) embed.setDescription(replace(config.description));
   if (config.url) embed.setURL(config.url);
-  if (config.color) embed.setColor(config.color);
+  if (config.color) embed.setColor(config.color as import("discord.js").HexColorString);
   if (config.footer) embed.setFooter({ text: replace(config.footer) });
   if (config.image) embed.setImage(config.image);
   if (config.thumbnail) embed.setThumbnail(config.thumbnail);
