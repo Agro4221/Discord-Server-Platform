@@ -2976,7 +2976,7 @@ export class Music implements PlatformModule {
       const from = interaction.options.getInteger("from");
       const end = interaction.options.getInteger("end");
       if (action === "clear") {
-        this.playlistContinuations.delete(interaction.guild.id);
+        this.playlistContinuations.delete(interaction.guildId!);
         queue.splice(0, queue.length);
         await this.persistPlayer(player);
         await this.syncController(player);
