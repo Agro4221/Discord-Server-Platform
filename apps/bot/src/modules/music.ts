@@ -1678,6 +1678,21 @@ export class Music implements PlatformModule {
       return;
     }
 
+    const requester = await interaction.client.users.fetch(request.requester_user_id).catch(() => null);
+    if (!requester) {
+      await this.db.query(
+        "UPDATE music_request_approvals SET status='failed',resolved_by=$1,resolved_at=now() WHERE id=$2 AND status='processing'",
+        [interaction.user.id, requestId]
+      );
+      await this.updateMusicRequestApprovalMessage(
+        interaction,
+        "failed",
+        requestId,
+        "Автор запроса больше недоступен."
+      );
+      return;
+    }
+
     if (action === "reject") {
       await this.db.query(
         \`UPDATE music_request_approvals
@@ -1702,13 +1717,13 @@ export class Music implements PlatformModule {
 
     try {
       const queued = request.track && typeof request.track === "object"
-        ? await this.enqueueApprovedStoredTrack(request, member.user)
+        ? await this.enqueueApprovedStoredTrack(request, requester)
         : await this.queueQuery(
             request.guild_id,
             request.requester_voice_channel_id,
             request.source_channel_id,
             request.query,
-            member.user,
+            requester,
             true,
             true
           );
