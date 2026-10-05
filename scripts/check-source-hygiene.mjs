@@ -3,11 +3,13 @@ import { join, relative } from "node:path";
 
 const roots = ["apps", "packages", "scripts"];
 const patterns = [
-  /\\bMT[A-Za-z0-9_-]{20,}\\b/,
-  /\\bgh[pousr]_[A-Za-z0-9_]{30,}\\b/,
+  /\bMT[A-Za-z0-9_-]{20,}\b/,
+  /\bgh[pousr]_[A-Za-z0-9_]{30,}\b/,
+  /\bgithub_pat_[A-Za-z0-9_]{50,}\b/,
+  /\bAKIA[0-9A-Z]{16}\b/,
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
-  /DISCORD_TOKEN\\s*=\\s*[^$\\s][^\\n#]+/,
-  /CLIENT_SECRET\\s*=\\s*[^$\\s][^\\n#]+/
+  /DISCORD_TOKEN\s*=\s*[^$\s][^\n#]+/,
+  /CLIENT_SECRET\s*=\s*[^$\s][^\n#]+/
 ];
 const failures = [];
 const ignored = new Set(["node_modules", ".next", "dist", "build", ".git"]);
