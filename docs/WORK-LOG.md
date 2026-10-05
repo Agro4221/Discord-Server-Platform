@@ -904,3 +904,10 @@ Never write credentials, tokens or private user data here.
 - CI #2399, #2400, #2401 and #2402 failed only in this stale deployment-contract layer while the cleanup was being reconciled; the exact JavaScript syntax issue found in #2402 has been removed from both legacy-file absence checks.
 - No implemented bot feature was removed by this cleanup; deleted Dashboard files were unused legacy implementations, while the active Control Center remains intact.
 - Fresh CI on the finalized cleanup baseline is the remaining automated verification step.
+
+
+## 2026-10-05 — VPS bootstrap cleanup
+- Removed obsolete Dashboard admin-password/session prompts and secret generation from `scripts/install-vps.sh`.
+- VPS bootstrap now matches the current local architecture: Discord credentials are entered, Management API and Bot credential secrets are generated, and the local Control Center uses no end-user login.
+- Installer documentation output now points to the loopback Control Center after the health check.
+- Existing Docker/VPS feature set is preserved; this change only removes dead authentication state.
