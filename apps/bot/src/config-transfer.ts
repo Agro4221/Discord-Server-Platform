@@ -34,7 +34,7 @@ const CONFIG_TABLES: ExportTable[] = [
   { table: "verification_settings", fields: ["enabled","channel_id","verified_role_id","quarantine_role_id","log_channel_id","code_ttl_minutes","panel_title","panel_description","issue_button_label","confirm_button_label"] },
   { table: "leveling_settings", fields: ["enabled","xp_per_message","cooldown_seconds","announce_level_up"] },
   { table: "starboard_settings", fields: ["channel_id","threshold","ignore_self_reaction","ignore_bots"] },
-  { table: "music_settings", fields: ["enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven","queue_access","vote_skip_enabled","vote_skip_percent","vote_skip_minimum"] },
+  { table: "music_settings", fields: ["enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven","queue_access","vote_skip_enabled","vote_skip_percent","vote_skip_minimum","fair_queue_enabled"] },
   { table: "birthday_settings", fields: ["channel_id","announcement_template"] },
   { table: "analytics_settings", fields: ["retention_days","visible_counters"] },
   { table: "onboarding_flows", fields: ["enabled","trigger","steps"] },
@@ -558,7 +558,7 @@ export class ConfigTransferService {
     });
 
     await execute("music_settings", "music", [
-      "enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven","queue_access","vote_skip_enabled","vote_skip_percent","vote_skip_minimum"
+      "enabled","preferred_text_channel_id","request_channel_id","default_volume","announce_track_start","autoplay","twenty_four_seven","queue_access","vote_skip_enabled","vote_skip_percent","vote_skip_minimum","fair_queue_enabled"
     ], {
       enabled: false,
       preferred_text_channel_id: null,
@@ -570,7 +570,8 @@ export class ConfigTransferService {
       queue_access: "everyone",
       vote_skip_enabled: false,
       vote_skip_percent: 0.5,
-      vote_skip_minimum: 2
+      vote_skip_minimum: 2,
+      fair_queue_enabled: false
     });
 
     await execute("birthday_settings", "birthdays", [
