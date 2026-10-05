@@ -398,7 +398,7 @@ try {
     }
 
     $env:NODE_OPTIONS = "--max-old-space-size=$dashboardNodeHeap"
-    Start-NativeProcess "dashboard" "npm.cmd" @("run", "start", "-w", "apps/dashboard") (Get-Location).Path "dashboard"
+    Start-NativeProcess "dashboard" "npm.cmd" @("run", "start:native", "-w", "apps/dashboard", "--", "-p", $dashboardPort) (Get-Location).Path "dashboard"
     $env:NODE_OPTIONS = $previousNodeOptions
 
     $dashboardUrl = "http://127.0.0.1:{0}/" -f $dashboardPort
