@@ -222,7 +222,7 @@
 | Nightcore | ✅ |
 | 8D rotation | ✅ |
 | Karaoke | ✅ |
-| Pitch control | 🟡 |
+| Pitch control | ✅ |
 | Speed control | 🟡 |
 | Tremolo / rotation / other Lavalink effects | 🟡 |
 | Custom EQ editor | 🟡 |
