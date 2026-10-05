@@ -1393,7 +1393,14 @@ const migrations = [
     sql: q([
       "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS max_queued_per_user integer NOT NULL DEFAULT 10 CHECK(max_queued_per_user BETWEEN 0 AND 100);"
     ])
-  },
+  },,
+  {
+    version: 90,
+    name: "music_fair_queue_setting",
+    sql: q([
+      "ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS fair_queue_enabled boolean NOT NULL DEFAULT false;"
+    ])
+  }
   {
     version: 90,
     name: "music_guild_queue_limit",
