@@ -171,6 +171,7 @@ test("music quick filter actions allow only known presets", async () => {
     "pop",
     "electronic",
     "fullsound",
+    "karaoke",
     "gaming",
     "nightcore",
     "8d"
