@@ -4,62 +4,64 @@ Native Windows is the primary local mode for a gaming/streaming PC. Docker Deskt
 
 ## One-click startup
 
-Use `start.bat` for the low-overhead everyday mode.
+Use exactly one file:
 
-It starts:
-- an already installed local PostgreSQL service/process;
-- one Lavalink node;
-- the compiled Discord Server Platform bot.
+    start.bat
 
-Dashboard is OFF by default to minimize background resource use.
+By default it starts the complete local stack:
+- an already installed local PostgreSQL service/process (or installs PostgreSQL 17 on first run);
+- one Lavalink node (the 4.2.2 JAR is downloaded and SHA-256 checked on first run);
+- the compiled Discord Server Platform bot;
+- the local Control Center.
 
-Use `control-center.bat` when the web Control Center is needed.
-Use `start.bat -Lavalink2` only when a second Lavalink node is actually needed for redundancy.
-Use `stop.bat` to stop only the native processes tracked by this launcher.
+Discord credentials are optional at process startup. The first run can therefore reach Control Center → Bot Fleet before a Discord bot is registered.
 
-Discord credentials are optional at process startup. The Management API and Control Center can start first; register the bot through Control Center → Bot Fleet. The bot token is stored encrypted by the application.
+Optional arguments use the same `start.bat` file:
+- `start.bat -NoDashboard` — bot + PostgreSQL + Lavalink without Dashboard;
+- `start.bat -Lavalink2` — add the second Lavalink node;
+- `start.bat -Rebuild` — rebuild application artifacts;
+- `start.bat -Down` — stop the native processes started by the launcher;
+- `start.bat -Status` — show the machine RAM/CPU and tracked native process working set.
+
+## First run
+
+The launcher checks for Node.js 24.17+, Java 17+, PostgreSQL 17 and the native npm dependency tree. Missing Node.js, Microsoft OpenJDK 17 and PostgreSQL 17 can be installed automatically through WinGet; the launcher then refreshes PATH and continues.
+
+On a fresh configuration it also:
+1. creates `.env` from `.env.example`;
+2. generates local Management API/Lavalink/PostgreSQL secrets;
+3. installs npm dependencies;
+4. installs/starts PostgreSQL and creates the default `discord_platform` database;
+5. downloads Lavalink 4.2.2;
+6. builds the domain, bot and Control Center;
+7. starts the native processes and opens the local Control Center.
+
+WinGet must be present on Windows. The launcher fails with an explicit message rather than silently falling back to Docker if App Installer/WinGet is unavailable.
 
 ## Native requirements
 
-Install these on Windows:
-- Node.js 24.17+
-- PostgreSQL with `psql.exe` and `pg_isready.exe` available in PATH;
-- Java 17+ for the repository's Lavalink 4 runtime;
-- a Lavalink JAR downloaded separately.
+Supported runtime target:
+- Windows x64;
+- Node.js 24.17+;
+- PostgreSQL 17;
+- Java 17+;
+- enough free SSD for dependencies, build output, PostgreSQL data and Lavalink.
 
-Lavalink officially supports standalone JAR execution and requires Java 17 or higher.
+Lavalink v4 officially requires Java 17 or newer and provides a standalone JAR release. The project pins Lavalink 4.2.2 for native startup. See https://lavalink.dev/ and https://github.com/lavalink-devs/Lavalink/releases/tag/4.2.2.
 
-Set `LAVALINK_JAR_PATH` in `.env`. The default is `./infrastructure/lavalink/lavalink.jar`.
-The repository does not commit a Lavalink JAR.
+## Resource limits
 
-## Database
+Default native caps are intentionally conservative:
+- Lavalink JVM: `-Xms128m -Xmx512m`;
+- bot Node.js old-space: 768 MiB;
+- Dashboard Node.js old-space: 512 MiB.
 
-Native mode keeps PostgreSQL as the source of truth. The launcher uses `DATABASE_URL` from `.env`.
-
-If PostgreSQL is installed as a Windows service but is stopped, the launcher attempts to start a local `postgresql*` service automatically. If the configured database is still unreachable, it asks for a working `DATABASE_URL` instead of modifying the database setup blindly.
-
-## Resource caps
-
-Default native limits are intentionally modest:
-- Lavalink: `LAVALINK_JAVA_XMS=128m`, `LAVALINK_JAVA_XMX=512m`;
-- Bot Node.js old-space: 768 MiB;
-- Dashboard Node.js old-space: 512 MiB when Dashboard is enabled.
-
-These are memory ceilings for the respective runtimes, not predictions of actual RSS.
-See `docs/RESOURCE-REQUIREMENTS.md` for system tiers and the measurement procedure.
-
-## Build behavior
-
-The first native start builds the domain package and bot. Dashboard is built only when `control-center.bat` is used. Later starts reuse the compiled outputs.
-
-Use `start.bat -Rebuild` after dependency/source changes when a clean rebuild is needed.
+These are ceilings for the respective runtimes, not the total RSS of the processes. See `docs/RESOURCE-REQUIREMENTS.md` for the DSP-only hardware tiers.
 
 ## Runtime files
 
 PID files and logs are kept under `.native-runtime/`, which is ignored by Git.
-Stdout/stderr logs are rotated when a log exceeds 10 MiB, keeping one previous copy.
-
-Use `native-status.bat` to see the machine RAM/CPU information and current working set of tracked native processes.
+stdout/stderr logs rotate at 10 MiB and keep one previous copy.
 
 ## Docker
 
