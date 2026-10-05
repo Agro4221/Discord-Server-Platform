@@ -49,17 +49,17 @@ export function normalizeMusicPlaylistVisibility(shared: boolean): MusicPlaylist
   return shared ? "shared" : "personal";
 }
 
-export type MusicSearchProvider = "youtube" | "yandex" | "spotify";
+export type MusicSearchProvider = "youtube" | "yandex" | "spotify" | "applemusic";
 
 export function normalizeMusicSearchProvider(value: string | null | undefined): MusicSearchProvider | null {
-  if (value === "youtube" || value === "yandex" || value === "spotify") return value;
+  if (value === "youtube" || value === "yandex" || value === "spotify" || value === "applemusic") return value;
   return null;
 }
 
 export function resolveMusicSearchRequest(
   query: string,
   provider?: MusicSearchProvider | null
-): { query: string; source?: "ytsearch" | "ymsearch" | "spsearch" } {
+): { query: string; source?: "ytsearch" | "ymsearch" | "spsearch" | "amsearch" } {
   const normalized = query.trim();
   if (/^https?:\/\//i.test(normalized)) return { query: normalized };
   if (/^ymsearch:/i.test(normalized)) {
@@ -68,11 +68,15 @@ export function resolveMusicSearchRequest(
   if (/^spsearch:/i.test(normalized)) {
     return { query: normalized.replace(/^spsearch:\s*/i, ""), source: "spsearch" };
   }
+  if (/^amsearch:/i.test(normalized)) {
+    return { query: normalized.replace(/^amsearch:\s*/i, ""), source: "amsearch" };
+  }
   if (/^ytsearch:/i.test(normalized)) {
     return { query: normalized.replace(/^ytsearch:\s*/i, ""), source: "ytsearch" };
   }
   if (provider === "yandex") return { query: normalized, source: "ymsearch" };
   if (provider === "spotify") return { query: normalized, source: "spsearch" };
+  if (provider === "applemusic") return { query: normalized, source: "amsearch" };
   return { query: normalized, source: "ytsearch" };
 }
 
@@ -903,6 +907,7 @@ export class Music implements PlatformModule {
         { name: "YouTube", enabled: true, mode: "direct" },
         { name: "SoundCloud", enabled: true, mode: "direct" },
         { name: "Spotify", enabled: process.env.LAVASRC_SPOTIFY_ENABLED === "true" && Boolean(process.env.SPOTIFY_CLIENT_ID?.trim()) && Boolean(process.env.SPOTIFY_CLIENT_SECRET?.trim()), mode: "mirror" },
+        { name: "Apple Music", enabled: process.env.LAVASRC_APPLEMUSIC_ENABLED === "true" && Boolean(process.env.APPLE_MUSIC_API_TOKEN?.trim()), mode: "mirror" },
         { name: "Apple Music", enabled: process.env.LAVASRC_APPLEMUSIC_ENABLED === "true", mode: "mirror" },
         { name: "Deezer", enabled: process.env.LAVASRC_DEEZER_ENABLED === "true", mode: "direct" },
         { name: "Yandex Music", enabled: process.env.LAVASRC_YANDEXMUSIC_ENABLED === "true", mode: "direct" },
