@@ -1267,3 +1267,10 @@ Never write credentials, tokens or private user data here.
 - Deployment contract now requires the secret-preservation helpers and explicit per-secret handling.
 - Source checkpoint: `73e5ebdf792f38ae2ab29fb0ba0adba7f224154f`.
 - Fresh CI is not visible yet; clean-host/reinstall execution remains a live release-gate check.
+
+## 2026-10-05 — VPS upgrade secret guard
+- Hardened `upgrade.sh` with a fail-fast check for `MANAGEMENT_API_KEY`, `POSTGRES_PASSWORD` and `LAVALINK_PASSWORD` before Compose startup.
+- A damaged or incomplete `.env` now fails clearly instead of starting a partially configured stack.
+- Deployment contract now checks that the upgrade guard remains present.
+- Source checkpoint: `67ed79823ca844e1daa088b9631f7a41a45c26be`.
+- Fresh CI is not visible yet; actual upgrade/recovery execution remains a live gate.
