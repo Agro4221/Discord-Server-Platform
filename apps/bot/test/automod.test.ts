@@ -214,6 +214,7 @@ test("AutoMod records a durable audit event for a handled violation", async () =
           }]
         } as { rows: T[] };
       }
+      if (text.startsWith("SELECT detector,threshold")) return { rows: [] } as { rows: T[] };
       if (text.startsWith("INSERT INTO automod_events")) return { rows: [], rowCount: 1 } as { rows: T[] };
       throw new Error("unexpected query: " + text);
     }
@@ -303,14 +304,14 @@ test("AutoMod timeout rule creates a moderation case only after Discord timeout 
           threshold: null,
           window_seconds: null,
           action: "timeout",
-          timeout_minutes: 15,
-          affected_role_ids: [],
-          ignored_role_ids: [],
-          affected_channel_ids: ["345678901234567890"],
-          ignored_channel_ids: [],
-          ignore_moderators: false,
-          log_channel_id: null,
-          message_template: ""
+          timeoutMinutes: 15,
+          affectedRoleIds: [],
+          ignoredRoleIds: [],
+          affectedChannelIds: ["345678901234567890"],
+          ignoredChannelIds: [],
+          ignoreModerators: false,
+          logChannelId: null,
+          messageTemplate: ""
         }] } as { rows: T[] };
       }
       if (text.startsWith("INSERT INTO moderation_cases")) {
@@ -658,7 +659,7 @@ test("AutoMod log rule can deliver a template to its configured log channel", as
         return { rows: [{ enabled: true, blocked_words: [], max_mentions: 6, max_caps_ratio: 0.85, max_repeated_messages: 5, repeated_window_seconds: 10, block_links: false, block_invites: false, max_links: 3, max_emojis: 20, max_line_length: 1000, exempt_channel_ids: "", exempt_role_ids: "", delete_message: false, timeout_minutes: 0 }] } as { rows: T[] };
       }
       if (text.includes("FROM automod_rules WHERE guild_id=")) {
-        return { rows: [{ detector: "honeypot", threshold: null, window_seconds: null, action: "log", timeout_minutes: 0, affected_role_ids: [], ignored_role_ids: [], affected_channel_ids: ["345678901234567890"], ignored_channel_ids: [], ignore_moderators: true, log_channel_id: "999999999999999999", message_template: "{mention} нарушил правило в {channel}" }] } as { rows: T[] };
+        return { rows: [{ detector: "honeypot", threshold: null, windowSeconds: null, action: "log", timeoutMinutes: 0, affectedRoleIds: [], ignoredRoleIds: [], affectedChannelIds: ["345678901234567890"], ignoredChannelIds: [], ignoreModerators: true, logChannelId: "999999999999999999", messageTemplate: "{mention} нарушил правило в {channel}" }] } as { rows: T[] };
       }
       if (text.startsWith("INSERT INTO automod_events")) return { rows: [], rowCount: 1 } as { rows: T[] };
       return { rows: [], rowCount: 1 } as { rows: T[] };
