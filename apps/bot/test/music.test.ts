@@ -605,21 +605,33 @@ test("Music speed normalization accepts the supported range and rounds to cents"
 });
 
 
-test("Music provider resolver routes Yandex search to ymsearch and preserves direct URLs", () => {
+test("Music provider resolver routes Yandex and Spotify searches and preserves direct URLs", () => {
   assert.equal(normalizeMusicSearchProvider("youtube"), "youtube");
   assert.equal(normalizeMusicSearchProvider("yandex"), "yandex");
-  assert.equal(normalizeMusicSearchProvider("spotify"), null);
+  assert.equal(normalizeMusicSearchProvider("spotify"), "spotify");
+  assert.equal(normalizeMusicSearchProvider("deezer"), null);
 
   assert.deepEqual(resolveMusicSearchRequest("animals", "yandex"), {
     query: "animals",
     source: "ymsearch"
   });
+  assert.deepEqual(resolveMusicSearchRequest("animals architects", "spotify"), {
+    query: "animals architects",
+    source: "spsearch"
+  });
   assert.deepEqual(resolveMusicSearchRequest("ymsearch:animals architects"), {
     query: "animals architects",
     source: "ymsearch"
   });
+  assert.deepEqual(resolveMusicSearchRequest("spsearch:animals architects"), {
+    query: "animals architects",
+    source: "spsearch"
+  });
   assert.deepEqual(resolveMusicSearchRequest("https://music.yandex.ru/track/71663565", "yandex"), {
     query: "https://music.yandex.ru/track/71663565"
+  });
+  assert.deepEqual(resolveMusicSearchRequest("https://open.spotify.com/track/0eG08cBeKk0mzykKjw4hcQ", "spotify"), {
+    query: "https://open.spotify.com/track/0eG08cBeKk0mzykKjw4hcQ"
   });
   assert.deepEqual(resolveMusicSearchRequest("animals"), {
     query: "animals",
