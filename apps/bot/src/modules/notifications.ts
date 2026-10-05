@@ -1,11 +1,21 @@
 import dns from "node:dns/promises";
 import net from "node:net";
 import { XMLParser } from "fast-xml-parser";
-import { ChannelType, type ChatInputCommandInteraction, type Client } from "discord.js";
+import { EmbedBuilder, ChannelType, type ChatInputCommandInteraction, type Client } from "discord.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
+
+export type NotificationEmbedConfig = {
+  title?: string;
+  description?: string;
+  url?: string;
+  color?: string;
+  footer?: string;
+  image?: string;
+  thumbnail?: string;
+};
 
 export type NotificationFeedRecord = {
   id: number;
@@ -19,6 +29,7 @@ export type NotificationFeedRecord = {
   messageTemplate: string;
   includeKeywords: string[];
   excludeKeywords: string[];
+  embedConfig: NotificationEmbedConfig | null;
 };
 
 type Feed = {
@@ -31,6 +42,7 @@ type Feed = {
   messageTemplate: string;
   includeKeywords: string[];
   excludeKeywords: string[];
+  embedConfig: NotificationEmbedConfig | null;
 };
 
 export class Notifications implements PlatformModule {
@@ -56,8 +68,9 @@ export class Notifications implements PlatformModule {
       message_template: string;
       include_keywords: string[];
       exclude_keywords: string[];
+      embed_config: NotificationEmbedConfig | null;
     }>(
-      "SELECT id,guild_id,channel_id,url,enabled,interval_seconds,last_item_key,last_polled_at,message_template,include_keywords,exclude_keywords FROM notification_feeds WHERE guild_id=$1 ORDER BY id DESC",
+      "SELECT id,guild_id,channel_id,url,enabled,interval_seconds,last_item_key,last_polled_at,message_template,include_keywords,exclude_keywords,embed_config FROM notification_feeds WHERE guild_id=$1 ORDER BY id DESC",
       [guildId]
     );
     return result.rows.map((row) => ({
@@ -71,7 +84,8 @@ export class Notifications implements PlatformModule {
       lastPolledAt: row.last_polled_at,
       messageTemplate: row.message_template,
       includeKeywords: Array.isArray(row.include_keywords) ? row.include_keywords : [],
-      excludeKeywords: Array.isArray(row.exclude_keywords) ? row.exclude_keywords : []
+      excludeKeywords: Array.isArray(row.exclude_keywords) ? row.exclude_keywords : [],
+      embedConfig: normalizeNotificationEmbedConfig(row.embed_config)
     }));
   }
 
@@ -80,16 +94,22 @@ export class Notifications implements PlatformModule {
     channelId: string,
     url: string,
     intervalSeconds: number,
-    options: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[] } = {}
+    options: {
+      messageTemplate?: string;
+      includeKeywords?: string[];
+      excludeKeywords?: string[];
+      embedConfig?: NotificationEmbedConfig | null;
+    } = {}
   ): Promise<NotificationFeedRecord> {
     await assertSafeFeedUrl(url);
     const safeInterval = Math.min(Math.max(Math.trunc(intervalSeconds), 60), 86_400);
     const messageTemplate = normalizeFeedTemplate(options.messageTemplate);
     const includeKeywords = normalizeKeywords(options.includeKeywords);
     const excludeKeywords = normalizeKeywords(options.excludeKeywords);
+    const embedConfig = options.embedConfig ? await normalizeNotificationEmbedConfig(options.embedConfig) : null;
     const result = await this.db.query<{ id: string }>(
-      "INSERT INTO notification_feeds(guild_id,channel_id,url,interval_seconds,enabled,message_template,include_keywords,exclude_keywords) VALUES($1,$2,$3,$4,true,$5,$6,$7) RETURNING id",
-      [guildId, channelId, url, safeInterval, messageTemplate, includeKeywords, excludeKeywords]
+      "INSERT INTO notification_feeds(guild_id,channel_id,url,interval_seconds,enabled,message_template,include_keywords,exclude_keywords,embed_config) VALUES($1,$2,$3,$4,true,$5,$6,$7,$8::jsonb) RETURNING id",
+      [guildId, channelId, url, safeInterval, messageTemplate, includeKeywords, excludeKeywords, embedConfig ? JSON.stringify(embedConfig) : null]
     );
     const id = result.rows[0]?.id;
     if (!id) throw new Error("feed_create_failed");
@@ -110,7 +130,12 @@ export class Notifications implements PlatformModule {
     target: string,
     channelId: string,
     intervalSeconds: number,
-    options: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[] } = {}
+    options: {
+      messageTemplate?: string;
+      includeKeywords?: string[];
+      excludeKeywords?: string[];
+      embedConfig?: NotificationEmbedConfig | null;
+    } = {}
   ): Promise<NotificationFeedRecord> {
     const url = buildSocialFeedUrl(provider, target);
     return this.addFeed(guildId, channelId, url, intervalSeconds, options);
@@ -124,6 +149,7 @@ export class Notifications implements PlatformModule {
     messageTemplate?: string;
     includeKeywords?: string[];
     excludeKeywords?: string[];
+    embedConfig?: NotificationEmbedConfig | null;
   }): Promise<boolean> {
     if (patch.url !== undefined) await assertSafeFeedUrl(patch.url);
     const current = (await this.listFeeds(guildId)).find((item) => item.id === id);
