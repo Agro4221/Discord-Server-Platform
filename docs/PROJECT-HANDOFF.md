@@ -686,3 +686,9 @@ Feature Matrix полностью reconciled: все строки ✅.
 - The required() helper was removed intentionally; keep requiredNonBlank() as the sole required secret validator.
 ## 2026-10-05 — VPS secret contract
 - Keep critical secret checks whitespace-aware in both install-vps.sh and upgrade.sh; do not regress to plain -z checks.
+## 2026-10-05 — Native Windows operating model
+- The primary local path is native Windows without Docker Desktop. Do not describe Docker Compose as the everyday gaming setup.
+- The supported quick-start entrypoint is start.bat; control-center.bat enables Dashboard; stop.bat stops native processes; native-status.bat reports tracked working set.
+- First-run native startup intentionally permits missing Discord credentials so Control Center can register the bot through Fleet.
+- Native Dashboard must stay bound to 127.0.0.1.
+- Keep the default native memory caps conservative unless measured workloads justify raising them.
