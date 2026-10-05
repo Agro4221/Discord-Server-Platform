@@ -283,3 +283,8 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-05 — Music queue permission gate
 - CI #2063 passed: typecheck, tests, domain build, bot build and Dashboard production build.
 - Live Discord validation remains for actual role/channel policy behavior on queue mutations.
+
+### 2026-10-05 — Backup/restore scope snapshot
+- Database integration coverage now exercises BackupService guild-ID validation plus cross-guild isolation for read/restore/delete operations.
+- Invalid backup filenames are rejected before filesystem access.
+- Live remote-S3 failure/recovery behavior and clean-host restore remain environment-dependent release-gate checks.
