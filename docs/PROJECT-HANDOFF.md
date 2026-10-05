@@ -378,20 +378,21 @@ Premium parity = **совокупность сильных функций раз
 PR: **#3** — `feat: Discord platform expansion + Music v2`  
 PR остаётся **draft**.
 
-Текущий кодовый checkpoint перед документационными коммитами:
-`35442a31c3161421576b96e89ebe3fd1b2d73e08`
+Текущий source HEAD:
+`53008d169a1b4a12659656c665e97125f2ca182e`
 
 За последний проход:
-- исправлен production Dashboard build blocker в TikTok OAuth route: скорректирован относительный импорт `apps/dashboard/lib/auth.ts`;
-- добавлен `scripts/check-dashboard-imports.mjs`, проверяющий локальные относительные imports Dashboard до production build;
-- CI теперь запускает этот import contract перед `next build`;
-- сохраняется продуктовый контракт: локальный Control Center без пользовательской авторизации, регистрация/секреты Discord-бота через Fleet, без artificial Premium wall.
+- исправлен Dashboard production build blocker в TikTok OAuth route;
+- добавлен `scripts/check-dashboard-imports.mjs` и CI-контракт локальных Dashboard imports;
+- исправлена дублирующаяся запись Apple Music в Music diagnostics;
+- Dashboard state и `/music providers` теперь используют единый token-aware критерий Apple Music;
+- добавлен regression test на readiness-конфигурацию.
 
-Последний доступный CI **#2369** был запущен на предыдущем checkpoint `cd47b8fa37f7dbde2b386e9fe476cd716bde5ba5`: dependency/audit/source/deployment/observability checks, bot typecheck, **196/196 bot tests**, domain build и bot build прошли; Dashboard production build упал на найденном TikTok import blocker. После фикса новый Actions run для текущего checkpoint пока не появился в доступном состоянии, поэтому slice **не считать CI-verified**.
+Последний доступный CI **#2369** был запущен до TikTok route fix/hardening: 196/196 bot tests, typecheck, domain build и bot build прошли; Dashboard build упал на неверном относительном импорте TikTok route. После исправлений свежий Actions run для текущего HEAD в доступном состоянии не появился, поэтому текущий срез **не считать CI-verified**.
 
-Feature Matrix сейчас полностью reconciled: все строки имеют ✅. Это означает, что дальше работа должна концентрироваться на release-gate hardening и environment-dependent acceptance, а не на искусственном добавлении новых checkbox features.
+Feature Matrix полностью reconciled: все строки ✅. Дальше приоритет — release-gate hardening и environment-dependent acceptance, а не искусственное добавление новых feature rows.
 
-Остаётся live validation:
+Live validation:
 - реальный Discord;
 - Lavalink voice playback и multi-node failover;
 - Windows local runtime UX;
