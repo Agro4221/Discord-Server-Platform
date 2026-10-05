@@ -601,3 +601,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Default gaming mode runs one Lavalink + bot; Dashboard and second Lavalink are opt-in.
 - Default Node/Lavalink memory ceilings are intentionally bounded and documented.
 - Native Dashboard is loopback-only; native Management API follows the configured local port.
+## 2026-10-05 — Single-launcher native Windows state
+- Exactly one root BAT file remains: start.bat.
+- Native first-run can bootstrap Node.js, PostgreSQL, OpenJDK and the pinned Lavalink JAR, then install project dependencies and build the stack.
+- Default start includes Control Center; -NoDashboard is the optional low-overhead mode.
+- Resource planning now explicitly excludes all unrelated PC workloads.
