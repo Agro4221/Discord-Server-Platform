@@ -71,7 +71,9 @@ test("Music provider normalization supports the built-in Lavalink search sources
   assert.equal(normalizeMusicSearchProvider("YouTube"), "youtube");
   assert.equal(normalizeMusicSearchProvider("youtube_music"), "youtube_music");
   assert.equal(normalizeMusicSearchProvider("SoundCloud"), "soundcloud");
-  assert.equal(normalizeMusicSearchProvider("spotify"), null);
+  assert.equal(normalizeMusicSearchProvider("spotify"), "spotify");
+  assert.equal(normalizeMusicSearchProvider("yandex_music"), "yandex_music");
+  assert.equal(normalizeMusicSearchProvider("Yandex_Music"), "yandex_music");
 });
 
 test("Music search builder preserves URLs, explicit prefixes and provider selection", () => {
@@ -80,6 +82,10 @@ test("Music search builder preserves URLs, explicit prefixes and provider select
   assert.deepEqual(buildMusicSearch("youtube", "Daft Punk"), { query: "Daft Punk", source: "ytsearch" });
   assert.deepEqual(buildMusicSearch("youtube_music", "ytsearch: Daft Punk"), { query: "Daft Punk", source: "ytmsearch" });
   assert.deepEqual(buildMusicSearch("soundcloud", "Daft Punk"), { query: "Daft Punk", source: "scsearch" });
+  assert.deepEqual(buildMusicSearch("spotify", "Daft Punk"), { query: "Daft Punk", source: "spsearch" });
+  assert.deepEqual(buildMusicSearch("yandex_music", "Daft Punk"), { query: "Daft Punk", source: "ymsearch" });
+  assert.deepEqual(buildMusicSearch("auto", "spsearch: Daft Punk"), { query: "spsearch: Daft Punk" });
+  assert.deepEqual(buildMusicSearch("auto", "ymsearch: Daft Punk"), { query: "ymsearch: Daft Punk" });
   assert.deepEqual(buildMusicSearch("soundcloud", "https://soundcloud.com/example/track"), { query: "https://soundcloud.com/example/track" });
   assert.equal(buildMusicSearch("auto", "   "), null);
 });
