@@ -420,3 +420,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - CI #2004 is green.
 - Load playlist with optional shuffle is complete.
 - Next high-value Music slice: Vote skip.
+
+
+## 2026-10-05 — Music Vote Skip verified
+- Source checkpoint: a87bc7803d200b371332b136e7bfe732b03bbdfe.
+- CI #2012 is green.
+- Vote Skip is complete and CI-verified.
+- Next high-value slice: Per-user request cooldown.
