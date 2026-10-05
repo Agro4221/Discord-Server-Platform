@@ -812,6 +812,17 @@ Never write credentials, tokens or private user data here.
 - The target playlist keeps the existing edit permissions; the source playlist is never deleted or modified by merge.
 - Merge respects the existing 500-track playlist capacity and reports added, duplicate and truncated counts back to the user.
 - Added regression coverage for order preservation, duplicate handling, source duplicates and the 500-track cap.
-- CI #2151 is the validation run for the code/test checkpoint 6eb88b3b8f1e672b04ca08af1ae7d6eed6ab9747.
-- Final source checkpoint will be recorded after the documentation commit and its resulting CI check.
+- CI #2152 validated the merge slice on the documentation-inclusive checkpoint ae94c38a050d2bff444104429acdc5779b3dcd34.
+- Final source checkpoint for the merge slice: ae94c38a050d2bff444104429acdc5779b3dcd34.
 - Next single Music slice: Playlist continuation after edits / stale continuation safety.
+
+
+## 2026-10-05 — Music playlist continuation stale-state safety
+- Completed stale-state protection for saved playlist continuation.
+- Editing a playlist with an active continuation (add current, remove, move or merge into that playlist) now invalidates the in-memory continuation before the next queue-end cycle.
+- Deleting a playlist with an active continuation also clears it; the persistent music_players continuation columns are cleared together, preventing the stale state from returning after a bot restart.
+- Continuation state for an unrelated playlist is left untouched.
+- Added a focused unit contract for playlist-id matching plus PostgreSQL coverage for clearing the persisted continuation state.
+- CI #2156 passed completely: observability/deployment contracts, Typecheck, 171 tests, domain build, bot build and Dashboard build.
+- Final source checkpoint: 36ba498f2446abf5e144bc88ba0d1f296374656c.
+- Next single Music slice: **Autoplay duplicate/recent-track avoidance**.
