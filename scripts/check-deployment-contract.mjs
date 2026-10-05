@@ -68,6 +68,19 @@ try {
   throw new Error("VPS Compose overlay failed config validation");
 }
 
+for (const runtimeContract of [
+  "dashboard_code",
+  "caddy_code",
+  "http_code",
+  "--resolve",
+  '== "200"',
+  '== "401"'
+]) {
+  if (!vpsInstaller.includes(runtimeContract) && !vpsUpgrade.includes(runtimeContract)) {
+    throw new Error("VPS runtime smoke-check contract missing: " + runtimeContract);
+  }
+}
+
 const localLauncher = await readFile("scripts/start-local.ps1", "utf8");
 for (const contract of [
   "docker compose up -d",
