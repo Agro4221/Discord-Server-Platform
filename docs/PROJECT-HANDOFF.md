@@ -578,3 +578,9 @@ Live validation, требующая пользовательского окру�
 ### 2026-10-05 — Current checkpoint after per-user queue limit
 - Per-user queued-track limit is complete and CI-verified (#2034).
 - Next single module: Max guild queue size.
+
+
+### 2026-10-05 — Current Music checkpoint
+- Controller permissions now honor the shared Command Policy; Autoplay has a persistent quick toggle.
+- Next single module: **separate queue add/remove/move permissions**.
+- Do not reopen completed controller permission/autoplay work.
