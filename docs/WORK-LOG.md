@@ -1376,3 +1376,7 @@ Never write credentials, tokens or private user data here.
 - Current source checkpoints: Lavalink config b91e2ab6db53949c97aad28091712de74c8e4a27; deployment contract ac703f4941fcfda2749d7b9129d0e139ae32e5c6.
 - This matches current Lavalink configuration guidance: LAVALINK_SERVER_PASSWORD is supported as an environment-variable setting, and environment variables take precedence over application.yml. See https://lavalink.dev/configuration/.
 - Fresh CI is still not visible; live Lavalink startup remains a release-gate check.
+## 2026-10-05 — Config validator reference repair
+- Found a concrete TypeScript regression left by the earlier whitespace-secret hardening: loadConfig() still referenced the removed required() helper for lavalinkPassword.
+- Replaced the stale call with requiredNonBlank("LAVALINK_PASSWORD"), matching the existing blank-secret tests and the other required configuration fields.
+- Repository search confirms no remaining required() call sites.
