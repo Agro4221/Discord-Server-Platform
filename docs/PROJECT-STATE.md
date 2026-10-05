@@ -448,3 +448,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - CI #2056 is green.
 - Controller permission parity and Autoplay quick toggle are complete; Max guild queue size is confirmed implemented.
 - Next high-value slice: **separate queue add/remove/move permissions**.
+
+
+## 2026-10-05 — Music queue permissions verified
+- Source checkpoint: `cb859ef8abd6f44c8e34510f4c2db6ebcf77f512`.
+- CI #2063 is green.
+- Queue add/remove/move permissions are now configurable through shared Command Policy with backwards-compatible fallback behavior.
