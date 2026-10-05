@@ -382,7 +382,7 @@ PR остаётся **draft**.
 `9ca8b24d022ee4494873da651162ccba583d3f53`
 
 Текущий branch HEAD (после continuity-doc updates):
-`4e97b46577113274cdc2721c77ca126ff2e72028`
+`e9543743fcbe02702e797e349c4b6c60aed95895`
 
 Последние bounded срезы:
 - исправлен Dashboard TikTok OAuth import blocker;
