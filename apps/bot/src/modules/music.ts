@@ -98,6 +98,7 @@ export function shouldInvalidateMusicPlaylistContinuation(
 export type MusicAutoplayTrackLike = {
   info: {
     identifier?: string;
+    author?: string | null;
     uri?: string | null;
   };
 };
