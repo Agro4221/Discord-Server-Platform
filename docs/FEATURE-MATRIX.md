@@ -244,8 +244,8 @@
 | Функция | План |
 |---|---|
 | Current-track lyrics lookup | ✅ |
-| Paginated lyrics UI | 🟡 |
-| Lyrics navigation buttons | 🟡 |
+| Paginated lyrics UI | ✅ | Lyrics are split into Discord-safe pages with readable line boundaries and page counters |
+| Lyrics navigation buttons | ✅ | Back/next buttons are bound to the requesting user/session and expire safely |
 | Synced lyrics when source provides timing | 🟡 |
 | Lyrics source/status diagnostics | 🟡 |
 
