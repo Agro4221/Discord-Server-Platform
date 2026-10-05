@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -398,4 +398,51 @@ test("music progress formatter clamps position and formats elapsed time", async 
 
   const over = formatMusicProgress(999_000, 120_000, 10);
   assert.equal(over, "━━━━━━━━━━ 2:00 / 2:00");
+});
+
+
+test("Music playlist merge preserves target order and skips duplicate identifiers", () => {
+  const target = [
+    { info: { identifier: "a", title: "A" } },
+    { info: { identifier: "b", title: "B" } }
+  ];
+  const source = [
+    { info: { identifier: "b", title: "B duplicate" } },
+    { info: { identifier: "c", title: "C" } },
+    { info: { identifier: "c", title: "C duplicate in source" } },
+    { info: { identifier: "d", title: "D" } }
+  ];
+
+  const merged = mergeMusicPlaylistTracks(
+    target,
+    source,
+    (track) => track.info.identifier
+  );
+
+  assert.deepEqual(merged.tracks.map((track) => track.info.identifier), ["a", "b", "c", "d"]);
+  assert.equal(merged.added, 2);
+  assert.equal(merged.duplicates, 2);
+  assert.equal(merged.truncated, 0);
+  assert.deepEqual(target.map((track) => track.info.identifier), ["a", "b"]);
+});
+
+test("Music playlist merge stops at the 500-track capacity", () => {
+  const target = Array.from({ length: 499 }, (_, index) => ({ info: { identifier: "target-" + index } }));
+  const source = [
+    { info: { identifier: "source-1" } },
+    { info: { identifier: "source-2" } },
+    { info: { identifier: "source-3" } }
+  ];
+
+  const merged = mergeMusicPlaylistTracks(
+    target,
+    source,
+    (track) => track.info.identifier
+  );
+
+  assert.equal(merged.tracks.length, 500);
+  assert.equal(merged.added, 1);
+  assert.equal(merged.duplicates, 0);
+  assert.equal(merged.truncated, 2);
+  assert.equal(merged.tracks.at(-1)?.info.identifier, "source-1");
 });
