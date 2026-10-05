@@ -651,3 +651,8 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Route checkpoint: 60b3a4ab7fd455fbe61bdcff6575c268f551666c; final checker checkpoint: 9fa32baf9c9522485b829c68a36675d191681492.
 - Continue with the next bounded release-gate audit; do not reopen completed feature modules. Keep the no-login local Control Center and internal Management API Bearer-key model unchanged.
 - Fresh CI remains unavailable in the current connector session; live Discord/Lavalink/Windows/E2E/chaos/soak/clean-host validation is still pending.
+### 2026-10-05 — Backup configuration contract cleanup
+- Removed the unused BACKUP_ENCRYPTION_KEY example entry after confirming the runtime never consumed it.
+- Do not treat the platform as locally encrypted-backup capable; the current backup implementation provides filesystem permissions and optional S3 AES256 server-side encryption.
+- Config export intentionally does not include bot/integration credential ciphertext.
+- Continue with the next bounded release-gate audit; avoid turning this cleanup into a broad backup-format rewrite.
