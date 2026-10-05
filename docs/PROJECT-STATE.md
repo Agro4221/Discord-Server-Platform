@@ -552,3 +552,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Final checker checkpoint: 9fa32baf9c9522485b829c68a36675d191681492.
 - Docs checkpoint after this slice: 557688aa12492758bc50c6cfd606a61298b1c5ed.
 - Fresh CI remains pending/unavailable in the current connector session.
+## 2026-10-05 — Backup configuration drift cleanup
+- Removed unused BACKUP_ENCRYPTION_KEY from .env.example after verifying the runtime does not read it.
+- ConfigTransfer excludes credential/token ciphertext; remote BackupService uploads request S3 AES256 server-side encryption.
+- No backup runtime behavior changed; the configuration contract now matches the implemented behavior.
+- Source checkpoint: b54754910ebfced9712a4a7fa4061d343e8d32bf.
+- Fresh CI remains unavailable in the current connector session.
