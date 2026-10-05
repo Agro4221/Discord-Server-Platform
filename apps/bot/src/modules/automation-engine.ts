@@ -531,7 +531,7 @@ export class AutomationEngine implements PlatformModule {
     }
 
     this.lastScheduleMinute = minute;
-    const guildIds = [...this.rules.keys()];
+    const guildIds = [...this.ruleGuilds];
     for (const guildId of guildIds) {
       await this.execute({
         type: "schedule",
