@@ -59,8 +59,8 @@ function localSpecifiers(content) {
   const seen = new Set();
 
   const patterns = [
-    /\b(?:import|export)\s+(?:[^"'\n]+?\s+from\s+)?["']([^"']+)["']/g,
-    /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
+    /\bfrom\s*["']([^"']+)["']/g,
+    /\bimport\s*(?:\(\s*)?["']([^"']+)["']/g,
     /\brequire\s*\(\s*["']([^"']+)["']\s*\)/g
   ];
 
