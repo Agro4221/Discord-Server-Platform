@@ -176,6 +176,23 @@ function Ensure-NpmDependencies {
   if ($LASTEXITCODE -ne 0) { throw "npm install failed." }
 }
 
+function Try-StartPostgresService {
+  $services = @(Get-Service -ErrorAction SilentlyContinue | Where-Object {
+    $_.Name -like "postgresql*" -and $_.Status -ne "Running"
+  })
+
+  foreach ($service in $services) {
+    try {
+      Start-Service -Name $service.Name -ErrorAction Stop
+      Write-Host "PostgreSQL service started: $($service.Name)"
+      return $true
+    } catch {
+    }
+  }
+
+  return $false
+}
+
 function Ensure-Postgres {
   $pgIsReady = Get-Command "pg_isready.exe" -ErrorAction SilentlyContinue
   $psql = Get-Command "psql.exe" -ErrorAction SilentlyContinue
@@ -191,6 +208,11 @@ function Ensure-Postgres {
   }
 
   & pg_isready.exe -d $dbUrl *> $null
+  if ($LASTEXITCODE -ne 0) {
+    Try-StartPostgresService | Out-Null
+    Start-Sleep -Seconds 2
+    & pg_isready.exe -d $dbUrl *> $null
+  }
   if ($LASTEXITCODE -ne 0) {
     $candidate = Read-Host "PostgreSQL is not reachable. Enter DATABASE_URL (or press Enter to abort)"
     if ([string]::IsNullOrWhiteSpace($candidate)) {
