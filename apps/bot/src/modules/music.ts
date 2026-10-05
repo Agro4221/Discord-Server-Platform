@@ -2323,7 +2323,9 @@ export class Music implements PlatformModule {
                   ? "vksearch:" + query
                   : provider === "tidal" && !/^https?:\/\//i.test(query)
                     ? "tdsearch:" + query
-                    : query,
+                    : provider === "qobuz" && !/^https?:\/\//i.test(query)
+                      ? "qbsearch:" + query
+                      : query,
         track: null,
         source: "query"
       });
