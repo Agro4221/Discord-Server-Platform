@@ -329,3 +329,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Fixed the Integration Credentials credential-test POST mutation, which was missed because the first static checker only validated that the file contained some assertSameOrigin() call.
 - Static gate is now per-handler for POST/PUT/PATCH/DELETE, preventing sibling mutations in the same route file from being masked by one protected handler.
 - Fresh CI is still required; live browser cross-origin mutation testing remains a release-gate validation case.
+### 2026-10-05 — Backup configuration contract snapshot
+- Removed the unused BACKUP_ENCRYPTION_KEY example setting so deployment configuration matches implemented backup behavior.
+- Config export excludes bot/integration credential ciphertext; optional remote S3 uploads request AES256 server-side encryption.
+- Live release-gate case remains: verify local backup permissions and remote S3 recovery/retention on a disposable environment.
