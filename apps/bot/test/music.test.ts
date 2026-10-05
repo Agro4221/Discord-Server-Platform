@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -10,6 +10,13 @@ test("music controls require the same voice channel unless Manage Server is gran
   assert.equal(canControlMusic("voice-2", null, false), false);
   assert.equal(canControlMusic(null, "voice-1", true), true);
   assert.equal(canControlMusic("voice-2", "voice-1", true), true);
+});
+
+test("Music request approval mode accepts only off or approval", () => {
+  assert.equal(normalizeMusicRequestApprovalMode("off"), "off");
+  assert.equal(normalizeMusicRequestApprovalMode("approval"), "approval");
+  assert.equal(normalizeMusicRequestApprovalMode("APPROVAL"), null);
+  assert.equal(normalizeMusicRequestApprovalMode("anything"), null);
 });
 
 test("Music repeat mode validator accepts only supported modes", () => {
