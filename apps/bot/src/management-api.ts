@@ -11,6 +11,7 @@ import { ConfigTransferService } from "./config-transfer.js";
 import { BackupService } from "./backup.js";
 import type { CustomCommandService } from "./custom-commands.js";
 import type { AutoResponder, AutoResponderInput } from "./modules/autoresponder.js";
+import { normalizeNotificationEmbedConfig } from "./modules/notifications.js";
 import type { Forms, CustomForm } from "./modules/forms.js";
 import { normalizeOnboardingSteps, normalizeOnboardingTrigger, type OnboardingStep, type OnboardingTrigger } from "./modules/onboarding.js";
 import type { TicketCustomization, TicketFormField } from "./modules/tickets.js";
@@ -73,7 +74,7 @@ type ApiOptions = {
       channelId: string,
       url: string,
       intervalSeconds: number,
-      options?: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[] }
+      options?: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[]; embedConfig?: Record<string, unknown> | null }
     ) => Promise<unknown>;
     createSocial: (
       guildId: string,
@@ -81,7 +82,7 @@ type ApiOptions = {
       target: string,
       channelId: string,
       intervalSeconds: number,
-      options?: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[] }
+      options?: { messageTemplate?: string; includeKeywords?: string[]; excludeKeywords?: string[]; embedConfig?: Record<string, unknown> | null }
     ) => Promise<unknown>;
     update: (
       guildId: string,
@@ -856,7 +857,12 @@ export class ManagementApiServer {
               {
                 messageTemplate: typeof body.messageTemplate === "string" ? body.messageTemplate : undefined,
                 includeKeywords: Array.isArray(body.includeKeywords) ? body.includeKeywords.filter((v): v is string => typeof v === "string") : undefined,
-                excludeKeywords: Array.isArray(body.excludeKeywords) ? body.excludeKeywords.filter((v): v is string => typeof v === "string") : undefined
+                excludeKeywords: Array.isArray(body.excludeKeywords) ? body.excludeKeywords.filter((v): v is string => typeof v === "string") : undefined,
+                embedConfig: await normalizeNotificationEmbedConfig(
+                  body.embedConfig && typeof body.embedConfig === "object" && !Array.isArray(body.embedConfig)
+                    ? body.embedConfig as Record<string, unknown>
+                    : null
+                )
               }
             );
             await this.options.auditLog.record({
@@ -915,7 +921,7 @@ export class ManagementApiServer {
                 body.channelId,
                 body.url,
                 Math.trunc(body.intervalSeconds),
-                { messageTemplate, includeKeywords, excludeKeywords }
+                { messageTemplate, includeKeywords, excludeKeywords, embedConfig }
               );
               await this.options.auditLog.record({ guildId, source: "dashboard", action: "feed.created", targetType: "feed", targetId: String((result as { id?: number })?.id ?? "unknown") });
               this.json(res, 200, { ok: true, feed: result });
@@ -930,6 +936,7 @@ export class ManagementApiServer {
               messageTemplate?: string;
               includeKeywords?: string[];
               excludeKeywords?: string[];
+              embedConfig?: Record<string, unknown> | null;
             } = {};
             if (typeof body.channelId === "string") input.channelId = body.channelId;
             if (typeof body.url === "string") input.url = body.url;
@@ -945,6 +952,13 @@ export class ManagementApiServer {
               input.excludeKeywords = body.excludeKeywords
                 .filter((value: unknown): value is string => typeof value === "string")
                 .slice(0,20);
+            }
+            if (body.embedConfig !== undefined) {
+              input.embedConfig = await normalizeNotificationEmbedConfig(
+                body.embedConfig && typeof body.embedConfig === "object" && !Array.isArray(body.embedConfig)
+                  ? body.embedConfig as Record<string, unknown>
+                  : null
+              );
             }
 
             if (input.channelId !== undefined) {
