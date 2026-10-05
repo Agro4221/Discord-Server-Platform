@@ -99,13 +99,13 @@ test("music shared playlists are guild-visible while personal playlists stay pri
     );
 
     const search = await db.query<{ name: string; visibility: string }>(
-      "SELECT name,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') AND ($4=false OR visibility='shared') AND name ILIKE $3 ESCAPE '\\' ORDER BY visibility DESC,updated_at DESC LIMIT 25",
+      "SELECT name,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') AND ($4=false OR visibility='shared') AND name ILIKE $3 ORDER BY visibility DESC,updated_at DESC LIMIT 25",
       [guildId,"234567890123456791","%Server%",false]
     );
     assert.deepEqual(search.rows, [{ name: "Server Mix", visibility: "shared" }]);
 
     const sharedOnly = await db.query<{ name: string; visibility: string }>(
-      "SELECT name,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') AND ($4=false OR visibility='shared') AND name ILIKE $3 ESCAPE '\\' ORDER BY visibility DESC,updated_at DESC LIMIT 25",
+      "SELECT name,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared') AND ($4=false OR visibility='shared') AND name ILIKE $3 ORDER BY visibility DESC,updated_at DESC LIMIT 25",
       [guildId,"234567890123456790","%Mix%",true]
     );
     assert.deepEqual(sharedOnly.rows, [{ name: "Server Mix", visibility: "shared" }]);
