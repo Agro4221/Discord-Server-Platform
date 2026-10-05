@@ -231,3 +231,15 @@ test("music per-user queue limit helpers enforce bounds and available slots", as
   assert.equal(remainingMusicQueueSlots(10, 10), 0);
   assert.equal(remainingMusicQueueSlots(999, 0), null);
 });
+
+
+test("music guild queue size helpers enforce bounds and remaining capacity", async () => {
+  const { normalizeMusicQueueSize, remainingMusicGuildQueueSlots } = await import("../src/modules/music.js");
+  assert.equal(normalizeMusicQueueSize(-5), 0);
+  assert.equal(normalizeMusicQueueSize(100.9), 100);
+  assert.equal(normalizeMusicQueueSize(999), 500);
+  assert.equal(normalizeMusicQueueSize(Number.NaN), 100);
+  assert.equal(remainingMusicGuildQueueSlots(40, 100), 60);
+  assert.equal(remainingMusicGuildQueueSlots(100, 100), 0);
+  assert.equal(remainingMusicGuildQueueSlots(999, 0), null);
+});
