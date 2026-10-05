@@ -133,6 +133,11 @@ export function buildMusicQueueShare(tracks: MusicQueueTrackLike[]): string {
     "\n… и ещё **" + remaining + "**. Используй export для полной очереди.";
 }
 
+export function voteSkipThreshold(listenerCount: number): number {
+  const safe = Math.max(1, Math.floor(listenerCount));
+  return Math.max(1, Math.ceil(safe * 0.6));
+}
+
 export function isValidMusicSearchSelection(index: number, length: number): boolean {
   return Number.isInteger(index) && index >= 0 && index < length;
 }
@@ -211,6 +216,7 @@ export class Music implements PlatformModule {
   private readonly autoLeaveTimers = new Map<string, NodeJS.Timeout>();
   private readonly requestInFlight = new Set<string>();
   private readonly failoverInFlight = new Set<string>();
+  private readonly voteSkipSessions = new Map<string, { trackIdentifier: string; voters: Set<string>; expiresAt: number }>();
   private readonly searchSessions = new Map<string, { guildId: string; userId: string; tracks: Track[]; expiresAt: number }>();
   private searchSequence = 0;
 
@@ -228,6 +234,7 @@ export class Music implements PlatformModule {
     this.autoplayInFlight.clear();
     this.requestInFlight.clear();
     this.failoverInFlight.clear();
+    this.voteSkipSessions.clear();
     for (const timer of this.autoLeaveTimers.values()) clearTimeout(timer);
     this.autoLeaveTimers.clear();
 
@@ -676,7 +683,7 @@ export class Music implements PlatformModule {
   private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!interaction.inGuild()) return;
     const directAliases = new Set([
-      "play", "search", "pause", "resume", "previous", "skip", "stop", "shuffle",
+      "play", "search", "pause", "resume", "previous", "skip", "vote-skip", "stop", "shuffle",
       "playlist", "favorite", "filter", "queue-policy", "queue", "repeat", "seek", "volume", "autoplay", "247", "providers", "nowplaying", "lyrics"
     ]);
     if (interaction.commandName !== "music" && !directAliases.has(interaction.commandName)) return;
@@ -720,6 +727,9 @@ export class Music implements PlatformModule {
         break;
       case "skip":
         await this.skip(interaction);
+        break;
+      case "vote-skip":
+        await this.voteSkip(interaction);
         break;
       case "skip-to":
         await this.skipTo(interaction);
@@ -1427,6 +1437,48 @@ export class Music implements PlatformModule {
     if (!await this.canControl(interaction, player.voiceChannelId)) return;
     await player.skip();
     await interaction.reply({ content: "⏭️ Пропущено.", ephemeral: true });
+  }
+
+  private async voteSkip(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player?.queue.current) {
+      await interaction.reply({ content: "Сейчас нечего пропускать.", ephemeral: true });
+      return;
+    }
+
+    const member = await interaction.guild!.members.fetch(interaction.user.id).catch(() => null);
+    if (!member?.voice.channelId || member.voice.channelId !== player.voiceChannelId) {
+      await interaction.reply({ content: "Голосовать за skip можно только из того же голосового канала.", ephemeral: true });
+      return;
+    }
+
+    const voice = interaction.guild!.channels.cache.get(player.voiceChannelId);
+    const listeners = voice && "members" in voice
+      ? [...voice.members.values()].filter((candidate) => !candidate.user.bot && !candidate.voice.selfDeaf && !candidate.voice.serverDeaf)
+      : [];
+    const threshold = voteSkipThreshold(listeners.length);
+    const trackIdentifier = player.queue.current.info.identifier;
+    const existing = this.voteSkipSessions.get(interaction.guildId!);
+    const session = !existing || existing.trackIdentifier !== trackIdentifier || existing.expiresAt < Date.now()
+      ? { trackIdentifier, voters: new Set<string>(), expiresAt: Date.now() + 45_000 }
+      : existing;
+
+    session.voters.add(interaction.user.id);
+    this.voteSkipSessions.set(interaction.guildId!, session);
+
+    if (session.voters.size >= threshold) {
+      await player.skip();
+      this.voteSkipSessions.delete(interaction.guildId!);
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await interaction.reply({ content: "⏭️ Vote Skip принят: **" + session.voters.size + "/" + threshold + "**. Трек пропущен.", ephemeral: true });
+      return;
+    }
+
+    await interaction.reply({
+      content: "🗳️ Vote Skip: **" + session.voters.size + "/" + threshold + "** голосов. Голоса действуют 45 секунд.",
+      ephemeral: true
+    });
   }
 
   private async stop(interaction: ChatInputCommandInteraction): Promise<void> {
