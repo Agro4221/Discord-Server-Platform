@@ -114,6 +114,29 @@ export function isMusicAutoplayCandidateAllowed<T extends MusicAutoplayTrackLike
   return true;
 }
 
+export function normalizeMusicArtistName(value: string | null | undefined): string {
+  return String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+export function selectMusicArtistAwareAutoplayCandidate<T extends MusicAutoplayTrackLike>(
+  tracks: readonly T[],
+  artist: string | null | undefined,
+  excludedIdentifiers: ReadonlySet<string>,
+  excludedUris: ReadonlySet<string>
+): T | null {
+  const allowed = tracks.filter((track) =>
+    isMusicAutoplayCandidateAllowed(track, excludedIdentifiers, excludedUris)
+  );
+  if (!allowed.length) return null;
+
+  const normalizedArtist = normalizeMusicArtistName(artist);
+  if (!normalizedArtist) return allowed[0] ?? null;
+
+  return allowed.find((track) =>
+    normalizeMusicArtistName(track.info.author) === normalizedArtist
+  ) ?? allowed[0] ?? null;
+}
+
 export const MUSIC_AUTOPLAY_RECENT_HISTORY_LIMIT = 20;
 
 export function mergeMusicPlaylistTracks<T>(
@@ -4196,14 +4219,34 @@ export class Music implements PlatformModule {
         addUri(row.url);
       }
 
-      const result = await player.search(
-        { query: seed, source: "ytsearch" },
-        this.client?.user
-      );
+      let candidate: Track | null = null;
+      const artist = String(lastPlayedTrack.info.author ?? "").trim();
+      if (artist) {
+        const artistResult = await player.search(
+          { query: artist + " songs", source: "ytsearch" },
+          this.client?.user
+        );
+        candidate = selectMusicArtistAwareAutoplayCandidate(
+          artistResult.tracks as Track[],
+          artist,
+          excludedIdentifiers,
+          excludedUris
+        );
+      }
 
-      const candidate = result.tracks.find(
-        (track) => isMusicAutoplayCandidateAllowed(track, excludedIdentifiers, excludedUris)
-      );
+      if (!candidate) {
+        const result = await player.search(
+          { query: seed, source: "ytsearch" },
+          this.client?.user
+        );
+        candidate = selectMusicArtistAwareAutoplayCandidate(
+          result.tracks as Track[],
+          artist || null,
+          excludedIdentifiers,
+          excludedUris
+        );
+      }
+
       if (!candidate) return;
 
       player.queue.add(candidate);
