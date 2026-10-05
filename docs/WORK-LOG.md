@@ -1385,3 +1385,13 @@ Never write credentials, tokens or private user data here.
 - Added a shared is_blank() check to the installer and upgrade paths; installer regenerates blank secrets, upgrade fails fast on them.
 - Deployment contract now protects the presence of this whitespace-aware secret handling.
 - Source checkpoints: 8ceea9457a65bc2e1888af4520564a0d7aabc8e8 (installer), 209312cb4b1d678fee857369ade15d59664300bb (upgrade), e3f030992877e4727e76d1d43c545568166b358d (contract).
+## 2026-10-05 — Native Windows launcher becomes primary local path
+- Confirmed the intended local-first operating model: everyday Windows usage is native and must not require Docker Desktop.
+- The existing native launcher had a real first-run mismatch: it requested Discord credentials before Control Center could start, and Dashboard used a hard-coded Management API port.
+- Native launcher now allows the process to start without Discord credentials, then registration happens through Control Center → Bot Fleet.
+- Native Dashboard uses a dedicated loopback start script and the configured MANAGEMENT_API_PORT instead of binding to all interfaces or hard-coding port 3002.
+- Added one-click root entrypoints: start.bat, control-center.bat, stop.bat and native-status.bat.
+- Native launcher now applies conservative default memory ceilings: Lavalink Xmx 512 MiB, bot Node old-space 768 MiB, Dashboard Node old-space 512 MiB.
+- Native stdout/stderr logs rotate at 10 MiB.
+- Native launcher attempts to start a stopped local PostgreSQL Windows service before asking for a replacement DATABASE_URL.
+- Added docs/RESOURCE-REQUIREMENTS.md with minimum/recommended/comfortable/heavy PC tiers and a measurement procedure.
