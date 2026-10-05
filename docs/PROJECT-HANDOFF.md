@@ -573,3 +573,8 @@ Live validation, требующая пользовательского окру�
 ### 2026-10-05 — Current checkpoint after request cooldown
 - Per-user request cooldown is complete and CI-verified (#2020).
 - Next single module: Per-user queued-track limit.
+
+
+### 2026-10-05 — Current checkpoint after per-user queue limit
+- Per-user queued-track limit is complete and CI-verified (#2034).
+- Next single module: Max guild queue size.
