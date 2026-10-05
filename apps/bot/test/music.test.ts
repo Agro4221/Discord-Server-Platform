@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, chunkMusicFilterActions, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicSearchProvider, resolveMusicSearchRequest, chunkMusicLyrics, musicLyricsPageCount, normalizeMusicLyricsPage, isValidMusicLyricsPage, normalizeMusicPitch, normalizeMusicSpeed, normalizeMusicEqBand, normalizeMusicEqGain, MUSIC_EQ_BAND_COUNT, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, musicPlaylistContinuationBatch, mergeMusicPlaylistTracks, shouldInvalidateMusicPlaylistContinuation, isMusicAutoplayCandidateAllowed, selectMusicArtistAwareAutoplayCandidate, normalizeMusicArtistName, chunkMusicFilterActions, normalizeMusicRadioMode, buildMusicRadioQuery, normalizeMusicSearchProvider, resolveMusicSearchRequest, chunkMusicLyrics, musicLyricsPageCount, normalizeMusicLyricsPage, isValidMusicLyricsPage, normalizeMusicTimedLyrics, findMusicTimedLyricIndex, formatMusicSyncedLyrics, normalizeMusicPitch, normalizeMusicSpeed, normalizeMusicEqBand, normalizeMusicEqGain, MUSIC_EQ_BAND_COUNT, MUSIC_PLAYLIST_PAGE_SIZE, musicPlaylistPageCount, normalizeMusicPlaylistPage, isValidMusicPlaylistPage, isValidMusicSavedPosition, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd, toggleMusicDistortion } from "../src/modules/music.js";
@@ -705,4 +705,26 @@ test("Music lyrics pagination keeps readable page boundaries and safe page index
   assert.equal(isValidMusicLyricsPage(0, chunks.length), true);
   assert.equal(isValidMusicLyricsPage(chunks.length - 1, chunks.length), true);
   assert.equal(isValidMusicLyricsPage(chunks.length, chunks.length), false);
+});
+
+
+test("Music synced lyrics normalize timestamps, select the active line and render a focused window", () => {
+  const lines = normalizeMusicTimedLyrics([
+    { timestamp: 2000, duration: 1500, line: "Second" },
+    { timestamp: 0, duration: null, line: "First" },
+    { timestamp: 5000, duration: null, line: "Third" },
+    { timestamp: "invalid", line: "Ignored" },
+    { timestamp: 3000, line: "" }
+  ]);
+
+  assert.deepEqual(lines.map((item) => item.line), ["First", "Second", "Third"]);
+  assert.equal(findMusicTimedLyricIndex(lines, 0), 0);
+  assert.equal(findMusicTimedLyricIndex(lines, 1999), 0);
+  assert.equal(findMusicTimedLyricIndex(lines, 2000), 1);
+  assert.equal(findMusicTimedLyricIndex(lines, 99999), 2);
+
+  const rendered = formatMusicSyncedLyrics(lines, 2200, 1);
+  assert.match(rendered, /First/);
+  assert.match(rendered, /\[0:02\] Second/);
+  assert.match(rendered, /▶ \*\*\[0:02\] Second\*\*/);
 });
