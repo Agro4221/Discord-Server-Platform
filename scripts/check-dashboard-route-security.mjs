@@ -6,6 +6,16 @@ const ignored = new Set(["node_modules", ".next", "dist", "build"]);
 const extensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 const failures = [];
 
+function extractFunctionBody(content, method) {
+  const marker = new RegExp(`export async function ${method}\\s*\\([^)]*\\)\\s*\\{`);
+  const match = marker.exec(content);
+  if (!match) return null;
+  const bodyStart = match.index + match[0].length;
+  const nextExport = /\\nexport async function (POST|PUT|PATCH|DELETE)\\b/.exec(content.slice(bodyStart));
+  const bodyEnd = nextExport ? bodyStart + nextExport.index : content.length;
+  return content.slice(bodyStart, bodyEnd);
+}
+
 async function walk(dir) {
   let entries;
   try {
@@ -26,18 +36,16 @@ async function walk(dir) {
     if (!extensions.has(extension)) continue;
 
     const content = await readFile(path, "utf8");
-    const mutatingMethods = [...content.matchAll(/export async function (POST|PUT|PATCH|DELETE)\b/g)].map(
+    const mutatingMethods = [...content.matchAll(/export async function (POST|PUT|PATCH|DELETE)\\b/g)].map(
       (match) => match[1]
     );
     if (!mutatingMethods.length) continue;
 
-    if (!content.includes("assertSameOrigin")) {
-      failures.push(relative(process.cwd(), path) + ": mutating route is missing assertSameOrigin");
-      continue;
-    }
-
-    if (!/assertSameOrigin\s*\(/.test(content)) {
-      failures.push(relative(process.cwd(), path) + ": mutating route imports assertSameOrigin but never calls it");
+    for (const method of mutatingMethods) {
+      const body = extractFunctionBody(content, method);
+      if (!body || !/assertSameOrigin\\s*\\(/.test(body)) {
+        failures.push(relative(process.cwd(), path) + `: ${method} route is missing assertSameOrigin`);
+      }
     }
   }
 }
