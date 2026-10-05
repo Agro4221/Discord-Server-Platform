@@ -884,3 +884,14 @@ Never write credentials, tokens or private user data here.
 - CI #2184 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
 - Final source checkpoint for this slice: 3560b4fdbcdabe787c8fd74068e3ddac76537121.
 - Next single Music slice: **Pitch control**.
+
+
+## 2026-10-05 — Music Pitch control
+- Completed independent pitch control for the Music player.
+- Added top-level `/pitch` because `/music` is already at Discord's 25-subcommand limit; Prefix supports `!pitch` as well.
+- Pitch uses the existing Lavalink timescale filter, changing only pitch while preserving the other timescale values.
+- Supported range is 0.5×–2.0×; 1.0× restores normal pitch. DJ / Manage Server permission is required for changes.
+- Added shared pitch normalization and deterministic unit coverage.
+- CI #2190 passed completely: source/deployment/observability contracts, Typecheck, tests, domain build, bot build and Dashboard build.
+- Final source checkpoint for this slice: 66106e46cda3e63221922435516613f13fa2f6f7.
+- Next single Music slice: **Speed control**.
