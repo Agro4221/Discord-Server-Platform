@@ -359,3 +359,6 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 - Live release-gate case: start both Lavalink nodes with the launcher-generated secret and verify authenticated /version healthchecks succeed.
 ## 2026-10-05 — Configuration validation snapshot
 - Existing config tests cover blank MANAGEMENT_API_KEY, DATABASE_URL and LAVALINK_PASSWORD values; the implementation is now aligned with those tests.
+## 2026-10-05 — VPS secret validation snapshot
+- Static deployment validation protects whitespace-aware critical secret handling in installer and upgrade scripts.
+- Live release-gate case: pre-seed a VPS .env with whitespace-only critical secrets and verify install regenerates them / upgrade rejects them before compose startup.
