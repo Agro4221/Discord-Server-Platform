@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { AnalyticsPanel } from "./analytics-panel";
 import { AutomationPanel } from "./automation-panel";
+import { BotSetupPanel } from "./bot-setup-panel";
 import { BackupPanel } from "./backup-panel";
 import { FleetPanel } from "./fleet-panel";
 import { GiveawaysPanel } from "./giveaways-panel";
@@ -158,6 +159,7 @@ const NAV_GROUPS = [
 ] as const;
 
 const SYSTEM_ITEMS = [
+  ["bot-setup", "Bot Setup", "◇"],
   ["settings", "Общие настройки", "⚙"],
   ["commands", "Команды", "⌘"],
   ["fleet", "Bot Fleet", "◈"],
@@ -604,6 +606,8 @@ export function DiscordAdmin() {
                 />
               </ModuleShell>
             )}
+
+            {view === "bot-setup" && <BotSetupPanel />}
 
             {view === "settings" && (
               <GeneralSettingsPanel
