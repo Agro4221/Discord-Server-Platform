@@ -250,3 +250,14 @@ test("music autoplay controller toggle flips the persisted state target", async 
   assert.equal(toggleMusicAutoplay(false), true);
   assert.equal(toggleMusicAutoplay(true), false);
 });
+
+
+test("music vote-to-skip threshold scales with listeners and honors minimum", async () => {
+  const { calculateMusicVoteSkipRequired } = await import("../src/modules/music.js");
+  assert.equal(calculateMusicVoteSkipRequired(0, 0.5, 2), 2);
+  assert.equal(calculateMusicVoteSkipRequired(1, 0.5, 2), 1);
+  assert.equal(calculateMusicVoteSkipRequired(4, 0.5, 2), 2);
+  assert.equal(calculateMusicVoteSkipRequired(9, 0.5, 2), 5);
+  assert.equal(calculateMusicVoteSkipRequired(20, 0.2, 6), 6);
+  assert.equal(calculateMusicVoteSkipRequired(20, 0.8, 2), 16);
+});
