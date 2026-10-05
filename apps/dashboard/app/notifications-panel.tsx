@@ -134,6 +134,22 @@ export function NotificationsPanel({
     }
   }
 
+  async function connectTikTok() {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tiktok/oauth/start", { cache: "no-store" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || typeof body.authorizationUrl !== "string") {
+        throw new Error(body.error ?? "tiktok_oauth_start_failed");
+      }
+      window.location.assign(body.authorizationUrl);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось начать TikTok OAuth.");
+      setBusy(false);
+    }
+  }
+
   async function saveTikTokCredential() {
     if (!tiktokLabel.trim() || !tiktokClientId.trim() || !tiktokClientSecret || !tiktokAccessToken || !tiktokRefreshToken) {
       setError("Для TikTok credential нужны label, client key/ID, client secret, access token и refresh token.");
@@ -392,7 +408,8 @@ export function NotificationsPanel({
           <input type="password" value={tiktokClientSecret} onChange={(e) => setTiktokClientSecret(e.target.value)} placeholder="Client secret" style={inputStyle} disabled={busy} />
           <input type="password" value={tiktokAccessToken} onChange={(e) => setTiktokAccessToken(e.target.value)} placeholder="Access token" style={inputStyle} disabled={busy} />
           <input type="password" value={tiktokRefreshToken} onChange={(e) => setTiktokRefreshToken(e.target.value)} placeholder="Refresh token" style={inputStyle} disabled={busy} />
-          <button type="button" disabled={busy} onClick={() => void saveTikTokCredential()} style={buttonStyle("primary")}>Сохранить credential</button>
+          <button type="button" disabled={busy} onClick={() => void connectTikTok()} style={buttonStyle("primary")}>Подключить через TikTok</button>
+          <button type="button" disabled={busy} onClick={() => void saveTikTokCredential()} style={buttonStyle("secondary")}>Сохранить вручную</button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 140px 140px auto", gap: 8 }}>
           <select value={tiktokCredentialId} onChange={(e) => setTiktokCredentialId(e.target.value)} style={inputStyle} disabled={busy}>
