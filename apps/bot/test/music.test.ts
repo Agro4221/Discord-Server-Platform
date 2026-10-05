@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, normalizeMusicPlaylistSearch, normalizeMusicPlaylistImportUrl, buildMusicPlaylistSnapshot, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -182,6 +182,15 @@ test("music quick filter actions allow only known presets", async () => {
   }
 });
 
+
+test("Music playlist snapshot keeps current track first and caps at 500", () => {
+  const queued = Array.from({ length: 600 }, (_, index) => "Q" + index);
+  const snapshot = buildMusicPlaylistSnapshot("CURRENT", queued);
+  assert.equal(snapshot.length, 500);
+  assert.equal(snapshot[0], "CURRENT");
+  assert.equal(snapshot[499], "Q498");
+  assert.notEqual(snapshot, queued);
+});
 
 test("Music playlist import URL accepts only HTTP(S)", () => {
   assert.equal(normalizeMusicPlaylistImportUrl("https://example.com/playlist?id=42"), "https://example.com/playlist?id=42");
