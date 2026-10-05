@@ -748,3 +748,14 @@ Never write credentials, tokens or private user data here.
 - CI #2110 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
 - Final source checkpoint: `0244df329476e9ed9f0922d9b6ec98473d8dff57`.
 - Next single Music slice: **Import playlists from supported URLs**.
+
+## 2026-10-05 — Music playlist URL import
+- Completed importing Music playlists from supported HTTP(S) URLs through the existing `/music playlist` command.
+- Added `Import URL` action with a destination playlist name; imported tracks are stored in their source order and capped at the existing 500-track playlist capacity.
+- Duplicate track identifiers are removed during import while preserving the first occurrence.
+- Personal imports remain private; shared imports use the existing DJ / Manage Server permission gate for shared playlists.
+- URL input is validated as HTTP(S) before it reaches the Music resolver. The current Lavalink-backed resolver supplies the track list; this slice does not add a second provider-specific importer.
+- Added regression coverage for import URL validation.
+- CI #2114 passed completely: observability/deployment contracts, Typecheck, Test bot, domain build, bot build and Dashboard build.
+- Final source checkpoint: `a7a2bb3a9325ebe0fb7c04feed9558f66cad2330`.
+- Next single Music slice: **Save queue as playlist improvements**.
