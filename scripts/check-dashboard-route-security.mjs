@@ -7,7 +7,7 @@ const extensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 const failures = [];
 
 function extractFunctionBody(content, method) {
-  const marker = new RegExp(\`export async function \${method}\s*\([^)]*\)\s*\{\`);
+  const marker = new RegExp("export async function " + method + "\\s*\\([^)]*\\)\\s*\\{");
   const match = marker.exec(content);
   if (!match) return null;
   const bodyStart = match.index + match[0].length;
@@ -44,7 +44,7 @@ async function walk(dir) {
     for (const method of mutatingMethods) {
       const body = extractFunctionBody(content, method);
       if (!body || !/assertSameOrigin\s*\(/.test(body)) {
-        failures.push(relative(process.cwd(), path) + \`: \${method} route is missing assertSameOrigin\`);
+        failures.push(relative(process.cwd(), path) + ": " + method + " route is missing assertSameOrigin");
       }
     }
   }
