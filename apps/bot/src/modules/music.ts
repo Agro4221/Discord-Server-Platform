@@ -1313,11 +1313,17 @@ export class Music implements PlatformModule {
     textChannelId: string,
     query: string,
     requester: import("discord.js").User
-  ): Promise<{ added: number; truncated: boolean; firstTitle: string; firstAuthor: string }> {
+  ): Promise<{ added: number; truncated: boolean; limited: boolean; firstTitle: string; firstAuthor: string }> {
     if (!this.manager) throw new Error("music_manager_unavailable");
     if (!await this.canQueueMusic(guildId, requester.id)) throw new Error("music_queue_permission_denied");
 
     const existing = this.manager.players.get(guildId);
+    const maxQueuedPerUser = (await this.musicSettings(guildId)).maxQueuedPerUser;
+    const queuedByUser = countMusicQueuedByUser(existing?.queue.tracks ?? [], requester.id);
+    const remainingSlots = remainingMusicQueueSlots(queuedByUser, maxQueuedPerUser);
+    if (remainingSlots === 0) {
+      return { added: 0, truncated: false, limited: true, firstTitle: "", firstAuthor: "" };
+    }
     const player = existing ?? await this.manager.createPlayer({
       guildId,
       voiceChannelId,
@@ -1351,7 +1357,8 @@ export class Music implements PlatformModule {
     const first = tracks[0]!;
     return {
       added: tracks.length,
-      truncated: result.tracks.length > tracks.length,
+      truncated: result.tracks.length > tracks.length && remainingSlots === null,
+      limited: remainingSlots !== null && result.tracks.length > tracks.length,
       firstTitle: first.info.title,
       firstAuthor: first.info.author ?? "Unknown artist"
     };
