@@ -1012,6 +1012,14 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Qobuz playback remains a release-gate validation item.
 - Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
 
+## 2026-10-05 — Music yt-dlp source parity reconciliation
+- Reconciled the remaining yt-dlp Matrix gap against the actual LavaSrc integration.
+- LavaSrc exposes yt-dlp as a Direct source manager, but its documented search query is still ytsearch; therefore no duplicate/fake provider choice was added beside YouTube.
+- The project already exposes LAVASRC_YTDLP_ENABLED and YTDLP_PATH and includes yt-dlp in /music providers diagnostics.
+- Direct URL loading remains untouched so Lavalink can select the appropriate source manager.
+- Matrix is now ✅ for source integration; actual availability of the yt-dlp executable and third-party site support remains a runtime/release-gate check.
+- Verified against the current LavaSrc documentation. citeturn436740view0turn992557view0
+
 ## 2026-10-05 — Music JioSaavn provider parity
 - Added an explicit JioSaavn Music search provider to /play, /music play and /music search.
 - Non-URL searches selected as JioSaavn use LavaSrc jssearch; users can also use the explicit jssearch: prefix from prefix/request-channel flows.
