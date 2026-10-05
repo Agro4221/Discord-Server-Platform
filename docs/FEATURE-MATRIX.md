@@ -226,7 +226,7 @@
 | Speed control | ✅ |
 | Tremolo / Vibrato / Distortion / Low Pass / Channel Mix / rotation / other Lavalink effects | 🟡 | Core effects covered: Tremolo ✅, Vibrato ✅, Distortion ✅, Low Pass ✅, Channel Mix ✅, 8D rotation ✅; remaining work is higher-level effect tooling and any non-core/plugin-specific filters
 | Custom EQ editor | ✅ | `/eq show`, `/eq set`, `/eq reset` and `!eq` equivalents |
-| Persist and restore effect state | 🟡 |
+| Persist and restore effect state | ✅ | Player persistence stores Lavalink filter state and resumed players restore it before queue/playback resync |
 
 #### Autoplay / radio
 
