@@ -5,6 +5,20 @@ import { useEffect, useState } from "react";
 type Resource = { id: string; name: string };
 type SocialProvider = "reddit" | "youtube" | "mastodon";
 type EmbedConfig = { title: string; description: string; url: string; color: string; footer: string; image: string; thumbnail: string };
+type Credential = { id: number; provider: string; label: string };
+type TikTokFeed = {
+  id: number;
+  channelId: string;
+  credentialId: number;
+  targetLabel: string;
+  enabled: boolean;
+  intervalSeconds: number;
+  lastPolledAt: string | null;
+  messageTemplate: string;
+  includeKeywords: string[];
+  excludeKeywords: string[];
+  embedConfig: Partial<EmbedConfig> | null;
+};
 type Feed = {
   id: number;
   channelId: string;
@@ -28,6 +42,15 @@ export function NotificationsPanel({
   onChanged?: () => void | Promise<void>;
 }) {
   const [feeds, setFeeds] = useState<Feed[]>([]);
+  const [tiktokFeeds, setTiktokFeeds] = useState<TikTokFeed[]>([]);
+  const [tiktokCredentials, setTiktokCredentials] = useState<Credential[]>([]);
+  const [tiktokCredentialId, setTiktokCredentialId] = useState("");
+  const [tiktokInterval, setTiktokInterval] = useState(300);
+  const [tiktokClientId, setTiktokClientId] = useState("");
+  const [tiktokClientSecret, setTiktokClientSecret] = useState("");
+  const [tiktokAccessToken, setTiktokAccessToken] = useState("");
+  const [tiktokRefreshToken, setTiktokRefreshToken] = useState("");
+  const [tiktokLabel, setTiktokLabel] = useState("");
   const [url, setUrl] = useState("");
   const [socialProvider, setSocialProvider] = useState<SocialProvider>("reddit");
   const [socialTarget, setSocialTarget] = useState("");
@@ -58,6 +81,16 @@ export function NotificationsPanel({
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.error ?? "feeds_failed");
     setFeeds(body.feeds ?? []);
+    const [credentialResponse, tiktokResponse] = await Promise.all([
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/integration-credentials", { cache: "no-store" }),
+      fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tiktok-feeds", { cache: "no-store" })
+    ]);
+    const credentialBody = await credentialResponse.json().catch(() => ({}));
+    const tiktokBody = await tiktokResponse.json().catch(() => ({}));
+    if (!credentialResponse.ok) throw new Error(credentialBody.error ?? "integration_credentials_failed");
+    if (!tiktokResponse.ok) throw new Error(tiktokBody.error ?? "tiktok_feeds_failed");
+    setTiktokCredentials((credentialBody.credentials ?? []).filter((item: Credential) => item.provider === "tiktok"));
+    setTiktokFeeds(tiktokBody.feeds ?? []);
   }
 
   useEffect(() => {
@@ -96,6 +129,125 @@ export function NotificationsPanel({
       await onChanged?.();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Не удалось создать feed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveTikTokCredential() {
+    if (!tiktokLabel.trim() || !tiktokClientId.trim() || !tiktokClientSecret || !tiktokAccessToken || !tiktokRefreshToken) {
+      setError("Для TikTok credential нужны label, client key/ID, client secret, access token и refresh token.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/integration-credentials", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          provider: "tiktok",
+          label: tiktokLabel.trim(),
+          clientId: tiktokClientId.trim(),
+          clientSecret: tiktokClientSecret,
+          accessToken: tiktokAccessToken,
+          refreshToken: tiktokRefreshToken
+        })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "tiktok_credential_save_failed");
+      setTiktokLabel("");
+      setTiktokClientSecret("");
+      setTiktokAccessToken("");
+      setTiktokRefreshToken("");
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось сохранить TikTok credential.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createTikTokFeed() {
+    if (!tiktokCredentialId || !channelId) {
+      setError("Для TikTok feed выбери credential и канал.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tiktok-feeds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          credentialId: Number(tiktokCredentialId),
+          channelId,
+          intervalSeconds: tiktokInterval,
+          messageTemplate,
+          includeKeywords: includeKeywords.split(",").map((value) => value.trim()).filter(Boolean),
+          excludeKeywords: excludeKeywords.split(",").map((value) => value.trim()).filter(Boolean),
+          embedConfig: {
+            title: embedTitle, description: embedDescription, url: embedUrl,
+            color: embedColor, footer: embedFooter, image: embedImage, thumbnail: embedThumbnail
+          }
+        })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "tiktok_feed_create_failed");
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось создать TikTok feed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function testTikTokFeed(feed: TikTokFeed) {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tiktok-feeds/" + feed.id + "/test", { method: "POST" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "tiktok_feed_test_failed");
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось протестировать TikTok feed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function patchTikTokFeed(feed: TikTokFeed, enabled: boolean) {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tiktok-feeds/" + feed.id, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ enabled })
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error ?? "tiktok_feed_update_failed");
+      }
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось изменить TikTok feed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeTikTokFeed(feed: TikTokFeed) {
+    if (!window.confirm("Удалить TikTok feed?")) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/tiktok-feeds/" + feed.id, { method: "DELETE" });
+      if (!response.ok) throw new Error("tiktok_feed_delete_failed");
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось удалить TikTok feed.");
     } finally {
       setBusy(false);
     }
@@ -226,6 +378,53 @@ export function NotificationsPanel({
       </div>
 
       {error && <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d" }}>{error}</div>}
+
+      <section style={{ display: "grid", gap: 8, padding: 12, border: "1px solid #252c38", borderRadius: 12, background: "#0e131a" }}>
+        <div>
+          <strong style={{ fontSize: 12 }}>TikTok Creator Feed</strong>
+          <div style={{ marginTop: 3, opacity: 0.42, fontSize: 10 }}>
+            Official Display API. Credential must already contain a user-authorized access + refresh token with video.list.
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 8 }}>
+          <input value={tiktokLabel} onChange={(e) => setTiktokLabel(e.target.value)} placeholder="Credential label" style={inputStyle} disabled={busy} />
+          <input value={tiktokClientId} onChange={(e) => setTiktokClientId(e.target.value)} placeholder="TikTok client key" style={inputStyle} disabled={busy} />
+          <input type="password" value={tiktokClientSecret} onChange={(e) => setTiktokClientSecret(e.target.value)} placeholder="Client secret" style={inputStyle} disabled={busy} />
+          <input type="password" value={tiktokAccessToken} onChange={(e) => setTiktokAccessToken(e.target.value)} placeholder="Access token" style={inputStyle} disabled={busy} />
+          <input type="password" value={tiktokRefreshToken} onChange={(e) => setTiktokRefreshToken(e.target.value)} placeholder="Refresh token" style={inputStyle} disabled={busy} />
+          <button type="button" disabled={busy} onClick={() => void saveTikTokCredential()} style={buttonStyle("primary")}>Сохранить credential</button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 140px 140px auto", gap: 8 }}>
+          <select value={tiktokCredentialId} onChange={(e) => setTiktokCredentialId(e.target.value)} style={inputStyle} disabled={busy}>
+            <option value="">TikTok credential</option>
+            {tiktokCredentials.map((credential) => <option key={credential.id} value={credential.id}>{credential.label}</option>)}
+          </select>
+          <select value={channelId} onChange={(e) => setChannelId(e.target.value)} style={inputStyle} disabled={busy}>
+            <option value="">Канал</option>
+            {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+          </select>
+          <input type="number" min={60} max={86400} value={tiktokInterval} onChange={(e) => setTiktokInterval(Number(e.target.value))} style={inputStyle} disabled={busy} />
+          <button type="button" disabled={busy || !tiktokCredentials.length} onClick={() => void createTikTokFeed()} style={buttonStyle("primary")}>{tiktokCredentials.length ? "Добавить feed" : "Сначала credential"}</button>
+        </div>
+      </section>
+
+      <section style={{ display: "grid", gap: 8 }}>
+        {tiktokFeeds.length > 0 && tiktokFeeds.map((feed) => (
+          <div key={feed.id} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, alignItems: "center", padding: 10, border: "1px solid #252c38", borderRadius: 10 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 600 }}>🎵 TikTok · {feed.targetLabel}</div>
+              <div style={{ marginTop: 4, fontSize: 11, opacity: 0.45 }}>
+                #{feed.channelId} · {feed.intervalSeconds}s · {feed.lastPolledAt ? "checked " + new Date(feed.lastPolledAt).toLocaleString() : "not checked"}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button type="button" disabled={busy} onClick={() => void testTikTokFeed(feed)} style={buttonStyle("secondary")}>Test</button>
+              <button type="button" disabled={busy} onClick={() => void patchTikTokFeed(feed, !feed.enabled)} style={buttonStyle("secondary")}>{feed.enabled ? "ON" : "OFF"}</button>
+              <button type="button" disabled={busy} onClick={() => void removeTikTokFeed(feed)} style={buttonStyle("danger")}>Удалить</button>
+            </div>
+          </div>
+        ))}
+      </section>
 
       <section style={{ display: "grid", gap: 8, padding: 12, border: "1px solid #252c38", borderRadius: 12, background: "#0e131a" }}>
         <div>
