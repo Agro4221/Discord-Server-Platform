@@ -263,7 +263,7 @@
 | **Yandex Music** | ✅ | LavaSrc source + access-token wiring + explicit ymsearch / provider selection in Music play/search; live provider playback still belongs to release-gate validation |
 | VK Music | ✅ | LavaSrc direct source + VK user token + explicit vksearch / provider selection in Music play/search; regional availability and live playback remain release-gate checks |
 | Tidal | ✅ | LavaSrc mirror source + Tidal token + explicit tdsearch / provider selection in Music play/search; live provider validation remains a release-gate check |
-| Qobuz | 🟡 |
+| Qobuz | ✅ | LavaSrc direct source + Qobuz user OAuth token + explicit qbsearch / provider selection in Music play/search; Qobuz account/token availability remains a release-gate check |
 | yt-dlp | 🟡 |
 | JioSaavn | 🟡 |
 
