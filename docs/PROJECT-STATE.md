@@ -572,3 +572,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - DATABASE_URL and LAVALINK_PASSWORD now use non-blank validation.
 - Custom Lavalink node passwords reject whitespace-only values.
 - Regression tests cover empty, spaces and tabs.
+
+## 2026-10-05 — Docker Management API port reconciliation
+- Fixed the Docker networking contract: host MANAGEMENT_API_PORT may remain 39001 (or another published port), but the bot now listens on internal port 3002 and Dashboard uses bot:3002.
+- Removed all remaining change-me PostgreSQL/Lavalink fallbacks from docker-compose.yml.
+- Deployment contract protects both invariants.
