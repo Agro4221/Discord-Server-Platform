@@ -1313,3 +1313,11 @@ Never write credentials, tokens or private user data here.
 - Added `scripts/check-dashboard-route-security.mjs` and wired it into CI; it scans Dashboard API routes and requires mutation handlers to contain an `assertSameOrigin()` call.
 - Source checkpoints: `ba3b4e5c3f6f79eaa03d84d0369c0c1e9d2eb9be`, `41c54ed4596896bac09f50e8ab2f3e708d4af7ff`, `6512a5658221614b6d9a4dadfe8e12cc33c3f76c`, CI contract `6f5cb19d2f38f46606a422c7b5b0fec167562b04`, checker `1fe226f405e1d596274d214a6e0664a112422fd4`.
 - Fresh CI is still not visible for the current PR head.
+
+## 2026-10-05 — Dashboard mutation-route checker gap fixed
+- Follow-up audit found a concrete false-negative in the new route-security gate: apps/dashboard/app/api/guilds/[guildId]/integration-credentials/[credentialId]/route.ts protected DELETE with assertSameOrigin() but left the POST credential-test mutation unprotected.
+- Added the same-origin check to that POST handler; behavior for the Management API request itself is unchanged.
+- Strengthened scripts/check-dashboard-route-security.mjs so it checks each exported POST/PUT/PATCH/DELETE handler independently instead of only verifying that the file contains one assertion somewhere.
+- Source checkpoints: route fix 60b3a4ab7fd455fbe61bdcff6575c268f551666c; finalized checker 9fa32baf9c9522485b829c68a36675d191681492.
+- Fresh CI is not visible yet; the new checker must pass on the branch before this slice is considered CI-verified.
+- Next concrete work remains another bounded release-gate audit, not a broad refactor.
