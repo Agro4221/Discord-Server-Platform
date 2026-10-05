@@ -146,6 +146,62 @@ test("AutoMod rule windows are independent from the base detector window", () =>
   );
 });
 
+test("AutoMod extended rule detectors cover burst spam, image-only and YouTube-only messages", () => {
+  const now = Date.now();
+  const config = {
+    enabled: true,
+    blockedWords: [],
+    maxMentions: 6,
+    maxCapsRatio: 0.85,
+    maxRepeatedMessages: 5,
+    repeatedWindowSeconds: 10,
+    blockLinks: false,
+    blockInvites: false,
+    maxLinks: 3,
+    maxEmojis: 20,
+    maxLineLength: 1000,
+    exemptChannelIds: "",
+    exemptRoleIds: "",
+    deleteMessage: true,
+    timeoutMinutes: 0
+  };
+
+  const burstMessage = { content: "hello" } as never;
+  assert.equal(
+    detectorMatches(
+      { detector: "spam-burst", threshold: 4, windowSeconds: 5 },
+      burstMessage,
+      [
+        { content: "a", timestamp: now - 4_000 },
+        { content: "b", timestamp: now - 3_000 },
+        { content: "c", timestamp: now - 2_000 },
+        { content: "d", timestamp: now }
+      ],
+      config
+    ),
+    true
+  );
+
+  const imageMessage = {
+    content: "",
+    attachments: new Map([["1", { contentType: "image/png", url: "https://example.test/image.png" }]])
+  } as never;
+  assert.equal(
+    detectorMatches({ detector: "image-only", threshold: null, windowSeconds: null }, imageMessage, [], config),
+    true
+  );
+
+  const youtubeMessage = { content: "https://youtu.be/dQw4w9WgXcQ" } as never;
+  assert.equal(
+    detectorMatches({ detector: "youtube-only", threshold: null, windowSeconds: null }, youtubeMessage, [], config),
+    true
+  );
+  assert.equal(
+    detectorMatches({ detector: "youtube-only", threshold: null, windowSeconds: null }, { content: "https://example.com" } as never, [], config),
+    false
+  );
+});
+
 test("AutoMod repeated-text rule honors its own window", () => {
   const now = Date.now();
   const message = { content: "same" } as never;
