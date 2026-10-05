@@ -93,6 +93,15 @@ for (const secretContract of [
   }
 }
 
+for (const upgradeContract of [
+  "Required secret is missing from .env",
+  "for required_secret in MANAGEMENT_API_KEY POSTGRES_PASSWORD LAVALINK_PASSWORD"
+]) {
+  if (!vpsUpgrade.includes(upgradeContract)) {
+    throw new Error("VPS upgrade secret guard missing: " + upgradeContract);
+  }
+}
+
 const localLauncher = await readFile("scripts/start-local.ps1", "utf8");
 for (const contract of [
   "docker compose up -d",
