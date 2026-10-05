@@ -1380,3 +1380,8 @@ Never write credentials, tokens or private user data here.
 - Found a concrete TypeScript regression left by the earlier whitespace-secret hardening: loadConfig() still referenced the removed required() helper for lavalinkPassword.
 - Replaced the stale call with requiredNonBlank("LAVALINK_PASSWORD"), matching the existing blank-secret tests and the other required configuration fields.
 - Repository search confirms no remaining required() call sites.
+## 2026-10-05 — VPS whitespace-secret recovery hardening
+- Found a concrete deployment drift: install-vps.sh and upgrade.sh treated whitespace-only MANAGEMENT_API_KEY/POSTGRES_PASSWORD/LAVALINK_PASSWORD values as present, while bot configuration rejects them as blank.
+- Added a shared is_blank() check to the installer and upgrade paths; installer regenerates blank secrets, upgrade fails fast on them.
+- Deployment contract now protects the presence of this whitespace-aware secret handling.
+- Source checkpoints: 8ceea9457a65bc2e1888af4520564a0d7aabc8e8 (installer), 209312cb4b1d678fee857369ade15d59664300bb (upgrade), e3f030992877e4727e76d1d43c545568166b358d (contract).
