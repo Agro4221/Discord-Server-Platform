@@ -178,3 +178,13 @@ test("music playlist names normalize whitespace and reject blanks", async () => 
   assert.equal(normalizeMusicPlaylistName("   "), null);
   assert.equal(normalizeMusicPlaylistName("x".repeat(100))?.length, 80);
 });
+
+
+test("music playlist shuffle returns a copy without mutating source", async () => {
+  const { shuffleMusicItems } = await import("../src/modules/music.js");
+  const source = [1, 2, 3, 4, 5];
+  const shuffled = shuffleMusicItems(source);
+  assert.notEqual(shuffled, source);
+  assert.deepEqual(source, [1, 2, 3, 4, 5]);
+  assert.deepEqual([...shuffled].sort((a, b) => a - b), source);
+});
