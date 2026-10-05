@@ -470,3 +470,8 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Added deterministic regression tests.
 - Source checkpoint: `53008d169a1b4a12659656c665e97125f2ca182e`.
 - Fresh CI for the repaired/hardened checkpoint is not yet visible in the current connector session.
+## 2026-10-05 — Music Lavalink failover hardening
+- Music failover target selection is now centralized and requires a connected, session-resumable secondary node.
+- The selector is covered by deterministic tests and is used consistently by the runtime failover path.
+- Source checkpoint: `3e854a4e158eaa332a625cfba1f375ca837411f7`.
+- Fresh CI is pending/not visible yet.
