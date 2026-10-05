@@ -39,8 +39,13 @@ get_env() {
   printf "%s" "${value}"
 }
 
+is_blank() {
+  local value="$1"
+  [[ -z "${value//[[:space:]]/}" ]]
+}
+
 for required_secret in MANAGEMENT_API_KEY POSTGRES_PASSWORD LAVALINK_PASSWORD; do
-  if [[ -z "$(get_env "${required_secret}")" ]]; then
+  if is_blank "$(get_env "${required_secret}")"; then
     echo "Required secret is missing from .env: ${required_secret}" >&2
     exit 1
   fi
