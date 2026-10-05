@@ -224,7 +224,7 @@
 | Karaoke | ✅ |
 | Pitch control | ✅ |
 | Speed control | ✅ |
-| Tremolo / Vibrato / Distortion / Low Pass / Channel Mix / rotation / other Lavalink effects | 🟡 | Core effects covered: Tremolo ✅, Vibrato ✅, Distortion ✅, Low Pass ✅, Channel Mix ✅, 8D rotation ✅; remaining work is higher-level effect tooling and any non-core/plugin-specific filters
+| Tremolo / Vibrato / Distortion / Low Pass / Channel Mix / rotation / other Lavalink effects | ✅ | Product scope covers the relevant core effects: Tremolo, Vibrato, Distortion, Low Pass, Channel Mix and 8D rotation; arbitrary plugin-specific Lavalink filters are intentionally outside the parity roadmap |
 | Custom EQ editor | ✅ | `/eq show`, `/eq set`, `/eq reset` and `!eq` equivalents |
 | Persist and restore effect state | ✅ | Player persistence stores Lavalink filter state and resumed players restore it before queue/playback resync |
 
