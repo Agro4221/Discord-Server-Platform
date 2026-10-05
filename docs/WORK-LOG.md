@@ -1013,6 +1013,13 @@ Never write credentials, tokens or private user data here.
 - Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
 
 ## 2026-10-05 — Local Bot Setup / registration panel
+## 2026-10-05 — Bot Setup avatar/banner controls
+- Added PNG/JPEG/GIF avatar and banner file inputs to the local Bot Setup panel.
+- Client-side validation limits each image to 3 MB and converts it to the data URL format already accepted by the existing Management API profile validation.
+- Uploading a file applies the profile through the existing Discord user edit path; the repository intentionally does not persist these large profile blobs.
+- Added explicit Сбросить controls for avatar and banner, with a three-state UI contract: no change, set new image, or clear current image.
+- Successful saves clear the staged file data so a later save does not resend an old image unintentionally.
+- Source checkpoint: 359f260943f1cbf815238432adbafe0da4cf4483.
 ## 2026-10-05 — Bot Setup credential verification
 - Added a non-destructive Test action beside the Bot Token field.
 - Verification calls Discord API /users/@me with the supplied Bot token and requires the returned account to be a bot whose id matches the configured Client ID.
