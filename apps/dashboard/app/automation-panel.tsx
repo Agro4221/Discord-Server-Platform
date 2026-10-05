@@ -372,7 +372,7 @@ export function AutomationPanel({
             {condition.type === "channel-is" && (
               <select value={condition.channelId} onChange={(e) => updateCondition(index, { channelId: e.target.value }, true)} style={inputStyle}>
                 <option value="">Канал</option>
-                {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                {textChannels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
               </select>
             )}
 
@@ -404,6 +404,7 @@ export function AutomationPanel({
               <option value="add-role">add-role</option>
               <option value="remove-role">remove-role</option>
               <option value="timeout">timeout</option>
+              <option value="warn">warn</option>
               <option value="delete-message">delete-message</option>
               <option value="add-reaction">add-reaction</option>
               <option value="remove-reaction">remove-reaction</option>
@@ -431,6 +432,26 @@ export function AutomationPanel({
               </div>
             )}
 
+            {action.type === "create-channel" && (
+              <div style={actionGrid}>
+                <input value={action.name} maxLength={100} onChange={(e) => updateAction(index, { name: e.target.value })} placeholder="Имя канала · ticket-{userId}" style={inputStyle} />
+                <select value={action.channelType} onChange={(e) => updateAction(index, { channelType: e.target.value as "text" | "voice" })} style={inputStyle}>
+                  <option value="text">Текстовый</option>
+                  <option value="voice">Голосовой</option>
+                </select>
+                <select value={action.parentId ?? ""} onChange={(e) => updateAction(index, { parentId: e.target.value || null })} style={inputStyle}>
+                  <option value="">Без категории</option>
+                  {categories.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            {action.type === "warn" && (
+              <div style={actionGrid}>
+                <input value={action.userId} maxLength={20} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event или User ID" style={inputStyle} />
+                <input value={action.reason} maxLength={500} onChange={(e) => updateAction(index, { reason: e.target.value })} placeholder="Причина предупреждения" style={inputStyle} />
+              </div>
+            )}
             {action.type === "dm-user" && (
               <div style={actionGrid}>
                 <input value={action.userId} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event или user ID" style={inputStyle} />
