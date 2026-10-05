@@ -507,3 +507,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Missing `MANAGEMENT_API_KEY`, `POSTGRES_PASSWORD` or `LAVALINK_PASSWORD` stops the upgrade with an explicit error.
 - Source checkpoint: `67ed79823ca844e1daa088b9631f7a41a45c26be`.
 - CI verification remains pending/unavailable; live recovery against an existing installation remains required.
+
+## 2026-10-05 — VPS upgrade domain validation
+- `upgrade.sh` now fails fast when `DOMAIN` is missing or malformed instead of attempting an invalid Caddy HTTPS smoke request.
+- Static deployment verification requires the domain guard.
+- Source checkpoint: `83f7e61bb7b9cfc25902effc011023ff8b5af288`.
+- CI verification remains pending/unavailable; live upgrade validation is still required.
