@@ -1767,6 +1767,125 @@ export class Music implements PlatformModule {
     await interaction.reply({ content: "Неизвестное действие playlist.", ephemeral: true });
   }
 
+  private musicPlaylistPaginationComponents(token: string, page: number, totalPages: number): ActionRowBuilder<ButtonBuilder>[] {
+    if (totalPages <= 1) return [];
+    const previous = new ButtonBuilder()
+      .setCustomId("dsp:music:playlist-page:" + token + ":" + (page - 1))
+      .setLabel("◀")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page <= 0);
+    const next = new ButtonBuilder()
+      .setCustomId("dsp:music:playlist-page:" + token + ":" + (page + 1))
+      .setLabel("▶")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page >= totalPages - 1);
+    const counter = new ButtonBuilder()
+      .setCustomId("dsp:music:playlist-page:" + token + ":" + page)
+      .setLabel((page + 1) + "/" + totalPages)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true);
+    return [new ActionRowBuilder<ButtonBuilder>().addComponents(previous, counter, next)];
+  }
+
+  private createMusicPlaylistPaginationSession(input: {
+    guildId: string;
+    userId: string;
+    action: "list" | "search" | "view";
+    name?: string;
+    query?: string;
+    sharedOnly?: boolean;
+  }): string {
+    const token = Date.now().toString(36) + "-" + (++this.playlistPaginationSequence).toString(36);
+    this.playlistPaginationSessions.set(token, {
+      ...input,
+      expiresAt: Date.now() + 10 * 60_000
+    });
+    return token;
+  }
+
+  private async renderMusicPlaylistPagination(
+    interaction: ChatInputCommandInteraction | ButtonInteraction,
+    session: {
+      guildId: string;
+      userId: string;
+      action: "list" | "search" | "view";
+      name?: string;
+      query?: string;
+      sharedOnly?: boolean;
+      expiresAt: number;
+    },
+    page: number
+  ): Promise<void> {
+    if (session.action === "view") {
+      const result = await this.db.query<{ tracks: unknown[]; visibility: MusicPlaylistVisibility }>(
+        "SELECT tracks,visibility FROM music_playlists WHERE guild_id=$1 AND name=$2 AND (user_id=$3 OR visibility='shared') ORDER BY CASE WHEN user_id=$3 THEN 0 ELSE 1 END LIMIT 1",
+        [session.guildId,session.name ?? "",session.userId]
+      );
+      const row = result.rows[0];
+      if (!row) {
+        await interaction[interaction.isButton() ? "update" : "reply"]({ content: "Плейлист больше недоступен.", ephemeral: true });
+        return;
+      }
+      const tracks = Array.isArray(row.tracks) ? row.tracks : [];
+      const totalPages = musicPlaylistPageCount(tracks.length);
+      const currentPage = normalizeMusicPlaylistPage(page,totalPages);
+      const start = currentPage * MUSIC_PLAYLIST_PAGE_SIZE;
+      const visible = tracks.slice(start,start + MUSIC_PLAYLIST_PAGE_SIZE);
+      const lines = visible.map((item,index) => {
+        const obj = item as { info?: { title?: string; author?: string } };
+        return (start + index + 1) + ". **" + String(obj.info?.title ?? "Unknown track") + "** — " + String(obj.info?.author ?? "Unknown artist");
+      });
+      const content = "🎼 **" + session.name + "** (" + (row.visibility === "shared" ? "🌐 shared" : "👤 личный") + ") · страница " +
+        (currentPage + 1) + "/" + totalPages + "\n" + (lines.length ? lines.join("\n") : "Плейлист пуст.");
+      const payload = { content, components: this.musicPlaylistPaginationComponents(
+        [...this.playlistPaginationSessions.entries()].find(([,value]) => value === session)?.[0] ?? "",
+        currentPage,
+        totalPages
+      ), ephemeral: true };
+      if (interaction.isButton()) await interaction.update(payload);
+      else await interaction.reply(payload);
+      return;
+    }
+
+    const queryText = session.query ?? "";
+    const pattern = "%" + queryText + "%";
+    const where = session.action === "search"
+      ? " AND ($4=false OR visibility='shared') AND name ILIKE $3"
+      : "";
+    const count = await this.db.query<{ total: number }>(
+      "SELECT COUNT(*)::int AS total FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared')" + where,
+      session.action === "search"
+        ? [session.guildId,session.userId,pattern,Boolean(session.sharedOnly)]
+        : [session.guildId,session.userId]
+    );
+    const totalItems = Number(count.rows[0]?.total ?? 0);
+    const totalPages = musicPlaylistPageCount(totalItems);
+    const currentPage = normalizeMusicPlaylistPage(page,totalPages);
+    const offset = currentPage * MUSIC_PLAYLIST_PAGE_SIZE;
+    const result = await this.db.query<{ name: string; tracks: unknown[]; visibility: MusicPlaylistVisibility }>(
+      "SELECT name,tracks,visibility FROM music_playlists WHERE guild_id=$1 AND (user_id=$2 OR visibility='shared')" + where +
+      " ORDER BY visibility DESC,updated_at DESC LIMIT $5 OFFSET $6",
+      session.action === "search"
+        ? [session.guildId,session.userId,pattern,Boolean(session.sharedOnly),MUSIC_PLAYLIST_PAGE_SIZE,offset]
+        : [session.guildId,session.userId,MUSIC_PLAYLIST_PAGE_SIZE,offset]
+    );
+    const lines = result.rows.map((row,index) =>
+      (offset + index + 1) + ". " + (row.visibility === "shared" ? "🌐" : "👤") + " **" + row.name + "** — " +
+      String(Array.isArray(row.tracks) ? row.tracks.length : 0) + " треков"
+    );
+    const heading = session.action === "search" ? "🔎 **Результаты поиска: " + queryText + "**" : "🎼 **Доступные плейлисты**";
+    const content = heading + " · страница " + (currentPage + 1) + "/" + totalPages + "\n" +
+      (lines.length ? lines.join("\n") : "Плейлистов не найдено.");
+    const tokenEntry = [...this.playlistPaginationSessions.entries()].find(([,value]) => value === session);
+    const payload = {
+      content,
+      components: this.musicPlaylistPaginationComponents(tokenEntry?.[0] ?? "",currentPage,totalPages),
+      ephemeral: true
+    };
+    if (interaction.isButton()) await interaction.update(payload);
+    else await interaction.reply(payload);
+  }
+
   private async previous(interaction: ChatInputCommandInteraction): Promise<void> {
     const player = this.manager?.players.get(interaction.guild!.id);
     if (!player) {
