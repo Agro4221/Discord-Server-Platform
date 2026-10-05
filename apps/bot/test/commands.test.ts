@@ -184,7 +184,7 @@ test("music play commands expose the supported search providers", () => {
   const topProvider = top?.options?.find((option) => option.name === "provider");
   const groupedPlay = grouped?.options?.find((option) => option.name === "play");
   const groupedProvider = groupedPlay?.options?.find((option) => option.name === "provider");
-  const expected = ["auto", "youtube", "youtube_music", "soundcloud"];
+  const expected = ["auto", "youtube", "youtube_music", "soundcloud", "spotify", "yandex_music"];
   assert.deepEqual(topProvider?.choices?.map((choice) => String(choice.value)), expected);
   assert.deepEqual(groupedProvider?.choices?.map((choice) => String(choice.value)), expected);
 });
