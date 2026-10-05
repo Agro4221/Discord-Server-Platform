@@ -1063,6 +1063,12 @@ Never write credentials, tokens or private user data here.
 - TikTok Display API requires user authorization with the video.list scope; therefore the adapter remains 🟡 until the self-hosted OAuth flow, creator-feed storage and Dashboard configuration are wired.
 - Source checkpoint: afce6977835b949cf33ac14807fdc96bdedf4591.
 
+## 2026-10-05 — Music effect backlog reconciliation
+- Reconciled the final remaining Music yellow row against the product principle.
+- All effects explicitly targeted by the product scope are already implemented and exposed through the Music controller/filter UI.
+- Arbitrary non-core Lavalink or plugin-specific effects are deliberately not treated as missing parity features; the product target is competitor feature parity, not exhaustive Lavalink capability exposure.
+- No source change was required for this reconciliation.
+
 ## 2026-10-05 — Notifications feed Test delivery
 - Added a Dashboard Test action for individual notification feeds.
 - Test delivery fetches the latest feed entry, renders the saved message template and optional embed, and sends it immediately to the configured channel.
