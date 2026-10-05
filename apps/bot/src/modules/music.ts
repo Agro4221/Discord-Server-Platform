@@ -1185,6 +1185,66 @@ export class Music implements PlatformModule {
       return;
     }
 
+    if (action === "play") {
+      const position = interaction.options.getInteger("track");
+      if (position === null) {
+        await interaction.reply({ content: "Укажи номер трека из избранного.", ephemeral: true });
+        return;
+      }
+
+      const result = await this.db.query<{
+        track: { info?: { uri?: string | null; identifier?: string; title?: string } };
+      }>(
+        "SELECT track FROM music_favorites WHERE guild_id=$1 AND user_id=$2 ORDER BY created_at DESC LIMIT 25 OFFSET $3",
+        [interaction.guild!.id,interaction.user.id,position - 1]
+      );
+      const saved = result.rows[0]?.track;
+      const query = String(saved?.info?.uri ?? saved?.info?.identifier ?? "");
+      if (!query) {
+        await interaction.reply({ content: "Не удалось восстановить выбранный трек.", ephemeral: true });
+        return;
+      }
+
+      const voice = (await interaction.guild!.members.fetch(interaction.user.id)).voice.channelId;
+      if (!voice) {
+        await interaction.reply({ content: "Сначала зайди в голосовой канал.", ephemeral: true });
+        return;
+      }
+
+      const cooldownKey = interaction.guild!.id + ":" + interaction.user.id;
+      const remaining = remainingMusicRequestCooldown(this.requestCooldownUntil.get(cooldownKey) ?? 0);
+      if (remaining > 0) {
+        await interaction.reply({ content: "⏳ Подожди ещё " + Math.ceil(remaining / 1000) + " сек. перед следующим запросом.", ephemeral: true });
+        return;
+      }
+
+      const queued = await this.queueQuery(
+        interaction.guild!.id,
+        voice,
+        interaction.channelId,
+        query,
+        interaction.user
+      );
+      this.requestCooldownUntil.set(cooldownKey, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
+
+      if (queued.pending) {
+        await interaction.reply({ content: "🕒 Избранный трек отправлен на подтверждение DJ или Manage Server.", ephemeral: true });
+        return;
+      }
+      if (!queued.added) {
+        await interaction.reply({
+          content: queued.limited ? "⛔ Лимит очереди уже достигнут." : "Не удалось добавить выбранный трек.",
+          ephemeral: true
+        });
+        return;
+      }
+      await interaction.reply({
+        content: "▶️ Запущен трек из избранного" + (queued.firstTitle ? ": **" + queued.firstTitle + "**" : "."),
+        ephemeral: true
+      });
+      return;
+    }
+
     const track = player?.queue.current;
     if (!track) {
       await interaction.reply({ content: "Нужен текущий трек в плеере.", ephemeral: true });
@@ -1520,7 +1580,7 @@ export class Music implements PlatformModule {
     }
 
     const current = this.manager?.players.get(guildId);
-    const shouldShuffle = action === "load" && interaction.options.getBoolean("shuffle") === true;
+    const shouldShuffle = (action === "load" || action === "play") && interaction.options.getBoolean("shuffle") === true;
 
     const trackPosition = interaction.options.getInteger("track");
     const targetPosition = interaction.options.getInteger("to");
@@ -1600,7 +1660,7 @@ export class Music implements PlatformModule {
       return;
     }
 
-    if (action === "load") {
+    if (action === "load" || action === "play") {
       const voice = (await interaction.guild!.members.fetch(interaction.user.id)).voice.channelId;
       if (!voice) {
         await interaction.reply({ content: "Сначала зайди в голосовой канал.", ephemeral: true });
@@ -1666,7 +1726,7 @@ export class Music implements PlatformModule {
           ? " — в пределах лимита очереди"
           : "";
       await interaction.reply({
-        content: "▶️ В очередь загружено **" + added + "** треков из **" + name + "**" + (shouldShuffle ? " в случайном порядке" : "") + limitedSuffix + ".",
+        content: "▶️ В очередь добавлено **" + added + "** треков из **" + name + "**" + (shouldShuffle ? " в случайном порядке" : "") + limitedSuffix + ".",
         ephemeral: true
       });
       return;
