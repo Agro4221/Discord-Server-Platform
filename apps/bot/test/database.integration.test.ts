@@ -22,7 +22,7 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1)",
       [[
         "guild_modules","automod_settings","verification_settings","automation_rules",
-        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs","moderation_presets","ticket_sla_settings","help_pages","analytics_settings","music_history","custom_forms","custom_form_submissions","onboarding_flows","server_config_presets","ticket_panels"
+        "bot_identities","guild_bot_assignments","bot_heartbeats","music_node_sessions","guild_music_bot_assignments","stream_alerts","afk_users","autoresponder_rules","ticket_settings","tickets","automation_workflow_presets","moderation_cleanup_rules","role_automation_rules","role_automation_jobs","moderation_presets","ticket_sla_settings","help_pages","analytics_settings","music_history","custom_forms","custom_form_submissions","onboarding_flows","server_config_presets","ticket_panels","music_request_approvals"
       ]]
     );
     assert.equal(tables.rows.length, 28);
@@ -56,9 +56,52 @@ test("postgres migrations apply cleanly and are idempotent", { skip: !enabled },
       [["guild_id","bot_identity_id","title","played_at"]]
     );
     assert.equal(musicHistoryColumns.rows.length, 4);
+    const approvalColumns = await db.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='music_settings' AND column_name = ANY($1)",
+      [["request_approval_mode","max_queued_per_user","max_queue_size","fair_queue_enabled"]]
+    );
+    assert.equal(approvalColumns.rows.length, 4);
     assert.equal(Number(version), Number(first.rows[0]?.count));
     assert.equal(Number(second.rows[0]?.count), Number(version));
   } finally {
+    await db.close();
+  }
+});
+
+test("music request approval mode persists pending requests", { skip: !enabled }, async () => {
+  const db = new Database(process.env.DATABASE_URL!);
+  const guildId = "123456789012345733";
+  try {
+    await migrate(db);
+    await db.query("DELETE FROM music_request_approvals WHERE guild_id=$1", [guildId]);
+    await db.query("DELETE FROM music_settings WHERE guild_id=$1", [guildId]);
+
+    await db.query(
+      "INSERT INTO music_settings(guild_id,request_approval_mode) VALUES($1,'approval')",
+      [guildId]
+    );
+    const saved = await db.query<{ request_approval_mode: string }>(
+      "SELECT request_approval_mode FROM music_settings WHERE guild_id=$1",
+      [guildId]
+    );
+    assert.equal(saved.rows[0]?.request_approval_mode, "approval");
+
+    const inserted = await db.query<{ id: string }>(
+      `INSERT INTO music_request_approvals(
+        guild_id,requester_user_id,requester_voice_channel_id,source_channel_id,query,expires_at
+      ) VALUES($1,$2,$3,$4,$5,now()+interval '15 minutes')
+      RETURNING id`,
+      [guildId,"234567890123456789","345678901234567890","456789012345678901","test song"]
+    );
+
+    const restored = await db.query<{ status: string; query: string }>(
+      "SELECT status,query FROM music_request_approvals WHERE id=$1",
+      [inserted.rows[0]!.id]
+    );
+    assert.deepEqual(restored.rows[0], { status: "pending", query: "test song" });
+  } finally {
+    await db.query("DELETE FROM music_request_approvals WHERE guild_id=$1", [guildId]).catch(() => undefined);
+    await db.query("DELETE FROM music_settings WHERE guild_id=$1", [guildId]).catch(() => undefined);
     await db.close();
   }
 });
