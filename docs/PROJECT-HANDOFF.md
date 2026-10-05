@@ -638,3 +638,9 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Keep the local Control Center intentionally login-free while protecting every Management API request with the configured exact Bearer key.
 - `isManagementApiAuthorizationValid()` is now directly regression-tested and rejects blank keys/headers, alternate auth schemes and non-exact credentials.
 - Source checkpoint: `3211e31ed8e07d0b41b0d25995a81e45ebef5f91`.
+
+### 2026-10-05 — Dashboard mutation security gate
+- Dashboard API mutations must use the shared `assertSameOrigin()` protection; read-only GET routes do not require it.
+- Fixed the discovered gaps in Help Pages deletion, Moderation Presets mutation and Role Automation creation.
+- `scripts/check-dashboard-route-security.mjs` now enforces the mutation-route contract in CI.
+- This complements the public VPS Caddy Basic Auth boundary and the internal Management API Bearer-key boundary without reintroducing end-user Dashboard login.
