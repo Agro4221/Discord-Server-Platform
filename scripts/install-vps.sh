@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 INSTALL_DIR="${INSTALL_DIR:-/opt/discord-server-platform}"
-REPO_URL="${REPO_URL:-git@github.com:Agro4221/Discord-Server-Platform.git}"
+REPO_URL="${REPO_URL:-https://github.com/Agro4221/Discord-Server-Platform.git}"
 BRANCH="${BRANCH:-development}"
 
 if [[ "${EUID}" -ne 0 ]]; then
@@ -50,6 +50,7 @@ set_env() {
 set_env DISCORD_TOKEN "${DISCORD_TOKEN}"
 set_env DISCORD_CLIENT_ID "${DISCORD_CLIENT_ID}"
 set_env MANAGEMENT_API_KEY "$(openssl rand -hex 32)"
+set_env BOT_CREDENTIALS_ENCRYPTION_KEY "$(openssl rand -hex 32)"
 set_env POSTGRES_PASSWORD "$(openssl rand -hex 24)"
 set_env LAVALINK_PASSWORD "$(openssl rand -hex 24)"
 
