@@ -19,7 +19,7 @@ services:
     image: ghcr.io/lavalink-devs/lavalink:4.2.2
     restart: unless-stopped
     environment:
-      _JAVA_OPTIONS: "-Xms256m -Xmx768m"
+      _JAVA_OPTIONS: "-Xms${LAVALINK_JAVA_XMS:-128m} -Xmx${LAVALINK_JAVA_XMX:-512m}"
       LAVALINK_SERVER_PASSWORD: ${LAVALINK_PASSWORD:-change-me-local}
     volumes:
       - ./infrastructure/lavalink/application.yml:/opt/Lavalink/application.yml:ro
@@ -35,7 +35,7 @@ services:
     image: ghcr.io/lavalink-devs/lavalink:4.2.2
     restart: unless-stopped
     environment:
-      _JAVA_OPTIONS: "-Xms256m -Xmx768m"
+      _JAVA_OPTIONS: "-Xms${LAVALINK_JAVA_XMS:-128m} -Xmx${LAVALINK_JAVA_XMX:-512m}"
       LAVALINK_SERVER_PASSWORD: ${LAVALINK_PASSWORD:-change-me-local}
       SERVER_PORT: 2334
     volumes:
