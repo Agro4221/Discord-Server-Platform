@@ -10,8 +10,8 @@ Self-hosted Discord Server Platform: local-first, resilient, modular, no artific
 ## Current branch
 development
 
-## Cleanup baseline
-`78a14d4cbb6b15ade0e7111e266eeff970a674e4`
+## Verified test baseline
+`be0d73b41359b4601742f7051a99fddf544c9bc3`
 
 ## Current phase
 Technical implementation freeze — current agreed feature scope is implemented; next phase is verification and live acceptance. Remaining work is tests/real-environment validation, not foundational feature construction.
@@ -626,3 +626,9 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 ## 2026-10-05 — Technical implementation freeze
 - Closed the known code-level completion gaps identified during the pre-test pass: Automation warn + create-channel, Automation scheduler guild-index bug, persisted moderation channel-lock cleanup, expanded AutoMod detectors, Spotify/Yandex Music provider wiring, Docker optional Lavalink2 topology, VPS bootstrap/upgrade secret repair and cleanup of legacy Dashboard implementations/contracts.
 - Current work now switches from feature construction to verification. The next objective is to exercise the implemented system systematically and convert every real failure into a regression fix.
+
+
+## 2026-10-05 — First verification baseline
+- CI #2442 passed the complete repository verification pipeline on the first post-freeze runtime test baseline: source hygiene, deployment/observability contracts, typecheck, bot tests, domain build, bot build and Dashboard build.
+- The first test failure discovered after the freeze was stale Music provider expectations; those were updated to the now-supported Spotify/Yandex providers. New AutoMod detector and Automation runtime tests were added and pass.
+- Subsequent verification work is now focused on the live/runtime matrix; feature work remains frozen unless a test exposes a concrete defect.
