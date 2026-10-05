@@ -27,6 +27,12 @@ export type ProviderCredentialSecret = {
   clientId?: string;
   clientSecret?: string;
   apiKey?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  openId?: string;
+  expiresAt?: number;
+  refreshExpiresAt?: number;
+  scope?: string;
 };
 
 export class IntegrationCredentialRepository {
