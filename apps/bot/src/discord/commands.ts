@@ -105,6 +105,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
     new SlashCommandBuilder().setName("pause").setDescription("Pause music"),
     new SlashCommandBuilder().setName("resume").setDescription("Resume music"),
     new SlashCommandBuilder().setName("skip").setDescription("Skip the current track"),
+    new SlashCommandBuilder().setName("vote-skip").setDescription("Vote to skip the current track"),
     new SlashCommandBuilder().setName("stop").setDescription("Stop music and clear the queue"),
     new SlashCommandBuilder().setName("shuffle").setDescription("Shuffle the queue"),
     new SlashCommandBuilder().setName("playlist").setDescription("Show the current playlist/queue"),
@@ -871,6 +872,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .addSubcommand((sub) => sub.setName("previous").setDescription("Play previous track"))
       .addSubcommand((sub) => sub.setName("lyrics").setDescription("Show lyrics for the current track"))
       .addSubcommand((sub) => sub.setName("skip").setDescription("Skip current track"))
+      .addSubcommand((sub) => sub.setName("vote-skip").setDescription("Vote to skip the current track"))
       .addSubcommand((sub) =>
         sub
           .setName("skip-to")
