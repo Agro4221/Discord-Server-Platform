@@ -88,6 +88,41 @@ export function musicPlaylistContinuationBatch(
   return { indexes, nextIndex: newIndex, done: newIndex >= order.length };
 }
 
+export function mergeMusicPlaylistTracks<T>(
+  target: readonly T[],
+  source: readonly T[],
+  getIdentifier: (track: T) => string | null | undefined,
+  limit = MAX_PLAYLIST_TRACKS
+): { tracks: T[]; added: number; duplicates: number; truncated: number } {
+  const safeLimit = Math.max(0, Math.min(MAX_PLAYLIST_TRACKS, Math.floor(limit)));
+  const tracks = [...target].slice(0, safeLimit);
+  const seen = new Set<string>();
+  for (const track of tracks) {
+    const identifier = getIdentifier(track);
+    if (identifier) seen.add(identifier);
+  }
+
+  let added = 0;
+  let duplicates = 0;
+  let truncated = 0;
+  for (const track of source) {
+    if (tracks.length >= safeLimit) {
+      truncated += 1;
+      continue;
+    }
+    const identifier = getIdentifier(track);
+    if (identifier && seen.has(identifier)) {
+      duplicates += 1;
+      continue;
+    }
+    if (identifier) seen.add(identifier);
+    tracks.push(track);
+    added += 1;
+  }
+
+  return { tracks, added, duplicates, truncated };
+}
+
 export function removeMusicPlaylistTrack<T>(tracks: T[], position: number): T[] | null {
   if (!Number.isInteger(position) || position < 1 || position > tracks.length) return null;
   const index = position - 1;
@@ -1611,6 +1646,75 @@ export class Music implements PlatformModule {
 
     const trackPosition = interaction.options.getInteger("track");
     const targetPosition = interaction.options.getInteger("to");
+    const sourceName = normalizeMusicPlaylistName(interaction.options.getString("source") ?? "");
+
+    if (action === "merge") {
+      if (!canEdit) {
+        await interaction.reply({ content: "Объединять этот плейлист могут только его создатель, DJ или Manage Server.", ephemeral: true });
+        return;
+      }
+      if (!sourceName) {
+        await interaction.reply({ content: "Укажи имя исходного плейлиста в параметре source.", ephemeral: true });
+        return;
+      }
+      if (sourceName === name) {
+        await interaction.reply({ content: "Исходный и целевой плейлисты должны быть разными.", ephemeral: true });
+        return;
+      }
+
+      const sourceResult = await this.db.query<{
+        id: string;
+        tracks: unknown[];
+        visibility: MusicPlaylistVisibility;
+        user_id: string;
+        name: string;
+      }>(
+        "SELECT id,tracks,visibility,user_id,name FROM music_playlists WHERE guild_id=$1 AND name=$2 AND (user_id=$3 OR visibility='shared') ORDER BY CASE WHEN user_id=$3 THEN 0 ELSE 1 END LIMIT 1",
+        [guildId,sourceName,interaction.user.id]
+      );
+      const source = sourceResult.rows[0];
+      if (!source) {
+        await interaction.reply({ content: "Исходный плейлист не найден или недоступен.", ephemeral: true });
+        return;
+      }
+      if (source.id === row.id) {
+        await interaction.reply({ content: "Исходный и целевой плейлисты должны быть разными.", ephemeral: true });
+        return;
+      }
+
+      const targetTracks = Array.isArray(row.tracks) ? row.tracks : [];
+      const sourceTracks = Array.isArray(source.tracks) ? source.tracks : [];
+      const merged = mergeMusicPlaylistTracks(
+        targetTracks,
+        sourceTracks,
+        (item) => {
+          const obj = item as { info?: { identifier?: unknown; uri?: unknown } };
+          const identifier = obj.info?.identifier;
+          if (typeof identifier === "string" && identifier) return identifier;
+          const uri = obj.info?.uri;
+          return typeof uri === "string" && uri ? uri : null;
+        }
+      );
+
+      if (merged.added === 0) {
+        await interaction.reply({
+          content: "Нечего добавлять: все треки из **" + source.name + "** уже есть в **" + name + "** или плейлист уже заполнен (500 треков).",
+          ephemeral: true
+        });
+        return;
+      }
+
+      await this.db.query(
+        "UPDATE music_playlists SET tracks=$1::jsonb,updated_at=now() WHERE id=$2",
+        [JSON.stringify(merged.tracks),row.id]
+      );
+      const suffix = merged.truncated > 0 ? " Лишние треки отброшены из-за лимита 500." : "";
+      await interaction.reply({
+        content: "🔀 В **" + name + "** добавлено **" + merged.added + "** уникальных треков из **" + source.name + "**; дублей пропущено: **" + merged.duplicates + "**." + suffix,
+        ephemeral: true
+      });
+      return;
+    }
 
     if (action === "remove" || action === "move") {
       if (!canEdit) {
