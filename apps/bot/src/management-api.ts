@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { timingSafeEqual } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { EmbedBuilder, type Client } from "discord.js";
 import { logger } from "./logger.js";
 import { ModuleSettingsRepository } from "./module-settings.js";
@@ -285,9 +285,95 @@ type RateWindow = { startedAt: number; count: number };
 export class ManagementApiServer {
   private server?: Server;
   private readonly rateWindows = new Map<string, RateWindow>();
+  private readonly tiktokOauthStates = new Map<string, { guildId: string; redirectUri: string; expiresAt: number }>();
   private rateCleanupTimer?: NodeJS.Timeout;
 
   constructor(private readonly options: ApiOptions) {}
+
+  private createTikTokOauthUrl(guildId: string): string {
+    const clientKey = process.env.TIKTOK_CLIENT_KEY?.trim();
+    const redirectUri = process.env.TIKTOK_REDIRECT_URI?.trim();
+    if (!clientKey || !process.env.TIKTOK_CLIENT_SECRET?.trim() || !redirectUri) {
+      throw new Error("tiktok_oauth_not_configured");
+    }
+    const state = randomBytes(32).toString("base64url");
+    this.tiktokOauthStates.set(state, {
+      guildId,
+      redirectUri,
+      expiresAt: Date.now() + 10 * 60_000
+    });
+
+    const url = new URL("https://www.tiktok.com/v2/auth/authorize/");
+    url.searchParams.set("client_key", clientKey);
+    url.searchParams.set("scope", "user.info.basic,video.list");
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("redirect_uri", redirectUri);
+    url.searchParams.set("state", state);
+    return url.toString();
+  }
+
+  private async exchangeTikTokOauthCode(code: string, state: string): Promise<unknown> {
+    const pending = this.tiktokOauthStates.get(state);
+    this.tiktokOauthStates.delete(state);
+    if (!pending || pending.expiresAt < Date.now()) throw new Error("tiktok_oauth_state_invalid");
+
+    const clientKey = process.env.TIKTOK_CLIENT_KEY?.trim();
+    const clientSecret = process.env.TIKTOK_CLIENT_SECRET?.trim();
+    if (!clientKey || !clientSecret) throw new Error("tiktok_oauth_not_configured");
+
+    const response = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "Cache-Control": "no-cache" },
+      body: new URLSearchParams({
+        client_key: clientKey,
+        client_secret: clientSecret,
+        code,
+        grant_type: "authorization_code",
+        redirect_uri: pending.redirectUri
+      }).toString(),
+      signal: AbortSignal.timeout(10_000)
+    });
+    if (!response.ok) throw new Error("tiktok_oauth_exchange_http_" + response.status);
+
+    const token = await response.json() as {
+      access_token?: string;
+      refresh_token?: string;
+      open_id?: string;
+      expires_in?: number;
+      refresh_expires_in?: number;
+      scope?: string;
+      error?: string;
+      error_description?: string;
+    };
+    if (!token.access_token || !token.refresh_token || !token.open_id) {
+      throw new Error("tiktok_oauth_exchange_invalid_response");
+    }
+    if (!this.options.integrationCredentials) throw new Error("integration_credentials_unavailable");
+
+    const credential = await this.options.integrationCredentials.save(pending.guildId, {
+      provider: "tiktok",
+      label: "TikTok · " + token.open_id.slice(0, 12),
+      clientId: clientKey,
+      clientSecret,
+      accessToken: token.access_token,
+      refreshToken: token.refresh_token,
+      openId: token.open_id,
+      expiresAt: Date.now() + Math.max(60, Number(token.expires_in ?? 86_400)) * 1000,
+      refreshExpiresAt: Date.now() + Math.max(60, Number(token.refresh_expires_in ?? 31_536_000)) * 1000,
+      scope: token.scope ?? ""
+    });
+
+    await this.options.auditLog.record({
+      guildId: pending.guildId,
+      source: "dashboard",
+      action: "integration.tiktok.oauth.connected",
+      targetType: "integration-credential",
+      targetId: String(credential.id),
+      metadata: { openId: token.open_id, scope: token.scope ?? "" }
+    });
+
+    return { guildId: pending.guildId, credential };
+  }
 
   start(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -886,6 +972,34 @@ export class ManagementApiServer {
             return;
           }
 
+
+          if (method === "GET" && path.match(/^\/api\/guilds\/([^/]+)\/tiktok\/oauth\/start$/)) {
+            const match = path.match(/^\/api\/guilds\/([^/]+)\/tiktok\/oauth\/start$/);
+            const guildId = match?.[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            try {
+              this.json(res, 200, { authorizationUrl: this.createTikTokOauthUrl(guildId) });
+            } catch (error) {
+              this.json(res, 400, { error: String(error).replace(/^Error:\s*/, "") });
+            }
+            return;
+          }
+
+          if (method === "POST" && path === "/api/tiktok/oauth/exchange") {
+            const body = await readJson(req);
+            if (typeof body.code !== "string" || typeof body.state !== "string") {
+              throw new RequestInputError("invalid_tiktok_oauth_exchange", 400);
+            }
+            try {
+              this.json(res, 200, { ok: true, ...(await this.exchangeTikTokOauthCode(body.code, body.state)) });
+            } catch (error) {
+              this.json(res, 400, { error: String(error).replace(/^Error:\s*/, "") });
+            }
+            return;
+          }
 
           const tiktokFeedsMatch = path.match(/^\/api\/guilds\/([^/]+)\/tiktok-feeds$/);
           const tiktokFeedItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/tiktok-feeds\/(\d+)$/);
