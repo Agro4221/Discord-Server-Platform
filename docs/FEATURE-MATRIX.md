@@ -221,7 +221,7 @@
 | Bassboost / Rock / Pop / Classic / Electronic / FullSound / Gaming | ✅ |
 | Nightcore | ✅ |
 | 8D rotation | ✅ |
-| Karaoke | 🟡 |
+| Karaoke | ✅ |
 | Pitch control | 🟡 |
 | Speed control | 🟡 |
 | Tremolo / rotation / other Lavalink effects | 🟡 |
