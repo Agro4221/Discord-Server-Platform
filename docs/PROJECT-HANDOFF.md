@@ -604,3 +604,9 @@ Feature Matrix полностью reconciled: все строки ✅.
 - Deployment contract checks for the preservation helpers.
 - Source checkpoint: `73e5ebdf792f38ae2ab29fb0ba0adba7f224154f`.
 - Fresh CI and actual existing-volume reinstall remain release-gate validation items.
+
+### 2026-10-05 — VPS upgrade configuration guard
+- `upgrade.sh` now fails before Compose startup when any critical secret is absent from `.env`.
+- This complements installer secret preservation and prevents a damaged configuration from being presented as a successful upgrade.
+- Deployment CI contract checks the guard textually; live upgrade/recovery is still a release-gate task.
+- Source checkpoint: `67ed79823ca844e1daa088b9631f7a41a45c26be`.
