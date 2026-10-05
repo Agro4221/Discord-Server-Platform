@@ -292,3 +292,7 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ### 2026-10-05 — VPS deployment smoke snapshot
 - Static deployment verification now requires installer/upgrade runtime probes for bot health, Dashboard readiness and Caddy Basic Auth edge behavior.
 - Actual VPS install/upgrade on a clean host, DNS/TLS issuance and external client access remain live release-gate cases.
+
+### 2026-10-05 — VPS reinstall/recovery snapshot
+- Deployment contract now covers preservation of existing installer-generated secrets across reruns.
+- Live release-gate case: rerun installer against an existing PostgreSQL volume and confirm bot/API/database continuity without secret rotation.
