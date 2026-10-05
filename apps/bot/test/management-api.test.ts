@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { validateAutomationPayload } from "../src/management-api.js";
+import { isManagementApiAuthorized, managementApiRateAllows, validateAutomationPayload } from "../src/management-api.js";
 
 function fakeClient() {
   const channel = { id: "123456789012345678", type: 0, isTextBased: () => true };
@@ -14,6 +14,27 @@ function fakeClient() {
     guilds: { cache: new Map([["999999999999999999", guild]]) }
   } as never;
 }
+
+test("Management API bearer authorization accepts only the exact configured token", () => {
+  assert.equal(isManagementApiAuthorized(undefined, "secret"), false);
+  assert.equal(isManagementApiAuthorized("Basic secret", "secret"), false);
+  assert.equal(isManagementApiAuthorized("Bearer wrong", "secret"), false);
+  assert.equal(isManagementApiAuthorized("Bearer secret", "secret"), true);
+  assert.equal(isManagementApiAuthorized("Bearer secretx", "secret"), false);
+  assert.equal(isManagementApiAuthorized("Bearer secret", "secretx"), false);
+});
+
+test("Management API rate limit allows exactly the configured number of requests per minute", () => {
+  const windows = new Map<string, { startedAt: number; count: number }>();
+  const now = 1_000_000;
+
+  assert.equal(managementApiRateAllows(windows, "client", 3, now), true);
+  assert.equal(managementApiRateAllows(windows, "client", 3, now + 1), true);
+  assert.equal(managementApiRateAllows(windows, "client", 3, now + 2), true);
+  assert.equal(managementApiRateAllows(windows, "client", 3, now + 3), false);
+  assert.equal(managementApiRateAllows(windows, "client-2", 3, now + 3), true);
+  assert.equal(managementApiRateAllows(windows, "client", 3, now + 60_001), true);
+});
 
 test("Management API accepts the full current Automation builder catalog", () => {
   assert.doesNotThrow(() => validateAutomationPayload(
