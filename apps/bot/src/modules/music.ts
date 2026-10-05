@@ -166,6 +166,42 @@ export function remainingMusicQueueSlots(queuedCount: number, limit: number): nu
   return Math.max(0, normalizedLimit - Math.max(0, Math.trunc(queuedCount)));
 }
 
+export function rebalanceMusicQueueByRequester<T>(
+  tracks: readonly T[],
+  getRequesterKey: (track: T) => string | null | undefined
+): T[] {
+  const groups = new Map<string | null, { items: T[]; index: number }>();
+
+  for (const track of tracks) {
+    const key = getRequesterKey(track) ?? null;
+    const group = groups.get(key);
+    if (group) {
+      group.items.push(track);
+    } else {
+      groups.set(key, { items: [track], index: 0 });
+    }
+  }
+
+  if (groups.size <= 1) return [...tracks];
+
+  const result: T[] = [];
+  while (result.length < tracks.length) {
+    let added = false;
+
+    for (const group of groups.values()) {
+      const item = group.items[group.index];
+      if (item === undefined) continue;
+      group.index += 1;
+      result.push(item);
+      added = true;
+    }
+
+    if (!added) break;
+  }
+
+  return result;
+}
+
 export function voteSkipThreshold(listenerCount: number): number {
   const safe = Math.max(1, Math.floor(listenerCount));
   return Math.max(1, Math.ceil(safe * 0.6));
@@ -624,6 +660,7 @@ export class Music implements PlatformModule {
       if (!result.tracks.length) throw new Error("music_track_not_found");
 
       player.queue.add(result.tracks[0]!);
+      await this.applyFairQueue(player);
       if (!player.playing) await player.play();
       await this.persistPlayer(player);
       return;
@@ -1257,6 +1294,7 @@ export class Music implements PlatformModule {
         added += 1;
       }
 
+      await this.applyFairQueue(player, settings.fairQueueEnabled);
       if (!player.playing && added > 0) await player.play();
       await this.persistPlayer(player);
       await this.syncController(player);
@@ -1409,6 +1447,7 @@ export class Music implements PlatformModule {
     );
     const tracks = result.tracks.slice(0, maxTracks);
     for (const track of tracks) player.queue.add(track);
+    await this.applyFairQueue(player, settings.fairQueueEnabled);
     if (!player.playing) await player.play();
 
     await this.persistPlayer(player);
@@ -2455,6 +2494,7 @@ export class Music implements PlatformModule {
         return;
       }
       player.queue.add(selected);
+      await this.applyFairQueue(player, settings.fairQueueEnabled);
       if (!player.playing) await player.play();
       this.requestCooldownUntil.set(interaction.guild.id + ":" + interaction.user.id, Date.now() + MUSIC_REQUEST_COOLDOWN_MS);
       await this.persistPlayer(player);
@@ -2760,10 +2800,9 @@ export class Music implements PlatformModule {
     return result.rows[0]?.autoplay ?? false;
   }
 
-  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number; twentyFourSeven: boolean; queueAccess: "everyone" | "dj"; maxQueuedPerUser: number;
-      maxQueueSize: number }> {
-    const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number; twenty_four_seven: boolean; queue_access: "everyone" | "dj"; max_queued_per_user: number; max_queue_size: number }>(
-      "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds,twenty_four_seven,queue_access,max_queued_per_user,max_queue_size FROM music_settings WHERE guild_id=$1",
+  private async musicSettings(guildId: string): Promise<{ preferredTextChannelId: string | null; requestChannelId: string | null; defaultVolume: number; announceTrackStart: boolean; autoLeaveSeconds: number; twentyFourSeven: boolean; queueAccess: "everyone" | "dj"; maxQueuedPerUser: number; maxQueueSize: number; fairQueueEnabled: boolean }> {
+    const result = await this.db.query<{ preferred_text_channel_id: string | null; request_channel_id: string | null; default_volume: number; announce_track_start: boolean; auto_leave_seconds: number; twenty_four_seven: boolean; queue_access: "everyone" | "dj"; max_queued_per_user: number; max_queue_size: number; fair_queue_enabled: boolean }>(
+      "SELECT preferred_text_channel_id,request_channel_id,default_volume,announce_track_start,auto_leave_seconds,twenty_four_seven,queue_access,max_queued_per_user,max_queue_size,fair_queue_enabled FROM music_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
@@ -2776,7 +2815,8 @@ export class Music implements PlatformModule {
       twentyFourSeven: row?.twenty_four_seven ?? false,
       queueAccess: row?.queue_access === "dj" ? "dj" : "everyone",
       maxQueuedPerUser: normalizeMusicQueueLimit(Number(row?.max_queued_per_user ?? 10)),
-      maxQueueSize: Math.min(500, Math.max(0, Math.trunc(Number(row?.max_queue_size ?? 100))))
+      maxQueueSize: Math.min(500, Math.max(0, Math.trunc(Number(row?.max_queue_size ?? 100)))),
+      fairQueueEnabled: row?.fair_queue_enabled ?? false
     };
   }
 
@@ -2834,6 +2874,20 @@ export class Music implements PlatformModule {
       [guildId, enabled]
     );
     if (enabled) this.cancelAutoLeave(guildId);
+  }
+
+  private async applyFairQueue(player: Player, enabled?: boolean): Promise<void> {
+    if (!enabled && enabled !== false) {
+      enabled = (await this.musicSettings(player.guildId)).fairQueueEnabled;
+    }
+    if (!enabled) return;
+
+    const queue = player.queue.tracks;
+    const balanced = rebalanceMusicQueueByRequester(
+      queue,
+      (track) => typeof track.requester?.id === "string" ? track.requester.id : null
+    );
+    queue.splice(0, queue.length, ...balanced);
   }
 
   private async setAutoplay(guildId: string, enabled: boolean): Promise<void> {
