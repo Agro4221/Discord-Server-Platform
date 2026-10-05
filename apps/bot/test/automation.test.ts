@@ -210,6 +210,60 @@ test("Automation set-nickname updates a manageable member and supports clearing"
 });
 
 
+test("Automation warn action uses the shared Moderation service", async () => {
+  const calls: Array<{ guildId: string; userId: string; reason: string }> = [];
+  const moderation = {
+    automationWarn: async (guildId: string, userId: string, reason: string) => {
+      calls.push({ guildId, userId, reason });
+      return 42;
+    }
+  } as never;
+  const engine = new AutomationEngine({} as never, moderation);
+  const state = engine as unknown as {
+    perform: (actions: unknown[], event: { type: "member.join"; guildId: string; userId: string }) => Promise<void>;
+  };
+
+  await state.perform([
+    { type: "warn", userId: "@event", reason: "Warning {userId}" }
+  ], { type: "member.join", guildId: "guild-1", userId: "user-1" });
+
+  assert.deepEqual(calls, [
+    { guildId: "guild-1", userId: "user-1", reason: "Warning user-1" }
+  ]);
+});
+
+test("Automation create-channel creates the requested Discord channel", async () => {
+  const calls: Array<{ name: string; type: number; parent?: string; reason?: string }> = [];
+  const engine = new AutomationEngine({} as never);
+  const state = engine as unknown as {
+    perform: (actions: unknown[], event: { type: "message.create"; guildId: string; userId: string }) => Promise<void>;
+    client: { guilds: { cache: Map<string, { channels: { create: (options: Record<string, unknown>) => Promise<void> } }> } };
+  };
+  state.client = {
+    guilds: {
+      cache: new Map([["guild-1", {
+        channels: {
+          create: async (options) => calls.push({
+            name: String(options.name),
+            type: Number(options.type),
+            parent: typeof options.parent === "string" ? options.parent : undefined,
+            reason: typeof options.reason === "string" ? options.reason : undefined
+          })
+        }
+      }]])
+    }
+  };
+
+  await state.perform([
+    { type: "create-channel", name: "ticket-{userId}", channelType: "text", parentId: "123456789012345678" }
+  ], { type: "message.create", guildId: "guild-1", userId: "user-1" });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]?.name, "ticket-user-1");
+  assert.equal(calls[0]?.parent, "123456789012345678");
+  assert.equal(calls[0]?.reason, "Automation rule");
+});
+
 test("Automation ban action validates target and reason", () => {
   assert.doesNotThrow(() => validateAutomationRule("member.join", [], [
     { type: "ban", userId: "@event", reason: "Automation rule" }
