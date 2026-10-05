@@ -1,4 +1,4 @@
-import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility } from "../src/modules/music.js";
+import { nextMusicQueueRepeatMode, nextMusicRepeatMode, clampMusicVolume, formatTrackProgress, trimMusicQueueToPosition, normalizeMusicRequestApprovalMode, normalizeMusicPlaylistVisibility, removeMusicPlaylistTrack, moveMusicPlaylistTrack } from "../src/modules/music.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canControlMusic, canFailoverMusicNode, musicNodeHealth, normalizeMusicRepeatMode, shouldAutoplayAfterQueueEnd } from "../src/modules/music.js";
@@ -13,7 +13,6 @@ test("music controls require the same voice channel unless Manage Server is gran
 });
 
 test("Music playlist visibility normalizes to personal or shared", async () => {
-  const { normalizeMusicPlaylistVisibility } = await import("../src/modules/music.js");
   assert.equal(normalizeMusicPlaylistVisibility(false), "personal");
   assert.equal(normalizeMusicPlaylistVisibility(true), "shared");
 });
@@ -183,6 +182,18 @@ test("music quick filter actions allow only known presets", async () => {
   }
 });
 
+
+test("Music playlist track removal and movement preserve order", () => {
+  const tracks = ["A", "B", "C", "D"];
+  assert.deepEqual(removeMusicPlaylistTrack(tracks, 2), ["A", "C", "D"]);
+  assert.deepEqual(removeMusicPlaylistTrack(tracks, 0), null);
+  assert.deepEqual(removeMusicPlaylistTrack(tracks, 5), null);
+  assert.deepEqual(moveMusicPlaylistTrack(tracks, 4, 2), ["A", "D", "B", "C"]);
+  assert.deepEqual(moveMusicPlaylistTrack(tracks, 1, 4), ["B", "C", "D", "A"]);
+  assert.deepEqual(moveMusicPlaylistTrack(tracks, 2, 2), ["A", "B", "C", "D"]);
+  assert.deepEqual(moveMusicPlaylistTrack(tracks, 1, 5), null);
+  assert.deepEqual(tracks, ["A", "B", "C", "D"]);
+});
 
 test("music playlist names normalize whitespace and reject blanks", async () => {
   const { normalizeMusicPlaylistName } = await import("../src/modules/music.js");
