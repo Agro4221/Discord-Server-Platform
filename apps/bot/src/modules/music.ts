@@ -969,7 +969,7 @@ export class Music implements PlatformModule {
     if (!interaction.inGuild()) return;
     const directAliases = new Set([
       "play", "search", "pause", "resume", "previous", "skip", "vote-skip", "stop", "shuffle",
-      "playlist", "favorite", "filter", "queue-policy", "queue-limit", "queue-size", "queue", "repeat", "seek", "volume", "pitch", "autoplay", "radio", "247", "providers", "nowplaying", "lyrics"
+      "playlist", "favorite", "filter", "queue-policy", "queue-limit", "queue-size", "queue", "repeat", "seek", "volume", "pitch", "speed", "autoplay", "radio", "247", "providers", "nowplaying", "lyrics"
     ]);
     if (interaction.commandName !== "music" && !directAliases.has(interaction.commandName)) return;
 
@@ -1070,6 +1070,9 @@ export class Music implements PlatformModule {
         break;
       case "pitch":
         await this.pitch(interaction);
+        break;
+      case "speed":
+        await this.speed(interaction);
         break;
       case "nowplaying":
         await this.nowPlaying(interaction);
@@ -3351,6 +3354,50 @@ export class Music implements PlatformModule {
     }
   }
 
+  private async speed(interaction: ChatInputCommandInteraction): Promise<void> {
+    const player = this.manager?.players.get(interaction.guildId!);
+    if (!player) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+
+    const value = interaction.options.getNumber("value");
+    const currentSpeed = Number((player.filterManager.data?.timescale as { speed?: number } | undefined)?.speed ?? 1);
+    if (value === null) {
+      await interaction.reply({ content: "⏩ Speed: **" + currentSpeed.toFixed(2) + "×**", ephemeral: true });
+      return;
+    }
+
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Менять speed могут пользователи с DJ-ролью или Manage Server.", ephemeral: true });
+      return;
+    }
+
+    const speed = normalizeMusicSpeed(value);
+    if (speed === null) {
+      await interaction.reply({ content: "Speed должен быть от 0.5 до 2.0.", ephemeral: true });
+      return;
+    }
+
+    try {
+      await player.filterManager.setSpeed(speed);
+      await this.persistPlayer(player);
+      await this.syncController(player);
+      await interaction.reply({
+        content: "⏩ Speed: **" + speed.toFixed(2) + "×**" + (speed === 1 ? " (норма)" : ""),
+        ephemeral: true
+      });
+    } catch (error) {
+      logger.warn("Music speed operation failed", {
+        guildId: interaction.guildId!,
+        speed,
+        error: String(error)
+      });
+      await interaction.reply({ content: "Не удалось изменить speed на текущем Lavalink node.", ephemeral: true });
+    }
+  }
+
   private async nowPlaying(interaction: ChatInputCommandInteraction): Promise<void> {
     const player = this.manager?.players.get(interaction.guildId!);
     const track = player?.queue.current;
@@ -3397,7 +3444,7 @@ export class Music implements PlatformModule {
     const action = aliases[commandName] ?? commandName;
     const supported = new Set([
       "play", "pause", "resume", "previous", "skip", "skip-to", "history", "stop", "shuffle",
-      "queue", "nowplaying", "lyrics", "repeat", "seek", "volume", "pitch", "autoplay"
+      "queue", "nowplaying", "lyrics", "repeat", "seek", "volume", "pitch", "speed", "autoplay"
     ]);
     if (!supported.has(action)) return false;
 
@@ -3621,6 +3668,27 @@ export class Music implements PlatformModule {
       } catch (error) {
         logger.warn("Music prefix pitch operation failed", { guildId: message.guild.id, pitch, error: String(error) });
         await message.reply("Не удалось изменить pitch на текущем Lavalink node.");
+      }
+    } else if (action === "speed") {
+      const value = args.length ? Number(args[0]) : null;
+      if (value === null) {
+        const currentSpeed = Number((player.filterManager.data?.timescale as { speed?: number } | undefined)?.speed ?? 1);
+        await message.reply("⏩ Speed: " + currentSpeed.toFixed(2) + "×");
+        return true;
+      }
+      const speed = normalizeMusicSpeed(value);
+      if (speed === null || !(manageGuild || dj)) {
+        await message.reply("Speed требует DJ / Manage Server и значение от 0.5 до 2.0. Значение 1.0 — норма.");
+        return true;
+      }
+      try {
+        await player.filterManager.setSpeed(speed);
+        await this.persistPlayer(player);
+        await this.syncController(player);
+        await message.reply("⏩ Speed: " + speed.toFixed(2) + "×");
+      } catch (error) {
+        logger.warn("Music prefix speed operation failed", { guildId: message.guild.id, speed, error: String(error) });
+        await message.reply("Не удалось изменить speed на текущем Lavalink node.");
       }
     } else if (action === "autoplay") {
       if (!(manageGuild || dj)) {
@@ -4776,6 +4844,11 @@ export function normalizeMusicRadioMode(value: string | null | undefined): Music
 }
 
 export function normalizeMusicPitch(value: number): number | null {
+  if (!Number.isFinite(value) || value < 0.5 || value > 2) return null;
+  return Math.round(value * 100) / 100;
+}
+
+export function normalizeMusicSpeed(value: number): number | null {
   if (!Number.isFinite(value) || value < 0.5 || value > 2) return null;
   return Math.round(value * 100) / 100;
 }
