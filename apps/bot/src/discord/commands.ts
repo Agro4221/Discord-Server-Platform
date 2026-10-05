@@ -1003,6 +1003,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
               { name: "Full sound", value: "fullsound" },
               { name: "Karaoke", value: "karaoke" },
               { name: "Tremolo", value: "tremolo" },
+              { name: "Vibrato", value: "vibrato" },
               { name: "Gaming", value: "gaming" },
               { name: "Nightcore", value: "nightcore" },
               { name: "8D rotation", value: "8d" }
