@@ -707,7 +707,7 @@ export class Music implements PlatformModule {
     if (!interaction.inGuild()) return;
     const directAliases = new Set([
       "play", "search", "pause", "resume", "previous", "skip", "vote-skip", "stop", "shuffle",
-      "playlist", "favorite", "filter", "queue-policy", "queue", "repeat", "seek", "volume", "autoplay", "247", "providers", "nowplaying", "lyrics"
+      "playlist", "favorite", "filter", "queue-policy", "queue-limit", "queue", "repeat", "seek", "volume", "autoplay", "247", "providers", "nowplaying", "lyrics"
     ]);
     if (interaction.commandName !== "music" && !directAliases.has(interaction.commandName)) return;
 
@@ -753,6 +753,9 @@ export class Music implements PlatformModule {
         break;
       case "vote-skip":
         await this.voteSkip(interaction);
+        break;
+      case "queue-limit":
+        await this.queueLimit(interaction);
         break;
       case "skip-to":
         await this.skipTo(interaction);
@@ -1723,6 +1726,32 @@ export class Music implements PlatformModule {
     const guild = this.client?.guilds.cache.get(guildId);
     const member = guild ? await guild.members.fetch(userId).catch(() => null) : null;
     return this.canManageMusicMember(guildId, member);
+  }
+
+  private async queueLimit(interaction: ChatInputCommandInteraction): Promise<void> {
+    const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+    if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+      await interaction.reply({ content: "Queue limit меняется только DJ или Manage Server.", ephemeral: true });
+      return;
+    }
+    const value = interaction.options.getInteger("limit");
+    const current = (await this.musicSettings(interaction.guildId!)).maxQueuedPerUser;
+    if (value === null) {
+      await interaction.reply({
+        content: "🎵 Лимит ожидающих треков на пользователя: **" + (current === 0 ? "без лимита" : current) + "**.",
+        ephemeral: true
+      });
+      return;
+    }
+    const normalized = normalizeMusicQueueLimit(value);
+    await this.db.query(
+      "INSERT INTO music_settings(guild_id,max_queued_per_user) VALUES($1,$2) ON CONFLICT(guild_id) DO UPDATE SET max_queued_per_user=EXCLUDED.max_queued_per_user,updated_at=now()",
+      [interaction.guildId!, normalized]
+    );
+    await interaction.reply({
+      content: "🎵 Лимит ожидающих треков на пользователя установлен: **" + (normalized === 0 ? "без лимита" : normalized) + "**.",
+      ephemeral: true
+    });
   }
 
   private async queuePolicy(interaction: ChatInputCommandInteraction): Promise<void> {
