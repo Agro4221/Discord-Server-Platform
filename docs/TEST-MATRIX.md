@@ -351,3 +351,6 @@ Status key: ☐ not run, ✅ passed, ⚠ known limitation, ❌ failed.
 ## 2026-10-05 — First-run Control Center snapshot
 - Automated health tests now cover the distinction between control-plane liveness and full bot readiness.
 - Live release-gate case: fresh local/VPS deployment with empty Discord credentials must bring up Dashboard and Bot Fleet registration; after credentials are added, /ready should become 200.
+## 2026-10-05 — Health deployment contract snapshot
+- Deployment contract now checks the intended /health liveness and /ready readiness semantics in addition to unit-level health tests.
+- Environment limitation: this session cannot execute Docker/network smoke tests due unavailable outbound DNS.
