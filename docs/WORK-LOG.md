@@ -1001,6 +1001,17 @@ Never write credentials, tokens or private user data here.
 - Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Yandex playback still requires the user's Lavalink credentials/runtime.
 - Source checkpoint: 5514371977eb7a13f5696ebabf34a159a40d7094.
 
+## 2026-10-05 — Music Qobuz provider parity
+- Added an explicit Qobuz Music search provider to /play, /music play and /music search.
+- Non-URL searches selected as Qobuz use LavaSrc qbsearch; users can also use the explicit qbsearch: prefix from prefix/request-channel flows.
+- Direct Qobuz URLs continue through Lavalink/LavaSrc URL resolution for supported track, album, playlist and artist forms.
+- Approval-mode requests preserve the selected Qobuz source across the moderation step.
+- Provider status now treats Qobuz as configured only when the LavaSrc switch and Qobuz user OAuth token are present.
+- Added deterministic resolver and command-schema regression coverage.
+- Current LavaSrc documentation identifies Qobuz as direct playback and documents qbsearch plus supported Qobuz URLs; Qobuz requires a suitable authenticated account/token.
+- Automated CI for this branch commit is not exposed by the current GitHub connector wrapper; live Qobuz playback remains a release-gate validation item.
+- Source checkpoint: 65bc291da40796029890953bfa5a6ba382acf802.
+
 ## 2026-10-05 — Music Tidal provider parity
 - Added an explicit Tidal Music search provider to /play, /music play and /music search.
 - Non-URL searches selected as Tidal use LavaSrc tdsearch; users can also use the explicit tdsearch: prefix from prefix/request-channel flows.
