@@ -158,6 +158,9 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "defaultVolume", label: "Громкость по умолчанию", type: "number", min: 0, max: 200 },
       { key: "announceTrackStart", label: "Объявлять начало трека", type: "boolean" },
       { key: "autoplay", label: "Autoplay", type: "boolean", description: "После окончания очереди искать следующий трек автоматически." },
+      { key: "radioEnabled", label: "Radio", type: "boolean", description: "Продолжать воспроизведение по сохранённому artist / genre / search seed." },
+      { key: "radioMode", label: "Radio mode", type: "text", maxLength: 16, description: "artist, genre или search." },
+      { key: "radioSeed", label: "Radio seed", type: "text", maxLength: 200, description: "Исполнитель, жанр или поисковый запрос. Для artist может быть пустым." },
       { key: "autoLeaveSeconds", label: "Автовыход из voice после простоя, сек.", type: "number", min: 0, max: 86400 },
       { key: "twentyFourSeven", label: "24/7 режим", type: "boolean", description: "Не выходить из voice при пустой очереди." },
       { key: "queueAccess", label: "Кто может добавлять треки", type: "text", description: "everyone или dj — режим DJ ограничивает добавление очереди DJ-ролью/Manage Server." },
@@ -296,6 +299,9 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       defaultVolume: "default_volume",
       announceTrackStart: "announce_track_start",
       autoplay: "autoplay",
+      radioEnabled: "radio_enabled",
+      radioMode: "radio_mode",
+      radioSeed: "radio_seed",
       autoLeaveSeconds: "auto_leave_seconds",
       twentyFourSeven: "twenty_four_seven",
       queueAccess: "queue_access",
@@ -490,6 +496,9 @@ function validateValues(
 
     if (field.type === "text" || field.type === "channel" || field.type === "role") {
       if (value !== null && typeof value !== "string") throw new Error(`invalid_${field.key}`);
+      if (field.key === "radioMode" && value !== null && !["artist", "genre", "search"].includes(String(value).trim())) {
+        throw new Error("invalid_radioMode");
+      }
       const maxLength = field.maxLength ?? 200;
       if (typeof value === "string" && value.length > maxLength) throw new Error(`invalid_${field.key}`);
       if ((field.key === "imageUrl" || field.key === "goodbyeImageUrl") && value) {
