@@ -2876,11 +2876,16 @@ export class Music implements PlatformModule {
         return;
       }
       const settings = await this.musicSettings(interaction.guild.id);
+      const requesterVoiceChannelId = member?.voice.channelId;
+      if (!requesterVoiceChannelId) {
+        await interaction.reply({ content: "Сначала зайди в голосовой канал.", ephemeral: true });
+        return;
+      }
       if (settings.requestApprovalMode === "approval") {
         const approvalId = await this.createMusicRequestApproval({
           guildId: interaction.guild.id,
           requesterUserId: interaction.user.id,
-          requesterVoiceChannelId: player.voiceChannelId,
+          requesterVoiceChannelId,
           sourceChannelId: interaction.channelId,
           query: selected.info.title,
           track: selected,
