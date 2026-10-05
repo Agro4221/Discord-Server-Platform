@@ -85,8 +85,8 @@ export class Moderation implements PlatformModule {
   async automationWarn(guildId: string, targetUserId: string, reason: string): Promise<number | null> {
     const target = await this.client?.users.fetch(targetUserId).catch(() => null);
     if (!target) throw new Error("user_not_found");
-    await this.applyWarn(guildId, "automation", target, reason || "Automation warning");
-    return this.latestCaseId ? await this.latestCaseId(guildId, targetUserId, "warn") : null;
+    await this.applyWarn(guildId, "system", target, reason || "Automation warning");
+    return await this.latestCaseId(guildId, targetUserId, "warn");
   }
 
   async history(guildId: string, targetUserId: string, limit = 10): Promise<ModerationCase[]> {
