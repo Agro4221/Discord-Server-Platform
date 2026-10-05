@@ -188,6 +188,48 @@ export class Notifications implements PlatformModule {
     return true;
   }
 
+  async testFeed(guildId: string, id: number): Promise<{ title: string; url: string }> {
+    const feed = (await this.listFeeds(guildId)).find((item) => item.id === id);
+    if (!feed) throw new Error("feed_not_found");
+    await assertSafeFeedUrl(feed.url);
+
+    const response = await fetch(feed.url, {
+      headers: { "user-agent": "DiscordServerPlatform/0.1 (+self-hosted feed tester)" },
+      redirect: "error",
+      signal: AbortSignal.timeout(10_000)
+    });
+    if (!response.ok) throw new Error("feed_http_" + response.status);
+
+    const size = Number(response.headers.get("content-length") ?? 0);
+    if (size > 2_000_000) throw new Error("feed_response_too_large");
+
+    const xml = await response.text();
+    if (xml.length > 2_000_000) throw new Error("feed_response_too_large");
+
+    const parser = new XMLParser({
+      ignoreAttributes: true,
+      processEntities: false,
+      removeNSPrefix: true,
+      parseTagValue: true,
+      trimValues: true
+    });
+    const document = parser.parse(xml) as Record<string, any>;
+    const first = normalizeFeedEntries(document)[0];
+    if (!first) throw new Error("feed_no_entries");
+
+    const channel = this.client?.channels.cache.get(feed.channelId);
+    if (!channel?.isTextBased() || !("send" in channel)) throw new Error("destination_unavailable");
+
+    const content = renderFeedTemplate(feed.messageTemplate, first);
+    const embed = buildNotificationEmbed(feed.embedConfig, first);
+    await channel.send({
+      content: content || undefined,
+      embeds: embed ? [embed] : undefined
+    });
+
+    return { title: first.title, url: first.url };
+  }
+
   async deleteFeed(guildId: string, id: number): Promise<boolean> {
     const result = await this.db.query("DELETE FROM notification_feeds WHERE id=$1 AND guild_id=$2", [id,guildId]);
     return result.rowCount === 1;
