@@ -163,7 +163,8 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "queueAccess", label: "Кто может добавлять треки", type: "text", description: "everyone или dj — режим DJ ограничивает добавление очереди DJ-ролью/Manage Server." },
       { key: "voteSkipEnabled", label: "Vote-to-skip", type: "boolean" },
       { key: "voteSkipPercent", label: "Vote-to-skip доля слушателей", type: "number", min: 0.1, max: 1, step: 0.05 },
-      { key: "voteSkipMinimum", label: "Vote-to-skip минимум голосов", type: "number", min: 1, max: 99 }
+      { key: "voteSkipMinimum", label: "Vote-to-skip минимум голосов", type: "number", min: 1, max: 99 },
+      { key: "fairQueueEnabled", label: "Fair Queue / requester rotation", type: "boolean", description: "Чередовать треки разных участников, когда в очереди есть несколько requester." }
     ]
   }
 ];
@@ -299,7 +300,8 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       queueAccess: "queue_access",
       voteSkipEnabled: "vote_skip_enabled",
       voteSkipPercent: "vote_skip_percent",
-      voteSkipMinimum: "vote_skip_minimum"
+      voteSkipMinimum: "vote_skip_minimum",
+      fairQueueEnabled: "fair_queue_enabled"
     }
   }
 };
