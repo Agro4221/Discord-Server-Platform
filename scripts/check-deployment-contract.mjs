@@ -116,6 +116,7 @@ for (const runtimeContract of [
 
 for (const secretContract of [
   "get_env()",
+  "is_blank()",
   "ensure_secret()",
   "ensure_secret MANAGEMENT_API_KEY",
   "ensure_secret POSTGRES_PASSWORD",
@@ -127,6 +128,7 @@ for (const secretContract of [
 }
 
 for (const upgradeContract of [
+  "is_blank()",
   "Required secret is missing from .env",
   "for required_secret in MANAGEMENT_API_KEY POSTGRES_PASSWORD LAVALINK_PASSWORD"
 ]) {
