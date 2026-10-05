@@ -487,3 +487,10 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Integration regression coverage verifies invalid IDs and cross-guild backup isolation without changing the existing backup format or retention policy.
 - Source checkpoint: `9ca8b24d022ee4494873da651162ccba583d3f53`.
 - CI verification is pending/unavailable in the current connector session.
+
+## 2026-10-05 — VPS runtime smoke-gate hardening
+- Installer/upgrade scripts no longer declare success solely from the bot health endpoint.
+- VPS success requires bot health, Dashboard HTTP 200 and Caddy HTTPS edge responding 401 before Basic Auth credentials are supplied.
+- Added deployment-contract assertions for the runtime probe strings/status expectations.
+- Source checkpoint: `95877c00ac9fff5d1615d519f202a316ba403783`.
+- CI verification is pending/unavailable in the current connector session; clean-host execution remains environment-dependent.
