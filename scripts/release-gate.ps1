@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-  [switch]$SkipLavalink
+  [switch]$SkipLavalink,
+  [switch]$RequireLavalink2
 )
 
 $ErrorActionPreference = "Stop"
@@ -42,7 +43,10 @@ Write-Host ""
 & docker compose ps
 Assert-Ok ($LASTEXITCODE -eq 0) "Docker Compose project is reachable"
 
-$runningServices = @(& docker compose ps --services 2>$null)
+$composeArgs = @("compose")
+if ($RequireLavalink2) { $composeArgs += @("--profile", "failover") }
+$composeArgs += @("ps", "--services")
+$runningServices = @(& docker @composeArgs 2>$null)
 Assert-Ok ($LASTEXITCODE -eq 0) "Docker Compose service inventory is available"
 
 function Assert-ContainerHealthy([string]$Service) {
@@ -57,7 +61,9 @@ function Assert-ContainerHealthy([string]$Service) {
   Assert-Ok ($parts[1] -eq "healthy") ("Docker healthcheck is healthy: " + $Service)
 }
 
-foreach ($service in @("postgres", "lavalink", "lavalink2", "bot", "dashboard")) {
+$requiredServices = @("postgres", "lavalink", "bot", "dashboard")
+if ($RequireLavalink2) { $requiredServices += "lavalink2" }
+foreach ($service in $requiredServices) {
   Assert-Ok ($runningServices -contains $service) ("Docker Compose service is running: " + $service)
   Assert-ContainerHealthy $service
 }
@@ -129,7 +135,9 @@ try {
 if (-not $SkipLavalink) {
   Assert-Ok (-not [string]::IsNullOrWhiteSpace($lavalinkPassword)) "Lavalink password is configured"
   $lavalinkHeaders = @{ Authorization = $lavalinkPassword }
-  foreach ($nodePort in @($lavalinkPort, 2334)) {
+  $nodePorts = @($lavalinkPort)
+  if ($RequireLavalink2) { $nodePorts += 2334 }
+  foreach ($nodePort in $nodePorts) {
     try {
       $version = Get-Json ("http://" + $lavalinkHost + ":" + $nodePort + "/version") $lavalinkHeaders
       Assert-Ok ($null -ne $version) ("Lavalink node " + $nodePort + " responds to /version")
