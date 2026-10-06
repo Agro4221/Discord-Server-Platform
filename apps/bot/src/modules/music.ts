@@ -482,7 +482,7 @@ export class Music implements PlatformModule {
       const result = await searchMusicWithFallback(player, provider, query, this.client?.user);
       if (!result) throw new Error("music_track_not_found");
 
-      for (const track of selectMusicEnqueueTracks(result.tracks)) {
+      for (const track of selectMusicEnqueueTracks(result.tracks, MAX_MUSIC_ENQUEUE_TRACKS, result.loadType === "playlist")) {
         player.queue.add(track);
       }
       if (!player.playing) await player.play();
@@ -2021,7 +2021,7 @@ export function buildMusicSearch(
   if (!query) return null;
 
   const normalizedUrl = normalizeMusicUrlQuery(query);
-  if (normalizedUrl) return { query: normalizedUrl };
+  if (normalizedUrl) return { query: normalizedUrl, source: "https" };
 
   if (provider === "auto") {
     if (/^(ytsearch|ytmsearch|scsearch|spsearch|ymsearch):/i.test(query)) return { query };
@@ -2052,12 +2052,13 @@ export function buildMusicSearchCandidates(
 
 export function selectMusicEnqueueTracks(
   tracks: readonly (Track | UnresolvedTrack)[],
-  limit = MAX_MUSIC_ENQUEUE_TRACKS
+  limit = MAX_MUSIC_ENQUEUE_TRACKS,
+  playlist = false
 ): Array<Track | UnresolvedTrack> {
   const safeLimit = Number.isInteger(limit)
     ? Math.min(Math.max(limit, 1), MAX_MUSIC_ENQUEUE_TRACKS)
     : MAX_MUSIC_ENQUEUE_TRACKS;
-  return tracks.filter(Boolean).slice(0, safeLimit);
+  return tracks.filter(Boolean).slice(0, playlist ? safeLimit : 1);
 }
 
 async function searchMusicWithFallback(
