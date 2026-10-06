@@ -359,12 +359,8 @@ async function main(): Promise<void> {
   });
   await management.start();
 
-  await registerCommands(config, client);
   wireDiscordEvents(client, events);
   client.once("ready", () => temporaryVoice.markReady());
-
-  await identities.claimUnassignedGuilds([...client.guilds.cache.keys()]);
-  await identities.refreshAssignments();
 
   fleetTimer = setInterval(() => {
     void (async () => {
@@ -508,6 +504,17 @@ async function main(): Promise<void> {
   });
 
   await client.login(config.discordToken);
+
+  await identities.claimUnassignedGuilds([...client.guilds.cache.keys()]);
+  await identities.refreshAssignments();
+
+  try {
+    await registerCommands(config, client);
+  } catch (error) {
+    logger.error("Discord command registration failed; continuing with existing commands", {
+      error: String(error)
+    });
+  }
 
   let shuttingDown = false;
   const shutdown = async (signal: string) => {
