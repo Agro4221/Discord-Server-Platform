@@ -19,6 +19,16 @@ export type TempVoiceConfig = {
 
 type Room = { guildId: string; ownerId: string };
 
+export function buildTemporaryVoiceChannelName(displayName: string): string {
+  return displayName.slice(0, 100);
+}
+
+export function getTemporaryVoiceChannelBitrate(
+  guild: Pick<Guild, "maximumBitrate">
+): number {
+  return guild.maximumBitrate;
+}
+
 export class TemporaryVoice implements PlatformModule {
   readonly name = "temporary-voice";
   private readonly rooms = new Map<string, Room>();
@@ -376,7 +386,8 @@ export class TemporaryVoice implements PlatformModule {
     }
 
     const channel = await guild.channels.create({
-      name: `DSP • ${member.displayName}`.slice(0, 100),
+      name: buildTemporaryVoiceChannelName(member.displayName),
+      bitrate: getTemporaryVoiceChannelBitrate(guild),
       type: ChannelType.GuildVoice,
       parent: parent?.type === ChannelType.GuildCategory ? parent.id : undefined,
       userLimit: config.defaultLimit,
