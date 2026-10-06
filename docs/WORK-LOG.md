@@ -982,3 +982,8 @@ Never write credentials, tokens or private user data here.
 ## 2026-10-06 — Native Discord connection retry
 - Native live smoke reproduced a transient Discord `ConnectTimeoutError` during `client.login()`.
 - Bot startup now retries Discord Gateway login up to three times with a short delay and logs each attempt before treating the startup as failed.
+
+## 2026-10-06 — Fix local Dashboard write-action origin validation
+- Live testing showed module toggles and runtime shutdown both failed while GET endpoints remained reachable.
+- Root cause: `assertSameOrigin()` inferred HTTPS whenever `NODE_ENV=production`, but `next start` serves the native Control Center over local HTTP. Protected PUT/POST requests therefore returned `bad_origin`.
+- Origin validation now uses the actual request protocol/host, honoring `X-Forwarded-Proto` when present.
