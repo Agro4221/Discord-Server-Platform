@@ -12,54 +12,42 @@ import {
   type AudioResource,
   type VoiceConnection
 } from "@discordjs/voice";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcessByStdio } from "node:child_process";
+import type { Readable, Writable } from "node:stream";
 import type { VoiceChannel, StageChannel } from "discord.js";
 import { logger } from "../logger.js";
+import { NativeMusicResolver, type NativeMusicTrack } from "./music-resolver.js";
 
-export type NativeMusicTrack = {
-  title: string;
-  author: string;
-  durationMs: number;
-  url: string;
-  source: string;
-  artworkUrl: string | null;
-};
+export type { NativeMusicTrack } from "./music-resolver.js";
+
 
 type NativeMusicSession = {
   connection: VoiceConnection;
   player: AudioPlayer;
   current: NativeMusicTrack | null;
   volume: number;
-  youtubeProcess?: ChildProcessWithoutNullStreams;
-  ffmpegProcess?: ChildProcessWithoutNullStreams;
+  youtubeProcess?: ChildProcessByStdio<null, Readable, Readable>;
+  ffmpegProcess?: ChildProcessByStdio<Writable, Readable, Readable>;
   generation: number;
   leaveTimer?: NodeJS.Timeout;
 };
 
-type YtDlpMetadata = {
-  title?: unknown;
-  uploader?: unknown;
-  artist?: unknown;
-  duration?: unknown;
-  webpage_url?: unknown;
-  original_url?: unknown;
-  url?: unknown;
-  extractor_key?: unknown;
-  extractor?: unknown;
-  thumbnail?: unknown;
-  entries?: unknown;
-};
+
 
 const DEFAULT_AUTO_LEAVE_MS = 30_000;
-const RESOLVE_TIMEOUT_MS = 20_000;
 
 export class NativeYtdlpMusicBackend {
   private readonly sessions = new Map<string, NativeMusicSession>();
 
+  private readonly resolver: NativeMusicResolver;
+
   constructor(
     private readonly ytDlpPath = process.env.YTDLP_PATH?.trim() || "yt-dlp",
-    private readonly ffmpegPath = process.env.FFMPEG_PATH?.trim() || "ffmpeg"
-  ) {}
+    private readonly ffmpegPath = process.env.FFMPEG_PATH?.trim() || "ffmpeg",
+    resolver?: NativeMusicResolver
+  ) {
+    this.resolver = resolver ?? new NativeMusicResolver(this.ytDlpPath);
+  }
 
   async play(
     channel: VoiceChannel | StageChannel,
@@ -69,16 +57,15 @@ export class NativeYtdlpMusicBackend {
     const normalizedQuery = query.trim();
     if (!normalizedQuery) throw new Error("music_query_empty");
 
-    const track = await this.resolve(normalizedQuery);
+    const resolution = await this.resolver.resolve(normalizedQuery);
+    const track = resolution.track;
     const session = await this.getOrCreateSession(channel);
 
     this.cancelLeave(session);
     this.stopProcesses(session);
 
     const generation = ++session.generation;
-    const lookup = isHttpUrl(normalizedQuery)
-      ? normalizedQuery
-      : `ytsearch1:${normalizedQuery}`;
+    const lookup = resolution.playbackQuery;
 
     const ytdlp = spawn(
       this.ytDlpPath,
@@ -208,7 +195,11 @@ export class NativeYtdlpMusicBackend {
       guildId,
       title: track.title,
       source: track.source,
+      resolverProvider: resolution.provider,
+      resolverStrategy: resolution.strategy,
+      fallbackUsed: resolution.fallbackUsed,
       query: normalizedQuery,
+      playbackQuery: lookup,
       voiceChannelId: channel.id
     });
 
@@ -385,82 +376,6 @@ export class NativeYtdlpMusicBackend {
     await entersState(connection, VoiceConnectionStatus.Ready, 15_000);
   }
 
-  private async resolve(query: string): Promise<NativeMusicTrack> {
-    const lookup = isHttpUrl(query) ? query : `ytsearch1:${query}`;
-    const raw = await this.runForJson([
-      "--quiet",
-      "--no-warnings",
-      "--no-playlist",
-      "--skip-download",
-      "--dump-single-json",
-      lookup
-    ], RESOLVE_TIMEOUT_MS);
-
-    const root = parseJson(raw);
-    const entry = pickFirstEntry(root);
-
-    const title = asString(entry.title) || "Unknown title";
-    const author =
-      asString(entry.artist) ||
-      asString(entry.uploader) ||
-      "Unknown artist";
-    const duration = asNumber(entry.duration);
-    const url =
-      asString(entry.webpage_url) ||
-      asString(entry.original_url) ||
-      (isHttpUrl(query) ? query : "");
-    if (!url) throw new Error("music_track_url_unavailable");
-
-    return {
-      title,
-      author,
-      durationMs: Math.max(0, Math.round(duration * 1000)),
-      url,
-      source: asString(entry.extractor_key) || asString(entry.extractor) || "yt-dlp",
-      artworkUrl: asString(entry.thumbnail) || null
-    };
-  }
-
-  private runForJson(args: string[], timeoutMs: number): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const child = spawn(this.ytDlpPath, args, {
-        stdio: ["ignore", "pipe", "pipe"],
-        windowsHide: true
-      });
-
-      const stdout: Buffer[] = [];
-      const stderr: Buffer[] = [];
-      let settled = false;
-
-      const timer = setTimeout(() => {
-        child.kill();
-        finish(new Error(`yt-dlp timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-
-      const finish = (error?: Error): void => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        if (error) reject(error);
-        else resolve(Buffer.concat(stdout).toString("utf8").trim());
-      };
-
-      child.stdout.on("data", (chunk) => stdout.push(Buffer.from(chunk)));
-      child.stderr.on("data", (chunk) => stderr.push(Buffer.from(chunk)));
-      child.on("error", (error) => finish(error));
-      child.on("close", (code) => {
-        if (code === 0) {
-          finish();
-          return;
-        }
-        const details = Buffer.concat(stderr).toString("utf8").trim();
-        finish(new Error(
-          `yt-dlp exited with code ${code ?? "unknown"}${details ? `: ${details.slice(0, 1200)}` : ""}`
-        ));
-      });
-    });
-  }
-
   private stopProcesses(session: NativeMusicSession): void {
     const yt = session.youtubeProcess;
     const ffmpeg = session.ffmpegProcess;
@@ -489,41 +404,3 @@ export class NativeYtdlpMusicBackend {
   }
 }
 
-function isHttpUrl(value: string): boolean {
-  return /^https?:\/\//i.test(value);
-}
-
-function parseJson(value: string): YtDlpMetadata {
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!parsed || typeof parsed !== "object") throw new Error("not an object");
-    return parsed as YtDlpMetadata;
-  } catch {
-    const lines = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-    for (let index = lines.length - 1; index >= 0; index--) {
-      try {
-        const parsed: unknown = JSON.parse(lines[index]);
-        if (parsed && typeof parsed === "object") return parsed as YtDlpMetadata;
-      } catch {
-        // Try the next line.
-      }
-    }
-    throw new Error("yt-dlp returned invalid JSON metadata");
-  }
-}
-
-function pickFirstEntry(metadata: YtDlpMetadata): YtDlpMetadata {
-  if (Array.isArray(metadata.entries)) {
-    const first = metadata.entries.find((item) => item && typeof item === "object");
-    if (first) return first as YtDlpMetadata;
-  }
-  return metadata;
-}
-
-function asString(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function asNumber(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}

@@ -987,3 +987,28 @@ Never write credentials, tokens or private user data here.
 - Live testing showed module toggles and runtime shutdown both failed while GET endpoints remained reachable.
 - Root cause: `assertSameOrigin()` inferred HTTPS whenever `NODE_ENV=production`, but `next start` serves the native Control Center over local HTTP. Protected PUT/POST requests therefore returned `bad_origin`.
 - Origin validation now uses the actual request protocol/host, honoring `X-Forwarded-Proto` when present.
+
+
+## 2026-10-07 — Native Music universal Resolver v1
+- Started a stacked Music module branch from PR #4's native yt-dlp + FFmpeg backend instead of changing the stable Lavalink path.
+- Added a dedicated NativeMusicResolver layer so native playback no longer hardcodes every text query to ytsearch.
+- Native text resolution now tries real yt-dlp mechanisms in order: YouTube ytsearch1:, YouTube Music search URL, then SoundCloud scsearch1:.
+- Direct URLs are classified for YouTube, YouTube Music, SoundCloud, Spotify, Yandex Music, VK/VK Video and TikTok; metadata-only links can fall back to an artist/title search mirror.
+- Playback still flows through the existing native yt-dlp -> FFmpeg -> Discord Voice pipeline, while the resolver decides which query should actually be played.
+- Added unit tests for provider detection, search candidates, playable metadata detection and metadata-only URL fallback construction.
+- This slice deliberately does not add queue/skip/repeat/filter/dashboard changes; those remain separate modules.
+## 2026-10-07 — Native Music resolver build-error correction
+- Reproduced the first local native rebuild failure from the resolver slice.
+- Fixed the strict indexed-access error in resolver JSON line parsing by narrowing the indexed line before JSON.parse().
+- Corrected native yt-dlp / FFmpeg process session types to match their actual stdio layouts (yt-dlp stdin is null; FFmpeg stdin is writable), removing the invalid ChildProcessWithoutNullStreams assignment.
+- The remaining @discordjs/voice and event-callback typing errors are expected to disappear when the declared dependency is correctly installed/resolved locally; CI performs a fresh dependency installation.
+- No Music feature scope changed; this is a compile-correctness fix only.
+## 2026-10-07 — Native Music stacked-branch dependency sync
+- Local rebuild exposed that PR #5 is stacked on PR #4: the resolver/backend source was copied into a development checkout without the inherited PR #4 package dependency changes.
+- `@discordjs/voice` is present in PR #4/#5 `apps/bot/package.json`, but was absent from the local development checkout; npm therefore reported the existing dependency tree as up to date without installing Voice.
+- No Music runtime feature change is required; the local fix is to synchronize the PR #4 package manifest before reinstalling dependencies.
+## 2026-10-07 — Native Music resolver local build verified
+- Local Windows checkout successfully rebuilt after synchronizing the stacked PR #4 dependencies.
+- `npm install` installed the missing native Voice dependencies; subsequent `start-native.bat -Rebuild` completed Domain, Bot and Dashboard builds without TypeScript or Next.js errors.
+- PostgreSQL became ready, Lavalink node 1 started, Management API responded on the configured port, and the native Control Center/Fleet supervisor reached the running state.
+- This confirms the resolver slice is compile-clean in the user's actual Windows environment; runtime Music command acceptance remains the next verification point.
