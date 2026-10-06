@@ -576,7 +576,7 @@ try {
 
   Write-Host ""
   Write-Host "Native Fleet supervisor: enabled for registered secondary Bot Identities."
-  Write-Host "For Sea of Thieves + OBS/RTMP, keep the default single-Lavalink mode."
+
   exit 0
 } catch {
   Write-Host ""
