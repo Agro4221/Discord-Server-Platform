@@ -1932,13 +1932,47 @@ export function normalizeMusicSearchProvider(value: string): MusicSearchProvider
     : null;
 }
 
+function normalizeMusicUrlQuery(query: string): string | null {
+  if (!/^https?:\/\//i.test(query)) return null;
+
+  try {
+    const url = new URL(query);
+    const hostname = url.hostname.toLowerCase();
+
+    if (hostname === "youtu.be") {
+      const videoId = url.pathname.split("/").filter(Boolean)[0];
+      return videoId
+        ? `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`
+        : query;
+    }
+
+    if (hostname === "youtube.com" || hostname === "www.youtube.com" || hostname === "m.youtube.com") {
+      const videoId = url.searchParams.get("v");
+      if (videoId) {
+        return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+      }
+
+      const match = url.pathname.match(/^\/(shorts|live)\/([^/?#]+)/i);
+      if (match?.[2]) {
+        return `https://www.youtube.com/watch?v=${encodeURIComponent(match[2])}`;
+      }
+    }
+
+    return query;
+  } catch {
+    return query;
+  }
+}
+
 export function buildMusicSearch(
   provider: MusicSearchProvider,
   rawQuery: string
 ): { query: string; source?: MusicSearchSource } | null {
   const query = rawQuery.trim();
   if (!query) return null;
-  if (/^https?:\/\//i.test(query)) return { query };
+
+  const normalizedUrl = normalizeMusicUrlQuery(query);
+  if (normalizedUrl) return { query: normalizedUrl };
 
   if (provider === "auto") {
     if (/^(ytsearch|ytmsearch|scsearch|spsearch|ymsearch):/i.test(query)) return { query };
