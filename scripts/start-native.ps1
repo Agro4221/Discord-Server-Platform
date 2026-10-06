@@ -318,7 +318,7 @@ function Ensure-Postgres {
     }
   }
 
-  & $psql $env:DATABASE_URL -c "SELECT 1;" 2>$null
+  & $psql $env:DATABASE_URL -c "SELECT 1;" *> $null
   $applicationExitCode = $LASTEXITCODE
   Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
   if ($applicationExitCode -ne 0) { throw "PostgreSQL rejected the configured DATABASE_URL." }
