@@ -192,6 +192,11 @@ export class ManagementApiServer {
           const url = new URL(requestPath, `http://${this.options.host}:${this.options.port}`);
           const path = url.pathname;
 
+          if (method === "GET" && path === "/api/runtime/catalog") {
+            this.json(res, 200, { catalog: MODULE_CATALOG });
+            return;
+          }
+
           if (method === "GET" && path === "/api/runtime/logs") {
             const rawLimit = url.searchParams.get("limit");
             const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 200;
