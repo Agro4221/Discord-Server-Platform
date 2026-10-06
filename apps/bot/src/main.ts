@@ -503,7 +503,30 @@ async function main(): Promise<void> {
     void prefixCommands.handleMessage(message);
   });
 
-  await client.login(config.discordToken);
+  let discordLoginError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      logger.info("Discord login attempt", { attempt, maxAttempts: 3 });
+      await client.login(config.discordToken);
+      discordLoginError = undefined;
+      break;
+    } catch (error) {
+      discordLoginError = error;
+      logger.warn("Discord login attempt failed", {
+        attempt,
+        maxAttempts: 3,
+        error: String(error)
+      });
+      client.destroy();
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
+    }
+  }
+
+  if (discordLoginError) {
+    throw discordLoginError;
+  }
 
   await identities.claimUnassignedGuilds([...client.guilds.cache.keys()]);
   await identities.refreshAssignments();
