@@ -973,3 +973,8 @@ Never write credentials, tokens or private user data here.
 - Live testing showed the "Выключить бота" action could report failure even though the shutdown request was accepted.
 - Root cause: Management API returned `200 OK` and immediately started graceful cleanup, which closed the API/process before the Dashboard proxy reliably consumed the response.
 - Shutdown now waits 250 ms after sending the response before beginning cleanup, then waits another 250 ms after cleanup before the final process exit.
+
+## 2026-10-06 — Control Center action/audit pipeline fix
+- Added the missing Dashboard `/api/guilds/[guildId]/audit` proxy required by the Control Center.
+- Made client-side audit refresh best-effort so a successful module/action/settings request is not reported as failed when audit refresh is unavailable.
+- This fixes the observed cascade where module toggles appeared broken because the subsequent audit request failed.
