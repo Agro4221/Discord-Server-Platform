@@ -27,6 +27,16 @@ const REDACT_KEYS = new Set([
 
 const MAX_STRING = 2_000;
 const MAX_DEPTH = 5;
+const MAX_RECENT_LOGS = 500;
+
+type RecentLog = {
+  ts: string;
+  level: "INFO" | "WARN" | "ERROR";
+  message: string;
+  meta?: Meta;
+};
+
+const recentLogs: RecentLog[] = [];
 
 function normalizeKey(key: string): string {
   return key.replace(/[^a-z0-9]/gi, "").toLowerCase();
@@ -79,8 +89,15 @@ function write(level: "INFO" | "WARN" | "ERROR", message: string, meta?: Meta): 
     ...(meta ? { meta: sanitizeMeta(meta) } : {})
   };
   const line = JSON.stringify(payload);
+  recentLogs.push(payload);
+  if (recentLogs.length > MAX_RECENT_LOGS) recentLogs.splice(0, recentLogs.length - MAX_RECENT_LOGS);
   if (level === "ERROR") console.error(line);
   else console.log(line);
+}
+
+export function getRecentLogs(limit = 200): RecentLog[] {
+  const safeLimit = Math.max(1, Math.min(MAX_RECENT_LOGS, Math.trunc(limit)));
+  return recentLogs.slice(-safeLimit).reverse();
 }
 
 export const logger = {
