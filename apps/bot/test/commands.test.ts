@@ -177,14 +177,16 @@ test("prefix command allowlist covers all policy-defined prefix commands", () =>
 });
 
 
-test("music play commands expose the supported search providers", () => {
+test("music slash commands are exposed directly without a /music group", () => {
   const commands = buildCommands().map((command) => command.toJSON());
-  const top = commands.find((command) => command.name === "play");
-  const grouped = commands.find((command) => command.name === "music");
-  const topProvider = top?.options?.find((option) => option.name === "provider");
-  const groupedPlay = grouped?.options?.find((option) => option.name === "play");
-  const groupedProvider = groupedPlay?.options?.find((option) => option.name === "provider");
+  const musicNames = ["play", "pause", "resume", "skip", "stop", "shuffle", "playlist", "queue", "repeat", "seek", "volume", "autoplay", "nowplaying"];
+  for (const name of musicNames) {
+    assert.ok(commands.some((command) => command.name === name), "Missing direct /" + name);
+  }
+  assert.equal(commands.some((command) => command.name === "music"), false);
+
+  const play = commands.find((command) => command.name === "play");
+  const provider = play?.options?.find((option) => option.name === "provider");
   const expected = ["auto", "youtube", "youtube_music", "soundcloud", "spotify", "yandex_music"];
-  assert.deepEqual(topProvider?.choices?.map((choice) => String(choice.value)), expected);
-  assert.deepEqual(groupedProvider?.choices?.map((choice) => String(choice.value)), expected);
+  assert.deepEqual(provider?.choices?.map((choice) => String(choice.value)), expected);
 });
