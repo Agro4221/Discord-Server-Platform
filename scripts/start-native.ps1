@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
   [switch]$Dashboard,
+  [switch]$NoDashboard,
   [switch]$Lavalink2,
   [switch]$Rebuild,
   [switch]$NoOpen,
@@ -451,8 +452,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Bot build failed." }
   }
 
+  $dashboardEnabled = -not $NoDashboard
   $dashboardBuildMarker = Join-Path (Get-Location) "apps\dashboard\.next\BUILD_ID"
-  if ($Dashboard -and ($Rebuild -or -not (Test-Path $dashboardBuildMarker) -or @(
+  if ($dashboardEnabled -and ($Rebuild -or -not (Test-Path $dashboardBuildMarker) -or @(
       Get-ChildItem "apps\dashboard\app" -Recurse -File -ErrorAction SilentlyContinue |
         Where-Object { $_.LastWriteTimeUtc -gt (Get-Item $dashboardBuildMarker -ErrorAction SilentlyContinue).LastWriteTimeUtc }
     ).Count -gt 0)) {
@@ -533,7 +535,7 @@ try {
     throw "Bot health endpoint did not become ready: $healthUrl"
   }
 
-  if ($Dashboard) {
+  if ($dashboardEnabled) {
     $dashboardPort = Get-EnvValue "DASHBOARD_PORT"
     if ([string]::IsNullOrWhiteSpace($dashboardPort)) { $dashboardPort = "3000" }
 
@@ -567,11 +569,9 @@ try {
     "-Loop"
   ) (Get-Location).Path "fleet"
 
-  if ($Dashboard) {
+  if ($dashboardEnabled) {
     Write-Host "Control Center: $dashboardUrl"
     if (-not $NoOpen) { Start-Process $dashboardUrl }
-  } else {
-    Write-Host "Dashboard is OFF for low-overhead gaming mode. Add -Dashboard when you need it."
   }
 
   Write-Host ""
