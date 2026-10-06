@@ -672,7 +672,20 @@ export class Music implements PlatformModule {
 
     const tracks = selectMusicEnqueueTracks(result.tracks, MAX_MUSIC_ENQUEUE_TRACKS, result.loadType === "playlist");
     for (const track of tracks) player.queue.add(track);
-    if (!player.playing) await player.play();
+    if (!player.playing) {
+      try {
+        await player.play();
+      } catch (error) {
+        logger.error("Music playback start failed", {
+          guildId: interaction.guildId!,
+          identity: this.config.botIdentityId,
+          voiceChannelId: player.voiceChannelId,
+          error: String(error)
+        });
+        await interaction.reply({ content: "Трек найден, но запустить воспроизведение не удалось. Подробности записаны в лог.", ephemeral: true });
+        return;
+      }
+    }
 
     const firstTrack = tracks[0]!;
     const suffix = tracks.length > 1 ? ` Добавлено треков: **${tracks.length}** (лимит ${MAX_MUSIC_ENQUEUE_TRACKS}).` : "";
@@ -1130,7 +1143,20 @@ export class Music implements PlatformModule {
 
       const tracks = selectMusicEnqueueTracks(result.tracks, MAX_MUSIC_ENQUEUE_TRACKS, result.loadType === "playlist");
       for (const track of tracks) nextPlayer.queue.add(track);
-      if (!nextPlayer.playing) await nextPlayer.play();
+      if (!nextPlayer.playing) {
+        try {
+          await nextPlayer.play();
+        } catch (error) {
+          logger.error("Music playback start failed", {
+            guildId: message.guild.id,
+            identity: this.config.botIdentityId,
+            voiceChannelId: nextPlayer.voiceChannelId,
+            error: String(error)
+          });
+          await message.reply("Трек найден, но запустить воспроизведение не удалось. Подробности записаны в лог.");
+          return true;
+        }
+      }
       const firstTrack = tracks[0]!;
       await message.reply(
         "🎵 Добавлено: " + firstTrack.info.title + " — " + firstTrack.info.author +
