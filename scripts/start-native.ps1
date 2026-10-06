@@ -111,7 +111,6 @@ function Start-NativeProcess(
 
   $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
   Set-Content -Path (Join-Path $runtimeRoot "$Name.pid") -Value $process.Id -Encoding ASCII
-  return $process
 }
 
 function Wait-Http([string]$Url, [int]$Attempts, [int]$DelaySeconds) {
@@ -297,7 +296,7 @@ function Ensure-Postgres {
   }
 
   # Check/create the application database using the always-present postgres database.
-  $systemCheck = & $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c "SELECT 1;" 2>$null
+  & $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c "SELECT 1;" *> $null
   if ($LASTEXITCODE -ne 0) {
     Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
     throw "PostgreSQL server is running but the postgres administrative connection failed."
@@ -378,7 +377,15 @@ function Ensure-Java {
 
 function Ensure-Secret([string]$Name, [int]$Length) {
   $value = Get-EnvValue $Name
-  if ([string]::IsNullOrWhiteSpace($value)) { Set-EnvValue $Name (New-Secret $Length) }
+  if ([string]::IsNullOrWhiteSpace($value)) {
+    Set-EnvValue $Name (New-Secret $Length)
+    return
+  }
+
+  if ($Name -eq "BOT_CREDENTIALS_ENCRYPTION_KEY" -and $value -notmatch "^[a-fA-F0-9]{64}$") {
+    Write-Host "Regenerating invalid BOT_CREDENTIALS_ENCRYPTION_KEY..."
+    Set-EnvValue $Name (New-Secret 32)
+  }
 }
 
 try {
