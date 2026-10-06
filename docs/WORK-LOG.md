@@ -978,3 +978,7 @@ Never write credentials, tokens or private user data here.
 - Added the missing Dashboard `/api/guilds/[guildId]/audit` proxy required by the Control Center.
 - Made client-side audit refresh best-effort so a successful module/action/settings request is not reported as failed when audit refresh is unavailable.
 - This fixes the observed cascade where module toggles appeared broken because the subsequent audit request failed.
+
+## 2026-10-06 — Native Discord connection retry
+- Native live smoke reproduced a transient Discord `ConnectTimeoutError` during `client.login()`.
+- Bot startup now retries Discord Gateway login up to three times with a short delay and logs each attempt before treating the startup as failed.
