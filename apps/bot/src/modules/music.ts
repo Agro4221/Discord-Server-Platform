@@ -652,20 +652,35 @@ export class Music implements PlatformModule {
       return;
     }
 
-    if (!this.manager || !this.initialized) {
+    if (!this.initialized) {
       await interaction.reply({ content: "Музыкальный движок ещё запускается.", ephemeral: true });
       return;
     }
 
     const voiceChannelId = guild.voiceStates.cache.get(interaction.user.id)?.channelId ?? null;
+    const action = commandName === "music"
+      ? interaction.options.getSubcommand()
+      : commandName;
+
+    if (this.nativeBackendEnabled) {
+      if (!this.nativeBackend) {
+        await interaction.reply({ content: "Native Music backend недоступен.", ephemeral: true });
+        return;
+      }
+      if (!await this.ensureMusicOwnership(interaction, voiceChannelId)) return;
+      await this.executeNativeSlashCommand(interaction, action, voiceChannelId);
+      return;
+    }
+
+    if (!this.manager) {
+      await interaction.reply({ content: "Музыкальный движок ещё запускается.", ephemeral: true });
+      return;
+    }
+
     const existingPlayer = this.manager.players.get(guild.id);
     const ownershipChannelId = voiceChannelId ?? existingPlayer?.voiceChannelId ?? null;
 
     if (!await this.ensureMusicOwnership(interaction, ownershipChannelId)) return;
-
-    const action = commandName === "music"
-      ? interaction.options.getSubcommand()
-      : commandName;
 
     switch (action) {
       case "play":
