@@ -61,9 +61,9 @@ type SearchAttempt = {
 const RESOLVE_TIMEOUT_MS = 20_000;
 
 const URL_PROVIDER_RULES: Array<{ pattern: RegExp; provider: NativeMusicProvider }> = [
+  { pattern: /(?:^|\.)music\.youtube\.com$/i, provider: "youtube_music" },
   { pattern: /(?:^|\.)youtube\.com$/i, provider: "youtube" },
   { pattern: /(?:^|\.)youtu\.be$/i, provider: "youtube" },
-  { pattern: /(?:^|\.)music\.youtube\.com$/i, provider: "youtube_music" },
   { pattern: /(?:^|\.)soundcloud\.com$/i, provider: "soundcloud" },
   { pattern: /(?:^|\.)open\.spotify\.com$/i, provider: "spotify" },
   { pattern: /(?:^|\.)spotify\.com$/i, provider: "spotify" },
@@ -147,7 +147,7 @@ export class NativeMusicResolver {
 
     for (const attempt of buildNativeMusicSearchAttempts(query)) {
       try {
-        const metadata = await this.resolveMetadata(attempt.lookup);
+        const metadata = await this.resolveMetadata(attempt.lookup, true);
         const entry = pickFirstEntry(metadata);
         if (!isPlayableNativeMusicMetadata(entry)) {
           continue;
@@ -194,16 +194,17 @@ export class NativeMusicResolver {
     throw new Error("music_track_not_found");
   }
 
-  private resolveMetadata(lookup: string): Promise<YtDlpMetadata> {
+  private resolveMetadata(lookup: string, allowPlaylistItem = false): Promise<YtDlpMetadata> {
     return new Promise((resolve, reject) => {
-      const child = spawn(this.ytDlpPath, [
+      const args = [
         "--quiet",
         "--no-warnings",
-        "--no-playlist",
         "--skip-download",
         "--dump-single-json",
+        ...(allowPlaylistItem ? ["--playlist-items", "1"] : ["--no-playlist"]),
         lookup
-      ], {
+      ];
+      const child = spawn(this.ytDlpPath, args, {
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true
       });
