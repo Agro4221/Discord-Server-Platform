@@ -1003,3 +1003,7 @@ Never write credentials, tokens or private user data here.
 - Corrected native yt-dlp / FFmpeg process session types to match their actual stdio layouts (yt-dlp stdin is null; FFmpeg stdin is writable), removing the invalid ChildProcessWithoutNullStreams assignment.
 - The remaining @discordjs/voice and event-callback typing errors are expected to disappear when the declared dependency is correctly installed/resolved locally; CI performs a fresh dependency installation.
 - No Music feature scope changed; this is a compile-correctness fix only.
+## 2026-10-07 — Native Music stacked-branch dependency sync
+- Local rebuild exposed that PR #5 is stacked on PR #4: the resolver/backend source was copied into a development checkout without the inherited PR #4 package dependency changes.
+- `@discordjs/voice` is present in PR #4/#5 `apps/bot/package.json`, but was absent from the local development checkout; npm therefore reported the existing dependency tree as up to date without installing Voice.
+- No Music runtime feature change is required; the local fix is to synchronize the PR #4 package manifest before reinstalling dependencies.
