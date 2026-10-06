@@ -997,3 +997,9 @@ Never write credentials, tokens or private user data here.
 - Playback still flows through the existing native yt-dlp -> FFmpeg -> Discord Voice pipeline, while the resolver decides which query should actually be played.
 - Added unit tests for provider detection, search candidates, playable metadata detection and metadata-only URL fallback construction.
 - This slice deliberately does not add queue/skip/repeat/filter/dashboard changes; those remain separate modules.
+## 2026-10-07 — Native Music resolver build-error correction
+- Reproduced the first local native rebuild failure from the resolver slice.
+- Fixed the strict indexed-access error in resolver JSON line parsing by narrowing the indexed line before JSON.parse().
+- Corrected native yt-dlp / FFmpeg process session types to match their actual stdio layouts (yt-dlp stdin is null; FFmpeg stdin is writable), removing the invalid ChildProcessWithoutNullStreams assignment.
+- The remaining @discordjs/voice and event-callback typing errors are expected to disappear when the declared dependency is correctly installed/resolved locally; CI performs a fresh dependency installation.
+- No Music feature scope changed; this is a compile-correctness fix only.
