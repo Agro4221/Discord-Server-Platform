@@ -46,6 +46,12 @@ type Resource = { id: string; name: string; type?: number; position?: number; ma
 type AuditEvent = { action: string; target_id: string | null; created_at: string };
 type CatalogItem = { key: string; title: string; description: string };
 type Health = { status: string; discord: string; database: string } | null;
+type RuntimeLog = {
+  ts: string;
+  level: "INFO" | "WARN" | "ERROR";
+  message: string;
+  meta?: Record<string, unknown>;
+};
 
 type Category = {
   key: "moderation" | "server" | "community" | "automation" | "integrations" | "system";
@@ -489,6 +495,8 @@ export function ControlCenter() {
   const [savedAt, setSavedAt] = useState("");
   const [search, setSearch] = useState("");
   const [functionsOnly, setFunctionsOnly] = useState(false);
+  const [runtimeLogs, setRuntimeLogs] = useState<RuntimeLog[]>([]);
+  const [runtimeStopping, setRuntimeStopping] = useState(false);
 
   const selectedGuild = guilds.find((guild) => guild.id === guildId);
   const selectedSchema = useMemo(
@@ -623,6 +631,44 @@ export function ControlCenter() {
       cancelled = true;
     };
   }, [guildId]);
+
+  useEffect(() => {
+    if (view !== "system") return;
+    let cancelled = false;
+
+    const loadLogs = async () => {
+      try {
+        const response = await fetch("/api/runtime/logs?limit=250", { cache: "no-store" });
+        if (!response.ok) return;
+        const body = await response.json().catch(() => ({}));
+        if (!cancelled) setRuntimeLogs((body.logs ?? []) as RuntimeLog[]);
+      } catch {}
+    };
+
+    void loadLogs();
+    const timer = window.setInterval(() => void loadLogs(), 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [view]);
+
+  async function shutdownBot() {
+    if (!window.confirm("Выключить Discord Server Platform Bot? Dashboard останется запущен.")) return;
+    setRuntimeStopping(true);
+    clearMessages();
+    try {
+      const response = await fetch("/api/runtime/shutdown", { method: "POST" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(String(body.error ?? "shutdown_failed"));
+      setNotice("Бот получил команду на штатное выключение. Control Center остаётся открытым.");
+      setHealth((current) => current ? { ...current, status: "stopping", discord: "down" } : current);
+    } catch {
+      setError("Не удалось выключить бота.");
+      setRuntimeStopping(false);
+    }
+  }
 
   useEffect(() => {
     if (!guildId || !selectedModule || !selectedSchema) return;
@@ -962,7 +1008,16 @@ export function ControlCenter() {
             )}
 
             {view === "system" && (
-              <SystemPage guildId={guildId} health={health} audit={audit} resources={resources} onAudit={() => setView("audit")} />
+              <SystemPage
+                guildId={guildId}
+                health={health}
+                audit={audit}
+                resources={resources}
+                runtimeLogs={runtimeLogs}
+                runtimeStopping={runtimeStopping}
+                onShutdown={() => void shutdownBot()}
+                onAudit={() => setView("audit")}
+              />
             )}
 
             {view === "audit" && <AuditPage audit={audit} />}
@@ -1755,10 +1810,29 @@ function ModulePage(props: {
   );
 }
 
-function SystemPage(props: { guildId: string; health: Health; audit: AuditEvent[]; resources: { channels: Resource[]; roles: Resource[]; bot: { id: string; tag: string; highestRole: { id: string; name: string; position: number }; permissions: Record<string, boolean> } | null }; onAudit: () => void }) {
+function SystemPage(props: {
+  guildId: string;
+  health: Health;
+  audit: AuditEvent[];
+  resources: { channels: Resource[]; roles: Resource[]; bot: { id: string; tag: string; highestRole: { id: string; name: string; position: number }; permissions: Record<string, boolean> } | null };
+  runtimeLogs: RuntimeLog[];
+  runtimeStopping: boolean;
+  onShutdown: () => void;
+  onAudit: () => void;
+}) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <PageHeader eyebrow="SYSTEM" title="Система" description="Операционные инструменты экземпляра: fleet, здоровье Core, backups, permissions и аудит." />
+      <PageHeader
+        eyebrow="SYSTEM"
+        title="Система"
+        description="Операционные инструменты экземпляра: runtime, fleet, здоровье Core, backups, permissions и аудит."
+        right={
+          <button type="button" disabled={props.runtimeStopping} onClick={props.onShutdown} style={buttonStyle("danger")}>
+            {props.runtimeStopping ? "Выключаем…" : "Выключить бота"}
+          </button>
+        }
+      />
+      <RuntimeLogsPanel logs={props.runtimeLogs} />
       <section style={{ ...panel, padding: 20 }}>
         <SectionHeader title="Discord Diagnostics" eyebrow="PERMISSIONS & HIERARCHY" />
         <DiscordDiagnosticsPanel bot={props.resources.bot} />
@@ -1794,6 +1868,47 @@ function SystemPage(props: { guildId: string; health: Health; audit: AuditEvent[
         {!props.audit.length && <Empty text="Журнал пуст." />}
       </section>
     </div>
+  );
+}
+
+function RuntimeLogsPanel(props: { logs: RuntimeLog[] }) {
+  return (
+    <section style={{ ...panel, padding: 20 }}>
+      <SectionHeader
+        title="Логи бота"
+        eyebrow="RUNTIME LOGS"
+        action={<span style={{ color: "#596577", fontSize: 9 }}>автообновление · {props.logs.length}</span>}
+      />
+      <div style={{
+        minHeight: 260,
+        maxHeight: 560,
+        overflow: "auto",
+        padding: 12,
+        borderRadius: 12,
+        background: "#090d13",
+        border: "1px solid #1f2732",
+        fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace"
+      }}>
+        {props.logs.length ? props.logs.map((entry, index) => (
+          <div key={entry.ts + entry.level + entry.message + index} style={{ padding: "6px 0", borderBottom: index === props.logs.length - 1 ? "none" : "1px solid #141a23" }}>
+            <div style={{ display: "flex", gap: 9, alignItems: "baseline", flexWrap: "wrap" }}>
+              <time style={{ color: "#4f5b6c", fontSize: 9 }}>{new Date(entry.ts).toLocaleString("ru-RU")}</time>
+              <span style={{
+                color: entry.level === "ERROR" ? "#f07d7d" : entry.level === "WARN" ? "#e1bd75" : "#72d29a",
+                fontSize: 9,
+                fontWeight: 750
+              }}>{entry.level}</span>
+              <span style={{ color: "#d6dbe4", fontSize: 10, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{entry.message}</span>
+            </div>
+            {entry.meta && Object.keys(entry.meta).length > 0 && (
+              <div style={{ marginTop: 3, color: "#657082", fontSize: 9, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                {JSON.stringify(entry.meta)}
+              </div>
+            )}
+          </div>
+        )) : <Empty text="Логи пока не поступили." />}
+      </div>
+    </section>
   );
 }
 
