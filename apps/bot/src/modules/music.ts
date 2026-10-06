@@ -23,6 +23,7 @@ import type { BotIdentityRepository } from "../bot-identity.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
+import { NativeYtdlpMusicBackend, type NativeMusicTrack } from "./music-ytdlp.js";
 
 type MusicRepeatMode = "off" | "track" | "queue";
 export type MusicSearchProvider = "auto" | "youtube" | "youtube_music" | "soundcloud" | "spotify" | "yandex_music";
@@ -103,6 +104,8 @@ export class Music implements PlatformModule {
   private readonly autoLeaveTimers = new Map<string, NodeJS.Timeout>();
   private restoreTimer?: NodeJS.Timeout;
   private readonly recoveryGate = createMusicRecoveryGate();
+  private nativeBackend?: NativeYtdlpMusicBackend;
+  private readonly nativeBackendEnabled = process.env.MUSIC_BACKEND === "native";
 
   constructor(
     private readonly db: Database,
@@ -114,6 +117,21 @@ export class Music implements PlatformModule {
     this.client = context.client;
     this.setModuleHealth = context.setModuleHealth;
     this.connectedNodes.clear();
+
+    if (this.nativeBackendEnabled) {
+      this.nativeBackend = new NativeYtdlpMusicBackend();
+      const a = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
+      const b = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
+      this.unsubscribe = () => { a(); b(); };
+      this.initialized = true;
+      this.setModuleHealth?.(this.name, "ready");
+      logger.info("Native Music backend initialized", {
+        backend: "yt-dlp + FFmpeg",
+        ytDlpPath: process.env.YTDLP_PATH?.trim() || "yt-dlp",
+        ffmpegPath: process.env.FFMPEG_PATH?.trim() || "ffmpeg"
+      });
+      return;
+    }
     this.lastPlayedTracks.clear();
     this.autoplayInFlight.clear();
     for (const timer of this.autoLeaveTimers.values()) clearTimeout(timer);
@@ -450,6 +468,8 @@ export class Music implements PlatformModule {
     this.healthTimer = undefined;
     if (this.restoreTimer) clearTimeout(this.restoreTimer);
     this.restoreTimer = undefined;
+    await this.nativeBackend?.shutdown();
+    this.nativeBackend = undefined;
     this.connectedNodes.clear();
     this.lastPlayedTracks.clear();
     this.autoplayInFlight.clear();
