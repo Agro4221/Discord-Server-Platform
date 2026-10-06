@@ -325,7 +325,7 @@ async setFailover(id: string, enabled: boolean): Promise<void> {
     return this.db.transaction(async (client) => {
       const result = await client.query<{ guild_id: string; previous_identity_id: string }>(
         `WITH candidates AS (
-           SELECT ga.guild_id
+           SELECT ga.guild_id,ga.bot_identity_id
              FROM guild_bot_assignments ga
              LEFT JOIN bot_heartbeats bh ON bh.bot_identity_id=ga.bot_identity_id
             WHERE ga.guild_id = ANY($1::text[])
@@ -339,6 +339,7 @@ async setFailover(id: string, enabled: boolean): Promise<void> {
             SET bot_identity_id='primary',updated_at=now()
            FROM candidates
           WHERE ga.guild_id=candidates.guild_id
+            AND ga.bot_identity_id=candidates.bot_identity_id
           RETURNING ga.guild_id,candidates.bot_identity_id AS previous_identity_id`,
         [guildIds, safeLimit]
       );
