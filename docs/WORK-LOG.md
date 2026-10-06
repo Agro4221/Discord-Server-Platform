@@ -987,3 +987,13 @@ Never write credentials, tokens or private user data here.
 - Live testing showed module toggles and runtime shutdown both failed while GET endpoints remained reachable.
 - Root cause: `assertSameOrigin()` inferred HTTPS whenever `NODE_ENV=production`, but `next start` serves the native Control Center over local HTTP. Protected PUT/POST requests therefore returned `bad_origin`.
 - Origin validation now uses the actual request protocol/host, honoring `X-Forwarded-Proto` when present.
+
+
+## 2026-10-07 — Native Music universal Resolver v1
+- Started a stacked Music module branch from PR #4's native yt-dlp + FFmpeg backend instead of changing the stable Lavalink path.
+- Added a dedicated NativeMusicResolver layer so native playback no longer hardcodes every text query to ytsearch.
+- Native text resolution now tries real yt-dlp mechanisms in order: YouTube ytsearch1:, YouTube Music search URL, then SoundCloud scsearch1:.
+- Direct URLs are classified for YouTube, YouTube Music, SoundCloud, Spotify, Yandex Music, VK/VK Video and TikTok; metadata-only links can fall back to an artist/title search mirror.
+- Playback still flows through the existing native yt-dlp -> FFmpeg -> Discord Voice pipeline, while the resolver decides which query should actually be played.
+- Added unit tests for provider detection, search candidates, playable metadata detection and metadata-only URL fallback construction.
+- This slice deliberately does not add queue/skip/repeat/filter/dashboard changes; those remain separate modules.
