@@ -2098,7 +2098,7 @@ export function buildMusicSearch(
   if (!query) return null;
 
   const normalizedUrl = normalizeMusicUrlQuery(query);
-  if (normalizedUrl) return { query: normalizedUrl, source: "https" };
+  if (normalizedUrl) return { query: normalizedUrl };
 
   if (provider === "auto") {
     if (/^(ytsearch|ytmsearch|scsearch|spsearch|ymsearch):/i.test(query)) return { query };
