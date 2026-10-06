@@ -733,13 +733,19 @@ export function ControlCenter() {
     setSearch("");
   }
 
-  async function reloadAudit() {
+  async function reloadAudit(): Promise<void> {
     if (!guildId) return;
-    const response = await fetch(
-      "/api/guilds/" + encodeURIComponent(guildId) + "/audit?limit=60",
-      { cache: "no-store" }
-    );
-    if (response.ok) setAudit((await response.json()).events ?? []);
+    try {
+      const response = await fetch(
+        "/api/guilds/" + encodeURIComponent(guildId) + "/audit?limit=60",
+        { cache: "no-store" }
+      );
+      if (!response.ok) return;
+      const body = await response.json().catch(() => ({}));
+      setAudit((body.events ?? []) as AuditEvent[]);
+    } catch {
+      // Audit refresh is best-effort and must never make a successful action look failed.
+    }
   }
 
   async function toggle(moduleKey: string, enabled: boolean) {
