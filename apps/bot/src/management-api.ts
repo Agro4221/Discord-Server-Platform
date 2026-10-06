@@ -215,9 +215,11 @@ export class ManagementApiServer {
             }
             logger.warn("Remote shutdown requested", { ip });
             this.json(res, 200, { ok: true, status: "shutting_down" });
-            setImmediate(() => {
-              void this.options.shutdown!().finally(() => process.exit(0));
-            });
+            setTimeout(() => {
+              void this.options.shutdown!().finally(() => {
+                setTimeout(() => process.exit(0), 250);
+              });
+            }, 250);
             return;
           }
 
