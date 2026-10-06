@@ -1007,3 +1007,8 @@ Never write credentials, tokens or private user data here.
 - Local rebuild exposed that PR #5 is stacked on PR #4: the resolver/backend source was copied into a development checkout without the inherited PR #4 package dependency changes.
 - `@discordjs/voice` is present in PR #4/#5 `apps/bot/package.json`, but was absent from the local development checkout; npm therefore reported the existing dependency tree as up to date without installing Voice.
 - No Music runtime feature change is required; the local fix is to synchronize the PR #4 package manifest before reinstalling dependencies.
+## 2026-10-07 — Native Music resolver local build verified
+- Local Windows checkout successfully rebuilt after synchronizing the stacked PR #4 dependencies.
+- `npm install` installed the missing native Voice dependencies; subsequent `start-native.bat -Rebuild` completed Domain, Bot and Dashboard builds without TypeScript or Next.js errors.
+- PostgreSQL became ready, Lavalink node 1 started, Management API responded on the configured port, and the native Control Center/Fleet supervisor reached the running state.
+- This confirms the resolver slice is compile-clean in the user's actual Windows environment; runtime Music command acceptance remains the next verification point.
