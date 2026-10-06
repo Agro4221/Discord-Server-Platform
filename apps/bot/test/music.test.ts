@@ -94,7 +94,7 @@ test("Music search builder preserves URLs, explicit prefixes and provider select
   );
   assert.deepEqual(
     buildMusicSearch("auto", "https://www.youtube.com/watch?v=-CsjE_ILvnY&si=-ZVCk2EgFY9bSHFy"),
-    { query: "https://www.youtube.com/watch?v=-CsjE_ILvnY" }
+    { query: "https://www.youtube.com/watch?v=-CsjE_ILvnY", source: "https" }
   );
   assert.deepEqual(
     buildMusicSearch("auto", "https://www.youtube.com/shorts/-CsjE_ILvnY?si=-ZVCk2EgFY9bSHFy"),
@@ -102,19 +102,19 @@ test("Music search builder preserves URLs, explicit prefixes and provider select
   );
   assert.deepEqual(
     buildMusicSearch("auto", "https://www.youtube.com/watch?v=-CsjE_ILvnY&list=PL1234567890&index=2&si=-ZVCk2EgFY9bSHFy"),
-    { query: "https://www.youtube.com/watch?v=-CsjE_ILvnY&list=PL1234567890&index=2" }
+    { query: "https://www.youtube.com/watch?v=-CsjE_ILvnY&list=PL1234567890&index=2", source: "https" }
   );
   assert.deepEqual(
     buildMusicSearch("auto", "https://open.spotify.com/track/0eG08cBeKk0mzykKjw4hcQ?si=example"),
-    { query: "https://open.spotify.com/track/0eG08cBeKk0mzykKjw4hcQ?si=example" }
+    { query: "https://open.spotify.com/track/0eG08cBeKk0mzykKjw4hcQ?si=example", source: "https" }
   );
   assert.deepEqual(
     buildMusicSearch("auto", "https://open.spotify.com/intl-de/track/0eG08cBeKk0mzykKjw4hcQ"),
-    { query: "https://open.spotify.com/intl-de/track/0eG08cBeKk0mzykKjw4hcQ" }
+    { query: "https://open.spotify.com/intl-de/track/0eG08cBeKk0mzykKjw4hcQ", source: "https" }
   );
   assert.deepEqual(
     buildMusicSearch("auto", "https://music.yandex.ru/album/13886032/track/71663565"),
-    { query: "https://music.yandex.ru/album/13886032/track/71663565" }
+    { query: "https://music.yandex.ru/album/13886032/track/71663565", source: "https" }
   );
   assert.deepEqual(
     buildMusicSearch("auto", "https://soundcloud.com/example/track"),
