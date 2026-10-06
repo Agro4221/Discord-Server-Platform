@@ -496,7 +496,7 @@ try {
     Stop-NativeProcess "lavalink2"
   }
 
-  $env:LAVALINK_NODES = ($nodes | ConvertTo-Json -Compress)
+  $env:LAVALINK_NODES = ($nodes | ConvertTo-Json -Compress -Depth 4 -InputObject $nodes)
   $env:SERVER_PORT = "2333"
 
   Start-NativeProcess "bot" "npm.cmd" @("run", "start", "-w", "apps/bot") (Get-Location).Path "bot"
