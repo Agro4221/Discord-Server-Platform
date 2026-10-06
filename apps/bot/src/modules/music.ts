@@ -1941,20 +1941,30 @@ function normalizeMusicUrlQuery(query: string): string | null {
 
     if (hostname === "youtu.be") {
       const videoId = url.pathname.split("/").filter(Boolean)[0];
-      return videoId
-        ? `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`
-        : query;
+      if (!videoId) return query;
+      url.hostname = "www.youtube.com";
+      url.pathname = "/watch";
+      url.searchParams.set("v", videoId);
+      url.searchParams.delete("si");
+      return url.toString();
     }
 
     if (hostname === "youtube.com" || hostname === "www.youtube.com" || hostname === "m.youtube.com") {
       const videoId = url.searchParams.get("v");
       if (videoId) {
-        return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+        url.hostname = "www.youtube.com";
+        url.pathname = "/watch";
+        url.search = buildYouTubeQuery(url.searchParams);
+        return url.toString();
       }
 
       const match = url.pathname.match(/^\/(shorts|live)\/([^/?#]+)/i);
       if (match?.[2]) {
-        return `https://www.youtube.com/watch?v=${encodeURIComponent(match[2])}`;
+        url.hostname = "www.youtube.com";
+        url.pathname = "/watch";
+        url.searchParams.delete("si");
+        url.searchParams.set("v", match[2]);
+        return url.toString();
       }
     }
 
@@ -1962,6 +1972,12 @@ function normalizeMusicUrlQuery(query: string): string | null {
   } catch {
     return query;
   }
+}
+
+function buildYouTubeQuery(params: URLSearchParams): string {
+  const next = new URLSearchParams(params);
+  next.delete("si");
+  return next.toString();
 }
 
 export function buildMusicSearch(
