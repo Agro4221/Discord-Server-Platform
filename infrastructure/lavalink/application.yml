@@ -8,6 +8,8 @@ plugins:
     allowSearch: true
     allowDirectVideoIds: true
     allowDirectPlaylistIds: true
+    clients:
+      - MWEB
   lavasrc:
     providers:
       - "ytsearch:\"%ISRC%\""
