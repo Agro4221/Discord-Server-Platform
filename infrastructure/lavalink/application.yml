@@ -3,6 +3,11 @@ server:
   address: 0.0.0.0
 
 plugins:
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
   lavasrc:
     providers:
       - "ytsearch:\"%ISRC%\""
@@ -14,7 +19,7 @@ plugins:
     sources:
       spotify: ${LAVASRC_SPOTIFY_ENABLED:false}
       yandexmusic: ${LAVASRC_YANDEX_MUSIC_ENABLED:false}
-      youtube: true
+      youtube: false
     spotify:
       clientId: ${SPOTIFY_CLIENT_ID:}
       clientSecret: ${SPOTIFY_CLIENT_SECRET:}
@@ -24,6 +29,15 @@ plugins:
 lavalink:
   server:
     password: "${LAVALINK_SERVER_PASSWORD:change-me-local}"
+    sources:
+      youtube: false
+      bandcamp: true
+      soundcloud: true
+      twitch: true
+      vimeo: true
+      nico: true
+      http: true
+      local: false
     resumingEnabled: true
     resumeTimeout: 300
   plugins:
