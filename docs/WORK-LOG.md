@@ -968,3 +968,8 @@ Never write credentials, tokens or private user data here.
 - Hardened Management API JSON responses against PostgreSQL/driver `bigint` values by serializing bigint values as strings.
 - Hardened Management API error handling so an already-ended response is never written again, preventing the observed `ERR_HTTP_HEADERS_SENT` cascade after the BigInt serialization failure.
 - These changes are verification-driven fixes; no new feature scope was added.
+
+## 2026-10-06 — Control Center shutdown response race fix
+- Live testing showed the "Выключить бота" action could report failure even though the shutdown request was accepted.
+- Root cause: Management API returned `200 OK` and immediately started graceful cleanup, which closed the API/process before the Dashboard proxy reliably consumed the response.
+- Shutdown now waits 250 ms after sending the response before beginning cleanup, then waits another 250 ms after cleanup before the final process exit.
