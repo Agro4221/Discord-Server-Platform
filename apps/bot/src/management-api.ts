@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import type { Client } from "discord.js";
-import { logger } from "./logger.js";
+import { getRecentLogs, logger } from "./logger.js";
 import { ModuleSettingsRepository } from "./module-settings.js";
 import { MODULE_CATALOG, type ModuleKey } from "./modules/catalog.js";
 import { AuditLog } from "./audit.js";
@@ -117,6 +117,7 @@ type ApiOptions = {
   security?: Security;
   temporaryVoice?: TemporaryVoice;
   commandPolicy?: CommandPolicyService;
+  shutdown?: () => Promise<void>;
   rolePanels?: {
     list: (guildId: string) => Promise<unknown[]>;
     create: (
@@ -190,6 +191,30 @@ export class ManagementApiServer {
           const method = requestMethod;
           const url = new URL(requestPath, `http://${this.options.host}:${this.options.port}`);
           const path = url.pathname;
+
+          if (method === "GET" && path === "/api/runtime/logs") {
+            const rawLimit = url.searchParams.get("limit");
+            const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 200;
+            if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+              this.json(res, 400, { error: "invalid_log_limit" });
+              return;
+            }
+            this.json(res, 200, { logs: getRecentLogs(limit) });
+            return;
+          }
+
+          if (method === "POST" && path === "/api/runtime/shutdown") {
+            if (!this.options.shutdown) {
+              this.json(res, 503, { error: "shutdown_unavailable" });
+              return;
+            }
+            logger.warn("Remote shutdown requested", { ip });
+            this.json(res, 200, { ok: true, status: "shutting_down" });
+            setImmediate(() => {
+              void this.options.shutdown!().finally(() => process.exit(0));
+            });
+            return;
+          }
 
           const scopedGuild = path.match(/^\/api\/guilds\/([^/]+)/);
           if (scopedGuild && this.options.guildAccess && !this.options.guildAccess(scopedGuild[1] ?? "")) {
