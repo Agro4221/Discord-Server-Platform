@@ -98,7 +98,7 @@ test("Music search builder preserves URLs, explicit prefixes and provider select
   );
   assert.deepEqual(
     buildMusicSearch("auto", "https://www.youtube.com/shorts/-CsjE_ILvnY?si=-ZVCk2EgFY9bSHFy"),
-    { query: "https://www.youtube.com/watch?v=-CsjE_ILvnY" }
+    { query: "https://www.youtube.com/watch?v=-CsjE_ILvnY", source: "https" }
   );
   assert.deepEqual(
     buildMusicSearch("auto", "https://www.youtube.com/watch?v=-CsjE_ILvnY&list=PL1234567890&index=2&si=-ZVCk2EgFY9bSHFy"),
@@ -118,7 +118,7 @@ test("Music search builder preserves URLs, explicit prefixes and provider select
   );
   assert.deepEqual(
     buildMusicSearch("auto", "https://soundcloud.com/example/track"),
-    { query: "https://soundcloud.com/example/track" }
+    { query: "https://soundcloud.com/example/track", source: "https" }
   );
 
   assert.equal(buildMusicSearch("auto", "   "), null);
