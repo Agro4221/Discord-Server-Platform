@@ -536,33 +536,35 @@ export function ControlCenter() {
           fetch("/api/module-schemas", { cache: "no-store" })
         ]);
 
-        const guildBody = await guildResponse.json().catch(() => ({}));
+        const [guildBody, catalogBody, schemaBody] = await Promise.all([
+          guildResponse.json().catch(() => ({})),
+          catalogResponse.json().catch(() => ({})),
+          schemaResponse.json().catch(() => ({}))
+        ]);
+
         if (!guildResponse.ok) {
           throw new Error(String(guildBody.error ?? "guilds_failed"));
         }
-
-        const catalogBody = await catalogResponse.json().catch(() => ({}));
         if (!catalogResponse.ok) {
           throw new Error(String(catalogBody.error ?? "catalog_failed"));
         }
-
-        const schemaBody = await schemaResponse.json().catch(() => ({}));
         if (!schemaResponse.ok) {
           throw new Error(String(schemaBody.error ?? "module_schemas_failed"));
         }
 
         const nextCatalog = (catalogBody.catalog ?? []) as CatalogItem[];
-        setCatalog(nextCatalog);
+        const nextGuilds = (guildBody.guilds ?? []) as Guild[];
 
         const healthResponse = await fetch("/api/health", { cache: "no-store" })
           .then(async (response) => response.ok ? await response.json() : null)
           .catch(() => null);
 
-        const nextGuilds = (guildBody.guilds ?? []) as Guild[];
+        setCatalog(nextCatalog);
         setGuilds(nextGuilds);
         setGuildId((current) => current || nextGuilds[0]?.id || "");
         setSchemas((schemaBody.schemas ?? []) as Schema[]);
         setHealth(healthResponse);
+        setSelectedModule((current) => current || nextCatalog[0]?.key || "");
         setError("");
       } catch (reason) {
         const code = reason instanceof Error ? reason.message : "bootstrap_failed";
@@ -576,36 +578,9 @@ export function ControlCenter() {
         setError(messages[code] ?? "Не удалось связать Control Center с Management API: " + code);
       }
     }
-        const schemaBody = await schemaResponse.json().catch(() => ({}));
-        if (!schemaResponse.ok) {
-          throw new Error(String(schemaBody.error ?? "module_schemas_failed"));
-        }
-
-        const healthResponse = await fetch("/api/health", { cache: "no-store" })
-          .then(async (response) => response.ok ? await response.json() : null)
-          .catch(() => null);
-
-        const nextGuilds = (guildBody.guilds ?? []) as Guild[];
-        setGuilds(nextGuilds);
-        setGuildId((current) => current || nextGuilds[0]?.id || "");
-        setSchemas((schemaBody.schemas ?? []) as Schema[]);
-        setHealth(healthResponse);
-        setError("");
-      } catch (reason) {
-        const code = reason instanceof Error ? reason.message : "bootstrap_failed";
-        const messages: Record<string, string> = {
-          unauthorized: "Control Center не может авторизоваться в Management API. Проверь MANAGEMENT_API_KEY.",
-          module_schemas_failed: "Management API не отдал каталог настроек модулей.",
-          guilds_failed: "Management API не отдал список Discord-серверов.",
-          internal_error: "Management API вернул внутреннюю ошибку."
-        };
-        setError(messages[code] ?? "Не удалось связать Control Center с Management API: " + code);
-      }
-    }
 
     void loadBootstrap();
   }, []);
-
   useEffect(() => {
     if (!guildId) return;
     let cancelled = false;
