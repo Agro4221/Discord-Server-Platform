@@ -256,6 +256,10 @@ export class NativeYtdlpMusicBackend {
     return true;
   }
 
+  getVolume(guildId: string): number {
+    return this.sessions.get(guildId)?.volume ?? 100;
+  }
+
   getCurrent(guildId: string): NativeMusicTrack | null {
     return this.sessions.get(guildId)?.current ?? null;
   }
@@ -303,7 +307,7 @@ export class NativeYtdlpMusicBackend {
       return current;
     }
 
-    const stale = getVoiceConnection(guildId, channel.guild.voiceAdapterCreator);
+    const stale = getVoiceConnection(guildId);
     if (stale && stale.joinConfig.channelId !== channel.id) {
       stale.destroy();
     }
