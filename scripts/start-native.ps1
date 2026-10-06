@@ -270,8 +270,6 @@ function Ensure-Postgres {
 
     $pgStdOut = Join-Path $logRoot "postgres-stdout.log"
     $pgStdErr = Join-Path $logRoot "postgres-stderr.log"
-    # Start postgres.exe directly. This avoids Windows PowerShell argument and
-    # inherited-handle behavior observed when launching pg_ctl asynchronously.
     Start-Process -FilePath $postgres -ArgumentList @(
       "-D", $dataRoot,
       "-h", "127.0.0.1",
@@ -292,20 +290,33 @@ function Ensure-Postgres {
     throw "Local PostgreSQL did not become ready on 127.0.0.1:5432."
   }
 
-  & $psql $env:DATABASE_URL -c "SELECT 1;" *> $null
+  $uri = [Uri]$env:DATABASE_URL
+  $userinfo = $uri.UserInfo.Split(":", 2)
+  if ($userinfo.Count -eq 2) {
+    $env:PGPASSWORD = [Uri]::UnescapeDataString($userinfo[1])
+  }
+
+  # Check/create the application database using the always-present postgres database.
+  $systemCheck = & $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c "SELECT 1;" 2>$null
   if ($LASTEXITCODE -ne 0) {
-    & $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c "SELECT 1;" *> $null
-    if ($LASTEXITCODE -ne 0) { throw "PostgreSQL rejected the configured DATABASE_URL." }
+    Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+    throw "PostgreSQL server is running but the postgres administrative connection failed."
   }
 
   $databaseExists = (& $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='discord_platform';" 2>$null | Select-String -Quiet "1")
   if (-not $databaseExists) {
-    & $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c "CREATE DATABASE discord_platform;" *> $null
-    if ($LASTEXITCODE -ne 0) { throw "Could not create the discord_platform database." }
+    Write-Host "Creating local database discord_platform..."
+    & $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c "CREATE DATABASE discord_platform;" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+      Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+      throw "Could not create the discord_platform database."
+    }
   }
 
-  & $psql $env:DATABASE_URL -c "SELECT 1;" *> $null
-  if ($LASTEXITCODE -ne 0) { throw "PostgreSQL accepted the server connection but rejected DATABASE_URL." }
+  & $psql $env:DATABASE_URL -c "SELECT 1;" 2>$null
+  $applicationExitCode = $LASTEXITCODE
+  Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+  if ($applicationExitCode -ne 0) { throw "PostgreSQL rejected the configured DATABASE_URL." }
 
   Write-Host "PostgreSQL: ready"
 }
