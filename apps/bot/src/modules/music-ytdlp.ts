@@ -19,14 +19,6 @@ import { NativeMusicResolver, type NativeMusicTrack } from "./music-resolver.js"
 
 export type { NativeMusicTrack } from "./music-resolver.js";
 
-export type NativeMusicTrack = {
-  title: string;
-  author: string;
-  durationMs: number;
-  url: string;
-  source: string;
-  artworkUrl: string | null;
-};
 
 type NativeMusicSession = {
   connection: VoiceConnection;
@@ -39,22 +31,9 @@ type NativeMusicSession = {
   leaveTimer?: NodeJS.Timeout;
 };
 
-type YtDlpMetadata = {
-  title?: unknown;
-  uploader?: unknown;
-  artist?: unknown;
-  duration?: unknown;
-  webpage_url?: unknown;
-  original_url?: unknown;
-  url?: unknown;
-  extractor_key?: unknown;
-  extractor?: unknown;
-  thumbnail?: unknown;
-  entries?: unknown;
-};
+
 
 const DEFAULT_AUTO_LEAVE_MS = 30_000;
-const RESOLVE_TIMEOUT_MS = 20_000;
 
 export class NativeYtdlpMusicBackend {
   private readonly sessions = new Map<string, NativeMusicSession>();
