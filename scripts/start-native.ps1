@@ -429,9 +429,21 @@ try {
   Ensure-NpmDependencies
 
   # Build before starting Lavalink/bot so the first-run compiler spike does not
-  # happen at the same time as the runtime services.
+  # happen at the same time as the runtime services. Rebuild automatically when
+  # source files are newer than the compiled marker, so a fresh ZIP/update does
+  # not accidentally run stale JavaScript.
   $botBuildMarker = Join-Path (Get-Location) "apps\bot\dist\main.js"
-  if ($Rebuild -or -not (Test-Path $botBuildMarker)) {
+  $domainBuildMarker = Join-Path (Get-Location) "packages\domain\dist\index.js"
+  $botSourcesChanged = -not (Test-Path $botBuildMarker) -or @(
+    Get-ChildItem "apps\bot\src" -Recurse -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.LastWriteTimeUtc -gt (Get-Item $botBuildMarker -ErrorAction SilentlyContinue).LastWriteTimeUtc }
+  ).Count -gt 0
+  $domainSourcesChanged = -not (Test-Path $domainBuildMarker) -or @(
+    Get-ChildItem "packages\domain\src" -Recurse -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.LastWriteTimeUtc -gt (Get-Item $domainBuildMarker -ErrorAction SilentlyContinue).LastWriteTimeUtc }
+  ).Count -gt 0
+
+  if ($Rebuild -or $botSourcesChanged -or $domainSourcesChanged) {
     Write-Host "Building domain + bot..."
     & npm.cmd run build:domain
     if ($LASTEXITCODE -ne 0) { throw "Domain build failed." }
@@ -440,7 +452,10 @@ try {
   }
 
   $dashboardBuildMarker = Join-Path (Get-Location) "apps\dashboard\.next\BUILD_ID"
-  if ($Dashboard -and ($Rebuild -or -not (Test-Path $dashboardBuildMarker))) {
+  if ($Dashboard -and ($Rebuild -or -not (Test-Path $dashboardBuildMarker) -or @(
+      Get-ChildItem "apps\dashboard\app" -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTimeUtc -gt (Get-Item $dashboardBuildMarker -ErrorAction SilentlyContinue).LastWriteTimeUtc }
+    ).Count -gt 0)) {
     Write-Host "Building Dashboard..."
     & npm.cmd run build -w apps/dashboard
     if ($LASTEXITCODE -ne 0) { throw "Dashboard build failed." }
