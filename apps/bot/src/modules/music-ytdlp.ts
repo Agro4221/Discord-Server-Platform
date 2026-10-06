@@ -490,7 +490,7 @@ export class NativeYtdlpMusicBackend {
 }
 
 function isHttpUrl(value: string): boolean {
-  return /^https?:\\/\\/i.test(value);
+  return /^https?:\/\//i.test(value);
 }
 
 function parseJson(value: string): YtDlpMetadata {
@@ -499,7 +499,7 @@ function parseJson(value: string): YtDlpMetadata {
     if (!parsed || typeof parsed !== "object") throw new Error("not an object");
     return parsed as YtDlpMetadata;
   } catch {
-    const lines = value.split(/\\r?\\n/).map((line) => line.trim()).filter(Boolean);
+    const lines = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     for (let index = lines.length - 1; index >= 0; index--) {
       try {
         const parsed: unknown = JSON.parse(lines[index]);
