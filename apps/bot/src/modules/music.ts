@@ -28,7 +28,7 @@ type MusicRepeatMode = "off" | "track" | "queue";
 export type MusicSearchProvider = "auto" | "youtube" | "youtube_music" | "soundcloud" | "spotify" | "yandex_music";
 export type MusicFilterPreset = "off" | "nightcore" | "vaporwave" | "karaoke" | "rotation" | "tremolo" | "vibrato" | "lowpass";
 export const MAX_MUSIC_ENQUEUE_TRACKS = 100;
-type MusicSearchSource = "ytsearch" | "ytmsearch" | "scsearch" | "spsearch" | "ymsearch";
+type MusicSearchSource = "ytsearch" | "ytmsearch" | "scsearch" | "spsearch" | "ymsearch" | "http" | "https";
 
 const MUSIC_PROVIDER_SOURCES: Record<Exclude<MusicSearchProvider, "auto">, MusicSearchSource> = {
   youtube: "ytsearch",
@@ -474,7 +474,7 @@ export class Music implements PlatformModule {
       });
 
       if (player.voiceChannelId !== voiceChannelId) throw new Error("music_player_in_other_voice");
-      if (!player.connected) await player.connect();
+      if (!await this.ensureVoiceConnected(player)) throw new Error("music_voice_connection_failed");
 
       const query = String(input.query ?? "");
       const provider = normalizeMusicSearchProvider(String(input.provider ?? "auto"));
@@ -569,10 +569,9 @@ export class Music implements PlatformModule {
       return;
     }
 
-    const member = await guild.members.fetch(interaction.user.id);
-    const voice = member.voice.channel;
+    const voiceChannelId = guild.voiceStates.cache.get(interaction.user.id)?.channelId ?? null;
     const existingPlayer = this.manager.players.get(guild.id);
-    const ownershipChannelId = voice?.id ?? existingPlayer?.voiceChannelId ?? null;
+    const ownershipChannelId = voiceChannelId ?? existingPlayer?.voiceChannelId ?? null;
 
     if (!await this.ensureMusicOwnership(interaction, ownershipChannelId)) return;
 
@@ -582,7 +581,7 @@ export class Music implements PlatformModule {
 
     switch (action) {
       case "play":
-        await this.play(interaction, voice?.id ?? null);
+        await this.play(interaction, voiceChannelId);
         break;
       case "pause":
         await this.pause(interaction, true);
@@ -656,8 +655,12 @@ export class Music implements PlatformModule {
       return;
     }
 
-    if (!player.connected) {
-      await player.connect();
+    if (!await this.ensureVoiceConnected(player)) {
+      await interaction.reply({
+        content: "Не удалось подключиться к голосовому каналу. Проверь права бота на Connect/Speak и состояние Discord.",
+        ephemeral: true
+      });
+      return;
     }
 
     const result = await searchMusicWithFallback(player, provider, query, interaction.user);
@@ -667,7 +670,7 @@ export class Music implements PlatformModule {
       return;
     }
 
-    const tracks = selectMusicEnqueueTracks(result.tracks);
+    const tracks = selectMusicEnqueueTracks(result.tracks, MAX_MUSIC_ENQUEUE_TRACKS, result.loadType === "playlist");
     for (const track of tracks) player.queue.add(track);
     if (!player.playing) await player.play();
 
@@ -677,6 +680,28 @@ export class Music implements PlatformModule {
       content: `Добавлено в очередь: **${firstTrack.info.title}** — ${firstTrack.info.author}.${suffix}`,
       ephemeral: true
     });
+  }
+
+  private async ensureVoiceConnected(player: Player): Promise<boolean> {
+    if (player.connected) return true;
+
+    try {
+      await player.connect();
+    } catch (error) {
+      logger.warn("Music voice connection failed", {
+        guildId: player.guildId,
+        identity: this.config.botIdentityId,
+        voiceChannelId: player.voiceChannelId,
+        error: String(error)
+      });
+      return false;
+    }
+
+    const deadline = Date.now() + 2500;
+    while (!player.connected && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    return player.connected;
   }
 
   private async getOrCreatePlayer(
@@ -1045,9 +1070,14 @@ export class Music implements PlatformModule {
       return true;
     }
 
-    const member = await message.guild.members.fetch(message.author.id).catch(() => null);
-    const memberVoice = member?.voice.channel;
     const player = this.manager.players.get(message.guild.id);
+    const memberVoiceChannelId = message.guild.voiceStates.cache.get(message.author.id)?.channelId ?? null;
+    const memberVoice = memberVoiceChannelId
+      ? message.guild.channels.cache.get(memberVoiceChannelId) ?? null
+      : null;
+    const member = action === "play"
+      ? null
+      : await message.guild.members.fetch(message.author.id).catch(() => null);
     const playerVoiceId = player?.voiceChannelId ?? null;
     const manageGuild = member?.permissions.has("ManageGuild") ?? false;
     const djRole = await this.djRoleId(message.guild.id);
@@ -1087,7 +1117,10 @@ export class Music implements PlatformModule {
         await message.reply("Музыкальный бот уже находится в другом голосовом канале.");
         return true;
       }
-      if (!nextPlayer.connected) await nextPlayer.connect();
+      if (!await this.ensureVoiceConnected(nextPlayer)) {
+        await message.reply("Не удалось подключиться к голосовому каналу. Проверь права бота на Connect/Speak и состояние Discord.");
+        return true;
+      }
 
       const result = await searchMusicWithFallback(nextPlayer, "auto", query, message.author);
       if (!result) {
@@ -1095,7 +1128,7 @@ export class Music implements PlatformModule {
         return true;
       }
 
-      const tracks = selectMusicEnqueueTracks(result.tracks);
+      const tracks = selectMusicEnqueueTracks(result.tracks, MAX_MUSIC_ENQUEUE_TRACKS, result.loadType === "playlist");
       for (const track of tracks) nextPlayer.queue.add(track);
       if (!nextPlayer.playing) await nextPlayer.play();
       const firstTrack = tracks[0]!;
