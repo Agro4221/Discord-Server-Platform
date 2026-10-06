@@ -87,10 +87,10 @@ test("Music search builder preserves URLs, explicit prefixes and provider select
   assert.deepEqual(buildMusicSearch("yandex_music", "Daft Punk"), { query: "Daft Punk", source: "ymsearch" });
   assert.deepEqual(buildMusicSearch("auto", "spsearch: Daft Punk"), { query: "spsearch: Daft Punk" });
   assert.deepEqual(buildMusicSearch("auto", "ymsearch: Daft Punk"), { query: "ymsearch: Daft Punk" });
-  assert.deepEqual(buildMusicSearch("soundcloud", "https://soundcloud.com/example/track"), { query: "https://soundcloud.com/example/track" });
+  assert.deepEqual(buildMusicSearch("soundcloud", "https://soundcloud.com/example/track"), { query: "https://soundcloud.com/example/track", source: "https" });
   assert.deepEqual(
     buildMusicSearch("auto", "https://youtu.be/-CsjE_ILvnY?si=-ZVCk2EgFY9bSHFy"),
-    { query: "https://www.youtube.com/watch?v=-CsjE_ILvnY" }
+    { query: "https://www.youtube.com/watch?v=-CsjE_ILvnY", source: "https" }
   );
   assert.deepEqual(
     buildMusicSearch("auto", "https://www.youtube.com/watch?v=-CsjE_ILvnY&si=-ZVCk2EgFY9bSHFy"),
@@ -230,9 +230,12 @@ test("Music auto search falls back across built-in text providers", () => {
   );
 });
 
-test("Music queue selection enqueues complete search results up to the safety cap", () => {
-  assert.deepEqual(selectMusicEnqueueTracks(["a", "b", "c"], 2), ["a", "b"]);
-  assert.equal(selectMusicEnqueueTracks(Array.from({ length: 150 }, (_, i) => i)).length, MAX_MUSIC_ENQUEUE_TRACKS);
+test("Music queue selection keeps one search result and up to 100 playlist tracks", () => {
+  assert.deepEqual(selectMusicEnqueueTracks(["a", "b", "c"], 2, false), ["a"]);
+  assert.equal(
+    selectMusicEnqueueTracks(Array.from({ length: 150 }, (_, i) => i), MAX_MUSIC_ENQUEUE_TRACKS, true).length,
+    MAX_MUSIC_ENQUEUE_TRACKS
+  );
   assert.equal(MAX_MUSIC_ENQUEUE_TRACKS, 100);
 });
 
