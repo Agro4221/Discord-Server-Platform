@@ -21,10 +21,12 @@ export function assertSameOrigin(request: Request): void {
   const origin = request.headers.get("origin");
   if (!origin) return;
 
+  const requestUrl = new URL(request.url);
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
   const host = request.headers.get("host");
   const expected = host
-    ? `http${process.env.NODE_ENV === "production" ? "s" : ""}://${host}`
-    : null;
+    ? (forwardedProto ? `${forwardedProto}://${host}` : `${requestUrl.protocol}//${host}`)
+    : requestUrl.origin;
 
-  if (expected && origin !== expected) throw new Error("bad_origin");
+  if (origin !== expected) throw new Error("bad_origin");
 }
