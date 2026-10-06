@@ -12,7 +12,8 @@ import {
   type AudioResource,
   type VoiceConnection
 } from "@discordjs/voice";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcessByStdio } from "node:child_process";
+import type { Readable, Writable } from "node:stream";
 import type { VoiceChannel, StageChannel } from "discord.js";
 import { logger } from "../logger.js";
 import { NativeMusicResolver, type NativeMusicTrack } from "./music-resolver.js";
@@ -25,8 +26,8 @@ type NativeMusicSession = {
   player: AudioPlayer;
   current: NativeMusicTrack | null;
   volume: number;
-  youtubeProcess?: ChildProcessWithoutNullStreams;
-  ffmpegProcess?: ChildProcessWithoutNullStreams;
+  youtubeProcess?: ChildProcessByStdio<null, Readable, Readable>;
+  ffmpegProcess?: ChildProcessByStdio<Writable, Readable, Readable>;
   generation: number;
   leaveTimer?: NodeJS.Timeout;
 };
