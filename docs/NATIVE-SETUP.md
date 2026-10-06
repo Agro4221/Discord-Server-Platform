@@ -2,21 +2,26 @@
 
 For a gaming/streaming PC, Discord Server Platform can run without Docker Desktop. This keeps the bot, Dashboard and Lavalink as ordinary Windows processes instead of placing the application stack inside the Docker/WSL layer.
 
-## Everyday gaming launch
+## Full native launch
 
 Use:
 
     .\start-native.bat
 
-This intentionally starts only:
-- PostgreSQL as the separately installed local database
-- one Lavalink process
+The default native launch starts the full local platform required for acceptance testing:
+- PostgreSQL as the local database
+- the primary Lavalink node
 - the compiled Discord Server Platform bot
+- the Control Center Dashboard
+- the native Fleet supervisor for registered secondary Bot Identities
 
-The Dashboard stays off to keep the background footprint low. When the Dashboard is needed:
+The Dashboard opens automatically after it becomes ready. Use:
 
-    .\start-native.bat -Dashboard
+    .\start-native.bat -NoOpen
 
+to keep the Dashboard running without opening a browser window.
+
+The legacy `-Dashboard` switch remains accepted for compatibility; Dashboard is enabled by default.
 The second Lavalink node is optional:
 
     .\start-native.bat -Lavalink2
@@ -52,12 +57,12 @@ The native launcher still uses the .env DATABASE_URL; the database engine remain
 
 ## Build behavior
 
-The first native start builds the domain package and bot. The Dashboard is built only when -Dashboard is requested. Later starts reuse the compiled output.
+The first native start builds the domain package and bot. The Dashboard is built during the normal native launch. Later starts reuse the compiled output.
 
 Use -Rebuild after source/dependency changes:
 
     .\start-native.bat -Rebuild
-    .\start-native.bat -Dashboard -Rebuild
+    .\start-native.bat -Rebuild
 
 This prevents the normal gaming launch from performing a large TypeScript/Next.js build every time.
 
