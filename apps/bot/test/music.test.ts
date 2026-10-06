@@ -19,7 +19,8 @@ import {
   normalizeMusicQueuePosition,
   normalizeMusicQueueMove,
   selectMusicEnqueueTracks,
-  MAX_MUSIC_ENQUEUE_TRACKS
+  MAX_MUSIC_ENQUEUE_TRACKS,
+  adjustMusicVolume
 } from "../src/modules/music.js";
 
 test("music controls require the same voice channel unless Manage Server is granted", () => {
@@ -210,6 +211,14 @@ test("Music queue position helpers validate 1-based user positions", () => {
   assert.deepEqual(normalizeMusicQueueMove(1, 3, 3), { from: 0, to: 2 });
   assert.equal(normalizeMusicQueueMove(2, 2, 3), null);
   assert.equal(normalizeMusicQueueMove(1, 4, 3), null);
+});
+
+test("Music volume controls clamp to 0-200 while changing in integer steps", () => {
+  assert.equal(adjustMusicVolume(100, -10), 90);
+  assert.equal(adjustMusicVolume(100, 10), 110);
+  assert.equal(adjustMusicVolume(5, -10), 0);
+  assert.equal(adjustMusicVolume(195, 10), 200);
+  assert.equal(adjustMusicVolume(Number.NaN, 10), 110);
 });
 
 test("Music filter preset validator accepts supported built-in filters", () => {
