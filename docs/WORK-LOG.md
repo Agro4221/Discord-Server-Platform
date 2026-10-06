@@ -1,4 +1,12 @@
 
+## 2026-10-06 — Native PostgreSQL startup robustness
+
+- Fixed `scripts/start-native.ps1` again after live Windows testing showed asynchronous `pg_ctl` startup could leave the launcher waiting indefinitely even when PostgreSQL startup handling was ambiguous.
+- Native launcher now starts the bundled `postgres.exe` directly with explicit host/port and redirected logs, then uses `pg_isready` as the readiness gate.
+- Native launcher now prints PostgreSQL stderr/log tails when readiness fails, making first-run diagnosis actionable instead of silently waiting.
+- No Docker dependency added; native mode remains the target runtime for the user's Windows gaming/streaming PC.
+
+
 
 ## 2026-10-06 — Native first-run bootstrap correction
 
