@@ -1233,7 +1233,7 @@ export class Music implements PlatformModule {
         return true;
       }
       if (!Number.isInteger(value) || value < 0 || value > 200 || !(manageGuild || dj)) {
-        await message.reply("Для изменения громкости нужен Manage Server и значение 0–200.");
+        await message.reply("Для изменения громкости нужен DJ или Manage Server, значение — 0–200.");
         return true;
       }
       await player.setVolume(value);
@@ -1800,8 +1800,8 @@ function buildMusicControllerComponents(paused: boolean, volume: number): Action
       new ButtonBuilder().setCustomId("dsp:music:stop").setEmoji("⏹️").setStyle(ButtonStyle.Danger)
     ),
     new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId("dsp:music:volume_down").setEmoji("🔉").setLabel(String(adjustMusicVolume(volume, -10))).setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId("dsp:music:volume_up").setEmoji("🔊").setLabel(String(adjustMusicVolume(volume, 10))).setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder().setCustomId("dsp:music:volume_down").setEmoji({ name: "🔉" }).setLabel("-10").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("dsp:music:volume_up").setEmoji({ name: "🔊" }).setLabel("+10").setStyle(ButtonStyle.Secondary)
     )
   ];
 }
