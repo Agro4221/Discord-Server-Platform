@@ -960,3 +960,11 @@ Never write credentials, tokens or private user data here.
 - Added Control Center System page live bot log panel with 1.5s refresh and a confirmation-protected "Выключить бота" action.
 - Native launcher now exits its batch console on successful startup; failures keep the console available for diagnostics.
 - Updated native setup documentation for runtime logs, shutdown and launcher behavior.
+
+## 2026-10-06 — Native runtime defect fixes: Discord startup, Fleet failover and Management API serialization
+
+- Live native smoke reached a real Discord Gateway-ready state and connected the local Lavalink node; the earlier Discord REST timeout was no longer fatal to startup after moving slash-command registration behind `client.login()` and making command registration failures non-fatal.
+- Live Control Center logs exposed a Fleet SQL defect: the stale-guild failover CTE selected only `guild_id` while `RETURNING` referenced `candidates.bot_identity_id`. Both primary failover and secondary failover now select the current identity and match it in the UPDATE predicate.
+- Hardened Management API JSON responses against PostgreSQL/driver `bigint` values by serializing bigint values as strings.
+- Hardened Management API error handling so an already-ended response is never written again, preventing the observed `ERR_HTTP_HEADERS_SENT` cascade after the BigInt serialization failure.
+- These changes are verification-driven fixes; no new feature scope was added.
