@@ -263,13 +263,20 @@ function Ensure-Postgres {
   & $pgIsReady -h 127.0.0.1 -p 5432 *> $null
   if ($LASTEXITCODE -ne 0) {
     Write-Host "Starting local PostgreSQL..."
-    $pgLog = Join-Path $logRoot "postgres.log"
-    # Do not synchronously invoke pg_ctl here. On Windows, the native child
-    # process can keep inherited console handles alive even after PostgreSQL
-    # is ready, making PowerShell appear to hang. Start it asynchronously and
-    # use pg_isready below as the real readiness gate.
-    $pgArgs = @("-D", $dataRoot, "-l", $pgLog, "-o", "-h 127.0.0.1 -p 5432", "start", "-W")
-    Start-Process -FilePath $pgCtl -ArgumentList $pgArgs -WorkingDirectory (Get-Location).Path -WindowStyle Hidden | Out-Null
+    $postgres = Join-Path (Split-Path $pgCtl.Source -Parent) "postgres.exe"
+    if (-not (Test-Path $postgres)) {
+      throw "PostgreSQL server executable was not found next to pg_ctl.exe."
+    }
+
+    $pgStdOut = Join-Path $logRoot "postgres-stdout.log"
+    $pgStdErr = Join-Path $logRoot "postgres-stderr.log"
+    # Start postgres.exe directly. This avoids Windows PowerShell argument and
+    # inherited-handle behavior observed when launching pg_ctl asynchronously.
+    Start-Process -FilePath $postgres -ArgumentList @(
+      "-D", $dataRoot,
+      "-h", "127.0.0.1",
+      "-p", "5432"
+    ) -WorkingDirectory $dataRoot -RedirectStandardOutput $pgStdOut -RedirectStandardError $pgStdErr -WindowStyle Hidden | Out-Null
   }
 
   $ready = $false
@@ -278,7 +285,12 @@ function Ensure-Postgres {
     if ($LASTEXITCODE -eq 0) { $ready = $true; break }
     Start-Sleep -Seconds 1
   }
-  if (-not $ready) { throw "Local PostgreSQL did not become ready on 127.0.0.1:5432." }
+  if (-not $ready) {
+    Write-Host "PostgreSQL startup log:"
+    Get-Content (Join-Path $logRoot "postgres-stderr.log") -Tail 80 -ErrorAction SilentlyContinue
+    Get-Content (Join-Path $logRoot "postgres.log") -Tail 80 -ErrorAction SilentlyContinue
+    throw "Local PostgreSQL did not become ready on 127.0.0.1:5432."
+  }
 
   & $psql $env:DATABASE_URL -c "SELECT 1;" *> $null
   if ($LASTEXITCODE -ne 0) {
