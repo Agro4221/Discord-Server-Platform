@@ -217,6 +217,51 @@ export class Music implements PlatformModule {
       })();
     });
 
+    this.manager.on("playerDisconnect", (player, voiceChannelId) => {
+      logger.warn("Music player disconnected from voice", {
+        guildId: player.guildId,
+        identity: this.config.botIdentityId,
+        voiceChannelId,
+        node: musicPlayerNodeId(player)
+      });
+    });
+
+    this.manager.on("playerReconnect", (player, voiceChannelId) => {
+      logger.info("Music player reconnected to voice", {
+        guildId: player.guildId,
+        identity: this.config.botIdentityId,
+        voiceChannelId,
+        node: musicPlayerNodeId(player)
+      });
+    });
+
+    this.manager.on("playerSocketClosed", (player, payload) => {
+      logger.warn("Music player voice socket closed", {
+        guildId: player.guildId,
+        identity: this.config.botIdentityId,
+        node: musicPlayerNodeId(player),
+        payload: String(payload)
+      });
+    });
+
+    this.manager.on("trackError", (player, track, payload) => {
+      logger.error("Music track error", {
+        guildId: player.guildId,
+        identity: this.config.botIdentityId,
+        track: track?.info?.title ?? "unknown",
+        payload: String(payload)
+      });
+    });
+
+    this.manager.on("trackStuck", (player, track, payload) => {
+      logger.warn("Music track stuck", {
+        guildId: player.guildId,
+        identity: this.config.botIdentityId,
+        track: track?.info?.title ?? "unknown",
+        payload: String(payload)
+      });
+    });
+
     this.manager.on("trackEnd", (player) => {
       void this.persistPlayer(player);
       void this.syncController(player);
@@ -254,8 +299,14 @@ export class Music implements PlatformModule {
       void this.persistPlayer(newPlayer);
     });
 
-    this.manager.on("playerDestroy", (player) => {
+    this.manager.on("playerDestroy", (player, reason) => {
       this.cancelAutoLeave(player.guildId);
+      logger.warn("Music player destroyed", {
+        guildId: player.guildId,
+        identity: this.config.botIdentityId,
+        node: musicPlayerNodeId(player),
+        reason: String(reason ?? "unknown")
+      });
       this.lastPlayedTracks.delete(player.guildId);
       this.autoplayInFlight.delete(player.guildId);
       if (shouldRetainMusicPlayerState(player)) {
