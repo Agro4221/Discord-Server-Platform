@@ -303,7 +303,13 @@ function Ensure-Postgres {
     throw "PostgreSQL server is running but the postgres administrative connection failed."
   }
 
-  $databaseExists = (& $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='discord_platform';" 2>$null | Select-String -Quiet "1")
+  $databaseExistsRaw = & $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -tAc "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname='discord_platform');" 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+    throw "Could not query PostgreSQL databases."
+  }
+
+  $databaseExists = $databaseExistsRaw.Trim() -eq "t"
   if (-not $databaseExists) {
     Write-Host "Creating local database discord_platform..."
     & $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c "CREATE DATABASE discord_platform;" 2>$null
