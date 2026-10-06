@@ -998,11 +998,7 @@ export class Music implements PlatformModule {
       return;
     }
 
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId("dsp:music:pause").setLabel("Пауза").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId("dsp:music:skip").setLabel("Следующий").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId("dsp:music:stop").setLabel("Стоп").setStyle(ButtonStyle.Danger)
-    );
+    const rows = buildMusicControllerComponents(player.paused, player.volume);
 
     const autoplay = await this.autoplayEnabled(interaction.guildId!);
     const embed = new EmbedBuilder()
@@ -1026,7 +1022,7 @@ export class Music implements PlatformModule {
         }
       );
 
-    await interaction.reply({ embeds: [embed], components: [row] });
+    await interaction.reply({ embeds: [embed], components: rows });
   }
 
   async handlePrefixCommand(message: Message, commandName: string, args: string[]): Promise<boolean> {
@@ -1295,6 +1291,12 @@ export class Music implements PlatformModule {
       await Promise.resolve(player.queue.shuffle());
       await this.persistPlayer(player);
     }
+    else if (action === "volume_down" || action === "volume_up") {
+      const delta = action === "volume_up" ? 10 : -10;
+      const nextVolume = adjustMusicVolume(player.volume, delta);
+      await player.setVolume(nextVolume);
+      await this.persistPlayer(player);
+    }
 
     await this.syncController(player);
 
@@ -1302,6 +1304,8 @@ export class Music implements PlatformModule {
       content:
         action === "pause" ? (player.paused ? "⏸️ Пауза." : "▶️ Продолжаю.") :
         action === "skip" ? "⏭️ Следующий трек." :
+        action === "volume_down" ? `🔉 Громкость: **${player.volume}%**` :
+        action === "volume_up" ? `🔊 Громкость: **${player.volume}%**` :
         "⏹️ Стоп.",
       ephemeral: true
     });
@@ -1752,14 +1756,7 @@ export class Music implements PlatformModule {
       )
       .setTimestamp();
 
-    const components = [
-      new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId("dsp:music:pause").setLabel(player.paused ? "Resume" : "Pause").setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId("dsp:music:skip").setLabel("Skip").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("dsp:music:shuffle").setLabel("Shuffle").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("dsp:music:stop").setLabel("Stop").setStyle(ButtonStyle.Danger)
-      )
-    ];
+    const components = buildMusicControllerComponents(player.paused, player.volume);
 
     if (storedId) {
       const existing = await channel.messages.fetch(storedId).catch(() => null);
@@ -1787,6 +1784,27 @@ export class Music implements PlatformModule {
   }
 }
 
+
+export function adjustMusicVolume(currentVolume: number, delta: number): number {
+  const current = Number.isFinite(currentVolume) ? Math.trunc(currentVolume) : 100;
+  const change = Number.isFinite(delta) ? Math.trunc(delta) : 0;
+  return Math.min(200, Math.max(0, current + change));
+}
+
+function buildMusicControllerComponents(paused: boolean, volume: number): ActionRowBuilder<ButtonBuilder>[] {
+  return [
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId("dsp:music:pause").setEmoji(paused ? "▶️" : "⏸️").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("dsp:music:skip").setEmoji("⏭️").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("dsp:music:shuffle").setEmoji("🔀").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("dsp:music:stop").setEmoji("⏹️").setStyle(ButtonStyle.Danger)
+    ),
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId("dsp:music:volume_down").setEmoji("🔉").setLabel(String(adjustMusicVolume(volume, -10))).setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("dsp:music:volume_up").setEmoji("🔊").setLabel(String(adjustMusicVolume(volume, 10))).setStyle(ButtonStyle.Secondary)
+    )
+  ];
+}
 
 export function musicResumePosition(
   positionMs: number,
