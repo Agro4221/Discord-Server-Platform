@@ -279,6 +279,9 @@ async function main(): Promise<void> {
     auditLog,
     settings: dashboardSettings,
     transfer,
+    shutdown: async () => {
+      await fatalCleanup?.();
+    },
     backups,
     customCommands,
     moderation,
