@@ -100,6 +100,26 @@ test("Music search builder preserves URLs, explicit prefixes and provider select
     buildMusicSearch("auto", "https://www.youtube.com/shorts/-CsjE_ILvnY?si=-ZVCk2EgFY9bSHFy"),
     { query: "https://www.youtube.com/watch?v=-CsjE_ILvnY" }
   );
+  assert.deepEqual(
+    buildMusicSearch("auto", "https://www.youtube.com/watch?v=-CsjE_ILvnY&list=PL1234567890&index=2&si=-ZVCk2EgFY9bSHFy"),
+    { query: "https://www.youtube.com/watch?v=-CsjE_ILvnY&list=PL1234567890&index=2" }
+  );
+  assert.deepEqual(
+    buildMusicSearch("auto", "https://open.spotify.com/track/0eG08cBeKk0mzykKjw4hcQ?si=example"),
+    { query: "https://open.spotify.com/track/0eG08cBeKk0mzykKjw4hcQ?si=example" }
+  );
+  assert.deepEqual(
+    buildMusicSearch("auto", "https://open.spotify.com/intl-de/track/0eG08cBeKk0mzykKjw4hcQ"),
+    { query: "https://open.spotify.com/intl-de/track/0eG08cBeKk0mzykKjw4hcQ" }
+  );
+  assert.deepEqual(
+    buildMusicSearch("auto", "https://music.yandex.ru/album/13886032/track/71663565"),
+    { query: "https://music.yandex.ru/album/13886032/track/71663565" }
+  );
+  assert.deepEqual(
+    buildMusicSearch("auto", "https://soundcloud.com/example/track"),
+    { query: "https://soundcloud.com/example/track" }
+  );
 
   assert.equal(buildMusicSearch("auto", "   "), null);
 });
