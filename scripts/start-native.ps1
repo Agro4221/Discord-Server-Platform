@@ -535,12 +535,26 @@ try {
     throw "Bot health endpoint did not become ready: $healthUrl"
   }
 
+  $managementPort = Get-EnvValue "MANAGEMENT_API_PORT"
+  if ([string]::IsNullOrWhiteSpace($managementPort)) { $managementPort = "3002" }
+  $managementKey = Get-EnvValue "MANAGEMENT_API_KEY"
+  if ([string]::IsNullOrWhiteSpace($managementKey)) { throw "MANAGEMENT_API_KEY is required." }
+  try {
+    $managementHeaders = @{ Authorization = "Bearer $managementKey" }
+    $managementProbe = Invoke-RestMethod -Uri "http://127.0.0.1:$managementPort/api/guilds" -Headers $managementHeaders -Method Get -TimeoutSec 5
+    if ($null -eq $managementProbe.guilds) {
+      throw "Management API returned an invalid guild list."
+    }
+    Write-Host "Management API: ready ($managementPort)"
+  } catch {
+    Get-Content (Join-Path $logRoot "bot.err.log") -Tail 80 -ErrorAction SilentlyContinue
+    throw "Management API preflight failed on 127.0.0.1:$managementPort: $($_.Exception.Message)"
+  }
+
   if ($dashboardEnabled) {
     $dashboardPort = Get-EnvValue "DASHBOARD_PORT"
     if ([string]::IsNullOrWhiteSpace($dashboardPort)) { $dashboardPort = "3000" }
 
-    $managementPort = Get-EnvValue "MANAGEMENT_API_PORT"
-    if ([string]::IsNullOrWhiteSpace($managementPort)) { $managementPort = "3002" }
     $env:BOT_HEALTH_URL = $healthUrl
     $env:MANAGEMENT_API_URL = "http://127.0.0.1:$managementPort"
 
