@@ -528,6 +528,7 @@ export function ControlCenter() {
   }, [catalog, category, search]);
 
   useEffect(() => {
+    // Native runtime bootstrap is intentionally independent of guild selection.
     async function loadBootstrap() {
       try {
         const [guildResponse, catalogResponse, schemaResponse] = await Promise.all([
