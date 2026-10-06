@@ -2263,7 +2263,7 @@ export class ManagementApiServer {
           this.json(res, 404, { error: "not_found" });
         } catch (error) {
           if (error instanceof RequestInputError) {
-            this.json(res, error.status, { error: error.code });
+            if (!res.writableEnded) this.json(res, error.status, { error: error.code });
             return;
           }
 
@@ -2274,7 +2274,7 @@ export class ManagementApiServer {
             durationMs: Date.now() - requestStartedAt,
             error: String(error)
           });
-          this.json(res, 500, { error: "internal_error" });
+          if (!res.writableEnded) this.json(res, 500, { error: "internal_error" });
         }
       });
 
@@ -2319,12 +2319,20 @@ export class ManagementApiServer {
   }
 
   private json(res: ServerResponse, status: number, body: unknown): void {
-    res.writeHead(status, {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
-      "x-content-type-options": "nosniff"
-    });
-    res.end(JSON.stringify(body));
+    if (res.writableEnded) return;
+    const payload = JSON.stringify(
+      body,
+      (_key, value: unknown) => typeof value === "bigint" ? value.toString() : value
+    );
+    if (res.writableEnded) return;
+    if (!res.headersSent) {
+      res.writeHead(status, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff"
+      });
+    }
+    res.end(payload);
   }
 }
 
