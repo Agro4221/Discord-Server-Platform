@@ -21,6 +21,8 @@ The Dashboard opens automatically after it becomes ready. Use:
 
 to keep the Dashboard running without opening a browser window.
 
+After a successful native startup, the launcher batch terminates its console window. An error keeps the console open so the failure can be read.
+
 The legacy `-Dashboard` switch remains accepted for compatibility; Dashboard is enabled by default.
 The second Lavalink node is optional:
 
@@ -107,5 +109,7 @@ Include Dashboard and the second Lavalink node when those are expected:
 For machine-readable output:
 
     powershell -ExecutionPolicy Bypass -File .\scripts\native-diagnostics.ps1 -Json
+
+The Control Center System page also provides a live bot log panel and a graceful "Выключить бота" control.
 
 The diagnostic report checks process/PID state, Bot health, Management API authentication, Fleet identity state, Dashboard reachability and Lavalink versions. Tokens/passwords are never printed.
