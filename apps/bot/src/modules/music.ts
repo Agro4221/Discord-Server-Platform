@@ -765,7 +765,7 @@ export class Music implements PlatformModule {
     while (!player.connected && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    return player.connected;
+    return player.connected === true;
   }
 
   private async getOrCreatePlayer(
