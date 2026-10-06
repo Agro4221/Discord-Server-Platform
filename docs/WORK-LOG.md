@@ -949,3 +949,14 @@ Never write credentials, tokens or private user data here.
 - Two stale provider expectations were found and corrected in the initial test run; the next full baseline passed with the expanded Spotify/Yandex provider contract.
 - Added regression coverage for AutoMod burst/image-only/YouTube-only detectors, Automation warn/channel creation runtime, and persisted moderation channel-lock cleanup.
 - No new feature scope is being added from this point unless a failing test or reproducible runtime defect requires it.
+
+
+## 2026-10-06 — Native Control Center runtime controls
+
+- Native launcher now starts the full local platform by default, including Control Center; `-NoOpen` only suppresses browser opening and `-NoDashboard` remains available for explicit headless use.
+- Control Center bootstrap now reports Management API HTTP failures instead of silently rendering empty module data.
+- Added bounded in-process bot log buffer (500 entries) with sanitized metadata.
+- Added Management API runtime endpoints for recent bot logs and graceful primary-bot shutdown.
+- Added Control Center System page live bot log panel with 1.5s refresh and a confirmation-protected "Выключить бота" action.
+- Native launcher now exits its batch console on successful startup; failures keep the console available for diagnostics.
+- Updated native setup documentation for runtime logs, shutdown and launcher behavior.
