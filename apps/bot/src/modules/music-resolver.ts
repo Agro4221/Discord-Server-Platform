@@ -373,8 +373,11 @@ function parseJson(value: string): YtDlpMetadata {
       .filter(Boolean);
 
     for (let index = lines.length - 1; index >= 0; index--) {
+      const line = lines[index];
+      if (!line) continue;
+
       try {
-        const parsed: unknown = JSON.parse(lines[index]);
+        const parsed: unknown = JSON.parse(line);
         if (parsed && typeof parsed === "object") return parsed as YtDlpMetadata;
       } catch {
         // Try the next line.
