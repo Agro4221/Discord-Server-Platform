@@ -548,7 +548,7 @@ try {
     Write-Host "Management API: ready ($managementPort)"
   } catch {
     Get-Content (Join-Path $logRoot "bot.err.log") -Tail 80 -ErrorAction SilentlyContinue
-    throw "Management API preflight failed on 127.0.0.1:$managementPort: $($_.Exception.Message)"
+    throw "Management API preflight failed on 127.0.0.1:${managementPort}: $($_.Exception.Message)"
   }
 
   if ($dashboardEnabled) {
