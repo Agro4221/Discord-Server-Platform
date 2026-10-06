@@ -520,19 +520,43 @@ export function ControlCenter() {
   }, [catalog, category, search]);
 
   useEffect(() => {
-    void Promise.all([
-      fetch("/api/guilds", { cache: "no-store" }).then(async (response) => response.json()),
-      fetch("/api/module-schemas", { cache: "no-store" }).then(async (response) => response.json()),
-      fetch("/api/health", { cache: "no-store" }).then(async (response) => response.json()).catch(() => null)
-    ])
-      .then(([guildResponse, schemaResponse, healthResponse]) => {
-        const nextGuilds = (guildResponse.guilds ?? []) as Guild[];
+    async function loadBootstrap() {
+      try {
+        const guildResponse = await fetch("/api/guilds", { cache: "no-store" });
+        const guildBody = await guildResponse.json().catch(() => ({}));
+        if (!guildResponse.ok) {
+          throw new Error(String(guildBody.error ?? "guilds_failed"));
+        }
+
+        const schemaResponse = await fetch("/api/module-schemas", { cache: "no-store" });
+        const schemaBody = await schemaResponse.json().catch(() => ({}));
+        if (!schemaResponse.ok) {
+          throw new Error(String(schemaBody.error ?? "module_schemas_failed"));
+        }
+
+        const healthResponse = await fetch("/api/health", { cache: "no-store" })
+          .then(async (response) => response.ok ? await response.json() : null)
+          .catch(() => null);
+
+        const nextGuilds = (guildBody.guilds ?? []) as Guild[];
         setGuilds(nextGuilds);
         setGuildId((current) => current || nextGuilds[0]?.id || "");
-        setSchemas((schemaResponse.schemas ?? []) as Schema[]);
+        setSchemas((schemaBody.schemas ?? []) as Schema[]);
         setHealth(healthResponse);
-      })
-      .catch(() => setError("Не удалось загрузить Control Center."));
+        setError("");
+      } catch (reason) {
+        const code = reason instanceof Error ? reason.message : "bootstrap_failed";
+        const messages: Record<string, string> = {
+          unauthorized: "Control Center не может авторизоваться в Management API. Проверь MANAGEMENT_API_KEY.",
+          module_schemas_failed: "Management API не отдал каталог настроек модулей.",
+          guilds_failed: "Management API не отдал список Discord-серверов.",
+          internal_error: "Management API вернул внутреннюю ошибку."
+        };
+        setError(messages[code] ?? "Не удалось связать Control Center с Management API: " + code);
+      }
+    }
+
+    void loadBootstrap();
   }, []);
 
   useEffect(() => {
