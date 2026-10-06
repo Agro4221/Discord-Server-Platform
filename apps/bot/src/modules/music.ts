@@ -741,6 +741,42 @@ export class Music implements PlatformModule {
       return;
     }
 
+    if (this.nativeBackendEnabled) {
+      const channel = interaction.guild?.channels.cache.get(voiceChannelId);
+      if (!channel || (channel.type !== 2 && channel.type !== 13)) {
+        await interaction.reply({ content: "Не удалось определить голосовой канал." });
+        return;
+      }
+
+      const query = interaction.options.getString("query", true).trim();
+      if (!query) {
+        await interaction.reply({ content: "Поисковый запрос пуст." });
+        return;
+      }
+
+      try {
+        const track = await this.nativeBackend?.play(
+          channel as import("discord.js").VoiceChannel | import("discord.js").StageChannel,
+          query
+        );
+        if (!track) throw new Error("native_music_backend_unavailable");
+        await interaction.reply({
+          content: "🎵 Добавлено: **" + track.title + "** — " + track.author + " · источник **" + track.source + "**"
+        });
+      } catch (error) {
+        logger.error("Native Music playback failed", {
+          guildId: interaction.guildId!,
+          voiceChannelId,
+          query,
+          error: String(error)
+        });
+        await interaction.reply({
+          content: "Не удалось запустить native Music. Проверь, что `yt-dlp` и `ffmpeg` доступны системе. Подробности записаны в лог."
+        });
+      }
+      return;
+    }
+
     const query = interaction.options.getString("query", true).trim();
     const provider = normalizeMusicSearchProvider(interaction.options.getString("provider") ?? "auto");
     if (!provider) {
@@ -796,6 +832,217 @@ export class Music implements PlatformModule {
     });
   }
 
+  private async executeNativeSlashCommand(
+    interaction: ChatInputCommandInteraction,
+    action: string,
+    voiceChannelId: string | null
+  ): Promise<void> {
+    const backend = this.nativeBackend;
+    if (!backend) throw new Error("native_music_backend_unavailable");
+
+    if (action === "play") {
+      await this.play(interaction, voiceChannelId);
+      return;
+    }
+
+    const playerVoiceId = backend.getVoiceChannelId(interaction.guildId!);
+    if (!playerVoiceId) {
+      await interaction.reply({ content: "Музыка не запущена.", ephemeral: true });
+      return;
+    }
+
+    if (["pause", "resume", "stop", "volume", "nowplaying"].includes(action)) {
+      if (!await this.canControl(interaction, playerVoiceId)) return;
+    }
+
+    if (action === "pause") {
+      const changed = await backend.pause(interaction.guildId!);
+      await interaction.reply({ content: changed ? "⏸️ Пауза." : "Музыка не играет.", ephemeral: true });
+      return;
+    }
+    if (action === "resume") {
+      const changed = await backend.resume(interaction.guildId!);
+      await interaction.reply({ content: changed ? "▶️ Продолжаю." : "Музыка не находится на паузе.", ephemeral: true });
+      return;
+    }
+    if (action === "stop") {
+      await backend.stop(interaction.guildId!, true);
+      await interaction.reply({ content: "⏹️ Остановлено.", ephemeral: true });
+      return;
+    }
+    if (action === "volume") {
+      const value = interaction.options.getInteger("value");
+      if (value === null) {
+        await interaction.reply({ content: "🔊 Громкость: **" + backend.getVolume(interaction.guildId!) + "**", ephemeral: true });
+        return;
+      }
+      const member = interaction.guild ? await interaction.guild.members.fetch(interaction.user.id).catch(() => null) : null;
+      if (!await this.canManageMusicMember(interaction.guildId!, member)) {
+        await interaction.reply({ content: "Менять громкость сервера могут пользователи с DJ-ролью или Manage Server.", ephemeral: true });
+        return;
+      }
+      if (!await backend.setVolume(interaction.guildId!, value)) {
+        await interaction.reply({ content: "Не удалось изменить громкость.", ephemeral: true });
+        return;
+      }
+      await interaction.reply({ content: "🔊 Громкость: **" + value + "**", ephemeral: true });
+      return;
+    }
+    if (action === "nowplaying") {
+      await this.replyNativeNowPlaying(interaction, backend.getCurrent(interaction.guildId!), backend);
+      return;
+    }
+
+    await interaction.reply({
+      content: "Native Music уже работает через yt-dlp + FFmpeg. Очередь, skip, repeat и остальные расширенные операции подключим следующим срезом.",
+      ephemeral: true
+    });
+  }
+
+  private async handleNativePrefixCommand(
+    message: Message,
+    action: string,
+    args: string[]
+  ): Promise<void> {
+    const backend = this.nativeBackend;
+    if (!backend) {
+      await message.reply("Native Music backend недоступен.");
+      return;
+    }
+
+    const voiceChannelId = message.guild!.voiceStates.cache.get(message.author.id)?.channelId ?? null;
+
+    if (action === "play") {
+      const memberVoice = voiceChannelId
+        ? message.guild!.channels.cache.get(voiceChannelId) ?? null
+        : null;
+      if (!memberVoice || (memberVoice.type !== 2 && memberVoice.type !== 13)) {
+        await message.reply("Сначала зайди в голосовой канал.");
+        return;
+      }
+
+      const owner = await this.identities.musicVoiceOwner(message.guild!.id, voiceChannelId);
+      if (owner && owner !== this.config.botIdentityId) {
+        await message.reply("Этот голосовой канал закреплён за bot identity " + owner + ".");
+        return;
+      }
+      if (!owner && this.config.botIdentityId !== "primary") {
+        await message.reply("Эта voice channel не назначена данной bot identity.");
+        return;
+      }
+
+      const query = args.join(" ").trim();
+      if (!query) {
+        await message.reply("Использование: !play <песня | URL | плейлист>.");
+        return;
+      }
+
+      try {
+        const track = await backend.play(
+          memberVoice as import("discord.js").VoiceChannel | import("discord.js").StageChannel,
+          query
+        );
+        await message.reply(
+          "🎵 Добавлено: **" + track.title + "** — " + track.author + " · источник **" + track.source + "**"
+        );
+      } catch (error) {
+        logger.error("Native Music prefix playback failed", {
+          guildId: message.guild!.id,
+          query,
+          voiceChannelId,
+          error: String(error)
+        });
+        await message.reply("Не удалось запустить native Music. Проверь `yt-dlp` и `ffmpeg`. Подробности записаны в лог.");
+      }
+      return;
+    }
+
+    const playerVoiceId = backend.getVoiceChannelId(message.guild!.id);
+    if (!playerVoiceId) {
+      await message.reply("Музыка не запущена.");
+      return;
+    }
+
+    const member = await message.guild!.members.fetch(message.author.id).catch(() => null);
+    const manageGuild = member?.permissions.has("ManageGuild") ?? false;
+    const djRole = await this.djRoleId(message.guild!.id);
+    const dj = Boolean(djRole && member?.roles.cache.has(djRole));
+    if (!canControlMusic(voiceChannelId, playerVoiceId, manageGuild || dj)) {
+      await message.reply("Управлять музыкой можно из того же голосового канала или с правом Manage Server.");
+      return;
+    }
+
+    if (action === "pause") {
+      await backend.pause(message.guild!.id);
+      await message.reply("⏸️ Пауза.");
+    } else if (action === "resume") {
+      await backend.resume(message.guild!.id);
+      await message.reply("▶️ Продолжаю.");
+    } else if (action === "stop") {
+      await backend.stop(message.guild!.id, true);
+      await message.reply("⏹️ Остановлено.");
+    } else if (action === "volume") {
+      const value = args.length ? Number(args[0]) : backend.getVolume(message.guild!.id);
+      if (!Number.isInteger(value) || value < 0 || value > 200) {
+        await message.reply("Использование: !volume <0-200>.");
+        return;
+      }
+      const volumeMember = await message.guild!.members.fetch(message.author.id).catch(() => null);
+      const volumeDjRole = await this.djRoleId(message.guild!.id);
+      const volumeAllowed = Boolean(volumeMember?.permissions.has("ManageGuild")) ||
+        Boolean(volumeDjRole && volumeMember?.roles.cache.has(volumeDjRole));
+      if (!volumeAllowed) {
+        await message.reply("Менять громкость могут пользователи с DJ-ролью или Manage Server.");
+        return;
+      }
+      await backend.setVolume(message.guild!.id, value);
+      await message.reply("🔊 Громкость: " + value + ".");
+    } else if (action === "nowplaying") {
+      const track = backend.getCurrent(message.guild!.id);
+      if (!track) {
+        await message.reply("Сейчас ничего не играет.");
+        return;
+      }
+      const status = backend.isPaused(message.guild!.id) ? "⏸️ Пауза" : backend.isPlaying(message.guild!.id) ? "▶️ Играет" : "⏹️ Ожидание";
+      await message.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle("🎵 Сейчас играет")
+            .setDescription("**" + track.title + "**\\n" + track.author)
+            .addFields({ name: "Состояние", value: status, inline: true }, { name: "Источник", value: track.source, inline: true })
+        ]
+      });
+    } else {
+      await message.reply("Native Music уже работает через yt-dlp + FFmpeg. Очередь, skip, repeat и остальные расширенные операции подключим следующим срезом.");
+    }
+  }
+
+  private async replyNativeNowPlaying(
+    interaction: ChatInputCommandInteraction,
+    track: NativeMusicTrack | null,
+    backend: NativeYtdlpMusicBackend
+  ): Promise<void> {
+    if (!track) {
+      await interaction.reply({ content: "Сейчас ничего не играет.", ephemeral: true });
+      return;
+    }
+    const status = backend.isPaused(interaction.guildId!)
+      ? "⏸️ Пауза"
+      : backend.isPlaying(interaction.guildId!)
+        ? "▶️ Играет"
+        : "⏹️ Ожидание";
+    await interaction.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle("🎵 Сейчас играет")
+          .setDescription("**" + track.title + "**\\n" + track.author)
+          .addFields(
+            { name: "Состояние", value: status, inline: true },
+            { name: "Источник", value: track.source, inline: true }
+          )
+      ]
+    });
+  }
   private async ensureVoiceConnected(player: Player): Promise<boolean> {
     if (player.connected) return true;
 
@@ -1179,12 +1426,21 @@ export class Music implements PlatformModule {
       await message.reply("Модуль Music выключен.");
       return true;
     }
-    if (!this.manager || !this.initialized) {
+    if (!this.initialized) {
       await message.reply("Музыкальный движок ещё запускается.");
       return true;
     }
 
-    const player = this.manager.players.get(message.guild.id);
+    if (this.nativeBackendEnabled) {
+      if (!this.nativeBackend) {
+        await message.reply("Native Music backend недоступен.");
+        return true;
+      }
+      await this.handleNativePrefixCommand(message, action, args);
+      return true;
+    }
+
+    const player = this.manager?.players.get(message.guild.id);
     const memberVoiceChannelId = message.guild.voiceStates.cache.get(message.author.id)?.channelId ?? null;
     const memberVoice = memberVoiceChannelId
       ? message.guild.channels.cache.get(memberVoiceChannelId) ?? null
