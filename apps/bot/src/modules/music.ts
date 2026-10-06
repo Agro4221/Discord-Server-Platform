@@ -210,6 +210,15 @@ export class Music implements PlatformModule {
           return;
         }
         this.lastPlayedTracks.set(player.guildId, track);
+        logger.info("Music track started", {
+          guildId: player.guildId,
+          identity: this.config.botIdentityId,
+          title: track.info.title,
+          durationMs: Number(track.info.duration ?? 0),
+          voiceChannelId: player.voiceChannelId,
+          connected: Boolean(player.connected),
+          node: musicPlayerNodeId(player)
+        });
         if (await this.announceTrackStart(player.guildId)) {
           await this.announce(channelId, `🎵 Сейчас играет **${track.info.title}** — ${track.info.author}`);
         }
@@ -269,6 +278,14 @@ export class Music implements PlatformModule {
 
     this.manager.on("queueEnd", (player) => {
       const lastTrack = this.lastPlayedTracks.get(player.guildId);
+      logger.info("Music queue ended", {
+        guildId: player.guildId,
+        identity: this.config.botIdentityId,
+        lastTrack: lastTrack?.info.title ?? null,
+        connected: Boolean(player.connected),
+        voiceChannelId: player.voiceChannelId,
+        autoLeavePending: player.queue.tracks.length === 0
+      });
       void this.syncController(player);
       void (async () => {
         try {
@@ -685,31 +702,30 @@ export class Music implements PlatformModule {
 
   private async play(interaction: ChatInputCommandInteraction, voiceChannelId: string | null): Promise<void> {
     if (!voiceChannelId) {
-      await interaction.reply({ content: "Сначала зайди в голосовой канал.", ephemeral: true });
+      await interaction.reply({ content: "Сначала зайди в голосовой канал." });
       return;
     }
 
     const query = interaction.options.getString("query", true).trim();
     const provider = normalizeMusicSearchProvider(interaction.options.getString("provider") ?? "auto");
     if (!provider) {
-      await interaction.reply({ content: "Неизвестный источник поиска.", ephemeral: true });
+      await interaction.reply({ content: "Неизвестный источник поиска." });
       return;
     }
     if (!query) {
-      await interaction.reply({ content: "Поисковый запрос пуст.", ephemeral: true });
+      await interaction.reply({ content: "Поисковый запрос пуст." });
       return;
     }
 
     const player = await this.getOrCreatePlayer(interaction, voiceChannelId);
     if (player.voiceChannelId !== voiceChannelId) {
-      await interaction.reply({ content: "Музыкальный бот уже находится в другом голосовом канале этого сервера.", ephemeral: true });
+      await interaction.reply({ content: "Музыкальный бот уже находится в другом голосовом канале этого сервера." });
       return;
     }
 
     if (!await this.ensureVoiceConnected(player)) {
       await interaction.reply({
-        content: "Не удалось подключиться к голосовому каналу. Проверь права бота на Connect/Speak и состояние Discord.",
-        ephemeral: true
+        content: "Не удалось подключиться к голосовому каналу. Проверь права бота на Connect/Speak и состояние Discord."
       });
       return;
     }
@@ -717,7 +733,7 @@ export class Music implements PlatformModule {
     const result = await searchMusicWithFallback(player, provider, query, interaction.user);
 
     if (!result) {
-      await interaction.reply({ content: "Ничего не найдено.", ephemeral: true });
+      await interaction.reply({ content: "Ничего не найдено." });
       return;
     }
 
@@ -733,7 +749,7 @@ export class Music implements PlatformModule {
           voiceChannelId: player.voiceChannelId,
           error: String(error)
         });
-        await interaction.reply({ content: "Трек найден, но запустить воспроизведение не удалось. Подробности записаны в лог.", ephemeral: true });
+        await interaction.reply({ content: "Трек найден, но запустить воспроизведение не удалось. Подробности записаны в лог." });
         return;
       }
     }
@@ -741,8 +757,7 @@ export class Music implements PlatformModule {
     const firstTrack = tracks[0]!;
     const suffix = tracks.length > 1 ? ` Добавлено треков: **${tracks.length}** (лимит ${MAX_MUSIC_ENQUEUE_TRACKS}).` : "";
     await interaction.reply({
-      content: `Добавлено в очередь: **${firstTrack.info.title}** — ${firstTrack.info.author}.${suffix}`,
-      ephemeral: true
+      content: `Добавлено в очередь: **${firstTrack.info.title}** — ${firstTrack.info.author}.${suffix}`
     });
   }
 
