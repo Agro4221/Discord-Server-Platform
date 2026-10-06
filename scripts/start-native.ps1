@@ -190,8 +190,10 @@ function Ensure-Node {
 }
 
 function Ensure-NpmDependencies {
-  if (Test-Path "node_modules") { return }
-  Write-Host "Installing npm dependencies once (native mode)..."
+  $voicePackage = Join-Path (Get-Location) "node_modules\\@discordjs\\voice\\package.json"
+  $opusPackage = Join-Path (Get-Location) "node_modules\\opusscript\\package.json"
+  if ((Test-Path "node_modules") -and (Test-Path $voicePackage) -and (Test-Path $opusPackage)) { return }
+  Write-Host "Installing/updating npm dependencies..."
   & npm.cmd install
   if ($LASTEXITCODE -ne 0) { throw "npm install failed." }
 }
