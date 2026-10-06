@@ -88,6 +88,19 @@ test("Music search builder preserves URLs, explicit prefixes and provider select
   assert.deepEqual(buildMusicSearch("auto", "spsearch: Daft Punk"), { query: "spsearch: Daft Punk" });
   assert.deepEqual(buildMusicSearch("auto", "ymsearch: Daft Punk"), { query: "ymsearch: Daft Punk" });
   assert.deepEqual(buildMusicSearch("soundcloud", "https://soundcloud.com/example/track"), { query: "https://soundcloud.com/example/track" });
+  assert.deepEqual(
+    buildMusicSearch("auto", "https://youtu.be/-CsjE_ILvnY?si=-ZVCk2EgFY9bSHFy"),
+    { query: "https://www.youtube.com/watch?v=-CsjE_ILvnY" }
+  );
+  assert.deepEqual(
+    buildMusicSearch("auto", "https://www.youtube.com/watch?v=-CsjE_ILvnY&si=-ZVCk2EgFY9bSHFy"),
+    { query: "https://www.youtube.com/watch?v=-CsjE_ILvnY" }
+  );
+  assert.deepEqual(
+    buildMusicSearch("auto", "https://www.youtube.com/shorts/-CsjE_ILvnY?si=-ZVCk2EgFY9bSHFy"),
+    { query: "https://www.youtube.com/watch?v=-CsjE_ILvnY" }
+  );
+
   assert.equal(buildMusicSearch("auto", "   "), null);
 });
 
