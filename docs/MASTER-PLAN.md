@@ -59,7 +59,7 @@ Event -> conditions -> actions engine. Initial actions include messages, role ch
 YouTube, Twitch, Reddit, RSS, TikTok/Kick where stable and permitted, optional GitHub notifications. Providers are adapters and no single provider is a platform dependency.
 
 ### Music
-Search/play by text, URL handling where permitted, YouTube plus other supportable providers, queue/history/favorites/playlists, pause/resume/skip/stop/seek/volume/shuffle/repeat/autoplay, lyrics where available, Discord player UI, Lavalink backend, multiple guilds, and multiple voice channels in one guild through additional bot identities managed by the control plane.
+Search/play by text, YouTube URLs and playlists through yt-dlp, queue/history/favorites/playlists, pause/resume/skip/stop/seek/volume/shuffle/repeat/autoplay, Discord player UI with FFmpeg decoding, durable state/recovery, multiple guilds, and multiple voice channels in one guild through additional bot identities managed by the control plane.
 
 ### Dashboard
 Local web UI, health, guild/module toggles, guided setup, configuration forms, previews, logs/diagnostics, export/import, bot identity management and music node/session status.
@@ -95,6 +95,6 @@ Monorepo:
 PostgreSQL is the source of truth for configuration and durable state; in-memory caches are disposable.
 
 ## Deployment
-Local: native Windows processes on the user's PC (PostgreSQL + Lavalink + Bot + optional Control Center + native Fleet supervisor), with no Docker Desktop/WSL requirement.
+Local: native Windows processes on the user's PC (PostgreSQL + yt-dlp + FFmpeg + Bot + optional Control Center + native Fleet supervisor), with no Docker Desktop/WSL requirement.
 VPS: Docker-based topology with persistent volumes, reverse proxy, backups and monitoring.
 The application architecture stays shared between native local and Docker/VPS deployment paths; runtime launch tooling may be OS-specific where required.
