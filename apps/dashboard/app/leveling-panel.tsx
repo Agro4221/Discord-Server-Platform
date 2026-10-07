@@ -112,12 +112,12 @@ export function LevelingPanel({ guildId, roles, channels, onChanged }: {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ color: "#707b8d", fontSize: 11, lineHeight: 1.55 }}>
-        Базовые XP-параметры находятся в Configuration выше. Здесь управляются role rewards и исключения из начисления XP.
+        Базовые параметры XP находятся в настройках выше. Здесь настраиваются роли за уровни и исключения из начисления опыта.
       </div>
       {error && <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d", color: "#f0b9be", fontSize: 11 }}>{error}</div>}
 
       <section style={panel}>
-        <div style={label}>LEVEL REWARD</div>
+        <div style={label}>НАГРАДА ЗА УРОВЕНЬ</div>
         <div style={{ display: "grid", gridTemplateColumns: "100px minmax(180px,1fr) minmax(170px,1fr)", gap: 8, marginTop: 9 }}>
           <input value={level} onChange={(event) => setLevel(event.target.value)} type="number" min={1} max={10000} style={inputStyle} placeholder="Level" />
           <select value={roleId} onChange={(event) => setRoleId(event.target.value)} style={inputStyle}>
