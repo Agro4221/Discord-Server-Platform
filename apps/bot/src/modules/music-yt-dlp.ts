@@ -21,6 +21,8 @@ export type MusicFilterPreset = "off"|"nightcore"|"vaporwave"|"karaoke"|"rotatio
 export const MAX_MUSIC_ENQUEUE_TRACKS = 100;
 
 export type MusicTrack = { id:string; title:string; author:string; durationMs:number; url:string };
+export type MusicSearchHitKind = "track"|"playlist";
+export type MusicSearchHit = { provider:MusicSearchProvider; kind:MusicSearchHitKind; title:string; url:string };
 type Result = { code:number; stdout:string; stderr:string };
 type Session = {
   guildId:string; voiceChannelId:string; textChannelId:string|null;
@@ -156,6 +158,13 @@ export class YtDlpMusicEngine implements PlatformModule {
     if(!await moduleEnabled(this.db,message.guild.id,"music",false)){await message.reply("Модуль Music выключен.");return true;}
     if(!this.ready){await message.reply("Музыка недоступна: проверь yt-dlp и ffmpeg.");return true;}
     try{
+      if(commandName==="search"||commandName==="srch"){
+        const query=args.join(" ").trim();
+        if(!query){await message.reply("Укажи запрос. Пример: `!search ost Cyberpunk Edgerunners`.");return true;}
+        const results=await this.searchEverywhere(query);
+        await this.replySearchResults(message,query,results);
+        return true;
+      }
       const member=message.member??await message.guild.members.fetch(message.author.id).catch(()=>null), voice=member?.voice.channelId??null;
       if(commandName==="play"||commandName==="music"){
         if(!voice)throw new Error("voice_channel_required");const query=args.join(" ").trim();if(!query)throw new Error("music_query_required");
@@ -302,6 +311,31 @@ export class YtDlpMusicEngine implements PlatformModule {
     }
   }
 
+  private async searchEverywhere(query:string):Promise<MusicSearchHit[]> {
+    const jobs=MUSIC_WEB_SEARCH_TARGETS.flatMap(target=>[this.searchWebIndex(target,query,"track"),this.searchWebIndex(target,query+" playlist album set","playlist")]);
+    const settled=await Promise.allSettled(jobs);const out:MusicSearchHit[]=[];
+    for(const result of settled)if(result.status==="fulfilled")out.push(...result.value);
+    const seen=new Set<string>();
+    return out.filter(item=>{if(seen.has(item.url))return false;seen.add(item.url);return true;}).slice(0,24);
+  }
+
+  private async searchWebIndex(target:{provider:MusicSearchProvider;domain:string;trackQuery:string;playlistQuery:string},query:string,kind:MusicSearchHitKind):Promise<MusicSearchHit[]> {
+    const q=("site:"+target.domain+" "+(kind==="playlist"?target.playlistQuery:target.trackQuery)+" "+query).trim().slice(0,500);
+    const url="https://html.duckduckgo.com/html/?q="+encodeURIComponent(q)+"&kl=wt-wt";
+    const response=await fetch(url,{headers:{"user-agent":"Discord-Server-Platform Music Search/1.0","accept":"text/html"}});
+    if(!response.ok)throw new Error("music_web_search_http_"+response.status);
+    return parseDuckDuckGoMusicResults(await response.text(),target.provider,target.domain,kind);
+  }
+
+  private async replySearchResults(message:Message,query:string,results:MusicSearchHit[]):Promise<void> {
+    if(!results.length){await message.reply("🔎 По запросу **"+query.slice(0,180)+"** ничего не найдено.");return;}
+    const tracks=results.filter(x=>x.kind==="track").slice(0,12);
+    const playlists=results.filter(x=>x.kind==="playlist").slice(0,12);
+    const embed=new EmbedBuilder().setTitle("🔎 Music Search · "+query.slice(0,200)).setDescription("YouTube · TikTok · Яндекс Музыка · VK Музыка · Spotify · SoundCloud").setTimestamp();
+    if(tracks.length)embed.addFields({name:"🎵 Треки",value:formatMusicSearchHits(tracks)});
+    if(playlists.length)embed.addFields({name:"📚 Плейлисты / альбомы",value:formatMusicSearchHits(playlists)});
+    await message.reply({embeds:[embed]});
+  }
   private async resolve(track:MusicTrack):Promise<string>{
     const r=await runProcess(this.config.ytDlpPath,[...this.ytArgs(),"--no-playlist","-f","bestaudio/best","-g",track.url],45000);
     if(r.code!==0)throw new Error("music_stream_resolve_failed");const url=r.stdout.split(/\r?\n/).map(x=>x.trim()).find(Boolean);if(!url)throw new Error("music_stream_resolve_failed");return url;
@@ -369,7 +403,48 @@ export class YtDlpMusicEngine implements PlatformModule {
   private async destroy(s:Session,remove:boolean){this.cancelLeave(s);s.intentionalStop=true;s.player.stop(true);this.killFfmpeg(s);s.connection.destroy();if(remove){await this.db.query("DELETE FROM music_players WHERE guild_id=$1 AND bot_identity_id=$2",[s.guildId,this.config.botIdentityId]).catch(()=>undefined);await this.db.query("DELETE FROM music_queue_store WHERE guild_id=$1 AND bot_identity_id=$2",[s.guildId,this.config.botIdentityId]).catch(()=>undefined);}}
 }
 
-export const BUILTIN_MUSIC_COMMANDS=new Set(["music","play","pause","resume","skip","stop","shuffle","playlist","queue","nowplaying","repeat","seek","volume","autoplay"]);
+export const BUILTIN_MUSIC_COMMANDS=new Set(["music","play","pause","resume","skip","stop","shuffle","playlist","queue","nowplaying","repeat","seek","volume","autoplay","search","srch"]);
+
+const MUSIC_WEB_SEARCH_TARGETS:Array<{provider:MusicSearchProvider;domain:string;trackQuery:string;playlistQuery:string}> = [
+  {provider:"youtube",domain:"youtube.com",trackQuery:"watch OR shorts",playlistQuery:"playlist OR music"},
+  {provider:"tiktok",domain:"tiktok.com",trackQuery:"video",playlistQuery:"playlist OR compilation OR mix"},
+  {provider:"yandex_music",domain:"music.yandex.ru",trackQuery:"track OR album",playlistQuery:"playlist OR album"},
+  {provider:"vk_music",domain:"vk.com",trackQuery:"audio OR music",playlistQuery:"playlist OR music/playlist"},
+  {provider:"spotify",domain:"open.spotify.com",trackQuery:"track OR album",playlistQuery:"playlist OR album"},
+  {provider:"soundcloud",domain:"soundcloud.com",trackQuery:"track OR music",playlistQuery:"sets OR playlist"}
+];
+
+export function classifyMusicSearchUrl(url:string):{provider:MusicSearchProvider;kind:MusicSearchHitKind}|null{
+  try{
+    const u=new URL(url);const host=u.hostname.toLowerCase();const path=u.pathname.toLowerCase();
+    if(host==="youtube.com"||host.endsWith(".youtube.com")||host==="youtu.be")return{provider:"youtube",kind:path.includes("/playlist")||u.searchParams.has("list")?"playlist":"track"};
+    if(host==="tiktok.com"||host.endsWith(".tiktok.com"))return{provider:"tiktok",kind:"track"};
+    if(host==="music.yandex.ru"||host==="music.yandex.com"||host.endsWith(".music.yandex.ru")||host.endsWith(".music.yandex.com"))return{provider:"yandex_music",kind:path.includes("/album/")||path.includes("/playlist/")||path.includes("/playlists/")?"playlist":"track"};
+    if(host==="vk.com"||host.endsWith(".vk.com")||host==="vk.ru"||host.endsWith(".vk.ru")||host==="vkvideo.ru"||host.endsWith(".vkvideo.ru"))return{provider:"vk_music",kind:path.includes("playlist")||path.includes("audios")||u.searchParams.has("z")?"playlist":"track"};
+    if(host==="open.spotify.com")return{provider:"spotify",kind:path.includes("/playlist/")||path.includes("/album/")?"playlist":"track"};
+    if(host==="soundcloud.com"||host.endsWith(".soundcloud.com"))return{provider:"soundcloud",kind:path.includes("/sets/")?"playlist":"track"};
+  }catch{}
+  return null;
+}
+function parseDuckDuckGoMusicResults(html:string,provider:MusicSearchProvider,domain:string,kind:MusicSearchHitKind):MusicSearchHit[]{
+  const hits:MusicSearchHit[]=[];
+  const re=new RegExp("<a[^>]+href=\"([^\"]+)\"[^>]*>([\\s\\S]*?)</a>","gi");
+  let m:RegExpExecArray|null;
+  while((m=re.exec(html))&&hits.length<8){
+    const url=decodeDuckUrl(decodeHtml(m[1]??""));
+    const title=decodeHtml(String(m[2]??"").replace(/<[^>]+>/g," ")).replace(/\\s+/g," ").trim();
+    if(!/^https?:\\/\\//i.test(url)||!url.toLowerCase().includes(domain))continue;
+    const classified=classifyMusicSearchUrl(url);if(!classified||classified.provider!==provider||classified.kind!==kind)continue;
+    if(hits.some(item=>item.url===url))continue;
+    hits.push({provider,kind,title:title.slice(0,180)||url,url});
+  }
+  return hits;
+}
+function decodeDuckUrl(value:string):string{try{const u=new URL(value);const redirected=u.searchParams.get("uddg");return redirected?decodeURIComponent(redirected):value;}catch{return value;}}
+function decodeHtml(value:string):string{return value.replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">");}
+function formatMusicSearchHits(items:MusicSearchHit[]):string{return items.map((item,index)=>(index+1)+". ["+item.title.replace(/[\\[\\]\\(\\)]/g,"")+"]("+item.url+") · "+musicProviderLabel(item.provider)).join("\n").slice(0,3900);}
+function musicProviderLabel(provider:MusicSearchProvider):string{return provider==="yandex_music"?"Яндекс Музыка":provider==="vk_music"?"VK Музыка":provider==="youtube"?"YouTube":provider==="tiktok"?"TikTok":provider==="spotify"?"Spotify":provider==="soundcloud"?"SoundCloud":"Music";}
+
 
 export function normalizeMusicSearchProvider(v:string):MusicSearchProvider|null{
   const x=v.trim().toLowerCase();
