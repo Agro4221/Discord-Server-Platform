@@ -1171,3 +1171,10 @@ Never write credentials, tokens or private user data here.
 - Controller now retries with a plain Discord message plus buttons when the embed send/edit fails, which covers missing Embed Links permissions and similar embed-only failures.
 - `!play` and `/play` now pass their command text-channel as a fallback target when the configured preferred Music channel cannot be used.
 - Controller channel fetch/send/edit failures remain logged instead of being silently swallowed.
+
+## 2026-10-07 — Music search routing and playlist continuation fix
+- Found that `!search` / `!srch` were missing from the real `BUILTIN_PREFIX_COMMANDS` router, so the commands could be ignored before reaching the Music module.
+- Added both aliases to the prefix router and to the command-policy definitions as prefix-only Music commands.
+- Added an immediate search status reply, an 8-second timeout for each external web-index request, and more tolerant DuckDuckGo redirect parsing.
+- Fixed playlist progression so a failed track resolution is skipped and the queue continues instead of stopping after the first track.
+- Playlist progression now attempts the full bounded Music queue rather than stopping after ten failed entries.
