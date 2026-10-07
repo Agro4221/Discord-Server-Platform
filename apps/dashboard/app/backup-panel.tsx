@@ -82,27 +82,27 @@ export function BackupPanel({ guildId, onChanged }: { guildId: string; onChanged
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16 }}>
         <div>
-          <h3 style={{ margin: 0, fontSize: 17 }}>Backups</h3>
+          <h3 style={{ margin: 0, fontSize: 17 }}>Резервные копии</h3>
           <div style={{ marginTop: 5, opacity: 0.45, fontSize: 12 }}>
-            Архивы ограничены текущим сервером. Restore заменяет сохранённую конфигурацию в PostgreSQL.
+            Резервная копия относится только к выбранному серверу. Восстановление заменяет текущую конфигурацию сервера сохранённой версией.
           </div>
         </div>
         <button type="button" disabled={busy} onClick={() => void create()} style={buttonStyle("primary")}>
-          Создать backup
+          Создать резервную копию
         </button>
       </div>
 
       {error && <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d" }}>{error}</div>}
 
       {backups.length === 0 ? (
-        <div style={{ opacity: 0.42, padding: "8px 0" }}>Backup-файлов пока нет.</div>
+        <div style={{ opacity: 0.42, padding: "8px 0" }}>Резервных копий пока нет.</div>
       ) : (
         <div style={{ display: "grid", gap: 7 }}>
           {backups.map((file) => (
             <div key={file} style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: "10px 0", borderBottom: "1px solid #1d212b" }}>
               <code style={{ fontSize: 12, opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis" }}>{file}</code>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                <button type="button" disabled={busy} onClick={() => void restore(file)} style={buttonStyle("secondary")}>Restore</button>
+                <button type="button" disabled={busy} onClick={() => void restore(file)} style={buttonStyle("secondary")} >Восстановить</button>
                 <button type="button" disabled={busy} onClick={() => void remove(file)} style={buttonStyle("danger")}>Удалить</button>
               </div>
             </div>
