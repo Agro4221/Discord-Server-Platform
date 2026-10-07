@@ -4,6 +4,7 @@ export {
   MAX_MUSIC_ENQUEUE_TRACKS,
   normalizeMusicSearchProvider,
   buildMusicSearchTarget,
+  normalizeMusicSourceUrl,
   detectMusicSearchProvider,
   normalizeYtDlpEntry,
   normalizeMusicFilterPreset,
