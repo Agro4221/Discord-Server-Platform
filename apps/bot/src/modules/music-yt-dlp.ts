@@ -328,7 +328,7 @@ export class YtDlpMusicEngine implements PlatformModule {
 
   private async controller(s:Session):Promise<void>{
     if(!this.client||!s.textChannelId)return;const channel=this.client.channels.cache.get(s.textChannelId);if(!channel?.isTextBased()||!("send"in channel))return;
-    const embed=new EmbedBuilder().setTitle("🎵 Music").setDescription(s.current?`**${s.current.title}**\n${s.current.author}`:"Сейчас ничего не играет.").addFields({name:"Состояние",value:s.paused?"⏸ Пауза":"▶ Играет",inline:true},{name:"Повтор",value:s.repeatMode,inline:true},{name:"Громкость",value:String(s.volume),inline:true}).setTimestamp();
+    const repeatText=s.repeatMode==="off"?"выкл.":s.repeatMode==="track"?"трек":"очередь"; const embed=new EmbedBuilder().setTitle("🎵 Music").setDescription(s.current?`**${s.current.title}**\n${s.current.author}`:"Сейчас ничего не играет.").addFields({name:"Состояние",value:s.paused?"⏸ Пауза":"▶ Играет",inline:true},{name:"Повтор",value:repeatText,inline:true},{name:"Громкость",value:String(s.volume),inline:true}).setTimestamp();
     const components=buildController(s.paused,s.repeatMode), existing=s.controllerMessageId?await channel.messages.fetch(s.controllerMessageId).catch(()=>null):null;
     if(existing){await existing.edit({embeds:[embed],components}).catch(()=>undefined);return;}
     const sent=await channel.send({embeds:[embed],components}).catch(()=>null);if(sent){s.controllerMessageId=sent.id;await this.db.query("UPDATE music_players SET controller_message_id=$1,updated_at=now() WHERE guild_id=$2 AND bot_identity_id=$3",[sent.id,s.guildId,this.config.botIdentityId]).catch(()=>undefined);}
@@ -402,7 +402,7 @@ function extractQueue(input:unknown):MusicTrack[]{if(!input||typeof input!=="obj
 function coerceTrack(x:any):MusicTrack|null{if(!x||typeof x!=="object")return null;if(typeof x.id==="string"&&typeof x.url==="string"&&typeof x.title==="string")return{id:x.id,url:x.url,title:x.title,author:String(x.author??"Unknown artist"),durationMs:Number(x.durationMs??0)};const info=x.info;if(!info||typeof info!=="object"||!info.identifier||!info.title)return null;return{id:String(info.identifier),title:String(info.title),author:String(info.author??"Unknown artist"),durationMs:Number(info.duration??0),url:`https://www.youtube.com/watch?v=${info.identifier}`};}
 function normalizePersistedMusicState(x:unknown){const s=x&&typeof x==="object"?x as any:{};return{track:coerceTrack(s.track),paused:s.paused===true,positionMs:Number.isFinite(Number(s.positionMs))?Math.max(0,Number(s.positionMs)):0,volume:Math.min(200,Math.max(0,Number(s.volume??100))),repeatMode:normalizeMusicRepeatMode(String(s.repeatMode??""))??"off" as MusicRepeatMode,filter:normalizeMusicFilterPreset(String(s.filter??""))??"off" as MusicFilterPreset};}
 function buildController(paused:boolean,repeatMode:MusicRepeatMode){
-  const repeatLabel=repeatMode==="off"?"Off":repeatMode==="track"?"Track":"Queue";
+  const repeatLabel=repeatMode==="off"?"выкл.":repeatMode==="track"?"трек":"очередь";
   return [
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setCustomId("dsp:music:pause").setEmoji(paused?"▶️":"⏸️").setStyle(ButtonStyle.Primary),
