@@ -858,6 +858,19 @@ const migrations = [
       "ALTER TABLE automod_rules ADD CONSTRAINT automod_rules_action_check CHECK(action IN ('delete','timeout','warn','log','ban'));"
     ])
   },
+  {
+    version: 53,
+    name: "stream_alert_display_name_template",
+    sql: q([
+      "ALTER TABLE stream_alerts ADD COLUMN IF NOT EXISTS display_name text;",
+      "ALTER TABLE stream_alerts ADD COLUMN IF NOT EXISTS template text;",
+      "UPDATE stream_alerts SET display_name=COALESCE(NULLIF(display_name,''),target), template=COALESCE(NULLIF(template,''),'Хей! {channel} запустил стрим на канале. Присоединяйся!\\n{url}') WHERE display_name IS NULL OR display_name='' OR template IS NULL OR template='';",
+      "ALTER TABLE stream_alerts ALTER COLUMN display_name SET DEFAULT '';",
+      "ALTER TABLE stream_alerts ALTER COLUMN display_name SET NOT NULL;",
+      "ALTER TABLE stream_alerts ALTER COLUMN template SET DEFAULT 'Хей! {channel} запустил стрим на канале. Присоединяйся!\\n{url}';",
+      "ALTER TABLE stream_alerts ALTER COLUMN template SET NOT NULL;"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {
