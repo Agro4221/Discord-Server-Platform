@@ -28,6 +28,7 @@ export class StreamAlerts implements PlatformModule {
     this.identityId=context.identityId;
     this.timer=setInterval(()=>void this.pollAll(),Math.max(15,this.config.pollIntervalSeconds)*1000);
     this.timer.unref();
+    context.client.once("ready",()=>void this.pollAll());
   }
 
   async shutdown():Promise<void>{
@@ -97,9 +98,12 @@ export class StreamAlerts implements PlatformModule {
         mention_role_id:string|null;last_stream_key:string|null;last_online:boolean;
       }>(
         "SELECT sa.id,sa.guild_id,sa.platform,sa.target,sa.target_id,sa.channel_id,sa.mention_role_id,sa.last_stream_key,sa.last_online "+
-        "FROM stream_alerts sa INNER JOIN guild_bot_assignments ga ON ga.guild_id=sa.guild_id "+
-        "WHERE sa.enabled=true AND (ga.bot_identity_id=$1 OR ($1='primary' AND ga.bot_identity_id<>'primary' AND NOT EXISTS ("+
-        "SELECT 1 FROM bot_heartbeats bh WHERE bh.bot_identity_id=ga.bot_identity_id AND bh.last_seen_at>=now()-interval '90 seconds'))) "+
+        "FROM stream_alerts sa LEFT JOIN guild_bot_assignments ga ON ga.guild_id=sa.guild_id "+
+        "WHERE sa.enabled=true AND ("+
+        "ga.bot_identity_id=$1 OR "+
+        "($1='primary' AND (ga.guild_id IS NULL OR (ga.bot_identity_id<>'primary' AND NOT EXISTS ("+
+        "SELECT 1 FROM bot_heartbeats bh WHERE bh.bot_identity_id=ga.bot_identity_id AND bh.last_seen_at>=now()-interval '90 seconds'))))"+
+        ") "+
         "AND (sa.last_checked_at IS NULL OR sa.last_checked_at<=now()-make_interval(secs=>sa.interval_seconds)) "+
         "ORDER BY sa.last_checked_at NULLS FIRST LIMIT 25",
         [this.identityId]
@@ -210,7 +214,9 @@ export class StreamAlerts implements PlatformModule {
   }
 
   private async sendAlert(guildId:string,channelId:string,mentionRoleId:string|null,platform:StreamAlertPlatform,live:LiveInfo):Promise<void>{
-    const channel=this.client?.guilds.cache.get(guildId)?.channels.cache.get(channelId);
+    const guild=this.client?.guilds.cache.get(guildId);
+    let channel=guild?.channels.cache.get(channelId);
+    if(!channel)channel=await guild?.channels.fetch(channelId).catch(()=>undefined)??undefined;
     if(!channel?.isTextBased()||!("send" in channel))throw new Error("stream_alert_channel_unavailable");
     const names:Record<StreamAlertPlatform,string>={twitch:"Twitch",youtube:"YouTube",vk:"VK Видео Live"};
     const embed=new EmbedBuilder().setTitle("🔴 "+names[platform]+" — эфир начался").setDescription("**"+live.title+"**").setURL(live.url).addFields({name:"Канал",value:live.author,inline:true}).setTimestamp();
