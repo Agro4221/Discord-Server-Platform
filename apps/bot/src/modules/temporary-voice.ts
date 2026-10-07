@@ -20,13 +20,19 @@ export type TempVoiceConfig = {
 type Room = { guildId: string; ownerId: string };
 
 export function buildTemporaryVoiceChannelName(displayName: string): string {
-  return displayName.slice(0, 100);
+  const cleaned = displayName
+    .trim()
+    .replace(/^DSP\s*[:|_-]\s*/i, "")
+    .trim();
+  return (cleaned || displayName.trim() || "Voice").slice(0, 100);
 }
 
 export function getTemporaryVoiceChannelBitrate(
   guild: Pick<Guild, "maximumBitrate">
 ): number {
-  return guild.maximumBitrate;
+  // 96 kbps is the normal unboosted ceiling. Do not silently raise
+  // Temporary Voice quality when the server has boosts.
+  return Math.min(Math.max(0, guild.maximumBitrate), 96_000);
 }
 
 export class TemporaryVoice implements PlatformModule {
