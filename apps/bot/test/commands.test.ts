@@ -187,6 +187,6 @@ test("music slash commands are exposed directly without a /music group", () => {
 
   const play = commands.find((command) => command.name === "play");
   const provider = play?.options?.find((option) => option.name === "provider");
-  const expected = ["auto", "youtube", "youtube_music", "soundcloud", "spotify", "yandex_music"];
+  const expected = ["auto", "youtube", "tiktok", "yandex_music", "vk_music", "spotify", "soundcloud"];
   assert.deepEqual(provider?.choices?.map((choice) => String(choice.value)), expected);
 });
