@@ -1133,3 +1133,10 @@ Never write credentials, tokens or private user data here.
 - Added `vk.ru` provider detection and normalization to `vk.com` before yt-dlp extraction.
 - Added a fallback full-source metadata extraction without `--flat-playlist` when direct URL extraction fails, covering album/playlist extractors such as Yandex Music.
 - Added regression coverage for the VK mirror and URL normalization.
+
+
+## 2026-10-07 — Music controller delivery hardening
+- Diagnosed why `!play` could report successful queueing while no Music panel appeared.
+- Controller delivery used only the Discord channel cache and silently swallowed send/edit/fetch errors, making the failure invisible.
+- Controller now falls back to `client.channels.fetch()` when the channel is not cached and logs fetch/edit/send failures.
+- Slash `play` now also assigns the command channel as the controller target when no preferred Music text channel is configured.
