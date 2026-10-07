@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   StreamAlerts,
   normalizeStreamAlertTarget,
-  clampStreamAlertInterval
+  clampStreamAlertInterval,
+  buildYouTubeLiveUrl,
+  normalizeVkStreamTarget
 } from "../src/modules/stream-alerts.js";
 
 test("Stream Alerts exposes YouTube through the local yt-dlp fallback", () => {
@@ -27,4 +29,12 @@ test("Stream Alerts clamps polling interval to the safe bounds", () => {
   assert.equal(clampStreamAlertInterval(30), 30);
   assert.equal(clampStreamAlertInterval(99999), 3600);
   assert.throws(() => clampStreamAlertInterval(Number.NaN), /invalid_stream_alert_interval/);
+});
+
+
+test("Stream Alerts builds YouTube/VK targets without API credentials", () => {
+  assert.equal(buildYouTubeLiveUrl("@Foo.Bar", null), "https://www.youtube.com/%40Foo.Bar/live");
+  assert.equal(buildYouTubeLiveUrl("https://www.youtube.com/@Foo.Bar", null), "https://www.youtube.com/@Foo.Bar/live");
+  assert.equal(buildYouTubeLiveUrl("UC12345678901234567890", null), "https://www.youtube.com/channel/UC12345678901234567890/live");
+  assert.equal(normalizeVkStreamTarget("https://live.vkvideo.ru/channel-slug"), "channel-slug");
 });
