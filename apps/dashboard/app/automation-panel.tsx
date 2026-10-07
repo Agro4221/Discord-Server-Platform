@@ -223,9 +223,9 @@ export function AutomationPanel({
   return (
     <div style={{ display: "grid", gap: 15 }}>
       <div>
-        <h3 style={{ margin: 0, fontSize: 17 }}>Automation Builder</h3>
+        <h3 style={{ margin: 0, fontSize: 17 }}>Конструктор автоматизаций</h3>
         <div style={{ marginTop: 5, opacity: 0.45, fontSize: 12 }}>
-          Полный каталог событий, условий и действий, которые исполняет Core.
+          Здесь создаётся правило: выберите событие, задайте условия и укажите, что бот должен сделать. Правило выполняется автоматически на стороне бота.
         </div>
       </div>
 
@@ -238,28 +238,28 @@ export function AutomationPanel({
           {EVENTS.map((item) => <option key={item}>{item}</option>)}
         </select>
         <input type="number" min={0} max={86400} value={cooldownSeconds} onChange={(e) => setCooldownSeconds(Number(e.target.value))} style={inputStyle} />
-        <button type="button" onClick={() => setEnabled((value) => !value)} style={buttonStyle("secondary")}>{enabled ? "ON" : "OFF"}</button>
+        <button type="button" onClick={() => setEnabled((value) => !value)} style={buttonStyle("secondary")}>{enabled ? "Включено" : "Выключено"}</button>
       </div>
 
       <section style={sectionStyle}>
-        <div style={sectionTitle}>Conditions · ALL</div>
+        <div style={sectionTitle}>Условия — все должны совпасть</div>
         {conditions.length === 0 && <div style={{ opacity: 0.4, fontSize: 12 }}>Без условий — правило реагирует на каждый выбранный event.</div>}
         {conditions.map((condition, index) => (
           <div key={index} style={rowStyle}>
             <select value={condition.type} onChange={(e) => replaceCondition(index, e.target.value as Condition["type"])} style={inputStyle}>
-              <option value="contains">contains</option>
-              <option value="starts-with">starts-with</option>
-              <option value="ends-with">ends-with</option>
-              <option value="equals">equals</option>
-              <option value="matches">matches</option>
-              <option value="number-gte">number-gte</option>
-              <option value="number-lte">number-lte</option>
-              <option value="number-eq">number-eq</option>
-              <option value="number-gt">number-gt</option>
-              <option value="number-lt">number-lt</option>
-              <option value="has-role">has-role</option>
-              <option value="channel-is">channel-is</option>
-              <option value="cooldown-clear">cooldown-clear</option>
+              <option value="contains">содержит</option>
+              <option value="starts-with">начинается с</option>
+              <option value="ends-with">заканчивается на</option>
+              <option value="equals">точно равно</option>
+              <option value="matches">соответствует шаблону</option>
+              <option value="число-gte">число: не меньше</option>
+              <option value="число-lte">число: не больше</option>
+              <option value="число-eq">число: равно</option>
+              <option value="число-gt">число: больше</option>
+              <option value="число-lt">число: меньше</option>
+              <option value="has-role">у пользователя есть роль</option>
+              <option value="channel-is">сообщение в канале</option>
+              <option value="cooldown-clear">cooldown свободен</option>
             </select>
 
             {(condition.type === "contains" || condition.type === "equals" || condition.type === "starts-with" || condition.type === "ends-with" || condition.type === "matches") && (
@@ -314,25 +314,25 @@ export function AutomationPanel({
       </section>
 
       <section style={sectionStyle}>
-        <div style={sectionTitle}>Conditions · ANY</div>
-        {anyConditions.length === 0 && <div style={{ opacity: 0.4, fontSize: 12 }}>Нет OR-условий. Заполни их, если достаточно любого совпадения.</div>}
+        <div style={sectionTitle}>Условия — достаточно любого</div>
+        {anyConditions.length === 0 && <div style={{ opacity: 0.4, fontSize: 12 }}>Нет дополнительных условий. Добавляйте их только тогда, когда достаточно одного из вариантов.</div>}
         {anyConditions.map((condition, index) => (
           <div key={"any-" + index} style={rowStyle}>
             <select value={condition.type} onChange={(e) => replaceCondition(index, e.target.value as Condition["type"], true)} style={inputStyle}>
-              <option value="contains">contains</option>
-              <option value="starts-with">starts-with</option>
-              <option value="ends-with">ends-with</option>
-              <option value="equals">equals</option>
-              <option value="matches">matches</option>
-              <option value="number-gte">number-gte</option>
-              <option value="number-lte">number-lte</option>
-              <option value="number-eq">number-eq</option>
-              <option value="number-gt">number-gt</option>
-              <option value="number-lt">number-lt</option>
-              <option value="number-eq">number-eq</option>
-              <option value="has-role">has-role</option>
-              <option value="channel-is">channel-is</option>
-              <option value="cooldown-clear">cooldown-clear</option>
+              <option value="contains">содержит</option>
+              <option value="starts-with">начинается с</option>
+              <option value="ends-with">заканчивается на</option>
+              <option value="equals">точно равно</option>
+              <option value="matches">соответствует шаблону</option>
+              <option value="число-gte">число: не меньше</option>
+              <option value="число-lte">число: не больше</option>
+              <option value="число-eq">число: равно</option>
+              <option value="число-gt">число: больше</option>
+              <option value="число-lt">число: меньше</option>
+              <option value="число-eq">число: равно</option>
+              <option value="has-role">у пользователя есть роль</option>
+              <option value="channel-is">сообщение в канале</option>
+              <option value="cooldown-clear">cooldown свободен</option>
             </select>
 
             {(condition.type === "contains" || condition.type === "equals" || condition.type === "starts-with" || condition.type === "ends-with" || condition.type === "matches") && (
@@ -398,27 +398,27 @@ export function AutomationPanel({
         {actions.map((action, index) => (
           <div key={index} style={{ display: "grid", gridTemplateColumns: "minmax(150px,180px) minmax(0,1fr) auto", gap: 8 }}>
             <select value={action.type} onChange={(e) => replaceAction(index, e.target.value as Action["type"])} style={inputStyle}>
-              <option value="send-message">send-message</option>
-              <option value="create-channel">create-channel</option>
-              <option value="dm-user">dm-user</option>
-              <option value="add-role">add-role</option>
-              <option value="remove-role">remove-role</option>
-              <option value="timeout">timeout</option>
-              <option value="warn">warn</option>
-              <option value="delete-message">delete-message</option>
-              <option value="add-reaction">add-reaction</option>
-              <option value="remove-reaction">remove-reaction</option>
-              <option value="pin-message">pin-message</option>
-              <option value="unpin-message">unpin-message</option>
-              <option value="set-slowmode">set-slowmode</option>
-              <option value="set-channel-topic">set-channel-topic</option>
-              <option value="set-channel-name">set-channel-name</option>
-              <option value="set-nickname">set-nickname</option>
-              <option value="ban">ban</option>
-              <option value="kick">kick</option>
-              <option value="clear-cooldown">clear-cooldown</option>
-              <option value="set-cooldown">set-cooldown</option>
-              <option value="log">log</option>
+              <option value="send-message">отправить сообщение</option>
+              <option value="create-channel">создать канал</option>
+              <option value="dm-user">написать пользователю в ЛС</option>
+              <option value="add-role">выдать роль</option>
+              <option value="remove-role">снять роль</option>
+              <option value="timeout">выдать timeout</option>
+              <option value="warn">выдать предупреждение</option>
+              <option value="delete-message">удалить сообщение</option>
+              <option value="add-reaction">добавить реакцию</option>
+              <option value="remove-reaction">убрать реакцию</option>
+              <option value="pin-message">закрепить сообщение</option>
+              <option value="unpin-message">открепить сообщение</option>
+              <option value="set-slowmode">изменить медленный режим</option>
+              <option value="set-channel-topic">изменить описание канала</option>
+              <option value="set-channel-name">изменить название канала</option>
+              <option value="set-nickname">изменить никнейм</option>
+              <option value="ban">заблокировать участника</option>
+              <option value="kick">исключить участника</option>
+              <option value="clear-cooldown">сбросить cooldown</option>
+              <option value="set-cooldown">установить cooldown</option>
+              <option value="log">записать в журнал</option>
             </select>
 
             {action.type === "send-message" && (
@@ -585,7 +585,7 @@ export function AutomationPanel({
       </section>
 
       <div style={{ display: "flex", gap: 8 }}>
-        <button type="button" disabled={saving} onClick={() => void save()} style={buttonStyle("primary")}>{editingId ? "Сохранить изменения" : "Создать rule"}</button>
+        <button type="button" disabled={saving} onClick={() => void save()} style={buttonStyle("primary")}>{editingId ? "Сохранить изменения" : "Создать правило"}</button>
         {editingId && <button type="button" disabled={saving} onClick={reset} style={buttonStyle("secondary")}>Отмена</button>}
       </div>
 
@@ -594,8 +594,8 @@ export function AutomationPanel({
         {rules.length === 0 ? <div style={{ opacity: 0.42 }}>Правил пока нет.</div> : rules.map((rule) => (
           <div key={rule.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "10px 0", borderBottom: "1px solid #1d212b" }}>
             <div>
-              <div style={{ fontWeight: 600 }}>{rule.name} · {rule.enabled ? "ON" : "OFF"}</div>
-              <div style={{ marginTop: 4, fontSize: 11, opacity: 0.45 }}>{rule.event} · {rule.all.length} ALL + {rule.any.length} ANY · {rule.actions.length} actions</div>
+              <div style={{ fontWeight: 600 }}>{rule.name} · {rule.enabled ? "Включено" : "Выключено"}</div>
+              <div style={{ marginTop: 4, fontSize: 11, opacity: 0.45 }}>Событие: {rule.event} · Обязательных условий: {rule.all.length} · Дополнительных: {rule.any.length} · Действий: {rule.actions.length}</div>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               <button type="button" disabled={saving} onClick={() => edit(rule)} style={buttonStyle("secondary")}>Изменить</button>
