@@ -16,7 +16,7 @@ import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
 
 export type MusicRepeatMode = "off"|"track"|"queue";
-export type MusicSearchProvider = "auto"|"youtube";
+export type MusicSearchProvider = "auto"|"youtube"|"tiktok"|"yandex_music"|"vk_music"|"spotify"|"soundcloud";
 export type MusicFilterPreset = "off"|"nightcore"|"vaporwave"|"karaoke"|"rotation"|"tremolo"|"vibrato"|"lowpass";
 export const MAX_MUSIC_ENQUEUE_TRACKS = 100;
 
@@ -162,7 +162,7 @@ export class YtDlpMusicEngine implements PlatformModule {
         s.queue.push(...await this.search(query,"auto",MAX_MUSIC_ENQUEUE_TRACKS));if(!s.current)await this.playNext(s);await this.persist(s);await message.reply("🎵 Добавлено в очередь.");return true;
       }
       const s=this.sessions.get(message.guild.id);if(!s){await message.reply("Музыка не запущена.");return true;}
-      const elevated=Boolean(member?.permissions.has("ManageGuild"))||await this.dj(message.guild.id,member);
+      const elevated=Boolean(member?.permissions.has("ManageGuild"))||await this.hasDj(message.guild.id,member);
       if(!canControlMusic(voice,s.voiceChannelId,elevated)){await message.reply("Управлять музыкой можно из того же voice-канала, с DJ-ролью или с Manage Server.");return true;}
       if(commandName==="pause")await this.pause(s);
       else if(commandName==="resume")await this.resume(s);
@@ -182,7 +182,7 @@ export class YtDlpMusicEngine implements PlatformModule {
   async onInteraction(i:Interaction):Promise<void>{
     if(!i.isButton()||!i.customId.startsWith("dsp:music:")||!i.guild)return;
     const s=this.sessions.get(i.guild.id);if(!s){await i.reply({content:"Музыка не запущена.",ephemeral:true}).catch(()=>undefined);return;}
-    const member=await i.guild.members.fetch(i.user.id).catch(()=>null), elevated=Boolean(member?.permissions.has("ManageGuild"))||await this.dj(i.guild.id,member);
+    const member=await i.guild.members.fetch(i.user.id).catch(()=>null), elevated=Boolean(member?.permissions.has("ManageGuild"))||await this.hasDj(i.guild.id,member);
     if(!canControlMusic(member?.voice.channelId??null,s.voiceChannelId,elevated)){await i.reply({content:"Управлять музыкой можно из того же voice-канала, с DJ-ролью или с Manage Server.",ephemeral:true});return;}
     try{
       const a=i.customId.slice("dsp:music:".length);
@@ -215,10 +215,10 @@ export class YtDlpMusicEngine implements PlatformModule {
     try{
       s.intentionalStop=true;s.player.stop(true);this.killFfmpeg(s);s.intentionalStop=false;
       const direct=await this.resolve(s.current);
-      const ffmpeg=spawn(this.config.ffmpegPath,buildFfmpegArgs(direct,offsetMs,s.filter),{windowsHide:true,stdio:["ignore","pipe","pipe"]});s.ffmpeg=ffmpeg;
+      const ffmpeg=spawn(this.config.ffmpegPath,buildFfmpegArgs(direct,offsetMs,s.filter),{windowsHide:true,stdio:["pipe","pipe","pipe"]});s.ffmpeg=ffmpeg;
       const resource=createAudioResource(ffmpeg.stdout,{inputType:StreamType.Raw,inlineVolume:true,metadata:s.current});resource.volume?.setVolume(s.volume/100);
       s.resource=resource;s.positionMs=Math.max(0,offsetMs);s.positionChangedAt=Date.now();s.paused=paused;
-      ffmpeg.stderr.on("data",chunk=>{const msg=String(chunk).trim();if(msg)logger.debug("Music ffmpeg",{guildId:s.guildId,message:msg.slice(-400)});});
+      ffmpeg.stderr.on("data",chunk=>{const msg=String(chunk).trim();if(msg)logger.info("Music ffmpeg",{guildId:s.guildId,message:msg.slice(-400)});});
       ffmpeg.once("exit",(code,signal)=>{if(s.ffmpeg===ffmpeg)s.ffmpeg=null;if((code??0)!==0&&!s.intentionalStop)logger.warn("Music ffmpeg exited unexpectedly",{guildId:s.guildId,code,signal});});
       s.player.play(resource);if(paused)s.player.pause();await this.persist(s);await this.controller(s);
       const st=await this.musicSettings(s.guildId);if(st.announceTrackStart&&s.textChannelId)await this.announce(s.textChannelId,`🎵 Сейчас играет: **${s.current.title}** — ${s.current.author}`);
@@ -241,12 +241,45 @@ export class YtDlpMusicEngine implements PlatformModule {
   private position(s:Session):number{return s.current?musicResumePosition(s.positionMs,s.positionChangedAt,s.paused,s.current.durationMs,Date.now()):0;}
 
   private async search(query:string,provider:MusicSearchProvider,limit:number):Promise<MusicTrack[]>{
-    const target=buildMusicSearchTarget(provider,query,limit);if(!target)return[];
+    const q=query.trim();if(!q)return[];
+    const detected=detectMusicSearchProvider(q);
+    if(detected==="spotify"){
+      return await this.searchSpotify(q,limit);
+    }
+    const target=buildMusicSearchTarget(provider,q,limit);
+    if(!target){
+      throw new Error("music_provider_requires_url");
+    }
     const r=await runProcess(this.config.ytDlpPath,[...this.ytArgs(),"--dump-single-json","--flat-playlist","--skip-download",target],45000);
-    if(r.code!==0){logger.warn("yt-dlp search failed",{query:query.slice(0,200),stderr:r.stderr.slice(-800)});throw new Error("music_search_failed");}
+    if(r.code!==0){logger.warn("yt-dlp search failed",{provider,query:q.slice(0,200),stderr:r.stderr.slice(-800)});throw new Error("music_search_failed");}
     let data:any;try{data=JSON.parse(r.stdout);}catch{throw new Error("music_search_failed");}
     const raw=Array.isArray(data.entries)?data.entries:[data];
-    return raw.map((e:any,n:number)=>normalizeYtDlpEntry(e,n)).filter((x:any):x is MusicTrack=>Boolean(x)).slice(0,limit);
+    return raw.map((e:any,n:number)=>normalizeYtDlpEntry(e,n,isHttpUrl(q)?q:undefined)).filter((x:any):x is MusicTrack=>Boolean(x)).slice(0,limit);
+  }
+
+  private async searchSpotify(url:string,limit:number):Promise<MusicTrack[]>{
+    if(!/\/track\//i.test(url))throw new Error("music_spotify_track_only");
+    try{
+      const endpoint=`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`;
+      const response=await fetch(endpoint,{headers:{"user-agent":"Discord-Server-Platform Music/1.0"},signal:AbortSignal.timeout(15000)});
+      if(!response.ok)throw new Error(`Spotify oEmbed HTTP ${response.status}`);
+      const data=await response.json() as {title?:unknown;author_name?:unknown};
+      const title=String(data.title??"").trim();
+      const author=String(data.author_name??"").trim();
+      if(!title)return[];
+      const query=[author,title].filter(Boolean).join(" ");
+      const target=`ytsearch${Math.min(Math.max(limit,1),MAX_MUSIC_ENQUEUE_TRACKS)}:${query}`;
+      const r=await runProcess(this.config.ytDlpPath,[...this.ytArgs(),"--dump-single-json","--flat-playlist","--skip-download",target],45000);
+      if(r.code!==0){logger.warn("Spotify metadata bridge search failed",{query:query.slice(0,200),stderr:r.stderr.slice(-800)});throw new Error("music_search_failed");}
+      let parsed:any;try{parsed=JSON.parse(r.stdout);}catch{throw new Error("music_search_failed");}
+      const raw=Array.isArray(parsed.entries)?parsed.entries:[parsed];
+      logger.info("Spotify metadata bridge resolved track",{title,author});
+      return raw.map((e:any,n:number)=>normalizeYtDlpEntry(e,n)).filter((x:any):x is MusicTrack=>Boolean(x)).slice(0,limit);
+    }catch(error){
+      if(error instanceof Error && error.message.startsWith("music_"))throw error;
+      logger.warn("Spotify metadata bridge failed",{url,error:String(error)});
+      throw new Error("music_search_failed");
+    }
   }
 
   private async resolve(track:MusicTrack):Promise<string>{
@@ -305,9 +338,41 @@ export class YtDlpMusicEngine implements PlatformModule {
 
 export const BUILTIN_MUSIC_COMMANDS=new Set(["music","play","pause","resume","skip","stop","shuffle","playlist","queue","nowplaying","repeat","seek","volume","autoplay"]);
 
-export function normalizeMusicSearchProvider(v:string):MusicSearchProvider|null{const x=v.trim().toLowerCase();return x==="auto"||x==="youtube"?x:null;}
-export function buildMusicSearchTarget(provider:MusicSearchProvider,query:string,limit=1):string|null{const q=query.trim();if(!q)return null;if(/^https?:\/\//i.test(q))return q;const n=Math.min(Math.max(Number.isInteger(limit)?limit:1,1),MAX_MUSIC_ENQUEUE_TRACKS);return `ytsearch${n}:${q}`;}
-export function normalizeYtDlpEntry(e:any,index=0):MusicTrack|null{if(!e||typeof e!=="object")return null;const id=String(e.id??e.url??"").trim();if(!id)return null;return{id,title:String(e.title??`Track ${index+1}`),author:String(e.uploader??e.channel??e.artist??"Unknown artist"),durationMs:Math.max(0,Math.trunc(Number(e.duration??0)*1000)),url:String(e.webpage_url??e.original_url??"").trim()||`https://www.youtube.com/watch?v=${id}`};}
+export function normalizeMusicSearchProvider(v:string):MusicSearchProvider|null{
+  const x=v.trim().toLowerCase();
+  return ["auto","youtube","tiktok","yandex_music","vk_music","spotify","soundcloud"].includes(x)?x as MusicSearchProvider:null;
+}
+export function buildMusicSearchTarget(provider:MusicSearchProvider,query:string,limit=1):string|null{
+  const q=query.trim();if(!q)return null;
+  if(/^https?:\/\//i.test(q))return q;
+  const n=Math.min(Math.max(Number.isInteger(limit)?limit:1,1),MAX_MUSIC_ENQUEUE_TRACKS);
+  if(provider==="auto"||provider==="youtube")return `ytsearch${n}:${q}`;
+  if(provider==="soundcloud")return `scsearch${n}:${q}`;
+  return null;
+}
+export function detectMusicSearchProvider(url:string):MusicSearchProvider|null{
+  if(!isHttpUrl(url))return null;
+  try{
+    const host=new URL(url).hostname.toLowerCase();
+    if(host==="spotify.com"||host.endsWith(".spotify.com"))return "spotify";
+    if(host==="tiktok.com"||host.endsWith(".tiktok.com"))return "tiktok";
+    if(host==="music.yandex.ru"||host==="music.yandex.com"||host.endsWith(".music.yandex.ru")||host.endsWith(".music.yandex.com"))return "yandex_music";
+    if(host==="vk.com"||host.endsWith(".vk.com")||host==="vkvideo.ru"||host.endsWith(".vkvideo.ru"))return "vk_music";
+    if(host==="soundcloud.com"||host.endsWith(".soundcloud.com"))return "soundcloud";
+    if(host==="youtube.com"||host.endsWith(".youtube.com")||host==="youtu.be")return "youtube";
+  }catch{}
+  return "auto";
+}
+export function normalizeYtDlpEntry(e:any,index=0,fallbackUrl?:string):MusicTrack|null{
+  if(!e||typeof e!=="object")return null;
+  const id=String(e.id??e.url??"").trim();if(!id)return null;
+  const explicitUrl=String(e.webpage_url??e.original_url??"").trim();
+  const entryUrl=/^https?:\/\//i.test(explicitUrl)?explicitUrl:/^https?:\/\//i.test(String(e.url??""))?String(e.url).trim():"";
+  const url=entryUrl||fallbackUrl||(/^[a-zA-Z0-9_-]{4,}$/.test(id)?`https://www.youtube.com/watch?v=${id}`: "");
+  if(!url)return null;
+  return{id,title:String(e.title??`Track ${index+1}`),author:String(e.uploader??e.channel??e.artist??"Unknown artist"),durationMs:Math.max(0,Math.trunc(Number(e.duration??0)*1000)),url};
+}
+function isHttpUrl(value:string):boolean{return /^https?:\/\//i.test(value.trim());}
 export function normalizeMusicFilterPreset(v:string):MusicFilterPreset|null{const x=v.trim().toLowerCase();return["off","nightcore","vaporwave","karaoke","rotation","tremolo","vibrato","lowpass"].includes(x)?x as MusicFilterPreset:null;}
 export function buildFfmpegFilter(p:MusicFilterPreset):string|null{if(p==="nightcore")return"asetrate=48000*1.25,aresample=48000,atempo=0.8";if(p==="vaporwave")return"asetrate=48000*0.8,aresample=48000,atempo=1.25";if(p==="karaoke")return"stereotools=mlev=0";if(p==="rotation")return"apulsator=hz=0.08";if(p==="tremolo")return"tremolo=f=5:d=0.5";if(p==="vibrato")return"vibrato=f=5:d=0.5";if(p==="lowpass")return"lowpass=f=12000";return null;}
 export function buildFfmpegArgs(url:string,offsetMs=0,filter:MusicFilterPreset="off"):string[]{const a=["-hide_banner","-loglevel","warning","-nostdin","-reconnect","1","-reconnect_streamed","1","-reconnect_delay_max","5"];if(offsetMs>0)a.push("-ss",String(offsetMs/1000));a.push("-i",url,"-vn");const f=buildFfmpegFilter(filter);if(f)a.push("-af",f);a.push("-f","s16le","-ar","48000","-ac","2","pipe:1");return a;}
@@ -326,5 +391,5 @@ function normalizePersistedMusicState(x:unknown){const s=x&&typeof x==="object"?
 function buildController(paused:boolean){return[new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId("dsp:music:pause").setEmoji(paused?"▶️":"⏸️").setStyle(ButtonStyle.Primary),new ButtonBuilder().setCustomId("dsp:music:skip").setEmoji("⏭️").setStyle(ButtonStyle.Secondary),new ButtonBuilder().setCustomId("dsp:music:shuffle").setEmoji("🔀").setStyle(ButtonStyle.Secondary),new ButtonBuilder().setCustomId("dsp:music:stop").setEmoji("⏹️").setStyle(ButtonStyle.Danger)),new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId("dsp:music:volume_down").setLabel("-10").setEmoji("🔉").setStyle(ButtonStyle.Secondary),new ButtonBuilder().setCustomId("dsp:music:volume_up").setLabel("+10").setEmoji("🔊").setStyle(ButtonStyle.Secondary))];}
 function shuffle<T>(items:T[]):void{for(let i=items.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[items[i],items[j]]=[items[j]!,items[i]!];}}
 function formatDuration(ms:number):string{const s=Math.max(0,Math.floor(ms/1000));return`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;}
-function formatError(error:unknown):string{const c=error instanceof Error?error.message:"music_failed";const m:Record<string,string>={music_disabled:"Модуль Music выключен.",music_unavailable:"Музыка недоступна: проверь yt-dlp и ffmpeg.",voice_channel_required:"Нужен голосовой канал.",music_voice_assigned_elsewhere:"Voice-канал закреплён за другим bot identity.",music_voice_not_assigned:"Voice-канал не назначен этой bot identity.",music_player_not_started:"Музыка не запущена.",music_player_in_other_voice:"Плеер уже работает в другом voice-канале.",music_query_required:"Укажи трек или URL.",music_track_not_found:"Трек не найден.",music_search_failed:"yt-dlp не смог выполнить поиск.",music_stream_resolve_failed:"Не удалось получить прямой аудиопоток.",music_queue_too_short:"В очереди недостаточно треков.",invalid_repeat_mode:"Некорректный repeat mode.",invalid_seek:"Некорректный seek.",invalid_volume:"Некорректная громкость.",invalid_music_filter:"Некорректный фильтр.",invalid_queue_position:"Некорректная позиция очереди.",invalid_queue_move:"Некорректное перемещение трека."};return m[c.split(":")[0]??c]??c;}
+function formatError(error:unknown):string{const c=error instanceof Error?error.message:"music_failed";const m:Record<string,string>={music_disabled:"Модуль Music выключен.",music_unavailable:"Музыка недоступна: проверь yt-dlp и ffmpeg.",voice_channel_required:"Нужен голосовой канал.",music_voice_assigned_elsewhere:"Voice-канал закреплён за другим bot identity.",music_voice_not_assigned:"Voice-канал не назначен этой bot identity.",music_player_not_started:"Музыка не запущена.",music_player_in_other_voice:"Плеер уже работает в другом voice-канале.",music_query_required:"Укажи трек или URL.",music_track_not_found:"Трек не найден.",music_search_failed:"yt-dlp не смог выполнить поиск.",music_stream_resolve_failed:"Не удалось получить прямой аудиопоток.",music_provider_requires_url:"Для этого источника нужна прямая ссылка: yt-dlp не предоставляет текстовый поиск для этой площадки.",music_spotify_track_only:"Для Spotify сейчас поддерживаются ссылки на отдельные треки; воспроизведение идёт через эквивалентный доступный источник.",music_queue_too_short:"В очереди недостаточно треков.",invalid_repeat_mode:"Некорректный repeat mode.",invalid_seek:"Некорректный seek.",invalid_volume:"Некорректная громкость.",invalid_music_filter:"Некорректный фильтр.",invalid_queue_position:"Некорректная позиция очереди.",invalid_queue_move:"Некорректное перемещение трека."};return m[c.split(":")[0]??c]??c;}
 async function runProcess(file:string,args:string[],timeoutMs:number):Promise<Result>{return await new Promise(resolve=>{const child=spawn(file,args,{windowsHide:true,stdio:["ignore","pipe","pipe"]});let stdout="",stderr="",done=false;const finish=(r:Result)=>{if(done)return;done=true;clearTimeout(timer);resolve(r);};const timer=setTimeout(()=>{try{child.kill("SIGKILL");}catch{}finish({code:-1,stdout,stderr:stderr+"\nprocess timeout"});},timeoutMs);timer.unref();child.stdout.on("data",c=>stdout+=String(c));child.stderr.on("data",c=>stderr+=String(c));child.once("error",e=>finish({code:-1,stdout,stderr:String(e)}));child.once("close",c=>finish({code:c??0,stdout,stderr}));});}
