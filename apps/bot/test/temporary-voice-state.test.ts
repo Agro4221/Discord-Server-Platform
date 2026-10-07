@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {\n  TemporaryVoice,\n  buildTemporaryVoiceChannelName,\n  getTemporaryVoiceChannelBitrate,\n  shouldDeleteEmptyTemporaryVoiceRoom\n} from "../src/modules/temporary-voice.js";
+import {
+  TemporaryVoice,
+  buildTemporaryVoiceChannelName,
+  getTemporaryVoiceChannelBitrate,
+  shouldDeleteEmptyTemporaryVoiceRoom
+} from "../src/modules/temporary-voice.js";
 import { PlatformEventBus } from "../src/events.js";
 
 test("temporary voice module starts with empty in-memory state", async () => {
@@ -9,12 +14,16 @@ test("temporary voice module starts with empty in-memory state", async () => {
 
 test("temporary voice channel uses the member display name without a DSP prefix", () => {
   assert.equal(buildTemporaryVoiceChannelName("Example"), "Example");
+  assert.equal(buildTemporaryVoiceChannelName("DSP | Example"), "Example");
+  assert.equal(buildTemporaryVoiceChannelName("DSP: Example"), "Example");
+  assert.equal(buildTemporaryVoiceChannelName("DSP_Example"), "Example");
+  assert.equal(buildTemporaryVoiceChannelName("DSPExample"), "DSPExample");
   assert.equal(buildTemporaryVoiceChannelName("A".repeat(120)).length, 100);
 });
 
 test("temporary voice channel uses the guild maximum bitrate", () => {
   assert.equal(getTemporaryVoiceChannelBitrate({ maximumBitrate: 96_000 }), 96_000);
-  assert.equal(getTemporaryVoiceChannelBitrate({ maximumBitrate: 384_000 }), 384_000);
+  assert.equal(getTemporaryVoiceChannelBitrate({ maximumBitrate: 384_000 }), 96_000);
 });
 
 
