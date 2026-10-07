@@ -14,26 +14,26 @@ export function DiscordDiagnosticsPanel({ bot }: { bot: BotResource | null }) {
   const missing = entries.filter(([, granted]) => !granted).map(([name]) => name);
 
   if (!bot) {
-    return <div style={muted}>Bot member не найден в cache Discord.</div>;
+    return <div style={muted}>Участник-бот не найден среди загруженных участников Discord.</div>;
   }
 
   return (
     <div style={{ display: "grid", gap: 11 }}>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.3fr) minmax(160px,.7fr)", gap: 12 }}>
         <div>
-          <div style={label}>BOT IDENTITY</div>
+          <div style={label}>ДАННЫЕ БОТА</div>
           <div style={{ color: "#d7ddea", fontSize: 12, marginTop: 5 }}>{bot.tag}</div>
           <div style={{ color: "#626e80", fontSize: 9, marginTop: 3 }}>{bot.id}</div>
         </div>
         <div>
-          <div style={label}>HIGHEST ROLE</div>
+          <div style={label}>САМАЯ ВЫСОКАЯ РОЛЬ</div>
           <div style={{ color: "#d7ddea", fontSize: 12, marginTop: 5 }}>@{bot.highestRole.name}</div>
-          <div style={{ color: "#626e80", fontSize: 9, marginTop: 3 }}>position {bot.highestRole.position}</div>
+          <div style={{ color: "#626e80", fontSize: 9, marginTop: 3 }}>позиция {bot.highestRole.position}</div>
         </div>
       </div>
 
       <div>
-        <div style={label}>KEY PERMISSIONS</div>
+        <div style={label}>ВАЖНЫЕ ПРАВА</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 6, marginTop: 8 }}>
           {entries.map(([name, granted]) => (
             <div key={name} style={{
