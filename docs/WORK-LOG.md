@@ -1155,3 +1155,9 @@ Never write credentials, tokens or private user data here.
 - Corrected the previous nullability patch: Discord `channels.fetch()` itself can return `null`, so the fetched value is now normalized with `?? undefined` before assignment.
 - This removes the remaining strict TypeScript `Channel | null | undefined` error without changing controller behavior.
 
+## 2026-10-07 — Music global search and controller verification passed
+- `npm run typecheck` passes for both `packages/domain` and `apps/bot` with zero TypeScript errors.
+- `npm test` passes: 167 total, 158 passed, 0 failed, 9 skipped.
+- The skipped cases are environment-dependent database/integration tests; no test failed.
+- Global Music search classification test passes alongside the existing Music, Temporary Voice, Security, Automation and platform test coverage.
+
