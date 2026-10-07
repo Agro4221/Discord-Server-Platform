@@ -1119,3 +1119,10 @@ Never write credentials, tokens or private user data here.
 - Restored a Repeat button that cycles `off → track → queue → off`.
 - The Repeat button label and the Music embed now show the current repeat mode in Russian.
 - Regression coverage added for the repeat cycle helper.
+
+
+## 2026-10-07 — Prefix Music controller fallback fix
+- Fixed `!play` so the Music controller uses the channel where the prefix command was sent when no preferred Music text channel is configured.
+- The prefix path now explicitly refreshes the controller after queueing/starting playback, so a manual `!play` produces both the queue confirmation and the interactive Music panel.
+- Removed the generic `✅ Готово.` success reply from prefix Music control commands such as `!volume`, `!pause`, `!resume`, `!skip`, `!stop`, `!shuffle`, `!repeat`, `!seek` and `!autoplay`.
+- The controller message is now the success-state UI for these manual controls; user-facing replies remain only for commands that need textual output such as queue/nowplaying or actual errors.
