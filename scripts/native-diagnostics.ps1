@@ -1,7 +1,6 @@
 [CmdletBinding()]
 param(
   [switch]$Dashboard,
-  [switch]$Lavalink2,
   [switch]$Json
 )
 
@@ -77,10 +76,7 @@ $fleetRoot = Join-Path $runtimeRoot "fleet"
 $healthPort = Get-EnvValue "HEALTH_PORT" "3001"
 $managementPort = Get-EnvValue "MANAGEMENT_API_PORT" "3002"
 $dashboardPort = Get-EnvValue "DASHBOARD_PORT" "3000"
-$lavalinkHost = Get-EnvValue "LAVALINK_HOST" "127.0.0.1"
-$lavalinkPort = [int](Get-EnvValue "LAVALINK_PORT" "2333")
 $managementKey = Get-EnvValue "MANAGEMENT_API_KEY" ""
-$lavalinkPassword = Get-EnvValue "LAVALINK_PASSWORD" ""
 
 $report = [ordered]@{
   timestamp = (Get-Date).ToUniversalTime().ToString("o")
@@ -110,9 +106,7 @@ try {
 
 $report.processes.primaryBot = Get-PidSnapshot (Join-Path $runtimeRoot "bot.pid")
 $report.processes.fleetSupervisor = Get-PidSnapshot (Join-Path $runtimeRoot "fleet.pid")
-$report.processes.lavalink = Get-PidSnapshot (Join-Path $runtimeRoot "lavalink.pid")
 if ($Lavalink2) {
-  $report.processes.lavalink2 = Get-PidSnapshot (Join-Path $runtimeRoot "lavalink2.pid")
 }
 if ($Dashboard) {
   $report.processes.dashboard = Get-PidSnapshot (Join-Path $runtimeRoot "dashboard.pid")
@@ -175,30 +169,13 @@ if ($Dashboard) {
   }
 }
 
-if (-not [string]::IsNullOrWhiteSpace($lavalinkPassword)) {
-  $headers = @{ Authorization = $lavalinkPassword }
-  $version1 = Test-Http ("http://" + $lavalinkHost + ":" + $lavalinkPort + "/version") $headers
-  $report.services.lavalink1 = @{
-    port = $lavalinkPort
-    ok = $version1.status -eq 200
-    httpStatus = $version1.status
-    version = if ($version1.body) { $version1.body } else { $null }
-    error = $version1.error
-  }
-
-  if ($Lavalink2) {
-    $version2 = Test-Http ("http://" + $lavalinkHost + ":2334/version") $headers
-    $report.services.lavalink2 = @{
-      port = 2334
-      ok = $version2.status -eq 200
-      httpStatus = $version2.status
-      version = if ($version2.body) { $version2.body } else { $null }
-      error = $version2.error
-    }
-  }
-} else {
-  $report.services.lavalink1 = @{ ok = $false; error = "lavalink_password_not_configured" }
+$ytDlp = Get-Command "yt-dlp.exe" -ErrorAction SilentlyContinue
+$ffmpeg = Get-Command "ffmpeg.exe" -ErrorAction SilentlyContinue
+$report.services.musicTooling = @{
+  ytDlp = if ($ytDlp) { @{ ok = $true; version = (& $ytDlp.Source --version).Trim() } } else { @{ ok = $false; error = "yt_dlp_not_found" } }
+  ffmpeg = if ($ffmpeg) { @{ ok = $true; version = ((& $ffmpeg.Source -version | Select-Object -First 1).Trim()) } } else { @{ ok = $false; error = "ffmpeg_not_found" } }
 }
+
 
 if ($Json) {
   $report | ConvertTo-Json -Depth 8
@@ -212,7 +189,7 @@ if ($report.node.version) { $nodeVersion = [string]$report.node.version }
 Write-Host ("Node.js: " + $nodeVersion)
 Write-Host ""
 
-foreach ($name in @("primaryBot", "fleetSupervisor", "lavalink", "lavalink2", "dashboard")) {
+foreach ($name in @("primaryBot", "fleetSupervisor", "dashboard")) {
   if ($report.processes.Contains($name)) {
     $p = $report.processes[$name]
     $processState = "DOWN"
@@ -237,14 +214,6 @@ $fleetAuthState = "NO"
 if ($report.fleet.authenticated) { $fleetAuthState = "YES" }
 Write-Host ("FLEET AUTHENTICATED: {0} identities={1}" -f $fleetAuthState, @($report.fleet.identities).Count)
 
-foreach ($name in @("dashboard", "lavalink1", "lavalink2")) {
-  if ($report.services.Contains($name)) {
-    $s = $report.services[$name]
-    $serviceState = "FAIL"
-    if ($s.ok) { $serviceState = "OK" }
-    Write-Host ("SERVICE {0}: {1} http={2}" -f $name, $serviceState, $s.httpStatus)
-  }
-}
 
 Write-Host ""
 Write-Host "Diagnostics are read-only. Credentials are not printed."
