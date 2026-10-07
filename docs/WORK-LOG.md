@@ -1110,3 +1110,12 @@ Never write credentials, tokens or private user data here.
 - `npm test`: 166 total, 157 passed, 0 failed, 9 skipped.
 - The nine skipped tests are environment/database integration cases and did not fail the suite.
 - Local unit/regression verification for the current multi-source Music implementation is therefore green. Remaining verification is live provider playback and Discord runtime behavior.
+
+
+## 2026-10-07 — Music controller UX fix: no success spam + Repeat restored
+- Fixed Music controller button interactions to acknowledge Discord immediately with `deferUpdate()`, preventing the visible “Приложение не отвечает” state during DB/FFmpeg work.
+- Successful controller clicks no longer send ephemeral `✅ Готово.` messages; the controller message itself is updated as the visible state.
+- Error replies remain ephemeral and are sent only when an operation actually fails or the user lacks control permission.
+- Restored a Repeat button that cycles `off → track → queue → off`.
+- The Repeat button label and the Music embed now show the current repeat mode in Russian.
+- Regression coverage added for the repeat cycle helper.
