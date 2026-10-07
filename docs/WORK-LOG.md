@@ -1041,3 +1041,15 @@ Never write credentials, tokens or private user data here.
   - run a real Windows smoke test with yt-dlp + FFmpeg;
   - verify Temporary Voice creation name and 96 kbps bitrate on the user's server;
   - perform live YouTube playback, seek, reconnect and restart recovery checks.
+
+
+## 2026-10-07 — Discord Voice Opus dependency alignment
+
+### What changed
+- Updated `apps/bot/package.json` from `@discordjs/opus ^0.4.0` to `^0.10.0`.
+- Reason: the installed `prism-media` dependency for `@discordjs/voice 0.19.2` reports `@discordjs/opus 0.4.0` as an invalid peer dependency; the current npm release is 0.10.0.
+
+### Verification status
+- Local `npm install` previously completed, but `npm ls @discordjs/voice @discordjs/opus --all` reported `@discordjs/opus@0.4.0` as invalid.
+- GitHub branch `development` now contains the dependency correction in commit `a7fe901f63f3c952bee4a75593f17264959703c6`.
+- Local machine still needs to refresh `apps/bot/package.json` and run `npm install` so `node_modules` uses the corrected Opus version.
