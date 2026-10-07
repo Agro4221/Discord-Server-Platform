@@ -161,6 +161,7 @@ export class YtDlpMusicEngine implements PlatformModule {
       if(commandName==="search"||commandName==="srch"){
         const query=args.join(" ").trim();
         if(!query){await message.reply("Укажи запрос. Пример: `!search ost Cyberpunk Edgerunners`.");return true;}
+        await message.reply("🔎 Ищу по YouTube, TikTok, Яндекс Музыке, VK, Spotify и SoundCloud…");
         const results=await this.searchEverywhere(query);
         await this.replySearchResults(message,query,results);
         return true;
@@ -230,7 +231,14 @@ export class YtDlpMusicEngine implements PlatformModule {
   }
 
   private async playNext(s:Session):Promise<void>{
-    for(let n=0;n<10&&!s.current&&s.queue.length;n++){s.current=s.queue.shift()??null;if(!s.current)break;try{await this.start(s,0,false);return;}catch(error){logger.warn("Music track skipped after start failure",{guildId:s.guildId,trackId:s.current.id,error:String(error)});s.current=null;}}
+    let attempts=0;
+    while(!s.current&&s.queue.length&&attempts<MAX_MUSIC_ENQUEUE_TRACKS){
+      attempts++;
+      s.current=s.queue.shift()??null;
+      if(!s.current)break;
+      try{await this.start(s,0,false);return;}
+      catch(error){logger.warn("Music track skipped after start failure",{guildId:s.guildId,trackId:s.current.id,title:s.current.title,error:String(error)});s.current=null;}
+    }
     if(!s.current&&!s.queue.length)this.scheduleLeave(s);
   }
 
@@ -334,7 +342,7 @@ export class YtDlpMusicEngine implements PlatformModule {
   private async searchWebIndex(target:{provider:MusicSearchProvider;domain:string;trackQuery:string;playlistQuery:string},query:string,kind:MusicSearchHitKind):Promise<MusicSearchHit[]> {
     const q=("site:"+target.domain+" "+(kind==="playlist"?target.playlistQuery:target.trackQuery)+" "+query).trim().slice(0,500);
     const url="https://html.duckduckgo.com/html/?q="+encodeURIComponent(q)+"&kl=wt-wt";
-    const response=await fetch(url,{headers:{"user-agent":"Discord-Server-Platform Music Search/1.0","accept":"text/html"}});
+    const response=await fetch(url,{headers:{"user-agent":"Discord-Server-Platform Music Search/1.0","accept":"text/html"},signal:AbortSignal.timeout(8000)});
     if(!response.ok)throw new Error("music_web_search_http_"+response.status);
     return parseDuckDuckGoMusicResults(await response.text(),target.provider,target.domain,kind);
   }
@@ -460,7 +468,7 @@ export function classifyMusicSearchUrl(url:string):{provider:MusicSearchProvider
 }
 function parseDuckDuckGoMusicResults(html:string,provider:MusicSearchProvider,domain:string,kind:MusicSearchHitKind):MusicSearchHit[]{
   const hits:MusicSearchHit[]=[];
-  const re=new RegExp("<a[^>]+href=\"([^\"]+)\"[^>]*>([\\s\\S]*?)</a>","gi");
+  const re=new RegExp("<a[^>]+href\\s*=\\s*[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)</a>","gi");
   let m:RegExpExecArray|null;
   while((m=re.exec(html))&&hits.length<8){
     const url=decodeDuckUrl(decodeHtml(m[1]??""));
@@ -472,7 +480,14 @@ function parseDuckDuckGoMusicResults(html:string,provider:MusicSearchProvider,do
   }
   return hits;
 }
-function decodeDuckUrl(value:string):string{try{const u=new URL(value);const redirected=u.searchParams.get("uddg");return redirected?decodeURIComponent(redirected):value;}catch{return value;}}
+function decodeDuckUrl(value:string):string{
+  try{
+    const raw=value.startsWith("//")?"https:"+value:value;
+    const u=new URL(raw,"https://html.duckduckgo.com");
+    const redirected=u.searchParams.get("uddg");
+    return redirected||value;
+  }catch{return value;}
+}
 function decodeHtml(value:string):string{return value.replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">");}
 function formatMusicSearchHits(items:MusicSearchHit[]):string{return items.map((item,index)=>(index+1)+". ["+item.title.replace(/[\\[\\]\\(\\)]/g,"")+"]("+item.url+") · "+musicProviderLabel(item.provider)).join("\n").slice(0,1000);}
 function musicProviderLabel(provider:MusicSearchProvider):string{return provider==="yandex_music"?"Яндекс Музыка":provider==="vk_music"?"VK Музыка":provider==="youtube"?"YouTube":provider==="tiktok"?"TikTok":provider==="spotify"?"Spotify":provider==="soundcloud"?"SoundCloud":"Music";}
