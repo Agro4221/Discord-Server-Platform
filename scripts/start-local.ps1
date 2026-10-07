@@ -2,7 +2,6 @@
 param(
   [switch]$Rebuild,
   [switch]$NoOpen,
-  [switch]$Lavalink2,
   [switch]$Down
 )
 
@@ -208,7 +207,6 @@ $generated = @{
   "MANAGEMENT_API_KEY" = 48
   "BOT_CREDENTIALS_ENCRYPTION_KEY" = 64
   "POSTGRES_PASSWORD" = 24
-  "LAVALINK_PASSWORD" = 24
 }
 foreach ($entry in $generated.GetEnumerator()) {
   $current = Get-EnvValue $entry.Key
@@ -219,12 +217,6 @@ foreach ($entry in $generated.GetEnumerator()) {
 }
 
 docker compose config | Out-Null
-if ($Lavalink2) {
-  $password = Get-EnvValue "LAVALINK_PASSWORD"
-  if ([string]::IsNullOrWhiteSpace($password)) { throw "LAVALINK_PASSWORD is required for the second Lavalink node." }
-  $env:LAVALINK_NODES = '[{"id":"local","host":"lavalink","port":2333,"password":"' + $password + '"},{"id":"local-2","host":"lavalink2","port":2334,"password":"' + $password + '"}]'
-}
-
 $dbPassword = Get-EnvValue "POSTGRES_PASSWORD"
 if ([string]::IsNullOrWhiteSpace($dbPassword)) {
   throw "POSTGRES_PASSWORD is required."
@@ -271,9 +263,6 @@ if ($Rebuild) {
 
 # Normal starts intentionally avoid an image rebuild so a gaming session does not
 # trigger a Next.js/Node/Java build unless the user explicitly asks for it.
-if ($Lavalink2) {
-  & docker compose --profile failover up -d
-} else {
   & docker compose up -d
 }
 $composeExitCode = $LASTEXITCODE
@@ -281,7 +270,7 @@ if ($composeExitCode -ne 0) {
   Write-Host ""
   Write-Host "Docker Compose failed. Recent service logs:"
   docker compose ps
-  docker compose logs --tail=80 lavalink lavalink2 postgres bot dashboard
+  docker compose logs --tail=80 postgres bot dashboard
   throw "docker compose up failed with exit code $composeExitCode."
 }
 
