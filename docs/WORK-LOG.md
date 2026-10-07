@@ -1053,3 +1053,37 @@ Never write credentials, tokens or private user data here.
 - Local `npm install` previously completed, but `npm ls @discordjs/voice @discordjs/opus --all` reported `@discordjs/opus@0.4.0` as invalid.
 - GitHub branch `development` now contains the dependency correction in commit `a7fe901f63f3c952bee4a75593f17264959703c6`.
 - Local machine still needs to refresh `apps/bot/package.json` and run `npm install` so `node_modules` uses the corrected Opus version.
+
+
+## 2026-10-07 — Music multi-source restoration + local verification failures logged
+
+### User requirement clarified
+- Music must not be limited to YouTube.
+- Required direct-source coverage includes TikTok, Яндекс Музыка, VK Музыка, Spotify and SoundCloud, with broader yt-dlp extractor coverage available through Auto/direct URLs.
+
+### Implementation changes
+- Restored Music provider choices: `auto`, `youtube`, `tiktok`, `yandex_music`, `vk_music`, `spotify`, `soundcloud`.
+- Direct URLs are passed to yt-dlp so supported extractors can resolve the source without a Lavalink service.
+- Added SoundCloud text search through yt-dlp's `scsearch` prefix.
+- Added automatic source detection for YouTube, TikTok, Yandex Music, VK, Spotify and SoundCloud URLs.
+- Added a Spotify track metadata bridge: Spotify track URLs are read through Spotify oEmbed and then resolved to a playable equivalent source. This avoids claiming direct Spotify audio extraction when the current yt-dlp tree classifies Spotify media as DRM-protected/unsupported.
+- Restored Dashboard provider options for the same source set.
+- Fixed local TypeScript defects found by the user's real `npm run typecheck`: missing `hasDj` calls, FFmpeg child-process typing, and use of a nonexistent `logger.debug` method.
+- Updated regression tests to remove obsolete Lavalink expectations and cover the multi-source provider set.
+
+### User-provided verification results
+- Node.js: `v24.21.0`.
+- npm: `11.19.0`.
+- FFmpeg is installed at `C:\\ffmpeg\\bin\\ffmpeg.exe` and reports a current 2026 build.
+- `@discordjs/opus@0.10.0` + `@discordjs/voice@0.19.2` install cleanly; `OpusEncoder` initializes successfully.
+- `npm run typecheck` previously failed with 5 concrete errors in `music-yt-dlp.ts`; these are now patched in `development`.
+- `npm test` previously reported 4 failures: three obsolete Lavalink/provider assertions and one FFmpeg argument expectation. Those tests are now patched to match the current architecture.
+- yt-dlp was installed through WinGet as version `2026.08.19`, along with Deno and a WinGet FFmpeg dependency. The current PowerShell session did not yet see the new PATH entry; a new shell is required before `yt-dlp` resolves by name.
+
+### Important external constraint
+- Current yt-dlp supported-site documentation includes TikTok, VK, Yandex Music and SoundCloud extractors, and explicitly notes that support can break when sites change. Spotify is currently listed among known DRM-protected services in yt-dlp's unsupported extractors, so Spotify is handled as metadata/input rather than as a direct audio stream. 
+
+### Next concrete verification
+- Open a new PowerShell session so the WinGet PATH update becomes visible.
+- Run `yt-dlp --version`, a non-downloading metadata lookup for representative provider URLs, then `npm run typecheck` and `npm test` again.
+- Run the native launcher and perform live Discord voice playback smoke tests for YouTube, TikTok, Yandex Music, VK, SoundCloud and a Spotify track link.
