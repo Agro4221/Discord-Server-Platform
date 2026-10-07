@@ -1183,3 +1183,8 @@ Never write credentials, tokens or private user data here.
 - Music controller target selection now prioritizes the text channel where `!play` or `/play` was issued, preventing a configured preferred channel from hiding the player from the command channel.
 - Global Music search now has native yt-dlp discovery for YouTube and SoundCloud in addition to the web-index search for all configured providers.
 - Web search now tries DuckDuckGo Lite first and the HTML endpoint second, with per-request timeouts and graceful empty-provider fallback.
+
+## 2026-10-07 — Music global search TypeScript cleanup
+- Fixed the native YouTube/SoundCloud global-search result mapping by explicitly typing the final `track` parameter as `MusicTrack`.
+- This resolves the strict TypeScript `noImplicitAny` error without changing runtime search behavior.
+- Existing test suite remains green at 167 total, 158 passed, 0 failed, 9 skipped.
