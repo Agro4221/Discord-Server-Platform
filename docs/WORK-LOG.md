@@ -1194,3 +1194,12 @@ Never write credentials, tokens or private user data here.
 - `start()` no longer publishes the controller before the `!play`/`/play` confirmation; play handlers now send the confirmation first and then publish the controller.
 - Global playlist discovery now tries Google, Bing, DuckDuckGo Lite and DuckDuckGo HTML, while YouTube/SoundCloud keep their native yt-dlp search fallback.
 - Search-result URL decoding now handles common `uddg`, `q` and `url` redirect parameters.
+
+## 2026-10-07 — Stream Alerts hardening and diagnostics
+- Stream Alerts now performs an immediate poll after Discord reaches `ready` instead of waiting for the first interval tick.
+- Primary bot polling no longer drops unassigned guild alerts; fleet-assigned secondary alerts retain their existing ownership/failover behavior.
+- Discord alert delivery now fetches the target channel when it is not cached and falls back to a plain-text notification when an embed cannot be sent.
+- YouTube monitoring can now fall back to local `yt-dlp` live detection when the YouTube API key is absent or the API request fails.
+- Added a dashboard `Проверить` action for immediate provider diagnostics and exposed `lastCheckedAt` in the alert list.
+- Fixed the management API numeric alert-id route matcher so update/delete/manual-check requests reach the intended alert.
+- Added unit coverage for Stream Alerts provider availability, target normalization and interval bounds.
