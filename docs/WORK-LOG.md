@@ -1,3 +1,13 @@
+## 2026-10-07 — Stream Alerts restored to proven light-stream-bot provider logic
+
+- Reworked `apps/bot/src/modules/stream-alerts.ts` to follow the proven implementation from the uploaded `Discord-Server-Platform-feature-light-stream-bot` build.
+- YouTube now checks the channel `/live` page directly through local `yt-dlp`; the YouTube Data API and `YOUTUBE_API_KEY` are no longer part of the detection path.
+- Removed the extra YouTube `--js-runtimes` / cookies arguments from Stream Alerts; those settings remain available to the Music subsystem only.
+- VK now follows the same proven order as the light build: public VK Video Live endpoint first, then local `yt-dlp` fallback.
+- Fixed YouTube target normalization so a bare `UC...` channel ID remains a channel ID instead of being converted to an `@handle`.
+- Kept the current platform features around the detector intact: PostgreSQL persistence, per-guild routing, role mentions, polling intervals, immediate startup polling, manual `Проверить`, fleet ownership/failover and Discord channel fallback.
+- Added regression coverage for YouTube/VK target construction without API credentials.
+
 ## 2026-10-07 — Stream Alerts typecheck/runtime correction
 
 - Fixed the Stream Alerts yt-dlp fallback build: the missing local runProcess() helper is now implemented with timeout/error handling.
