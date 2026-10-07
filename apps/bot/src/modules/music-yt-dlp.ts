@@ -131,7 +131,6 @@ export class YtDlpMusicEngine implements PlatformModule {
         await this.assertOwnership(guild.id,memberVoice);
         const s=existing??await this.createSession(guild,memberVoice);
         if(i.channelId)s.textChannelId=i.channelId;
-        if(!s.textChannelId&&i.channelId)s.textChannelId=i.channelId;
         s.queue.push(...await this.search(query,provider,MAX_MUSIC_ENQUEUE_TRACKS));if(!s.current)await this.playNext(s);
         await this.persist(s);await this.controller(s,i.channelId??undefined);await i.reply({content:"🎵 Добавлено в очередь."});return;
       }
