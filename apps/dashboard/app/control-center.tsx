@@ -106,7 +106,7 @@ const CATEGORIES: Category[] = [
     label: "Интеграции и медиа",
     eyebrow: "INTEGRATIONS & MEDIA",
     icon: "◌",
-    summary: "Ленты, музыка/Lavalink и аналитика активности."
+    summary: "Ленты, музыка/yt-dlp + FFmpeg и аналитика активности."
   },
   {
     key: "system",
@@ -423,7 +423,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
     icon: "♫",
     accent: "#8bb8f0",
     title: "Music",
-    summary: "Lavalink, очередь, repeat, autoplay и per-voice routing.",
+    summary: "yt-dlp + FFmpeg, очередь, repeat, autoplay и per-voice routing.",
     category: "integrations",
     commands: ["/music play", "/music pause", "/music resume", "/music skip", "/music stop", "/music shuffle", "/music repeat", "/music autoplay", "/music seek", "/music queue", "/music nowplaying", "/music volume"],
     functions: [
@@ -431,7 +431,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Queue", description: "Очередь, shuffle и повтор трека/очереди." },
       { title: "Autoplay", description: "Автоматическое продолжение после окончания очереди." },
       { title: "Voice access", description: "Управление привязано к voice-каналу или Manage Server." },
-      { title: "Lavalink health", description: "Статус модуля зависит от доступности узлов." },
+      { title: "Music tooling health", description: "Статус зависит от доступности yt-dlp и FFmpeg." },
       { title: "Multi-bot routing", description: "Отдельные bot identities могут обслуживать разные voice-каналы." }
     ],
     kind: "full"
