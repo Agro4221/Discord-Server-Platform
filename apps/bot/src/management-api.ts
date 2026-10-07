@@ -894,7 +894,7 @@ export class ManagementApiServer {
           }
 
           const streamAlertsMatch = path.match(/^\/api\/guilds\/([^/]+)\/stream-alerts$/);
-          const streamAlertItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/stream-alerts\/(\\d+)$/);
+          const streamAlertItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/stream-alerts\/(\d+)$/);
 
           if ((streamAlertsMatch || streamAlertItemMatch) && !this.options.streamAlerts) {
             this.json(res, 500, { error: "stream_alerts_unavailable" });
