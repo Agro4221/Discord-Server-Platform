@@ -144,7 +144,7 @@ export function StreamAlertsPanel({
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ fontSize: 12, opacity: 0.55 }}>
-        Для каждой подписки можно выбрать отдельный Discord-канал и роль для упоминания. Twitch и YouTube используют API-учётные данные бота.
+        Для каждой подписки можно выбрать отдельный Discord-канал и роль для упоминания. Twitch использует API-учётные данные; YouTube умеет проверяться через API или локальный yt-dlp.
       </div>
       {error && <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d" }}>{error}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "120px minmax(150px,1fr) minmax(140px,1fr) minmax(130px,1fr) 100px auto", gap: 8 }}>
