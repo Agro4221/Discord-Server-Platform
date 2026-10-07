@@ -1126,3 +1126,10 @@ Never write credentials, tokens or private user data here.
 - The prefix path now explicitly refreshes the controller after queueing/starting playback, so a manual `!play` produces both the queue confirmation and the interactive Music panel.
 - Removed the generic `✅ Готово.` success reply from prefix Music control commands such as `!volume`, `!pause`, `!resume`, `!skip`, `!stop`, `!shuffle`, `!repeat`, `!seek` and `!autoplay`.
 - The controller message is now the success-state UI for these manual controls; user-facing replies remain only for commands that need textual output such as queue/nowplaying or actual errors.
+
+
+## 2026-10-07 — Music provider URL extraction hardening
+- Diagnosed live failures for direct VK and Yandex Music URLs: the metadata path relied only on yt-dlp `--flat-playlist` extraction, and VK's `vk.ru` mirror is not handled by the VK extractor.
+- Added `vk.ru` provider detection and normalization to `vk.com` before yt-dlp extraction.
+- Added a fallback full-source metadata extraction without `--flat-playlist` when direct URL extraction fails, covering album/playlist extractors such as Yandex Music.
+- Added regression coverage for the VK mirror and URL normalization.
