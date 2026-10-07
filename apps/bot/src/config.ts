@@ -10,10 +10,10 @@ export type AppConfig = {
   managementApiKey: string;
   botCredentialsEncryptionKey: string;
   databaseUrl: string;
-  lavalinkHost: string;
-  lavalinkPort: number;
-  lavalinkPassword: string;
-  lavalinkNodes: Array<{ id: string; host: string; port: number; password: string; secure?: boolean }>;
+  ytDlpPath: string;
+  ffmpegPath: string;
+  ytDlpJsRuntime: string;
+  ytDlpCookiesFile?: string;
   backupDirectory: string;
   backupRetentionCount: number;
   streamAlerts: {
@@ -87,54 +87,6 @@ function parseBackupS3(): AppConfig["backupS3"] | null {
   };
 }
 
-function parseLavalinkNodes(): AppConfig["lavalinkNodes"] {
-  const raw = process.env.LAVALINK_NODES;
-  if (!raw?.trim()) {
-    return [{
-      id: "local",
-      host: process.env.LAVALINK_HOST ?? "127.0.0.1",
-      port: port("LAVALINK_PORT", 2333),
-      password: required("LAVALINK_PASSWORD"),
-      ...(process.env.LAVALINK_SECURE === "true" ? { secure: true } : {})
-    }];
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("LAVALINK_NODES must be valid JSON");
-  }
-  if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 16) {
-    throw new Error("LAVALINK_NODES must contain 1..16 nodes");
-  }
-
-  return parsed.map((item, index) => {
-    if (!item || typeof item !== "object" || Array.isArray(item)) {
-      throw new Error(`Invalid Lavalink node at index ${index}`);
-    }
-    const node = item as Record<string, unknown>;
-    if (
-      typeof node.id !== "string" || !/^[A-Za-z0-9._-]{1,80}$/.test(node.id) ||
-      typeof node.host !== "string" || !node.host.trim() ||
-      typeof node.port !== "number" || !Number.isInteger(node.port) || node.port < 1 || node.port > 65535 ||
-      typeof node.password !== "string" || !node.password
-    ) {
-      throw new Error(`Invalid Lavalink node at index ${index}`);
-    }
-    if (node.secure !== undefined && typeof node.secure !== "boolean") {
-      throw new Error(`Invalid Lavalink secure flag at index ${index}`);
-    }
-    return {
-      id: node.id,
-      host: node.host.trim(),
-      port: node.port,
-      password: node.password,
-      ...(node.secure === true ? { secure: true } : {})
-    };
-  });
-}
-
 export function loadConfig(): AppConfig {
   const backupS3 = parseBackupS3();
   const botIdentityId = process.env.BOT_IDENTITY_ID ?? "primary";
@@ -178,10 +130,10 @@ export function loadConfig(): AppConfig {
     managementApiKey: required("MANAGEMENT_API_KEY"),
     botCredentialsEncryptionKey: required("BOT_CREDENTIALS_ENCRYPTION_KEY"),
     databaseUrl: required("DATABASE_URL"),
-    lavalinkHost: process.env.LAVALINK_HOST ?? "127.0.0.1",
-    lavalinkPort: port("LAVALINK_PORT", 2333),
-    lavalinkPassword: required("LAVALINK_PASSWORD"),
-    lavalinkNodes: parseLavalinkNodes(),
+    ytDlpPath: process.env.YTDLP_PATH ?? "yt-dlp",
+    ffmpegPath: process.env.FFMPEG_PATH ?? "ffmpeg",
+    ytDlpJsRuntime: process.env.YTDLP_JS_RUNTIME ?? "node",
+    ...(process.env.YTDLP_COOKIES_FILE?.trim() ? { ytDlpCookiesFile: process.env.YTDLP_COOKIES_FILE.trim() } : {}),
     backupDirectory: process.env.BACKUP_DIRECTORY ?? "./data/backups",
     backupRetentionCount: integer("BACKUP_RETENTION_COUNT", 30, 1, 10_000),
     ...(backupS3 ? { backupS3 } : {}),
