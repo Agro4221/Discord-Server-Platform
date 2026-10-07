@@ -40,7 +40,7 @@ export function CommunityToolsPanel({ guildId, channels, onChanged }: { guildId:
     <div style={{ display: "grid", gap: 14 }}>
       {error && <div style={errorBox}>{error}</div>}
       <section style={panel}>
-        <div style={label}>CREATE POLL</div>
+        <div style={label}>СОЗДАНИЕ ОПРОСА</div>
         <div style={{ display: "grid", gap: 8, marginTop: 9 }}>
           <select value={pollChannelId} onChange={(e) => setPollChannelId(e.target.value)} style={inputStyle}>
             <option value="">Канал…</option>
@@ -95,7 +95,7 @@ export function CommunityToolsPanel({ guildId, channels, onChanged }: { guildId:
           </button>
         </div>
       </section>
-      <section style={panel}><div style={label}>STICKY MESSAGE</div>
+      <section style={panel}><div style={label}>ПОСТОЯННОЕ СООБЩЕНИЕ</div>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(180px,1fr) minmax(220px,1.4fr) auto", gap: 8, marginTop: 9 }}>
           <select value={stickyChannelId} onChange={(e) => setStickyChannelId(e.target.value)} style={inputStyle}><option value="">Канал…</option>{channels.map((c) => <option key={c.id} value={c.id}>#{c.name}</option>)}</select>
           <input value={stickyMessage} onChange={(e) => setStickyMessage(e.target.value)} maxLength={2000} placeholder="Текст sticky" style={inputStyle} />
@@ -106,10 +106,10 @@ export function CommunityToolsPanel({ guildId, channels, onChanged }: { guildId:
           {!snapshot.stickies.some((item) => item.enabled) && <div style={muted}>Активных sticky нет.</div>}
         </div>
       </section>
-      <section style={panel}><div style={label}>POLLS</div>
+      <section style={panel}><div style={label}>ОПРОСЫ</div>
         {snapshot.polls.length === 0 ? <div style={muted}>Опросов нет.</div> : snapshot.polls.map((poll) => <div key={poll.id} style={row}><div style={{ minWidth: 0, flex: 1 }}><strong>{"#" + poll.id}</strong><div style={{ color: "#c3cbd7", marginTop: 3, fontSize: 10 }}>{poll.question}</div><div style={muted}>{poll.options.join(" · ")} · до {formatDate(poll.endsAt)}</div></div><span style={{ color: poll.closed ? "#687386" : "#79ba91", fontSize: 9 }}>{poll.closed ? "CLOSED" : "ACTIVE"}</span>{!poll.closed && <button type="button" disabled={!!busy} onClick={() => void mutate("poll.close", { id: poll.id })} style={button("secondary")}>Закрыть</button>}</div>)}
       </section>
-      <section style={panel}><div style={label}>SUGGESTIONS</div>
+      <section style={panel}><div style={label}>ПРЕДЛОЖЕНИЯ</div>
         {snapshot.suggestions.length === 0 ? <div style={muted}>Предложений нет.</div> : snapshot.suggestions.map((item) => <div key={item.id} style={row}><div style={{ minWidth: 0, flex: 1 }}><strong>{"#" + item.id + " · " + item.userId}</strong><div style={{ color: "#c3cbd7", marginTop: 3, fontSize: 10, whiteSpace: "pre-wrap" }}>{item.content}</div></div><span style={{ color: item.status === "pending" ? "#d7aa72" : item.status === "approved" ? "#79ba91" : "#d17982", fontSize: 9 }}>{item.status}</span>{item.status === "pending" && <><button type="button" disabled={!!busy} onClick={() => void mutate("suggestion.status", { id: item.id, status: "approved" })} style={button("primary")}>Одобрить</button><button type="button" disabled={!!busy} onClick={() => void mutate("suggestion.status", { id: item.id, status: "denied" })} style={button("danger")}>Отклонить</button></>}</div>)}
       </section>
     </div>
