@@ -40,17 +40,17 @@ Technical implementation freeze — current agreed feature scope is implemented;
 - Multi-bot identity persistence for separate-process fleet deployment, per-voice Music routing and identity-scoped background workers.
 - Config transfer and compressed local backups with guild-scoped restore/delete controls, including local/remote retention enforcement.
 - Docker Compose / Dockerfiles for local-to-VPS topology.
-- Native Windows local runtime for low-overhead gaming/streaming, with single-Lavalink default and opt-in Dashboard/second Lavalink.
+- Native Windows local runtime for low-overhead gaming/streaming, with yt-dlp + FFmpeg music and opt-in Dashboard.
 
 ## Remaining verification work
 - Live Discord E2E smoke test on the user's real test server.
-- Lavalink restart/resume and multi-node failover validation in the real runtime.
+- Live yt-dlp/FFmpeg playback, YouTube edge cases and stream/recovery validation in the real runtime.
 - Multi-bot fleet takeover validation with real secondary identities.
 - Windows native launcher/runtime validation on the actual gaming/streaming PC.
 - VPS clean-host install/upgrade acceptance and secure remote-access/reverse-proxy drill.
 - Full E2E/chaos/soak/security runs in a controlled environment.
 
-The current implementation includes the agreed Automation action breadth, expanded AutoMod detector set, Spotify/Yandex Music provider wiring through LavaSrc, optional Docker Lavalink2 failover, native/Docker Fleet handling and VPS bootstrap/upgrade secret repair. Further feature additions after this freeze require an explicit scope decision.
+The current implementation includes the agreed Automation action breadth, expanded AutoMod detector set, local yt-dlp + FFmpeg Music, native/Docker Fleet handling and VPS bootstrap/upgrade secret repair. Further feature additions after this freeze require an explicit scope decision.
 
 ## Verification
 - GitHub Actions CI runs on Node.js 24.17.
@@ -71,7 +71,7 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - GitHub Actions CI run #1846 (37237396426) completed successfully on this exact HEAD.
 - The green CI job completed dependency installation/audit, source hygiene, deployment and observability checks, bot typecheck, bot tests, domain build, bot build and Dashboard production build.
 - Functional development is now treated as frozen for the release candidate. New work should be driven by a live failure, a concrete correctness/security defect, or an explicitly chosen post-RC feature.
-- Remaining release-gate items are environment-dependent: real Discord smoke/E2E, Lavalink/fleet failover, Windows runtime, VPS clean-host acceptance and controlled chaos/soak/security validation.
+- Remaining release-gate items are environment-dependent: real Discord smoke/E2E with YouTube playback, yt-dlp/FFmpeg recovery validation, multi-bot fleet takeover, Windows runtime, VPS clean-host acceptance and controlled chaos/soak/security validation.
 
 
 ## 2026-09-19 — Giveaway lifecycle hardening
