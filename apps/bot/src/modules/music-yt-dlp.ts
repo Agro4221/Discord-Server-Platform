@@ -333,19 +333,46 @@ export class YtDlpMusicEngine implements PlatformModule {
   }
 
   private async searchEverywhere(query:string):Promise<MusicSearchHit[]> {
-    const jobs=MUSIC_WEB_SEARCH_TARGETS.flatMap(target=>[this.searchWebIndex(target,query,"track"),this.searchWebIndex(target,query+" playlist album set","playlist")]);
-    const settled=await Promise.allSettled(jobs);const out:MusicSearchHit[]=[];
+    const nativeProviders:Array<{provider:"youtube"|"soundcloud";target:string}>= [
+      {provider:"youtube",target:"ytsearch8:"+query},
+      {provider:"soundcloud",target:"scsearch8:"+query}
+    ];
+    const nativeJobs=nativeProviders.map(async item=>{
+      const r=await runProcess(this.config.ytDlpPath,[...this.ytArgs(),"--dump-single-json","--flat-playlist","--skip-download",item.target],12000);
+      if(r.code!==0)return[] as MusicSearchHit[];
+      try{
+        const parsed=JSON.parse(r.stdout);
+        const entries=Array.isArray(parsed.entries)?parsed.entries:[parsed];
+        return entries.map((entry:any,index:number)=>normalizeYtDlpEntry(entry,index)).filter((track:MusicTrack|null):track is MusicTrack=>Boolean(track)).slice(0,8).map(track=>({provider:item.provider,kind:"track" as const,title:track.title,url:track.url}));
+      }catch{return[] as MusicSearchHit[];}
+    });
+    const webJobs=MUSIC_WEB_SEARCH_TARGETS.flatMap(target=>[
+      this.searchWebIndex(target,query,"track"),
+      this.searchWebIndex(target,query+" playlist album set","playlist")
+    ]);
+    const settled=await Promise.allSettled([...nativeJobs,...webJobs]);
+    const out:MusicSearchHit[]=[];
     for(const result of settled)if(result.status==="fulfilled")out.push(...result.value);
     const seen=new Set<string>();
     return out.filter(item=>{if(seen.has(item.url))return false;seen.add(item.url);return true;}).slice(0,24);
   }
 
   private async searchWebIndex(target:{provider:MusicSearchProvider;domain:string;trackQuery:string;playlistQuery:string},query:string,kind:MusicSearchHitKind):Promise<MusicSearchHit[]> {
-    const q=("site:"+target.domain+" "+(kind==="playlist"?target.playlistQuery:target.trackQuery)+" "+query).trim().slice(0,500);
-    const url="https://html.duckduckgo.com/html/?q="+encodeURIComponent(q)+"&kl=wt-wt";
-    const response=await fetch(url,{headers:{"user-agent":"Discord-Server-Platform Music Search/1.0","accept":"text/html"},signal:AbortSignal.timeout(8000)});
-    if(!response.ok)throw new Error("music_web_search_http_"+response.status);
-    return parseDuckDuckGoMusicResults(await response.text(),target.provider,target.domain,kind);
+    const terms=kind==="playlist"?"playlist album set":target.trackQuery;
+    const q=("site:"+target.domain+" "+query+" "+terms).trim().slice(0,500);
+    const urls=[
+      "https://lite.duckduckgo.com/lite/?q="+encodeURIComponent(q)+"&kl=wt-wt",
+      "https://html.duckduckgo.com/html/?q="+encodeURIComponent(q)+"&kl=wt-wt"
+    ];
+    for(const url of urls){
+      try{
+        const response=await fetch(url,{headers:{"user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) Discord-Server-Platform/1.0","accept":"text/html"},signal:AbortSignal.timeout(8000)});
+        if(!response.ok)continue;
+        const hits=parseDuckDuckGoMusicResults(await response.text(),target.provider,target.domain,kind);
+        if(hits.length)return hits;
+      }catch{}
+    }
+    return [];
   }
 
   private async replySearchResults(message:Message,query:string,results:MusicSearchHit[]):Promise<void> {
