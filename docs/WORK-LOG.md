@@ -1178,3 +1178,8 @@ Never write credentials, tokens or private user data here.
 - Added an immediate search status reply, an 8-second timeout for each external web-index request, and more tolerant DuckDuckGo redirect parsing.
 - Fixed playlist progression so a failed track resolution is skipped and the queue continues instead of stopping after the first track.
 - Playlist progression now attempts the full bounded Music queue rather than stopping after ten failed entries.
+
+## 2026-10-07 — Music controller placement and search fallback
+- Music controller target selection now prioritizes the text channel where `!play` or `/play` was issued, preventing a configured preferred channel from hiding the player from the command channel.
+- Global Music search now has native yt-dlp discovery for YouTube and SoundCloud in addition to the web-index search for all configured providers.
+- Web search now tries DuckDuckGo Lite first and the HTML endpoint second, with per-request timeouts and graceful empty-provider fallback.
