@@ -1087,3 +1087,10 @@ Never write credentials, tokens or private user data here.
 - Open a new PowerShell session so the WinGet PATH update becomes visible.
 - Run `yt-dlp --version`, a non-downloading metadata lookup for representative provider URLs, then `npm run typecheck` and `npm test` again.
 - Run the native launcher and perform live Discord voice playback smoke tests for YouTube, TikTok, Yandex Music, VK, SoundCloud and a Spotify track link.
+
+
+## 2026-10-07 — Music helper export compatibility fix
+- User's full `npm run typecheck` passed after the multi-source Music changes.
+- User's `npm test` reached 146 passing tests and one test-file failure caused by `detectMusicSearchProvider` being implemented in `music-yt-dlp.ts` but omitted from the compatibility re-export in `music.ts`.
+- Fixed `apps/bot/src/modules/music.ts` to re-export `detectMusicSearchProvider`.
+- Next verification: refresh this one local file and rerun `npm test`.
