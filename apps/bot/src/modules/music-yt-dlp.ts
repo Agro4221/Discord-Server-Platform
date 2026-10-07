@@ -226,7 +226,7 @@ export class YtDlpMusicEngine implements PlatformModule {
     const s:Session={guildId:guild.id,voiceChannelId,textChannelId:st.preferredTextChannelId,player,connection,queue:[],current:null,positionMs:0,positionChangedAt:Date.now(),paused:false,volume:st.defaultVolume,repeatMode:"off",autoplay:st.autoplay,filter:"off",ffmpeg:null,resource:null,intentionalStop:false,transitioning:false,controllerMessageId:null,autoLeaveTimer:null};
     player.on(AudioPlayerStatus.Idle,()=>void this.idle(s));
     connection.on("stateChange",(_o,state)=>{if(state.status===VoiceConnectionStatus.Disconnected)setTimeout(()=>{if(this.sessions.get(s.guildId)!==s||s.connection.state.status!==VoiceConnectionStatus.Disconnected)return;logger.info("Music voice rejoin requested",{guildId:s.guildId,rejoined:s.connection.rejoin()});},1000).unref();});
-    this.sessions.set(guild.id,s);await this.persist(s);return s;
+    this.sessions.set(guild.id,s);await this.persist(s);this.scheduleLeave(s);return s;
   }
 
   private async playNext(s:Session):Promise<void>{
@@ -260,7 +260,7 @@ export class YtDlpMusicEngine implements PlatformModule {
   private async pause(s:Session):Promise<void>{if(!s.current)throw new Error("music_player_not_started");s.positionMs=this.position(s);s.paused=true;s.player.pause();}
   private async resume(s:Session):Promise<void>{if(!s.current)throw new Error("music_player_not_started");s.paused=false;s.positionChangedAt=Date.now();s.player.unpause();}
   private async skip(s:Session):Promise<void>{if(!s.current)throw new Error("music_player_not_started");if(s.transitioning)return;s.transitioning=true;try{s.intentionalStop=true;s.player.stop(true);this.killFfmpeg(s);s.intentionalStop=false;s.current=s.queue.shift()??null;s.positionMs=0;if(s.current)await this.start(s,0,false);else this.scheduleLeave(s);}finally{s.transitioning=false;}}
-  private async stop(s:Session):Promise<void>{s.intentionalStop=true;s.player.stop(true);this.killFfmpeg(s);s.queue.length=0;s.current=null;s.positionMs=0;s.paused=false;this.cancelLeave(s);}
+  private async stop(s:Session):Promise<void>{s.intentionalStop=true;s.player.stop(true);this.killFfmpeg(s);s.queue.length=0;s.current=null;s.positionMs=0;s.paused=false;this.scheduleLeave(s);}
 
   private position(s:Session):number{return s.current?musicResumePosition(s.positionMs,s.positionChangedAt,s.paused,s.current.durationMs,Date.now()):0;}
 
