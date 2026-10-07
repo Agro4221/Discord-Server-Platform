@@ -1,62 +1,81 @@
 # Native Windows mode
 
-For a gaming/streaming PC, Vexa can run without Docker Desktop. This keeps the bot, Dashboard and Lavalink as ordinary Windows processes instead of placing the application stack inside the Docker/WSL layer.
+For a gaming/streaming PC, Discord Server Platform can run without Docker Desktop. This keeps the bot, Dashboard and local yt-dlp + FFmpeg playback as ordinary Windows processes instead of placing the application stack inside the Docker/WSL layer.
 
-## Everyday gaming launch
+## Full native launch
 
 Use:
 
-    start-native.bat
+    .\start-native.bat
 
-This intentionally starts only:
-- PostgreSQL as the separately installed local database
-- one Lavalink process
-- the compiled Vexa bot
+The default native launch starts the full local platform required for acceptance testing:
+- PostgreSQL as the local database
+- the compiled Discord Server Platform bot
+- the Control Center Dashboard
+- the native Fleet supervisor for registered secondary Bot Identities
 
-The Dashboard stays off to keep the background footprint low. When the Dashboard is needed:
+The Dashboard opens automatically after it becomes ready. Use:
 
-    start-native.bat -Dashboard
+    .\start-native.bat -NoOpen
 
-The second Lavalink node is optional:
+to keep the Dashboard running without opening a browser window.
 
-    start-native.bat -Lavalink2
+After a successful native startup, the launcher batch terminates its console window. An error keeps the console open so the failure can be read.
 
-For a single-PC gaming setup, the default one-node mode is the normal choice. The second node exists for redundancy/failover scenarios and is not required for ordinary music playback.
+The legacy `-Dashboard` switch remains accepted for compatibility; Dashboard is enabled by default.
+Registered secondary Bot Identities are supervised natively by the launcher without Docker. Each secondary process uses its own `BOT_IDENTITY_ID`, reads its encrypted Discord token from PostgreSQL and writes its PID/logs under `.native-runtime/`.
 
-## Native requirements
+For a single-PC gaming setup, yt-dlp + FFmpeg is the normal music path. Direct URLs can come from YouTube, TikTok, Yandex Music, VK, SoundCloud and other yt-dlp-supported extractors. Spotify track links are accepted through metadata bridging to an available playable source. There is no separate Lavalink service to keep running.
 
-Install these on Windows:
-- Node.js 24.17+
-- PostgreSQL with psql.exe and pg_isready.exe available in PATH
-- Java runtime compatible with the Lavalink version used by the repository
-- A Lavalink JAR downloaded separately
+## Native first-run bootstrap
 
-Set LAVALINK_JAR_PATH in .env to the Lavalink JAR location. The launcher defaults to:
+The normal native launcher is intentionally self-contained. On first run it:
+- reuses PostgreSQL portable binaries from .\tools\pgsql when present
+- downloads PostgreSQL portable binaries automatically when they are missing
+- initializes .postgres-data as UTF-8 when no local cluster exists
+- starts the local PostgreSQL server automatically when it is stopped
+- creates the discord_platform database automatically
+- installs Node.js 24.21.0 automatically through winget when the required runtime is missing
+- installs yt-dlp and FFmpeg through winget when the music tools are missing
 
-    .\infrastructure\lavalink\lavalink.jar
+No Docker Desktop is involved.
 
-The repository does not commit a Lavalink JAR.
+The launcher keeps runtime dependencies local to the machine/project where practical. PostgreSQL data lives under:
 
-The native launcher uses the existing .env DATABASE_URL. The database itself remains PostgreSQL; native mode does not replace it with a different database engine.
+    .\.postgres-data
+
+A working internet connection is required on a first run that needs to bootstrap missing dependencies.
+
+The native launcher still uses the .env DATABASE_URL; the database engine remains PostgreSQL.
 
 ## Build behavior
 
-The first native start builds the domain package and bot. The Dashboard is built only when -Dashboard is requested. Later starts reuse the compiled output.
+The first native start builds the domain package and bot. The Dashboard is built during the normal native launch. Later starts reuse the compiled output.
 
 Use -Rebuild after source/dependency changes:
 
-    start-native.bat -Rebuild
-    start-native.bat -Dashboard -Rebuild
+    .\start-native.bat -Rebuild
+    .\start-native.bat -Rebuild
 
 This prevents the normal gaming launch from performing a large TypeScript/Next.js build every time.
 
 ## Stop
 
-Stop only the Vexa processes started by the native launcher:
+Stop only the Discord Server Platform processes started by the native launcher:
 
-    start-native.bat -Down
+    .\start-native.bat -Down
 
 The launcher stores temporary PIDs and logs under .native-runtime/, which is ignored by Git.
+
+## Native release gate
+
+Run the non-destructive native preflight after startup:
+
+    powershell -ExecutionPolicy Bypass -File .\scripts\release-gate-native.ps1
+
+Add `-Dashboard` when the Control Center is expected to be running.
+
+The native gate checks the primary Bot process, Bot health/readiness, Management API authentication, enabled Fleet identities, native secondary-process PID state, Dashboard reachability when requested, and the required yt-dlp/FFmpeg tooling.
 
 ## Docker mode
 
@@ -66,3 +85,22 @@ Docker Compose remains supported for reproducible deployments and VPS use:
 
 The normal Docker launcher no longer rebuilds images on every start. Use -Rebuild when an image rebuild is actually needed.
 
+
+
+## Native diagnostics
+
+For a read-only snapshot of the native runtime:
+
+    powershell -ExecutionPolicy Bypass -File .\scripts\native-diagnostics.ps1
+
+Include Dashboard when it is expected:
+
+    powershell -ExecutionPolicy Bypass -File .\scripts\native-diagnostics.ps1 -Dashboard
+
+For machine-readable output:
+
+    powershell -ExecutionPolicy Bypass -File .\scripts\native-diagnostics.ps1 -Json
+
+The Control Center System page also provides a live bot log panel and a graceful "Выключить бота" control.
+
+The diagnostic report checks process/PID state, Bot health, Management API authentication, Fleet identity state, Dashboard reachability and yt-dlp and FFmpeg versions. Tokens/passwords are never printed.

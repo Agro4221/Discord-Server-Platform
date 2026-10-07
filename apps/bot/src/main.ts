@@ -31,21 +31,28 @@ import { ModuleSettingsRepository } from "./module-settings.js";
 import { AuditLog } from "./audit.js";
 import { PlatformEventBus } from "./events.js";
 import { BotIdentityRepository } from "./bot-identity.js";
+import { BotCredentialsService } from "./bot-credentials.js";
 import { ConfigTransferService } from "./config-transfer.js";
 import { BackupService } from "./backup.js";
 import { CustomCommandService } from "./custom-commands.js";
 import { CommandPolicyService } from "./command-policy.js";
+import { Utility } from "./modules/utility.js";
+import { CommunityTools } from "./modules/community-tools.js";
+import { Logging } from "./modules/logging.js";
+import { CommandDispatcher } from "./command-dispatcher.js";
+import { ContextCommandService } from "./context-commands.js";
 
 let fatalCleanup: (() => Promise<void>) | undefined;
 
 async function main(): Promise<void> {
-  const config = loadConfig();
+  let config = loadConfig();
   const health = new HealthServer();
   const database = new Database(config.databaseUrl);
   const moduleSettings = new ModuleSettingsRepository(database);
   const auditLog = new AuditLog(database);
   const dashboardSettings = new DashboardSettingsService(database);
   const identities = new BotIdentityRepository(database, config.botIdentityId);
+  const botCredentials = new BotCredentialsService(database, config.botCredentialsEncryptionKey);
   const transfer = new ConfigTransferService(database);
   const backups = new BackupService(
     database,
@@ -64,10 +71,20 @@ async function main(): Promise<void> {
   try {
     await database.ping();
     await migrate(database);
+    const runtimeCredentials = await botCredentials.resolveRuntimeCredentials(
+      config.botIdentityId,
+      config.discordToken || undefined,
+      config.discordClientId || undefined
+    );
+    config = {
+      ...config,
+      discordToken: runtimeCredentials.token,
+      discordClientId: runtimeCredentials.clientId
+    };
     await identities.ensureIdentity(config.botIdentityId, config.discordClientId);
     await identities.refreshAssignments();
     health.set({ database: "ready" });
-    await identities.heartbeat("starting", 0).catch((error) => {
+    await identities.heartbeat("starting", 0, true).catch((error) => {
       logger.warn("Initial fleet heartbeat failed", { identityId: config.botIdentityId, error: String(error) });
     });
   } catch (error) {
@@ -84,7 +101,10 @@ async function main(): Promise<void> {
 
   const client = createDiscordClient();
   auditLog.setClient(client);
-  const events = new PlatformEventBus((guildId) => identities.ownsGuild(guildId));
+  const events = new PlatformEventBus(
+    (guildId) => identities.ownsGuild(guildId),
+    (guildId) => identities.verifyGuildOwnership(guildId)
+  );
   const temporaryVoice = new TemporaryVoice(database, () => client.guilds.cache.values());
   const moderation = new Moderation(database);
   const autoMod = new AutoMod(database);
@@ -95,16 +115,47 @@ async function main(): Promise<void> {
   const giveaways = new Giveaways(database);
   const economy = new Economy(database);
   const reminders = new Reminders(database);
+  const utility = new Utility(database);
+  const communityTools = new CommunityTools(database);
+  const logging = new Logging(database);
   const starboard = new Starboard(database);
-  const automation = new AutomationEngine(database);
+  const automation = new AutomationEngine(database, moderation);
   const security = new Security(database);
   const notifications = new Notifications(database);
-  const streamAlerts = new StreamAlerts(database, config.streamAlerts);
+  const streamAlerts = new StreamAlerts(database, { ...config.streamAlerts, ytDlpPath: config.ytDlpPath, ytDlpJsRuntime: config.ytDlpJsRuntime, ytDlpCookiesFile: config.ytDlpCookiesFile });
   const verification = new Verification(database);
   const analytics = new Analytics(database);
   const music = new Music(database, config, identities);
   const customCommands = new CustomCommandService(database, config);
   const commandPolicy = new CommandPolicyService(database);
+  const contextCommands = new ContextCommandService(commandPolicy, moderation);
+
+  const dispatcher = new CommandDispatcher(
+    client,
+    database,
+    temporaryVoice,
+    moderation,
+    commandPolicy,
+    leveling,
+    economy,
+    reminders,
+    utility,
+    communityTools,
+    logging,
+    welcome,
+    verification,
+    security,
+    autoMod,
+    starboard,
+    notifications,
+    automation,
+    tickets,
+    rolePanels,
+    giveaways,
+    music,
+    analytics
+  );
+  customCommands.attachDispatcher(dispatcher);
 
   const setModuleHealth = (
     name: string,
@@ -155,6 +206,7 @@ async function main(): Promise<void> {
 
   modules.register(temporaryVoice);
   modules.register(moderation);
+  modules.register(contextCommands);
   modules.register(autoMod);
   modules.register(welcome);
   modules.register(leveling);
@@ -163,6 +215,9 @@ async function main(): Promise<void> {
   modules.register(giveaways);
   modules.register(economy);
   modules.register(reminders);
+  modules.register(utility);
+  modules.register(communityTools);
+  modules.register(logging);
   modules.register(starboard);
   modules.register(automation);
   modules.register(security);
@@ -219,19 +274,30 @@ async function main(): Promise<void> {
         ? client.guilds.cache.has(guildId)
         : identities.ownsGuild(guildId),
     identities,
+    botCredentials,
     moduleSettings,
     auditLog,
     settings: dashboardSettings,
     transfer,
+    shutdown: async () => {
+      await fatalCleanup?.();
+    },
     backups,
     customCommands,
     moderation,
     music,
     leveling,
+    tickets,
+    communityTools,
+    verification,
+    welcome,
+    security,
+    temporaryVoice,
     autoMod,
     commandPolicy,
     giveaways: {
       list: async (guildId) => giveaways.list(guildId),
+      create: async (guildId, input) => giveaways.dashboardCreateGiveaway(guildId, input.channelId, input.hostUserId, input.prize, input.winners, input.minutes),
       end: async (guildId, giveawayId) => giveaways.endGiveaway(giveawayId, guildId),
       reroll: async (guildId, giveawayId) => giveaways.rerollGiveaway(giveawayId, guildId)
     },
@@ -247,6 +313,7 @@ async function main(): Promise<void> {
     streamAlerts: {
       list: async (guildId) => streamAlerts.list(guildId),
       providers: () => streamAlerts.providers(),
+      checkNow: async (guildId, alertId) => streamAlerts.checkNow(guildId, alertId),
       create: async (guildId, input) => streamAlerts.create(guildId, input),
       update: async (guildId, alertId, input) => streamAlerts.update(guildId, alertId, input),
       delete: async (guildId, alertId) => streamAlerts.delete(guildId, alertId)
@@ -287,26 +354,139 @@ async function main(): Promise<void> {
     actions: {
       "temporary-voice.reconcile": async (guildId) => { await temporaryVoice.reconcileGuild(guildId); return { guildId, ok: true }; },
       "automation.reload": async (guildId) => { await automation.reload(); return { guildId, ok: true }; },
-      "security.check-hierarchy": async (guildId) => security.checkHierarchy(guildId)
+      "security.check-hierarchy": async (guildId) => security.checkHierarchy(guildId),
+      "security.clear-incidents": async (guildId) => ({ cleared: await security.clearIncidents(guildId), active: await security.getActiveIncidents(guildId) })
     }
   });
   await management.start();
 
-  await registerCommands(config, client);
   wireDiscordEvents(client, events);
   client.once("ready", () => temporaryVoice.markReady());
 
-  await identities.claimUnassignedGuilds([...client.guilds.cache.keys()]);
-  await identities.refreshAssignments();
-
   fleetTimer = setInterval(() => {
-    void identities.refreshAssignments()
-      .then(() => identities.heartbeat(modulesHealthy ? "ready" : "degraded", client.guilds.cache.size))
-      .catch((error) => logger.warn("Fleet heartbeat failed", {
+    void (async () => {
+      const connectedGuildIds = [...client.guilds.cache.keys()];
+
+      if (config.botIdentityId === "primary") {
+        try {
+          const claimed = await identities.claimStaleGuildsAsPrimary(connectedGuildIds, 100);
+          if (claimed.length) {
+            logger.warn("Primary fleet failover claimed stale guilds", {
+              identityId: config.botIdentityId,
+              guildIds: claimed.map((item) => item.guildId),
+              count: claimed.length
+            });
+            for (const item of claimed) {
+              await auditLog.record({
+                guildId: item.guildId,
+                source: "system",
+                action: "fleet.guild.failover",
+                targetType: "bot-identity",
+                targetId: config.botIdentityId,
+                metadata: {
+                  reason: "stale-heartbeat",
+                  previousIdentityId: item.previousIdentityId,
+                  newIdentityId: config.botIdentityId
+                }
+              }).catch((auditError) => logger.warn("Fleet guild failover audit failed", {
+                guildId: item.guildId,
+                error: String(auditError)
+              }));
+            }
+          }
+        } catch (error) {
+          logger.warn("Primary fleet failover check failed", {
+            identityId: config.botIdentityId,
+            error: String(error)
+          });
+        }
+      } else {
+        try {
+          const claimed = await identities.claimStaleGuilds(connectedGuildIds, 20);
+          if (claimed.length) {
+            logger.warn("Fleet failover claimed stale guilds", {
+              identityId: config.botIdentityId,
+              guildIds: claimed.map((item) => item.guildId),
+              count: claimed.length
+            });
+            for (const item of claimed) {
+              await auditLog.record({
+                guildId: item.guildId,
+                source: "system",
+                action: "fleet.guild.failover",
+                targetType: "bot-identity",
+                targetId: config.botIdentityId,
+                metadata: {
+                  reason: "stale-heartbeat",
+                  previousIdentityId: item.previousIdentityId,
+                  newIdentityId: config.botIdentityId
+                }
+              }).catch((auditError) => logger.warn("Fleet guild failover audit failed", {
+                guildId: item.guildId,
+                error: String(auditError)
+              }));
+            }
+          }
+        } catch (error) {
+          logger.warn("Fleet failover check failed", {
+            identityId: config.botIdentityId,
+            error: String(error)
+          });
+        }
+      }
+
+      try {
+        const claimedMusic = await identities.claimStaleMusicAssignments(connectedGuildIds, config.botIdentityId === "primary" ? 100 : 20);
+        if (claimedMusic.length) {
+          logger.warn("Fleet Music failover claimed stale voice assignments", {
+            identityId: config.botIdentityId,
+            guildIds: claimedMusic.map((item) => item.guildId),
+            count: claimedMusic.length
+          });
+          for (const item of claimedMusic) {
+            await auditLog.record({
+              guildId: item.guildId,
+              source: "system",
+              action: "fleet.music.failover",
+              targetType: "voice-channel",
+              targetId: item.voiceChannelId,
+              metadata: {
+                reason: "stale-heartbeat",
+                previousIdentityId: item.previousIdentityId,
+                newIdentityId: config.botIdentityId
+              }
+            }).catch((auditError) => logger.warn("Fleet Music failover audit failed", {
+              guildId: item.guildId,
+              voiceChannelId: item.voiceChannelId,
+              error: String(auditError)
+            }));
+          }
+        }
+      } catch (error) {
+        logger.warn("Fleet Music failover check failed", {
+          identityId: config.botIdentityId,
+          error: String(error)
+        });
+      }
+
+      try {
+        await identities.refreshAssignments();
+      } catch (error) {
+        logger.warn("Fleet assignment refresh failed", {
+          identityId: config.botIdentityId,
+          error: String(error)
+        });
+      }
+
+      await identities.heartbeat(
+        modulesHealthy ? "ready" : "degraded",
+        client.guilds.cache.size
+      ).catch((error) => logger.warn("Fleet heartbeat failed", {
         identityId: config.botIdentityId,
         error: String(error)
       }));
-  }, 15_000);
+    })();
+  }, 30_000);
   fleetTimer.unref();
 
   events.on("interaction.command", (interaction) => {
@@ -317,22 +497,48 @@ async function main(): Promise<void> {
 
   const prefixCommands = new PrefixCommandRouter(
     database,
-    leveling,
-    moderation,
-    music,
     customCommands,
     commandPolicy,
-    economy,
-    reminders,
-    tickets,
-    rolePanels,
-    giveaways
-  );
-  events.on("message.create", (message) => {
+    dispatcher
+  );  events.on("message.create", (message) => {
     void prefixCommands.handleMessage(message);
   });
 
-  await client.login(config.discordToken);
+  let discordLoginError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      logger.info("Discord login attempt", { attempt, maxAttempts: 3 });
+      await client.login(config.discordToken);
+      discordLoginError = undefined;
+      break;
+    } catch (error) {
+      discordLoginError = error;
+      logger.warn("Discord login attempt failed", {
+        attempt,
+        maxAttempts: 3,
+        error: String(error)
+      });
+      client.destroy();
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
+    }
+  }
+
+  if (discordLoginError) {
+    throw discordLoginError;
+  }
+
+  await identities.claimUnassignedGuilds([...client.guilds.cache.keys()]);
+  await identities.refreshAssignments();
+
+  try {
+    await registerCommands(config, client);
+  } catch (error) {
+    logger.error("Discord command registration failed; continuing with existing commands", {
+      error: String(error)
+    });
+  }
 
   let shuttingDown = false;
   const shutdown = async (signal: string) => {

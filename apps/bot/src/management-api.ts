@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import type { Client } from "discord.js";
-import { logger } from "./logger.js";
+import { getRecentLogs, logger } from "./logger.js";
 import { ModuleSettingsRepository } from "./module-settings.js";
 import { MODULE_CATALOG, type ModuleKey } from "./modules/catalog.js";
 import { AuditLog } from "./audit.js";
@@ -15,9 +15,17 @@ import type { Music } from "./modules/music.js";
 import type { Leveling } from "./modules/leveling.js";
 import type { Economy } from "./modules/economy.js";
 import type { AutoMod } from "./modules/automod.js";
+import type { Tickets } from "./modules/tickets.js";
+import type { Starboard } from "./modules/starboard.js";
+import type { CommunityTools } from "./modules/community-tools.js";
+import type { Verification } from "./modules/verification.js";
+import type { Welcome } from "./modules/welcome.js";
+import type { Security } from "./modules/security.js";
+import type { TemporaryVoice } from "./modules/temporary-voice.js";
 import { CommandPolicyService, COMMAND_DEFINITIONS } from "./command-policy.js";
 import type { StreamAlertPlatform } from "./modules/stream-alerts.js";
 import { BotIdentityRepository } from "./bot-identity.js";
+import type { BotCredentialsService } from "./bot-credentials.js";
 
 type ApiOptions = {
   host: string;
@@ -30,10 +38,18 @@ type ApiOptions = {
   transfer: ConfigTransferService;
   backups: BackupService;
   identities?: BotIdentityRepository;
+  botCredentials?: BotCredentialsService;
   guildAccess?: (guildId: string) => boolean;
   actions: Record<string, (guildId: string) => Promise<unknown>>;
   giveaways?: {
     list: (guildId: string) => Promise<unknown[]>;
+    create: (guildId: string, input: {
+      channelId: string;
+      hostUserId: string;
+      prize: string;
+      winners: number;
+      minutes: number;
+    }) => Promise<unknown>;
     end: (guildId: string, giveawayId: number) => Promise<unknown>;
     reroll: (guildId: string, giveawayId: number) => Promise<unknown>;
   };
@@ -49,6 +65,7 @@ type ApiOptions = {
   streamAlerts?: {
     list: (guildId: string) => Promise<unknown[]>;
     providers: () => unknown;
+    checkNow: (guildId: string, alertId: number) => Promise<unknown>;
     create: (guildId: string, input: {
       platform: StreamAlertPlatform;
       target: string;
@@ -93,7 +110,15 @@ type ApiOptions = {
   leveling?: Leveling;
   economy?: Economy;
   autoMod?: AutoMod;
+  tickets?: Tickets;
+  starboard?: Starboard;
+  communityTools?: CommunityTools;
+  verification?: Verification;
+  welcome?: Welcome;
+  security?: Security;
+  temporaryVoice?: TemporaryVoice;
   commandPolicy?: CommandPolicyService;
+  shutdown?: () => Promise<void>;
   rolePanels?: {
     list: (guildId: string) => Promise<unknown[]>;
     create: (
@@ -151,12 +176,15 @@ export class ManagementApiServer {
         });
 
         try {
-          if (!this.allowedRate(ip)) {
+          const isFleetRegistration = requestPath === "/api/fleet/register";
+          const requestRateLimit = isFleetRegistration ? 10 : 120;
+          const rateKey = isFleetRegistration ? ip + ":fleet-register" : ip;
+          if (!managementApiRateAllows(this.rateWindows, rateKey, requestRateLimit)) {
             this.json(res, 429, { error: "rate_limited" });
             return;
           }
 
-          if (!this.authorized(req.headers.authorization)) {
+          if (!isManagementApiAuthorized(req.headers.authorization, this.options.apiKey)) {
             this.json(res, 401, { error: "unauthorized" });
             return;
           }
@@ -165,9 +193,124 @@ export class ManagementApiServer {
           const url = new URL(requestPath, `http://${this.options.host}:${this.options.port}`);
           const path = url.pathname;
 
+          if (method === "GET" && path === "/api/runtime/catalog") {
+            this.json(res, 200, { catalog: MODULE_CATALOG });
+            return;
+          }
+
+          if (method === "GET" && path === "/api/runtime/logs") {
+            const rawLimit = url.searchParams.get("limit");
+            const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 200;
+            if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+              this.json(res, 400, { error: "invalid_log_limit" });
+              return;
+            }
+            this.json(res, 200, { logs: getRecentLogs(limit) });
+            return;
+          }
+
+          if (method === "POST" && path === "/api/runtime/shutdown") {
+            if (!this.options.shutdown) {
+              this.json(res, 503, { error: "shutdown_unavailable" });
+              return;
+            }
+            logger.warn("Remote shutdown requested", { ip });
+            res.once("finish", () => {
+              setTimeout(() => {
+                void this.options.shutdown!().finally(() => {
+                  setTimeout(() => process.exit(0), 250);
+                });
+              }, 50);
+            });
+            this.json(res, 200, { ok: true, status: "shutting_down" });
+            return;
+          }
+
           const scopedGuild = path.match(/^\/api\/guilds\/([^/]+)/);
           if (scopedGuild && this.options.guildAccess && !this.options.guildAccess(scopedGuild[1] ?? "")) {
             this.json(res, 404, { error: "guild_not_found" });
+            return;
+          }
+
+          if (method === "POST" && path === "/api/fleet/register") {
+            if (!this.options.botCredentials) {
+              this.json(res, 500, { error: "bot_credentials_unavailable" });
+              return;
+            }
+
+            const body = await readJson(req);
+            if (
+              typeof body.identityId !== "string" ||
+              body.identityId.trim().length < 1 ||
+              body.identityId.trim().length > 64 ||
+              typeof body.token !== "string" ||
+              body.token.trim().length < 20 ||
+              body.token.trim().length > 256
+            ) {
+              throw new RequestInputError("invalid_bot_registration", 400);
+            }
+
+            if (body.clientId !== undefined &&
+                (typeof body.clientId !== "string" || !/^\\d{17,20}$/.test(body.clientId))) {
+              throw new RequestInputError("invalid_discord_client_id", 400);
+            }
+
+            if (body.presenceName !== undefined &&
+                body.presenceName !== null &&
+                (typeof body.presenceName !== "string" || body.presenceName.length > 128)) {
+              throw new RequestInputError("invalid_presence_name", 400);
+            }
+
+            if (body.enabled !== undefined && typeof body.enabled !== "boolean") {
+              throw new RequestInputError("invalid_enabled", 400);
+            }
+
+            if (body.failoverEnabled !== undefined && typeof body.failoverEnabled !== "boolean") {
+              throw new RequestInputError("invalid_failover_enabled", 400);
+            }
+
+            const result = await this.options.botCredentials.register({
+              identityId: body.identityId,
+              clientId: body.clientId,
+              token: body.token,
+              presenceName: body.presenceName ?? null,
+              enabled: body.enabled,
+              failoverEnabled: body.failoverEnabled
+            });
+            const restartRequired = !result.created &&
+              result.identityId !== "primary" &&
+              Boolean(this.options.identities?.requestRestart)
+              ? await this.options.identities!.requestRestart(result.identityId)
+              : false;
+
+            await this.options.auditLog.record({
+              guildId: null,
+              source: "dashboard",
+              action: result.created ? "fleet.identity.registered" : "fleet.identity.credentials.rotated",
+              targetType: "bot-identity",
+              targetId: result.identityId,
+              metadata: {
+                clientId: result.clientId,
+                username: result.username,
+                globalName: result.globalName,
+                credentialConfigured: true,
+                restartRequired
+              }
+            });
+
+            this.json(res, 200, {
+              ok: true,
+              identity: {
+                identityId: result.identityId,
+                clientId: result.clientId,
+                username: result.username,
+                globalName: result.globalName,
+                credentialConfigured: true,
+                updatedAt: result.updatedAt,
+                created: result.created,
+                restartRequired
+              }
+            });
             return;
           }
 
@@ -177,6 +320,53 @@ export class ManagementApiServer {
               return;
             }
             this.json(res, 200, { identities: await this.options.identities.listFleet() });
+            return;
+          }
+
+          const fleetIdentityMatch = path.match(/^\/api\/fleet\/([^/]+)$/);
+          if (method === "PATCH" && fleetIdentityMatch) {
+            if (!this.options.identities) {
+              this.json(res, 500, { error: "fleet_unavailable" });
+              return;
+            }
+            const identityId = decodeURIComponent(fleetIdentityMatch[1] ?? "");
+            const body = await readJson(req);
+            const hasFailoverChange = body.failoverEnabled !== undefined;
+            const requestRestart = body.requestRestart === true;
+            if (
+              !identityId ||
+              (!hasFailoverChange && !requestRestart) ||
+              (hasFailoverChange && typeof body.failoverEnabled !== "boolean") ||
+              (body.requestRestart !== undefined && typeof body.requestRestart !== "boolean")
+            ) {
+              throw new RequestInputError("invalid_fleet_identity_update", 400);
+            }
+
+            if (hasFailoverChange) {
+              await this.options.identities.setFailover(identityId, body.failoverEnabled as boolean);
+            }
+
+            const restartRequested = requestRestart
+              ? await this.options.identities.requestRestart(identityId)
+              : false;
+
+            await this.options.auditLog.record({
+              guildId: null,
+              source: "dashboard",
+              action: "fleet.identity.updated",
+              targetType: "bot-identity",
+              targetId: identityId,
+              metadata: {
+                failoverEnabled: hasFailoverChange ? body.failoverEnabled : undefined,
+                restartRequested
+              }
+            });
+            this.json(res, 200, {
+              ok: true,
+              identityId,
+              ...(hasFailoverChange ? { failoverEnabled: body.failoverEnabled } : {}),
+              restartRequested
+            });
             return;
           }
 
@@ -340,6 +530,36 @@ export class ManagementApiServer {
             return;
           }
 
+          const temporaryVoiceMatch = path.match(/^\/api\/guilds\/([^/]+)\/temporary-voice$/);
+          if (method === "GET" && temporaryVoiceMatch) {
+            const guildId = temporaryVoiceMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (!this.options.temporaryVoice) {
+              this.json(res, 500, { error: "temporary_voice_unavailable" });
+              return;
+            }
+            this.json(res, 200, { guildId, ...(await this.options.temporaryVoice.dashboardSnapshot(guildId)) });
+            return;
+          }
+
+          const securityMatch = path.match(/^\/api\/guilds\/([^/]+)\/security$/);
+          if (method === "GET" && securityMatch) {
+            const guildId = securityMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            if (!this.options.security) {
+              this.json(res, 500, { error: "security_unavailable" });
+              return;
+            }
+            this.json(res, 200, { guildId, ...(await this.options.security.dashboardSnapshot(guildId)) });
+            return;
+          }
+
           const actionMatch = path.match(/^\/api\/guilds\/([^/]+)\/actions\/([^/]+)\/([^/]+)$/);
           if (method === "POST" && actionMatch) {
             const guildId = actionMatch[1];
@@ -482,11 +702,74 @@ export class ManagementApiServer {
             return;
           }
 
+          const ticketsMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets$/);
+          const ticketCloseMatch = path.match(/^\/api\/guilds\/([^/]+)\/tickets\/(\\d+)\/close$/);
+
+          if ((ticketsMatch || ticketCloseMatch) && !this.options.tickets) {
+            this.json(res, 500, { error: "tickets_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && ticketsMatch) {
+            const guildId = ticketsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, tickets: await this.options.tickets!.dashboardList(guildId) });
+            return;
+          }
+
+          if (method === "POST" && ticketCloseMatch) {
+            const guildId = ticketCloseMatch[1] ?? "";
+            const ticketId = Number(ticketCloseMatch[2]);
+            if (!guildId || !Number.isSafeInteger(ticketId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_ticket_not_found" });
+              return;
+            }
+            const closed = await this.options.tickets!.dashboardClose(guildId, ticketId);
+            if (!closed) {
+              this.json(res, 404, { error: "ticket_not_found_or_not_open" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "ticket.closed",
+              targetType: "ticket",
+              targetId: String(ticketId)
+            });
+            this.json(res, 200, { ok: true, ticketId });
+            return;
+          }
+
           const giveawaysMatch = path.match(/^\/api\/guilds\/([^/]+)\/giveaways$/);
           const giveawayActionMatch = path.match(/^\/api\/guilds\/([^/]+)\/giveaways\/(\d+)\/(end|reroll)$/);
 
           if ((giveawaysMatch || giveawayActionMatch) && !this.options.giveaways) {
             this.json(res, 500, { error: "giveaways_unavailable" });
+            return;
+          }
+
+          if (method === "POST" && giveawaysMatch) {
+            const guildId = giveawaysMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const channelId = typeof body.channelId === "string" ? body.channelId : "";
+            const hostUserId = typeof body.hostUserId === "string" ? body.hostUserId : "";
+            const prize = typeof body.prize === "string" ? body.prize : "";
+            const winners = Number(body.winners);
+            const minutes = Number(body.minutes);
+            if (!/^\d{15,25}$/.test(channelId) || !/^\d{15,25}$/.test(hostUserId)) throw new RequestInputError("invalid_giveaway_target", 400);
+            if (!prize.trim() || prize.length > 500) throw new RequestInputError("invalid_giveaway_prize", 400);
+            if (!Number.isSafeInteger(winners) || winners < 1 || winners > 20) throw new RequestInputError("invalid_giveaway_winners", 400);
+            if (!Number.isSafeInteger(minutes) || minutes < 1 || minutes > 10080) throw new RequestInputError("invalid_giveaway_duration", 400);
+            const giveawayId = await this.options.giveaways!.create(guildId, { channelId, hostUserId, prize, winners, minutes });
+            await this.options.auditLog.record({ guildId, source: "dashboard", action: "giveaway.created", targetType: "giveaway", targetId: String(giveawayId) });
+            this.json(res, 201, { ok: true, giveawayId });
             return;
           }
 
@@ -612,7 +895,7 @@ export class ManagementApiServer {
           }
 
           const streamAlertsMatch = path.match(/^\/api\/guilds\/([^/]+)\/stream-alerts$/);
-          const streamAlertItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/stream-alerts\/(\\d+)$/);
+          const streamAlertItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/stream-alerts\/(\d+)$/);
 
           if ((streamAlertsMatch || streamAlertItemMatch) && !this.options.streamAlerts) {
             this.json(res, 500, { error: "stream_alerts_unavailable" });
@@ -654,6 +937,22 @@ export class ManagementApiServer {
             });
             await this.options.auditLog.record({ guildId, source: "dashboard", action: "stream-alert.created", targetType: "stream-alert", targetId: String((created as { id?: number }).id ?? "unknown") });
             this.json(res, 200, { ok: true, alert: created });
+            return;
+          }
+
+          if (method === "POST" && streamAlertItemMatch) {
+            const guildId = streamAlertItemMatch[1] ?? "";
+            const alertId = Number(streamAlertItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(alertId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_stream_alert_not_found" });
+              return;
+            }
+            const checked = await this.options.streamAlerts!.checkNow(guildId, alertId);
+            if (!checked) {
+              this.json(res, 404, { error: "stream_alert_not_found" });
+              return;
+            }
+            this.json(res, 200, { ok: true, alert: checked });
             return;
           }
 
@@ -827,6 +1126,179 @@ export class ManagementApiServer {
             return;
           }
 
+          const verificationPanelMatch = path.match(/^\/api\/guilds\/([^/]+)\/verification\/panel$/);
+
+          if (method === "POST" && verificationPanelMatch) {
+            if (!this.options.verification) {
+              this.json(res, 500, { error: "verification_unavailable" });
+              return;
+            }
+            const guildId = verificationPanelMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const channelId = typeof body.channelId === "string" ? body.channelId : "";
+            const messageId = await this.options.verification!.dashboardPublishPanel(guildId, channelId);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "verification.panel.published",
+              targetType: "channel",
+              targetId: channelId,
+              metadata: { messageId }
+            });
+            this.json(res, 201, { ok: true, messageId });
+            return;
+          }
+
+          const communityToolsMatch = path.match(/^\/api\/guilds\/([^/]+)\/community-tools$/);
+
+          if (communityToolsMatch && !this.options.communityTools) {
+            this.json(res, 500, { error: "community_tools_unavailable" });
+            return;
+          }
+
+          if ((method === "GET" || method === "POST") && communityToolsMatch) {
+            const guildId = communityToolsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+
+            if (method === "GET") {
+              this.json(res, 200, { guildId, snapshot: await this.options.communityTools!.dashboardSnapshot(guildId) });
+              return;
+            }
+
+            const body = await readJson(req);
+            const rawAction = body.action;
+            const action = typeof rawAction === "string" ? rawAction : "";
+
+            if (action === "poll.create") {
+              const channelId = typeof body.channelId === "string" ? body.channelId.trim() : "";
+              const question = typeof body.question === "string" ? body.question : "";
+              const options = Array.isArray(body.options) ? body.options.filter((value: unknown): value is string => typeof value === "string") : [];
+              const durationMinutes = Number(body.durationMinutes ?? 60);
+              if (!/^\d{15,25}$/.test(channelId) || !question.trim() || options.length < 2 || options.length > 5 || !Number.isSafeInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 10080) {
+                throw new RequestInputError("invalid_poll_create", 400);
+              }
+              const result = await this.options.communityTools!.dashboardCreatePoll(
+                guildId, channelId, question, options, durationMinutes
+              );
+              await this.options.auditLog.record({
+                guildId,
+                source: "dashboard",
+                action: "poll.created",
+                targetType: "poll",
+                targetId: String(result.id),
+                metadata: { channelId: result.channelId }
+              });
+              this.json(res, 201, { ok: true, result });
+              return;
+            }
+
+            if (action === "poll.close") {
+              const pollId = Number(body.id);
+              if (!Number.isSafeInteger(pollId) || pollId < 1) throw new RequestInputError("invalid_poll", 400);
+              if (!await this.options.communityTools!.dashboardClosePoll(guildId, pollId)) {
+                this.json(res, 404, { error: "poll_not_found_or_already_closed" });
+                return;
+              }
+              await this.options.auditLog.record({ guildId, source: "dashboard", action: "poll.closed", targetType: "poll", targetId: String(pollId) });
+              this.json(res, 200, { ok: true });
+              return;
+            }
+
+            if (action === "suggestion.status") {
+              const suggestionId = Number(body.id);
+              const rawStatus = body.status;
+              const status = typeof rawStatus === "string" ? rawStatus : "";
+              if (!Number.isSafeInteger(suggestionId) || suggestionId < 1 || !["approved","denied"].includes(status)) {
+                throw new RequestInputError("invalid_suggestion_status", 400);
+              }
+              if (!await this.options.communityTools!.dashboardSetSuggestionStatus(guildId, suggestionId, status as "approved" | "denied")) {
+                this.json(res, 404, { error: "suggestion_not_found_or_already_processed" });
+                return;
+              }
+              await this.options.auditLog.record({ guildId, source: "dashboard", action: "suggestion." + status, targetType: "suggestion", targetId: String(suggestionId) });
+              this.json(res, 200, { ok: true });
+              return;
+            }
+
+            if (action === "sticky.set") {
+              const channelId = typeof body.channelId === "string" ? body.channelId : "";
+              const message = typeof body.message === "string" ? body.message : "";
+              await this.options.communityTools!.dashboardSetSticky(guildId, channelId, message);
+              await this.options.auditLog.record({ guildId, source: "dashboard", action: "sticky.updated", targetType: "channel", targetId: channelId });
+              this.json(res, 200, { ok: true });
+              return;
+            }
+
+            if (action === "sticky.clear") {
+              const channelId = typeof body.channelId === "string" ? body.channelId : "";
+              if (!await this.options.communityTools!.dashboardClearSticky(guildId, channelId)) {
+                this.json(res, 404, { error: "sticky_not_found" });
+                return;
+              }
+              await this.options.auditLog.record({ guildId, source: "dashboard", action: "sticky.cleared", targetType: "channel", targetId: channelId });
+              this.json(res, 200, { ok: true });
+              return;
+            }
+
+            throw new RequestInputError("invalid_community_tools_action", 400);
+          }
+
+          const starboardMatch = path.match(/^\/api\/guilds\/([^/]+)\/starboard$/);
+
+          if (starboardMatch && !this.options.starboard) {
+            this.json(res, 500, { error: "starboard_unavailable" });
+            return;
+          }
+
+          if ((method === "GET" || method === "PUT") && starboardMatch) {
+            const guildId = starboardMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+
+            if (method === "GET") {
+              this.json(res, 200, { guildId, config: await this.options.starboard!.dashboardConfig(guildId) });
+              return;
+            }
+
+            const body = await readJson(req);
+            const channelId = body.channelId === null ? null : typeof body.channelId === "string" ? body.channelId : undefined;
+            if (channelId !== null && channelId !== undefined && !/^\d{15,25}$/.test(channelId)) {
+              throw new RequestInputError("invalid_starboard_channel", 400);
+            }
+            if (body.threshold !== undefined && (!Number.isFinite(Number(body.threshold)) || Number(body.threshold) < 1 || Number(body.threshold) > 100)) {
+              throw new RequestInputError("invalid_starboard_threshold", 400);
+            }
+            if (channelId) {
+              const channel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(channelId);
+              if (!channel || channel.type !== 0) throw new RequestInputError("text_channel_required", 400);
+            }
+            const current = await this.options.starboard!.dashboardConfig(guildId);
+            await this.options.starboard!.dashboardConfigure(guildId, {
+              channelId: channelId === undefined ? current.channelId : channelId,
+              threshold: body.threshold === undefined ? current.threshold : Number(body.threshold),
+              ignoreSelfReaction: typeof body.ignoreSelfReaction === "boolean" ? body.ignoreSelfReaction : current.ignoreSelfReaction,
+              ignoreBots: typeof body.ignoreBots === "boolean" ? body.ignoreBots : current.ignoreBots
+            });
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "starboard.updated",
+              targetType: "starboard",
+              targetId: channelId ?? current.channelId ?? "unconfigured"
+            });
+            this.json(res, 200, { ok: true, config: await this.options.starboard!.dashboardConfig(guildId) });
+            return;
+          }
+
           const commandPoliciesMatch = path.match(/^\/api\/guilds\/([^/]+)\/command-policies$/);
           const commandPolicyItemMatch = path.match(/^\/api\/guilds\/([^/]+)\/command-policies\/([^/]+)$/);
 
@@ -906,21 +1378,40 @@ export class ManagementApiServer {
             const body = await readJson(req);
             const detector = typeof body.detector === "string" ? body.detector : "";
             const action = typeof body.action === "string" ? body.action : "delete";
-            if (!detector || !["delete","timeout","warn","log"].includes(action)) {
+            if (!detector || !["delete","timeout","warn","log","ban"].includes(action)) {
               throw new RequestInputError("invalid_automod_rule", 400);
+            }
+            const logChannelId =
+              body.logChannelId === undefined || body.logChannelId === null
+                ? null
+                : typeof body.logChannelId === "string"
+                  ? body.logChannelId
+                  : null;
+            if (body.logChannelId !== undefined && body.logChannelId !== null && logChannelId === null) {
+              throw new RequestInputError("invalid_automod_log_channel", 400);
+            }
+            if (action === "log" && !logChannelId) {
+              throw new RequestInputError("automod_log_channel_required", 400);
+            }
+            if (logChannelId) {
+              const logChannel = this.options.client.guilds.cache.get(guildId)?.channels.cache.get(logChannelId);
+              if (!logChannel?.isTextBased() || !("send" in logChannel)) {
+                throw new RequestInputError("invalid_automod_log_channel", 400);
+              }
             }
             await this.options.autoMod!.upsertRule(guildId, {
               detector,
               enabled: body.enabled !== false,
               threshold: body.threshold === null || body.threshold === undefined ? null : Number(body.threshold),
               windowSeconds: body.windowSeconds === null || body.windowSeconds === undefined ? null : Number(body.windowSeconds),
-              action: action as "delete" | "timeout" | "warn" | "log",
+              action: action as "delete" | "timeout" | "warn" | "log" | "ban",
               timeoutMinutes: body.timeoutMinutes === undefined ? 0 : Number(body.timeoutMinutes),
               affectedRoleIds: Array.isArray(body.affectedRoleIds) ? body.affectedRoleIds.filter((v: unknown): v is string => typeof v === "string") : [],
               ignoredRoleIds: Array.isArray(body.ignoredRoleIds) ? body.ignoredRoleIds.filter((v: unknown): v is string => typeof v === "string") : [],
               affectedChannelIds: Array.isArray(body.affectedChannelIds) ? body.affectedChannelIds.filter((v: unknown): v is string => typeof v === "string") : [],
               ignoredChannelIds: Array.isArray(body.ignoredChannelIds) ? body.ignoredChannelIds.filter((v: unknown): v is string => typeof v === "string") : [],
               ignoreModerators: body.ignoreModerators !== false,
+              logChannelId,
               messageTemplate: typeof body.messageTemplate === "string" ? body.messageTemplate : ""
             });
             await this.options.auditLog.record({
@@ -946,7 +1437,54 @@ export class ManagementApiServer {
               this.json(res, 404, { error: "automod_rule_not_found" });
               return;
             }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "automod.rule.deleted",
+              targetType: "automod-rule",
+              targetId: String(id)
+            });
             this.json(res, 200, { ok: true });
+            return;
+          }
+
+          const economyAccountsMatch = path.match(/^\/api\/guilds\/([^/]+)\/economy\/accounts$/);
+          const economyAccountMatch = path.match(/^\/api\/guilds\/([^/]+)\/economy\/accounts\/([^/]+)$/);
+
+          if ((economyAccountsMatch || economyAccountMatch) && !this.options.economy) {
+            this.json(res, 500, { error: "economy_unavailable" });
+            return;
+          }
+
+          if (method === "GET" && economyAccountsMatch) {
+            const guildId = economyAccountsMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            this.json(res, 200, { guildId, accounts: await this.options.economy!.dashboardAccounts(guildId) });
+            return;
+          }
+
+          if (method === "PUT" && economyAccountMatch) {
+            const guildId = economyAccountMatch[1] ?? "";
+            const userId = economyAccountMatch[2] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !/^\d{15,25}$/.test(userId)) {
+              this.json(res, 404, { error: "guild_or_user_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const balance = typeof body.balance === "string" ? body.balance.trim() : String(body.balance ?? "");
+            const nextBalance = await this.options.economy!.dashboardSetBalance(guildId, userId, balance);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "economy.balance.updated",
+              targetType: "economy-account",
+              targetId: userId,
+              metadata: { balance: nextBalance }
+            });
+            this.json(res, 200, { ok: true, balance: nextBalance });
             return;
           }
 
@@ -1116,6 +1654,13 @@ export class ManagementApiServer {
               throw new RequestInputError("invalid_leveling_exclusion", 400);
             }
             await this.options.leveling!.setExclusion(guildId, kind, refId, body.enabled);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: body.enabled ? "leveling.exclusion.enabled" : "leveling.exclusion.disabled",
+              targetType: kind,
+              targetId: refId
+            });
             this.json(res, 200, { ok: true, exclusions: await this.options.leveling!.listExclusions(guildId) });
             return;
           }
@@ -1192,6 +1737,75 @@ export class ManagementApiServer {
             return;
           }
 
+          const moderationChannelMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/channel$/);
+
+          if (method === "POST" && moderationChannelMatch) {
+            if (!this.options.moderation) {
+              this.json(res, 500, { error: "moderation_unavailable" });
+              return;
+            }
+            const guildId = moderationChannelMatch[1] ?? "";
+            if (!guildId || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_not_found" });
+              return;
+            }
+            const body = await readJson(req);
+            const rawAction = body.action;
+            if (typeof rawAction !== "string" || !["clear","slowmode","lock","unlock"].includes(rawAction)) {
+              throw new RequestInputError("invalid_channel_action", 400);
+            }
+            const action = rawAction as "clear" | "slowmode" | "lock" | "unlock";
+            const channelId = typeof body.channelId === "string" ? body.channelId : "";
+            if (!/^\d{15,25}$/.test(channelId)) throw new RequestInputError("invalid_channel", 400);
+            const value = body.value === undefined ? undefined : Number(body.value);
+            const result = await this.options.moderation!.dashboardChannelAction(guildId, channelId, action, value);
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "moderation.channel." + action,
+              targetType: "channel",
+              targetId: channelId,
+              metadata: result
+            });
+            this.json(res, 200, { ok: true, result });
+            return;
+          }
+
+          const moderationCaseMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/cases\/(\\d+)$/);
+          if (method === "PATCH" && moderationCaseMatch) {
+            if (!this.options.moderation) {
+              this.json(res, 500, { error: "moderation_unavailable" });
+              return;
+            }
+            const guildId = moderationCaseMatch[1] ?? "";
+            const caseId = Number(moderationCaseMatch[2]);
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) || !Number.isSafeInteger(caseId) || caseId <= 0) {
+              this.json(res, 400, { error: "invalid_moderation_case" });
+              return;
+            }
+            const body = await readJson(req);
+            if (typeof body.resolved !== "boolean") {
+              throw new RequestInputError("resolved_must_be_boolean", 400);
+            }
+            if (!body.resolved) {
+              throw new RequestInputError("case_reopen_not_supported", 400);
+            }
+            const resolved = await this.options.moderation.resolveCase(guildId, caseId);
+            if (!resolved) {
+              this.json(res, 404, { error: "moderation_case_not_found_or_already_resolved" });
+              return;
+            }
+            await this.options.auditLog.record({
+              guildId,
+              source: "dashboard",
+              action: "moderation.case.resolved",
+              targetType: "moderation-case",
+              targetId: String(caseId)
+            });
+            this.json(res, 200, { ok: true, caseId, resolved: true });
+            return;
+          }
+
           const moderationHistoryMatch = path.match(/^\/api\/guilds\/([^/]+)\/moderation\/history$/);
           if (method === "GET" && moderationHistoryMatch) {
             if (!this.options.moderation) {
@@ -1200,15 +1814,24 @@ export class ManagementApiServer {
             }
             const guildId = moderationHistoryMatch[1] ?? "";
             const userId = url.searchParams.get("userId") ?? "";
-            if (!guildId || !/^\d{15,25}$/.test(userId) || !this.options.client.guilds.cache.has(guildId)) {
+            const actionRaw = url.searchParams.get("action");
+            const limitRaw = url.searchParams.get("limit");
+            const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 50;
+            if (!guildId || !this.options.client.guilds.cache.has(guildId) ||
+                (userId && !/^\d{15,25}$/.test(userId)) ||
+                (actionRaw && !["warn","timeout","kick","ban","unban"].includes(actionRaw)) ||
+                !Number.isInteger(limit) || limit < 1 || limit > 200) {
               this.json(res, 400, { error: "invalid_moderation_history_query" });
               return;
             }
-            this.json(res, 200, {
-              guildId,
-              userId,
-              cases: await this.options.moderation.history(guildId, userId, 50)
-            });
+            const cases = userId
+              ? await this.options.moderation.history(guildId, userId, limit)
+              : await this.options.moderation.recent(
+                  guildId,
+                  limit,
+                  actionRaw as "warn" | "timeout" | "kick" | "ban" | "unban" | undefined
+                );
+            this.json(res, 200, { guildId, ...(userId ? { userId } : {}), cases });
             return;
           }
 
@@ -1237,7 +1860,7 @@ export class ManagementApiServer {
             }
             const body = await readJson(req);
             const musicAction = body.action;
-            if (typeof musicAction !== "string" || !["play","pause","resume","skip","stop","shuffle","repeat","seek","volume","autoplay"].includes(musicAction)) {
+            if (typeof musicAction !== "string" || !["play","pause","resume","skip","stop","shuffle","repeat","seek","volume","autoplay","remove","move","clear","filter"].includes(musicAction)) {
               throw new RequestInputError("invalid_music_action", 400);
             }
             const action = musicAction as "play" | "pause" | "resume" | "skip" | "stop" | "shuffle" | "repeat" | "seek" | "volume" | "autoplay";
@@ -1246,7 +1869,10 @@ export class ManagementApiServer {
               voiceChannelId: typeof body.voiceChannelId === "string" ? body.voiceChannelId : undefined,
               value: body.value === undefined ? undefined : Number(body.value),
               mode: typeof body.mode === "string" ? body.mode : undefined,
-              enabled: typeof body.enabled === "boolean" ? body.enabled : undefined
+              enabled: typeof body.enabled === "boolean" ? body.enabled : undefined,
+              from: body.from === undefined ? undefined : Number(body.from),
+              to: body.to === undefined ? undefined : Number(body.to),
+              filter: typeof body.filter === "string" ? body.filter : undefined
             });
             await this.options.auditLog.record({
               guildId,
@@ -1293,7 +1919,9 @@ export class ManagementApiServer {
               enabled: typeof body.enabled === "boolean" ? body.enabled : true,
               prefixEnabled: typeof body.prefixEnabled === "boolean" ? body.prefixEnabled : true,
               slashEnabled: typeof body.slashEnabled === "boolean" ? body.slashEnabled : false,
-              actionType: body.actionType === "alias" ? ("alias" as const) : ("response" as const),
+              actionType: ["response","alias","add_role","remove_role","toggle_role"].includes(String(body.actionType))
+                ? String(body.actionType) as "response" | "alias" | "add_role" | "remove_role" | "toggle_role"
+                : ("response" as const),
               response: typeof body.response === "string" ? body.response : "",
               aliasTarget: typeof body.aliasTarget === "string" ? body.aliasTarget : null,
               allowedRoleIds: Array.isArray(body.allowedRoleIds) ? body.allowedRoleIds.filter((v: unknown): v is string => typeof v === "string") : [],
@@ -1369,7 +1997,8 @@ export class ManagementApiServer {
                 timezone: typeof body.timezone === "string" ? body.timezone : undefined,
                 djRoleId: body.djRoleId === null || typeof body.djRoleId === "string" ? body.djRoleId : undefined,
                 moderatorRoleIds: Array.isArray(body.moderatorRoleIds) ? body.moderatorRoleIds.filter((v: unknown): v is string => typeof v === "string") : undefined,
-                defaultLogChannelId: body.defaultLogChannelId === null || typeof body.defaultLogChannelId === "string" ? body.defaultLogChannelId : undefined
+                defaultLogChannelId: body.defaultLogChannelId === null || typeof body.defaultLogChannelId === "string" ? body.defaultLogChannelId : undefined,
+                auditLogEnabled: typeof body.auditLogEnabled === "boolean" ? body.auditLogEnabled : undefined
               });
               await this.options.auditLog.record({
                 guildId,
@@ -1494,6 +2123,10 @@ export class ManagementApiServer {
             const botMember = guild.members.me;
             if (!channel || channel.type !== 0) throw new RequestInputError("text_channel_required", 400);
             if (!botMember?.permissions.has("ManageRoles")) throw new RequestInputError("bot_missing_manage_roles", 400);
+            const channelPermissions = channel.permissionsFor(botMember);
+            if (!channelPermissions?.has("ViewChannel") || !channelPermissions.has("SendMessages")) {
+              throw new RequestInputError("bot_missing_role_panel_channel_permissions", 400);
+            }
 
             for (const entry of roles) {
               const role = guild.roles.cache.get(entry.roleId);
@@ -1651,7 +2284,7 @@ export class ManagementApiServer {
           this.json(res, 404, { error: "not_found" });
         } catch (error) {
           if (error instanceof RequestInputError) {
-            this.json(res, error.status, { error: error.code });
+            if (!res.writableEnded) this.json(res, error.status, { error: error.code });
             return;
           }
 
@@ -1662,7 +2295,7 @@ export class ManagementApiServer {
             durationMs: Date.now() - requestStartedAt,
             error: String(error)
           });
-          this.json(res, 500, { error: "internal_error" });
+          if (!res.writableEnded) this.json(res, 500, { error: "internal_error" });
         }
       });
 
@@ -1706,33 +2339,21 @@ export class ManagementApiServer {
     });
   }
 
-  private authorized(header: string | undefined): boolean {
-    if (!header?.startsWith("Bearer ")) return false;
-    const received = Buffer.from(header.slice("Bearer ".length));
-    const expected = Buffer.from(this.options.apiKey);
-    return received.length === expected.length && timingSafeEqual(received, expected);
-  }
-
-  private allowedRate(key: string): boolean {
-    const now = Date.now();
-    const window = this.rateWindows.get(key);
-
-    if (!window || now - window.startedAt >= 60_000) {
-      this.rateWindows.set(key, { startedAt: now, count: 1 });
-      return true;
-    }
-
-    window.count += 1;
-    return window.count <= 120;
-  }
-
   private json(res: ServerResponse, status: number, body: unknown): void {
-    res.writeHead(status, {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
-      "x-content-type-options": "nosniff"
-    });
-    res.end(JSON.stringify(body));
+    if (res.writableEnded) return;
+    const payload = JSON.stringify(
+      body,
+      (_key, value: unknown) => typeof value === "bigint" ? value.toString() : value
+    );
+    if (res.writableEnded) return;
+    if (!res.headersSent) {
+      res.writeHead(status, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff"
+      });
+    }
+    res.end(payload);
   }
 }
 
@@ -1745,7 +2366,29 @@ class RequestInputError extends Error {
   }
 }
 
-function validateAutomationPayload(
+export function isManagementApiAuthorized(header: string | undefined, apiKey: string): boolean {
+  if (!header?.startsWith("Bearer ")) return false;
+  const received = Buffer.from(header.slice("Bearer ".length));
+  const expected = Buffer.from(apiKey);
+  return received.length === expected.length && timingSafeEqual(received, expected);
+}
+
+export function managementApiRateAllows(
+  windows: Map<string, RateWindow>,
+  key: string,
+  limit = 120,
+  now = Date.now()
+): boolean {
+  const window = windows.get(key);
+  if (!window || now - window.startedAt >= 60_000) {
+    windows.set(key, { startedAt: now, count: 1 });
+    return true;
+  }
+  window.count += 1;
+  return window.count <= limit;
+}
+
+export function validateAutomationPayload(
   client: Client,
   guildId: string,
   event: string,
@@ -1754,57 +2397,95 @@ function validateAutomationPayload(
 ): void {
   const supportedEvents = new Set([
     "member.join","member.leave","member.role.add","member.role.remove",
-    "message.create","message.delete","message.edit","reaction.add",
+    "message.create","message.delete","message.edit","reaction.add","reaction.remove",
+    "channel.update","role.update",
     "voice.join","voice.leave","voice.move","moderation.case",
-    "ticket.create","ticket.close","giveaway.end","schedule"
+    "ticket.create","ticket.close","giveaway.end","schedule",
+    "channel.create","channel.delete","role.create","role.delete",
+    "member.ban","member.unban","security.incident"
   ]);
   if (!supportedEvents.has(event)) throw new RequestInputError("unsupported_automation_event", 400);
 
   const guild = client.guilds.cache.get(guildId);
   if (!guild) throw new RequestInputError("guild_not_found", 404);
 
-  const stringFields = new Set(["content","userId","channelId","messageId","guildId"]);
-  const numericFields = new Set(["memberCount","messageLength","mentionCount","previousLength","giveawayId","winnerCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"]);
+  const stringFields = new Set(["content","userId","channelId","previousChannelId","messageId","guildId"]);
+  const numericFields = new Set([
+    "memberCount","messageLength","mentionCount","previousLength","attachmentCount","embedCount","stickerCount",
+    "giveawayId","winnerCount","rolePosition","incidentId","actionCount","joinCount",
+    "timestamp","minute","hour","dayOfWeek","dayOfMonth"
+  ]);
 
   for (const condition of conditions) {
     if (!condition || typeof condition !== "object" || Array.isArray(condition)) {
       throw new RequestInputError("invalid_automation_condition", 400);
     }
     const item = condition as Record<string, unknown>;
+
     switch (item.type) {
       case "channel-is": {
-        if (typeof item.channelId !== "string" || !/^\\d{17,20}$/.test(item.channelId)) throw new RequestInputError("invalid_condition_channel", 400);
+        if (typeof item.channelId !== "string" || !/^\d{17,20}$/.test(item.channelId)) {
+          throw new RequestInputError("invalid_condition_channel", 400);
+        }
         const channel = guild.channels.cache.get(item.channelId);
         if (!channel || !channel.isTextBased()) throw new RequestInputError("invalid_condition_channel", 400);
         break;
       }
       case "contains":
+      case "starts-with":
+      case "ends-with":
       case "equals":
-        if (typeof item.left !== "string" || !stringFields.has(item.left) || typeof item.right !== "string" || item.right.length > 200) {
+        if (
+          typeof item.left !== "string" ||
+          !stringFields.has(item.left) ||
+          typeof item.right !== "string" ||
+          item.right.length > 200
+        ) {
           throw new RequestInputError("invalid_content_condition", 400);
         }
         break;
       case "matches":
-        if (typeof item.left !== "string" || !stringFields.has(item.left) || typeof item.pattern !== "string" || item.pattern.length > 120) {
+        if (
+          typeof item.left !== "string" ||
+          !stringFields.has(item.left) ||
+          typeof item.pattern !== "string" ||
+          item.pattern.length > 120
+        ) {
           throw new RequestInputError("invalid_regex_condition", 400);
         }
-        try { new RegExp(item.pattern); } catch { throw new RequestInputError("invalid_regex_condition", 400); }
+        try { new RegExp(item.pattern); } catch {
+          throw new RequestInputError("invalid_regex_condition", 400);
+        }
         break;
       case "number-gte":
       case "number-lte":
-        if (typeof item.left !== "string" || !numericFields.has(item.left) || typeof item.right !== "number" || !Number.isFinite(item.right)) {
+      case "number-eq":
+      case "number-gt":
+      case "number-lt":
+        if (
+          typeof item.left !== "string" ||
+          !numericFields.has(item.left) ||
+          typeof item.right !== "number" ||
+          !Number.isFinite(item.right)
+        ) {
           throw new RequestInputError("invalid_numeric_condition", 400);
         }
         break;
       case "has-role":
-        if (typeof item.userId !== "string" || (!/^\\d{17,20}$/.test(item.userId)) ||
-            typeof item.roleId !== "string" || !/^\\d{17,20}$/.test(item.roleId) ||
-            !guild.roles.cache.has(item.roleId)) {
+        if (
+          typeof item.userId !== "string" ||
+          (item.userId !== "@event" && !/^\d{17,20}$/.test(item.userId)) ||
+          typeof item.roleId !== "string" ||
+          !/^\d{17,20}$/.test(item.roleId) ||
+          !guild.roles.cache.has(item.roleId)
+        ) {
           throw new RequestInputError("invalid_role_condition", 400);
         }
         break;
       case "cooldown-clear":
-        if (typeof item.key !== "string" || !item.key.trim() || item.key.length > 100) throw new RequestInputError("invalid_cooldown_key", 400);
+        if (typeof item.key !== "string" || !item.key.trim() || item.key.length > 100) {
+          throw new RequestInputError("invalid_cooldown_key", 400);
+        }
         break;
       default:
         throw new RequestInputError("unsupported_automation_condition", 400);
@@ -1816,50 +2497,148 @@ function validateAutomationPayload(
       throw new RequestInputError("invalid_automation_action", 400);
     }
     const item = action as Record<string, unknown>;
+
     switch (item.type) {
       case "log":
-        if (typeof item.message !== "string" || !item.message.length || item.message.length > 1000) throw new RequestInputError("invalid_log_action", 400);
+        if (typeof item.message !== "string" || !item.message.length || item.message.length > 1000) {
+          throw new RequestInputError("invalid_log_action", 400);
+        }
         break;
       case "send-message": {
-        if (typeof item.channelId !== "string" || typeof item.content !== "string" || !item.content.length || item.content.length > 2000) {
+        if (
+          typeof item.channelId !== "string" ||
+          (item.channelId !== "@event" && !/^\d{17,20}$/.test(item.channelId)) ||
+          typeof item.content !== "string" ||
+          !item.content.length ||
+          item.content.length > 2000
+        ) {
           throw new RequestInputError("invalid_send_message_action", 400);
         }
-        const channel = guild.channels.cache.get(item.channelId);
-        if (!channel || channel.type !== 0) throw new RequestInputError("invalid_send_message_channel", 400);
+        if (item.channelId !== "@event") {
+          const channel = guild.channels.cache.get(item.channelId);
+          if (!channel || channel.type !== 0) throw new RequestInputError("invalid_send_message_channel", 400);
+        }
         break;
       }
       case "dm-user":
-        if (typeof item.userId !== "string" || (item.userId !== "@event" && !/^\\d{17,20}$/.test(item.userId)) ||
-            typeof item.content !== "string" || !item.content.length || item.content.length > 2000) {
+        if (
+          typeof item.userId !== "string" ||
+          (item.userId !== "@event" && !/^\d{17,20}$/.test(item.userId)) ||
+          typeof item.content !== "string" ||
+          !item.content.length ||
+          item.content.length > 2000
+        ) {
           throw new RequestInputError("invalid_dm_action", 400);
         }
         break;
       case "add-role":
       case "remove-role":
-        if (typeof item.userId !== "string" || (item.userId !== "@event" && !/^\\d{17,20}$/.test(item.userId)) ||
-            typeof item.roleId !== "string" || !/^\\d{17,20}$/.test(item.roleId) ||
-            !guild.roles.cache.get(item.roleId)) {
+        if (
+          typeof item.userId !== "string" ||
+          (item.userId !== "@event" && !/^\d{17,20}$/.test(item.userId)) ||
+          typeof item.roleId !== "string" ||
+          !/^\d{17,20}$/.test(item.roleId) ||
+          !guild.roles.cache.has(item.roleId)
+        ) {
           throw new RequestInputError("invalid_role_action", 400);
         }
         break;
+      case "kick":
+        if (
+          typeof item.userId !== "string" ||
+          (item.userId !== "@event" && !/^\d{17,20}$/.test(item.userId)) ||
+          typeof item.reason !== "string" ||
+          !item.reason.length ||
+          item.reason.length > 500
+        ) {
+          throw new RequestInputError("invalid_kick_action", 400);
+        }
+        break;
+      case "ban":
+        if (
+          typeof item.userId !== "string" ||
+          (item.userId !== "@event" && !/^\d{17,20}$/.test(item.userId)) ||
+          typeof item.reason !== "string" ||
+          !item.reason.length ||
+          item.reason.length > 500
+        ) {
+          throw new RequestInputError("invalid_ban_action", 400);
+        }
+        break;
       case "timeout":
-        if (typeof item.userId !== "string" || (item.userId !== "@event" && !/^\\d{17,20}$/.test(item.userId)) ||
-            typeof item.durationSeconds !== "number" || !Number.isInteger(item.durationSeconds) || item.durationSeconds < 1 || item.durationSeconds > 2419200 ||
-            typeof item.reason !== "string" || !item.reason.length || item.reason.length > 500) {
+        if (
+          typeof item.userId !== "string" ||
+          (item.userId !== "@event" && !/^\d{17,20}$/.test(item.userId)) ||
+          typeof item.durationSeconds !== "number" ||
+          !Number.isInteger(item.durationSeconds) ||
+          item.durationSeconds < 1 ||
+          item.durationSeconds > 2419200 ||
+          typeof item.reason !== "string" ||
+          !item.reason.length ||
+          item.reason.length > 500
+        ) {
           throw new RequestInputError("invalid_timeout_action", 400);
         }
         break;
-      case "delete-message": {
-        if (typeof item.channelId !== "string" || (item.channelId !== "@event" && !/^\\d{17,20}$/.test(item.channelId)) ||
-            typeof item.messageId !== "string" || (item.messageId !== "@event" && !/^\\d{17,20}$/.test(item.messageId))) {
-          throw new RequestInputError("invalid_delete_message_action", 400);
+      case "delete-message":
+      case "add-reaction":
+      case "remove-reaction":
+      case "pin-message":
+      case "unpin-message": {
+        if (
+          typeof item.channelId !== "string" ||
+          (item.channelId !== "@event" && !/^\d{17,20}$/.test(item.channelId)) ||
+          typeof item.messageId !== "string" ||
+          (item.messageId !== "@event" && !/^\d{17,20}$/.test(item.messageId))
+        ) {
+          throw new RequestInputError("invalid_message_action", 400);
         }
         if (item.channelId !== "@event") {
           const channel = guild.channels.cache.get(item.channelId);
-          if (!channel || !channel.isTextBased()) throw new RequestInputError("invalid_delete_message_channel", 400);
+          if (!channel || !channel.isTextBased()) throw new RequestInputError("invalid_message_action_channel", 400);
+        }
+        if (item.type === "add-reaction" || item.type === "remove-reaction") {
+          if (typeof item.emoji !== "string" || !item.emoji.trim() || item.emoji.length > 100) {
+            throw new RequestInputError("invalid_reaction_action", 400);
+          }
         }
         break;
       }
+      case "set-slowmode":
+        if (typeof item.channelId !== "string" || (item.channelId !== "@event" && !/^\d{17,20}$/.test(item.channelId)) ||
+            typeof item.seconds !== "number" || !Number.isInteger(item.seconds) || item.seconds < 0 || item.seconds > 21600) {
+          throw new RequestInputError("invalid_slowmode_action", 400);
+        }
+        break;
+      case "set-channel-topic":
+        if (typeof item.channelId !== "string" || (item.channelId !== "@event" && !/^\d{17,20}$/.test(item.channelId)) ||
+            typeof item.topic !== "string" || item.topic.length > 1024) {
+          throw new RequestInputError("invalid_topic_action", 400);
+        }
+        break;
+      case "set-nickname":
+        if (typeof item.userId !== "string" || (item.userId !== "@event" && !/^\d{17,20}$/.test(item.userId)) ||
+            typeof item.nickname !== "string" || item.nickname.length > 32) {
+          throw new RequestInputError("invalid_set_nickname_action", 400);
+        }
+        break;
+      case "set-channel-name":
+        if (typeof item.channelId !== "string" || (item.channelId !== "@event" && !/^\d{17,20}$/.test(item.channelId)) ||
+            typeof item.name !== "string" || !item.name.trim() || item.name.length > 100) {
+          throw new RequestInputError("invalid_channel_name_action", 400);
+        }
+        break;
+      case "clear-cooldown":
+        if (typeof item.key !== "string" || !item.key.trim() || item.key.length > 100) {
+          throw new RequestInputError("invalid_clear_cooldown_key", 400);
+        }
+        break;
+      case "set-cooldown":
+        if (typeof item.key !== "string" || !item.key.trim() || item.key.length > 100 ||
+            typeof item.durationSeconds !== "number" || !Number.isInteger(item.durationSeconds) || item.durationSeconds < 1 || item.durationSeconds > 86400) {
+          throw new RequestInputError("invalid_set_cooldown_action", 400);
+        }
+        break;
       default:
         throw new RequestInputError("unsupported_automation_action", 400);
     }

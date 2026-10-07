@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
   [switch]$Dashboard,
-  [switch]$Lavalink2,
+  [switch]$NoDashboard,
   [switch]$Rebuild,
   [switch]$NoOpen,
   [switch]$Down
@@ -17,7 +17,9 @@ try {
 
 $runtimeRoot = Join-Path (Get-Location) ".native-runtime"
 $logRoot = Join-Path $runtimeRoot "logs"
-New-Item -ItemType Directory -Force -Path $runtimeRoot, $logRoot | Out-Null
+$nativeToolsRoot = Join-Path (Get-Location) "tools"
+$bundledPostgresBin = Join-Path $nativeToolsRoot "pgsql\\bin"
+New-Item -ItemType Directory -Force -Path $runtimeRoot, $logRoot, $nativeToolsRoot | Out-Null
 
 function Get-EnvValue([string]$Name) {
   if (-not (Test-Path ".env")) { return $null }
@@ -109,7 +111,6 @@ function Start-NativeProcess(
 
   $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
   Set-Content -Path (Join-Path $runtimeRoot "$Name.pid") -Value $process.Id -Encoding ASCII
-  return $process
 }
 
 function Wait-Http([string]$Url, [int]$Attempts, [int]$DelaySeconds) {
@@ -140,11 +141,22 @@ function Wait-Tcp([string]$HostName, [int]$Port, [int]$Attempts, [int]$DelaySeco
   return $false
 }
 
-function Ensure-Node {
+function Find-Node {
   $node = Get-Command "node.exe" -ErrorAction SilentlyContinue
-  if (-not $node) { throw "Node.js was not found. Install Node.js 24.17+ for native mode." }
+  if ($node) { return $node.Source }
+  $candidates = @(
+    "C:\Program Files\nodejs\node.exe",
+    (Join-Path $env:LOCALAPPDATA "Programs\nodejs\node.exe")
+  )
+  foreach ($candidate in $candidates) {
+    if (Test-Path $candidate) { return (Resolve-Path $candidate).Path }
+  }
+  return $null
+}
 
-  $versionText = (& node.exe --version).Trim().TrimStart("v")
+function Ensure-Node {
+  $nodePath = Find-Node
+  $versionText = if ($nodePath) { (& $nodePath --version).Trim().TrimStart("v") } else { "0.0.0" }
   $parts = $versionText.Split(".")
   $major = 0
   $minor = 0
@@ -153,7 +165,25 @@ function Ensure-Node {
     $minor = [int]$parts[1]
   }
   if ($major -lt 24 -or ($major -eq 24 -and $minor -lt 17)) {
+    $winget = Get-Command "winget.exe" -ErrorAction SilentlyContinue
+    if (-not $winget) { throw "Node.js 24.17+ is required for native mode and winget was not found for automatic installation." }
+    Write-Host "Node.js 24.21.0+ is missing. Installing the required Node.js LTS version..."
+    & $winget install --id OpenJS.NodeJS.LTS --exact --version 24.21.0 --silent --accept-package-agreements --accept-source-agreements
+    if ($LASTEXITCODE -ne 0) { throw "Automatic Node.js 24.21.0 installation failed." }
+    $nodePath = Find-Node
+    $versionText = if ($nodePath) { (& $nodePath --version).Trim().TrimStart("v") } else { "" }
+    $parts = $versionText.Split(".")
+    if ($parts.Count -ge 2) {
+      $major = [int]$parts[0]
+      $minor = [int]$parts[1]
+    }
+  }
+  if ($major -lt 24 -or ($major -eq 24 -and $minor -lt 17)) {
     throw "Native mode requires Node.js 24.17+. Detected $versionText."
+  }
+  $nodeDir = Split-Path $nodePath -Parent
+  if (-not (($env:Path -split ";" | Where-Object { $_ -eq $nodeDir }).Count)) {
+    $env:Path = "$nodeDir;$env:Path"
   }
   Write-Host "Node.js: $versionText"
 }
@@ -166,73 +196,185 @@ function Ensure-NpmDependencies {
 }
 
 function Ensure-Postgres {
+  if (Test-Path (Join-Path $bundledPostgresBin "pg_ctl.exe")) {
+    if (-not (($env:Path -split ";" | Where-Object { $_ -eq $bundledPostgresBin }).Count)) {
+      $env:Path = "$bundledPostgresBin;$env:Path"
+    }
+  }
+
   $pgIsReady = Get-Command "pg_isready.exe" -ErrorAction SilentlyContinue
   $psql = Get-Command "psql.exe" -ErrorAction SilentlyContinue
-  if (-not $pgIsReady -or -not $psql) {
-    throw "PostgreSQL client tools were not found. Install PostgreSQL and add pg_isready.exe/psql.exe to PATH."
+  $initdb = Get-Command "initdb.exe" -ErrorAction SilentlyContinue
+  $pgCtl = Get-Command "pg_ctl.exe" -ErrorAction SilentlyContinue
+
+  if (-not $pgIsReady -or -not $psql -or -not $initdb -or -not $pgCtl) {
+    Write-Host "Portable PostgreSQL is missing. Downloading PostgreSQL 18.6 binaries..."
+    $zipRoot = Join-Path $runtimeRoot "downloads"
+    $extractRoot = Join-Path $runtimeRoot "postgres-extract"
+    $zipPath = Join-Path $zipRoot "postgresql-18.6-5-windows-x64-binaries.zip"
+    New-Item -ItemType Directory -Force -Path $zipRoot | Out-Null
+    if (-not (Test-Path $zipPath)) {
+      Invoke-WebRequest -Uri "https://get.enterprisedb.com/postgresql/postgresql-18.6-5-windows-x64-binaries.zip" -OutFile $zipPath -UseBasicParsing
+    }
+    if (Test-Path $extractRoot) { Remove-Item -Recurse -Force $extractRoot }
+    Expand-Archive -LiteralPath $zipPath -DestinationPath $extractRoot -Force
+    $source = Join-Path $extractRoot "pgsql"
+    if (-not (Test-Path (Join-Path $source "bin\pg_ctl.exe"))) {
+      throw "Downloaded PostgreSQL archive did not contain the expected pgsql\bin runtime."
+    }
+    $target = Join-Path $nativeToolsRoot "pgsql"
+    if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+    Move-Item -Path $source -Destination $target
+    $env:Path = "$bundledPostgresBin;$env:Path"
+    $pgIsReady = Get-Command "pg_isready.exe" -ErrorAction SilentlyContinue
+    $psql = Get-Command "psql.exe" -ErrorAction SilentlyContinue
+    $initdb = Get-Command "initdb.exe" -ErrorAction SilentlyContinue
+    $pgCtl = Get-Command "pg_ctl.exe" -ErrorAction SilentlyContinue
   }
 
   $dbUrl = Get-EnvValue "DATABASE_URL"
-  if ([string]::IsNullOrWhiteSpace($dbUrl)) {
-    $dbUrl = "postgresql://postgres:postgres@127.0.0.1:5432/discord_platform"
+  if ([string]::IsNullOrWhiteSpace($dbUrl) -or $dbUrl -match "postgresql://USER:PASSWORD@") {
+    $dbPassword = New-Secret 32
+    $dbUrl = "postgresql://postgres:$dbPassword@127.0.0.1:5432/discord_platform"
     Set-EnvValue "DATABASE_URL" $dbUrl
-    $env:DATABASE_URL = $dbUrl
+    Set-EnvValue "POSTGRES_PASSWORD" $dbPassword
   }
+  $env:DATABASE_URL = $dbUrl
+  Import-EnvFile
 
-  & pg_isready.exe -d $dbUrl *> $null
-  if ($LASTEXITCODE -ne 0) {
-    $candidate = Read-Host "PostgreSQL is not reachable. Enter DATABASE_URL (or press Enter to abort)"
-    if ([string]::IsNullOrWhiteSpace($candidate)) {
-      throw "PostgreSQL is not reachable at the configured DATABASE_URL."
+  $dataRoot = Join-Path (Get-Location) ".postgres-data"
+  if (-not (Test-Path (Join-Path $dataRoot "PG_VERSION"))) {
+    Write-Host "Initializing local PostgreSQL cluster..."
+    New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
+    $uri = [Uri]$env:DATABASE_URL
+    $userinfo = $uri.UserInfo.Split(":", 2)
+    $dbPassword = if ($userinfo.Count -eq 2) { [Uri]::UnescapeDataString($userinfo[1]) } else { New-Secret 32 }
+    $pwFile = Join-Path $runtimeRoot "postgres-password.tmp"
+    Set-Content -Path $pwFile -Value $dbPassword -NoNewline -Encoding ASCII
+    try {
+      & $initdb -D $dataRoot -U postgres --pwfile=$pwFile --encoding=UTF8 --auth-local=trust --auth-host=scram-sha-256
+      if ($LASTEXITCODE -ne 0) { throw "PostgreSQL cluster initialization failed." }
+    } finally {
+      Remove-Item $pwFile -Force -ErrorAction SilentlyContinue
     }
-    Set-EnvValue "DATABASE_URL" $candidate
-    Import-EnvFile
-    & pg_isready.exe -d $env:DATABASE_URL *> $null
-    if ($LASTEXITCODE -ne 0) { throw "PostgreSQL is still not reachable at the supplied DATABASE_URL." }
   }
 
-  & psql.exe $env:DATABASE_URL -c "SELECT 1;" *> $null
-  if ($LASTEXITCODE -ne 0) { throw "PostgreSQL accepted no connection for DATABASE_URL." }
+  & $pgIsReady -h 127.0.0.1 -p 5432 *> $null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "Starting local PostgreSQL..."
+    $postgres = Join-Path (Split-Path $pgCtl.Source -Parent) "postgres.exe"
+    if (-not (Test-Path $postgres)) {
+      throw "PostgreSQL server executable was not found next to pg_ctl.exe."
+    }
+
+    $pgStdOut = Join-Path $logRoot "postgres-stdout.log"
+    $pgStdErr = Join-Path $logRoot "postgres-stderr.log"
+    Start-Process -FilePath $postgres -ArgumentList @(
+      "-D", $dataRoot,
+      "-h", "127.0.0.1",
+      "-p", "5432"
+    ) -WorkingDirectory $dataRoot -RedirectStandardOutput $pgStdOut -RedirectStandardError $pgStdErr -WindowStyle Hidden | Out-Null
+  }
+
+  $ready = $false
+  for ($attempt = 1; $attempt -le 20; $attempt++) {
+    & $pgIsReady -h 127.0.0.1 -p 5432 *> $null
+    if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+    Start-Sleep -Seconds 1
+  }
+  if (-not $ready) {
+    Write-Host "PostgreSQL startup log:"
+    Get-Content (Join-Path $logRoot "postgres-stderr.log") -Tail 80 -ErrorAction SilentlyContinue
+    Get-Content (Join-Path $logRoot "postgres.log") -Tail 80 -ErrorAction SilentlyContinue
+    throw "Local PostgreSQL did not become ready on 127.0.0.1:5432."
+  }
+
+  $uri = [Uri]$env:DATABASE_URL
+  $userinfo = $uri.UserInfo.Split(":", 2)
+  if ($userinfo.Count -eq 2) {
+    $env:PGPASSWORD = [Uri]::UnescapeDataString($userinfo[1])
+  }
+
+  # Check/create the application database using the always-present postgres database.
+  & $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c "SELECT 1;" *> $null
+  if ($LASTEXITCODE -ne 0) {
+    Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+    throw "PostgreSQL server is running but the postgres administrative connection failed."
+  }
+
+  $databaseExistsRaw = & $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -tAc "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname='discord_platform');" 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+    throw "Could not query PostgreSQL databases."
+  }
+
+  $databaseExists = $databaseExistsRaw.Trim() -eq "t"
+  if (-not $databaseExists) {
+    Write-Host "Creating local database discord_platform..."
+    & $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c "CREATE DATABASE discord_platform;" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+      Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+      throw "Could not create the discord_platform database."
+    }
+  }
+
+  & $psql $env:DATABASE_URL -c "SELECT 1;" *> $null
+  $applicationExitCode = $LASTEXITCODE
+  Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+  if ($applicationExitCode -ne 0) { throw "PostgreSQL rejected the configured DATABASE_URL." }
 
   Write-Host "PostgreSQL: ready"
 }
 
-function Ensure-LavalinkJar {
-  $configured = Get-EnvValue "LAVALINK_JAR_PATH"
-  if ([string]::IsNullOrWhiteSpace($configured)) {
-    $configured = ".\infrastructure\lavalink\lavalink.jar"
-    Set-EnvValue "LAVALINK_JAR_PATH" $configured
+function Ensure-MusicTools {
+  $ytDlp = Get-Command "yt-dlp.exe" -ErrorAction SilentlyContinue
+  $ffmpeg = Get-Command "ffmpeg.exe" -ErrorAction SilentlyContinue
+  $winget = Get-Command "winget.exe" -ErrorAction SilentlyContinue
+
+  if (-not $ytDlp -and $winget) {
+    Write-Host "yt-dlp is missing. Installing the current WinGet package..."
+    & $winget install --source winget --id yt-dlp.yt-dlp --exact --silent --accept-package-agreements --accept-source-agreements
+    if ($LASTEXITCODE -ne 0) { throw "Automatic yt-dlp installation failed." }
+    $ytDlp = Get-Command "yt-dlp.exe" -ErrorAction SilentlyContinue
   }
 
-  $resolved = if ([System.IO.Path]::IsPathRooted($configured)) { $configured } else { Join-Path (Get-Location) $configured }
-  if (-not (Test-Path $resolved -PathType Leaf)) {
-    $candidate = Read-Host "Lavalink JAR was not found at '$configured'. Enter the full path to Lavalink JAR (or press Enter to abort)"
-    if ([string]::IsNullOrWhiteSpace($candidate)) { throw "Lavalink JAR is required for native mode." }
-    if (-not (Test-Path $candidate -PathType Leaf)) { throw "The supplied Lavalink JAR does not exist: $candidate" }
-    $resolved = $candidate
-    Set-EnvValue "LAVALINK_JAR_PATH" $candidate
+  if (-not $ffmpeg -and $winget) {
+    Write-Host "FFmpeg is missing. Installing the current WinGet package..."
+    & $winget install --source winget --id Gyan.FFmpeg --exact --silent --accept-package-agreements --accept-source-agreements
+    if ($LASTEXITCODE -ne 0) { throw "Automatic FFmpeg installation failed." }
+    $ffmpeg = Get-Command "ffmpeg.exe" -ErrorAction SilentlyContinue
   }
-  return (Resolve-Path $resolved).Path
+
+  if (-not $ytDlp -or -not $ffmpeg) {
+    throw "Music requires yt-dlp and ffmpeg in PATH. Install them and start the launcher again."
+  }
+
+  Write-Host "yt-dlp: $((& $ytDlp.Source --version).Trim())"
+  Write-Host "FFmpeg: $((& $ffmpeg.Source -version | Select-Object -First 1).Trim())"
 }
 
-function Ensure-Java {
-  $java = Get-Command "java.exe" -ErrorAction SilentlyContinue
-  if (-not $java) { throw "Java was not found. Install the Java runtime required by your Lavalink version and put java.exe in PATH." }
-  return $java.Source
-}
 
 function Ensure-Secret([string]$Name, [int]$Length) {
   $value = Get-EnvValue $Name
-  if ([string]::IsNullOrWhiteSpace($value)) { Set-EnvValue $Name (New-Secret $Length) }
+  if ([string]::IsNullOrWhiteSpace($value)) {
+    Set-EnvValue $Name (New-Secret $Length)
+    return
+  }
+
+  if ($Name -eq "BOT_CREDENTIALS_ENCRYPTION_KEY" -and $value -notmatch "^[a-fA-F0-9]{64}$") {
+    Write-Host "Regenerating invalid BOT_CREDENTIALS_ENCRYPTION_KEY..."
+    Set-EnvValue $Name (New-Secret 32)
+  }
 }
 
 try {
   if ($Down) {
     Stop-NativeProcess "dashboard"
+    Stop-NativeProcess "fleet"
     Stop-NativeProcess "bot"
-    Stop-NativeProcess "lavalink2"
-    Stop-NativeProcess "lavalink"
-    Write-Host "Native Vexa processes stopped."
+    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ".\scripts\reconcile-fleet-native.ps1" -Down
+    if ($LASTEXITCODE -ne 0) { throw "Native Bot Fleet cleanup failed with exit code $LASTEXITCODE." }
+    Write-Host "Native Discord Server Platform processes stopped."
     exit 0
   }
 
@@ -255,81 +397,29 @@ try {
     Set-EnvValue "DISCORD_CLIENT_ID" $clientId
   }
 
-  if ([string]::IsNullOrWhiteSpace((Get-EnvValue "DASHBOARD_AUTH_REQUIRED"))) {
-    Set-EnvValue "DASHBOARD_AUTH_REQUIRED" "false"
-  }
-
   Ensure-Secret "MANAGEMENT_API_KEY" 48
-  Ensure-Secret "DASHBOARD_SESSION_SECRET" 48
-  Ensure-Secret "LAVALINK_PASSWORD" 24
+  Ensure-Secret "BOT_CREDENTIALS_ENCRYPTION_KEY" 64
 
   Import-EnvFile
   Ensure-Node
   Ensure-NpmDependencies
-  Ensure-Postgres
 
-  $java = Ensure-Java
-  $lavalinkJar = Ensure-LavalinkJar
-
-  $env:DSP_CONTAINERIZED = "false"
-  $env:HEALTH_HOST = "127.0.0.1"
-  $env:MANAGEMENT_API_HOST = "127.0.0.1"
-  $env:LAVALINK_HOST = "127.0.0.1"
-  $env:LAVALINK_PORT = "2333"
-
-  $password = Get-EnvValue "LAVALINK_PASSWORD"
-  if ([string]::IsNullOrWhiteSpace($password)) { throw "LAVALINK_PASSWORD is required." }
-
-  $nodes = @(
-    @{
-      id = "local"
-      host = "127.0.0.1"
-      port = 2333
-      password = $password
-    }
-  )
-
-  $javaXms = Get-EnvValue "LAVALINK_JAVA_XMS"
-  if ([string]::IsNullOrWhiteSpace($javaXms)) { $javaXms = "128m" }
-  $javaXmx = Get-EnvValue "LAVALINK_JAVA_XMX"
-  if ([string]::IsNullOrWhiteSpace($javaXmx)) { $javaXmx = "512m" }
-
-  $env:LAVALINK_SERVER_PASSWORD = $password
-  $env:SERVER_PORT = "2333"
-  $lavalinkWorkingDirectory = Join-Path (Get-Location) "infrastructure\lavalink"
-  Start-NativeProcess "lavalink" $java @("-Xms$javaXms", "-Xmx$javaXmx", "-jar", $lavalinkJar) $lavalinkWorkingDirectory "lavalink"
-  Write-Host "Lavalink node 1 starting..."
-
-  if (-not (Wait-Tcp "127.0.0.1" 2333 60 1)) {
-    Get-Content (Join-Path $logRoot "lavalink.err.log") -Tail 80 -ErrorAction SilentlyContinue
-    throw "Lavalink node 1 did not open port 2333."
-  }
-
-  if ($Lavalink2) {
-    $env:SERVER_PORT = "2334"
-    $nodes += @{
-      id = "local-2"
-      host = "127.0.0.1"
-      port = 2334
-      password = $password
-    }
-    Start-NativeProcess "lavalink2" $java @("-Xms$javaXms", "-Xmx$javaXmx", "-jar", $lavalinkJar) $lavalinkWorkingDirectory "lavalink2"
-    Write-Host "Lavalink node 2 starting..."
-    if (-not (Wait-Tcp "127.0.0.1" 2334 60 1)) {
-      Get-Content (Join-Path $logRoot "lavalink2.err.log") -Tail 80 -ErrorAction SilentlyContinue
-      throw "Lavalink node 2 did not open port 2334."
-    }
-  } else {
-    Stop-NativeProcess "lavalink2"
-  }
-
-  $env:LAVALINK_NODES = ($nodes | ConvertTo-Json -Compress)
-  $env:SERVER_PORT = "2333"
-
-  # Build before starting Lavalink/bot so the first-run compiler spike does not
-  # happen at the same time as the runtime services.
+  # Build before starting the bot so the first-run compiler spike does not
+  # happen at the same time as the runtime services. Rebuild automatically when
+  # source files are newer than the compiled marker, so a fresh ZIP/update does
+  # not accidentally run stale JavaScript.
   $botBuildMarker = Join-Path (Get-Location) "apps\bot\dist\main.js"
-  if ($Rebuild -or -not (Test-Path $botBuildMarker)) {
+  $domainBuildMarker = Join-Path (Get-Location) "packages\domain\dist\index.js"
+  $botSourcesChanged = -not (Test-Path $botBuildMarker) -or @(
+    Get-ChildItem "apps\bot\src" -Recurse -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.LastWriteTimeUtc -gt (Get-Item $botBuildMarker -ErrorAction SilentlyContinue).LastWriteTimeUtc }
+  ).Count -gt 0
+  $domainSourcesChanged = -not (Test-Path $domainBuildMarker) -or @(
+    Get-ChildItem "packages\domain\src" -Recurse -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.LastWriteTimeUtc -gt (Get-Item $domainBuildMarker -ErrorAction SilentlyContinue).LastWriteTimeUtc }
+  ).Count -gt 0
+
+  if ($Rebuild -or $botSourcesChanged -or $domainSourcesChanged) {
     Write-Host "Building domain + bot..."
     & npm.cmd run build:domain
     if ($LASTEXITCODE -ne 0) { throw "Domain build failed." }
@@ -337,12 +427,26 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Bot build failed." }
   }
 
+  $dashboardEnabled = -not $NoDashboard
   $dashboardBuildMarker = Join-Path (Get-Location) "apps\dashboard\.next\BUILD_ID"
-  if ($Dashboard -and ($Rebuild -or -not (Test-Path $dashboardBuildMarker))) {
+  if ($dashboardEnabled -and ($Rebuild -or -not (Test-Path $dashboardBuildMarker) -or @(
+      Get-ChildItem "apps\dashboard\app" -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTimeUtc -gt (Get-Item $dashboardBuildMarker -ErrorAction SilentlyContinue).LastWriteTimeUtc }
+    ).Count -gt 0)) {
     Write-Host "Building Dashboard..."
     & npm.cmd run build -w apps/dashboard
     if ($LASTEXITCODE -ne 0) { throw "Dashboard build failed." }
   }
+
+  Ensure-Postgres
+
+  Ensure-MusicTools
+
+  $env:HEALTH_HOST = "127.0.0.1"
+  $env:MANAGEMENT_API_HOST = "127.0.0.1"
+  $env:YTDLP_PATH = "yt-dlp"
+  $env:FFMPEG_PATH = "ffmpeg"
+  $env:YTDLP_JS_RUNTIME = "node"
 
   Start-NativeProcess "bot" "npm.cmd" @("run", "start", "-w", "apps/bot") (Get-Location).Path "bot"
 
@@ -356,12 +460,28 @@ try {
     throw "Bot health endpoint did not become ready: $healthUrl"
   }
 
-  if ($Dashboard) {
+  $managementPort = Get-EnvValue "MANAGEMENT_API_PORT"
+  if ([string]::IsNullOrWhiteSpace($managementPort)) { $managementPort = "3002" }
+  $managementKey = Get-EnvValue "MANAGEMENT_API_KEY"
+  if ([string]::IsNullOrWhiteSpace($managementKey)) { throw "MANAGEMENT_API_KEY is required." }
+  try {
+    $managementHeaders = @{ Authorization = "Bearer $managementKey" }
+    $managementProbe = Invoke-RestMethod -Uri "http://127.0.0.1:$managementPort/api/guilds" -Headers $managementHeaders -Method Get -TimeoutSec 5
+    if ($null -eq $managementProbe.guilds) {
+      throw "Management API returned an invalid guild list."
+    }
+    Write-Host "Management API: ready ($managementPort)"
+  } catch {
+    Get-Content (Join-Path $logRoot "bot.err.log") -Tail 80 -ErrorAction SilentlyContinue
+    throw "Management API preflight failed on 127.0.0.1:${managementPort}: $($_.Exception.Message)"
+  }
+
+  if ($dashboardEnabled) {
     $dashboardPort = Get-EnvValue "DASHBOARD_PORT"
     if ([string]::IsNullOrWhiteSpace($dashboardPort)) { $dashboardPort = "3000" }
 
     $env:BOT_HEALTH_URL = $healthUrl
-    $env:MANAGEMENT_API_URL = "http://127.0.0.1:3002"
+    $env:MANAGEMENT_API_URL = "http://127.0.0.1:$managementPort"
 
     Start-NativeProcess "dashboard" "npm.cmd" @("run", "start", "-w", "apps/dashboard") (Get-Location).Path "dashboard"
 
@@ -374,21 +494,28 @@ try {
   }
 
   Write-Host ""
-  Write-Host "Vexa is running in native Windows mode."
+  Write-Host "Discord Server Platform is running in native Windows mode."
   Write-Host "Docker Desktop is not required and is not started by this launcher."
-  Write-Host "Lavalink nodes: $($nodes.Count)"
+  Write-Host "Music engine: yt-dlp + FFmpeg"
   Write-Host "Bot health: $healthUrl"
   Write-Host "Logs: $logRoot"
 
-  if ($Dashboard) {
+  Start-NativeProcess "fleet" "powershell.exe" @(
+    "-NoLogo",
+    "-NoProfile",
+    "-ExecutionPolicy", "Bypass",
+    "-File", (Join-Path (Get-Location) "scripts\reconcile-fleet-native.ps1"),
+    "-Loop"
+  ) (Get-Location).Path "fleet"
+
+  if ($dashboardEnabled) {
     Write-Host "Control Center: $dashboardUrl"
     if (-not $NoOpen) { Start-Process $dashboardUrl }
-  } else {
-    Write-Host "Dashboard is OFF for low-overhead gaming mode. Add -Dashboard when you need it."
   }
 
   Write-Host ""
-  Write-Host "For Sea of Thieves + OBS/RTMP, keep the default single-Lavalink mode."
+  Write-Host "Native Fleet supervisor: enabled for registered secondary Bot Identities."
+
   exit 0
 } catch {
   Write-Host ""

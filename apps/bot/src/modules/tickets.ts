@@ -16,13 +16,15 @@ export class Tickets implements PlatformModule {
   private unsubscribe?: () => void;
   private events?: import("../events.js").PlatformEventBus;
   private recoveryTimer?: NodeJS.Timeout;
+  private client?: ModuleContext["client"];
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.events = context.events;
+    this.client = context.client;
     await this.recoverStaleClosures();
-    const a = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const a = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     const b = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
     this.unsubscribe = () => { a(); b(); };
     this.recoveryTimer = setInterval(() => {
@@ -39,6 +41,104 @@ export class Tickets implements PlatformModule {
     if (this.recoveryTimer) clearInterval(this.recoveryTimer);
     this.recoveryTimer = undefined;
     this.events = undefined;
+    this.client = undefined;
+  }
+
+  async dashboardList(guildId: string): Promise<Array<{
+    id: number;
+    channelId: string;
+    creatorId: string;
+    status: "open" | "closing" | "closed";
+    claimedBy: string | null;
+    createdAt: Date;
+    closedAt: Date | null;
+  }>> {
+    const result = await this.db.query<{
+      id: string;
+      channel_id: string;
+      creator_id: string;
+      status: "open" | "closing" | "closed";
+      claimed_by: string | null;
+      created_at: Date;
+      closed_at: Date | null;
+    }>(
+      "SELECT id,channel_id,creator_id,status,claimed_by,created_at,closed_at FROM tickets WHERE guild_id=$1 ORDER BY created_at DESC LIMIT 100",
+      [guildId]
+    );
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      channelId: row.channel_id,
+      creatorId: row.creator_id,
+      status: row.status,
+      claimedBy: row.claimed_by,
+      createdAt: row.created_at,
+      closedAt: row.closed_at
+    }));
+  }
+
+  async dashboardClose(guildId: string, ticketId: number): Promise<boolean> {
+    if (!Number.isSafeInteger(ticketId) || ticketId < 1) throw new Error("invalid_ticket");
+
+    const claimed = await this.db.query<{ channel_id: string; creator_id: string }>(
+      "UPDATE tickets SET status='closing',closing_at=now() WHERE id=$1 AND guild_id=$2 AND status='open' RETURNING channel_id,creator_id",
+      [ticketId, guildId]
+    );
+    const row = claimed.rows[0];
+    if (!row) return false;
+
+    const config = await this.config(guildId);
+    const channel = this.client?.guilds.cache.get(guildId)?.channels.cache.get(row.channel_id);
+    let transcript = "Transcript unavailable.";
+
+    try {
+      transcript = channel?.type === ChannelType.GuildText ? await this.transcript(channel) : transcript;
+
+      await this.db.transaction(async (client) => {
+        await client.query(
+          "INSERT INTO ticket_transcripts(ticket_id,guild_id,content) VALUES($1,$2,$3) ON CONFLICT(ticket_id) DO UPDATE SET content=EXCLUDED.content",
+          [ticketId, guildId, transcript]
+        );
+        await client.query(
+          "UPDATE tickets SET status='closed',closed_at=now(),closing_at=NULL WHERE id=$1 AND guild_id=$2 AND status='closing'",
+          [ticketId, guildId]
+        );
+      });
+    } catch (error) {
+      await this.db.query(
+        "UPDATE tickets SET status='open',closing_at=NULL WHERE id=$1 AND guild_id=$2 AND status='closing'",
+        [ticketId, guildId]
+      ).catch((rollbackError) => logger.error("Dashboard ticket close rollback failed", {
+        guildId, ticketId, error: String(rollbackError)
+      }));
+      throw error;
+    }
+
+    if (config.transcriptChannelId) {
+      const transcriptChannel = this.client?.guilds.cache.get(guildId)?.channels.cache.get(config.transcriptChannelId);
+      if (transcriptChannel?.isTextBased() && "send" in transcriptChannel) {
+        const { AttachmentBuilder } = await import("discord.js");
+        await transcriptChannel.send({
+          content: "Transcript ticket #" + ticketId,
+          files: [new AttachmentBuilder(Buffer.from(transcript, "utf8"), { name: "ticket-" + ticketId + ".txt" })]
+        }).catch((error) => logger.warn("Dashboard ticket transcript delivery failed", {
+          guildId, ticketId, error: String(error)
+        }));
+      }
+    }
+
+    await this.events?.emit("ticket.close", {
+      guildId,
+      userId: row.creator_id,
+      ticketId,
+      channelId: row.channel_id
+    });
+
+    if (channel?.type === ChannelType.GuildText) {
+      await channel.delete("Ticket closed from Control Center").catch((error) => logger.warn("Dashboard ticket channel cleanup failed", {
+        guildId, ticketId, channelId: row.channel_id, error: String(error)
+      }));
+    }
+    return true;
   }
 
   private async config(guildId: string): Promise<TicketConfig> {
@@ -100,8 +200,8 @@ export class Tickets implements PlatformModule {
     return true;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "ticket") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "ticket") return;
     const sub = interaction.options.getSubcommand();
 
     if (sub === "setup") {

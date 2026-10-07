@@ -21,6 +21,7 @@ export type ModerationCase = {
   action: ModerationAction;
   reason: string | null;
   expiresAt: Date | null;
+  resolvedAt: Date | null;
   createdAt: Date;
 };
 
@@ -81,6 +82,13 @@ export class Moderation implements PlatformModule {
     return caseId;
   }
 
+  async automationWarn(guildId: string, targetUserId: string, reason: string): Promise<number | null> {
+    const target = await this.client?.users.fetch(targetUserId).catch(() => null);
+    if (!target) throw new Error("user_not_found");
+    await this.applyWarn(guildId, "system", target, reason || "Automation warning");
+    return await this.latestCaseId(guildId, targetUserId, "warn");
+  }
+
   async history(guildId: string, targetUserId: string, limit = 10): Promise<ModerationCase[]> {
     const safeLimit = Math.min(Math.max(limit, 1), 50);
     const result = await this.db.query<{
@@ -91,9 +99,10 @@ export class Moderation implements PlatformModule {
       action: ModerationAction;
       reason: string | null;
       expires_at: Date | null;
+      resolved_at: Date | null;
       created_at: Date;
     }>(
-      `SELECT id,guild_id,target_user_id,moderator_user_id,action,reason,expires_at,created_at
+      `SELECT id,guild_id,target_user_id,moderator_user_id,action,reason,expires_at,resolved_at,created_at
        FROM moderation_cases
        WHERE guild_id=$1 AND target_user_id=$2
        ORDER BY created_at DESC
@@ -109,8 +118,63 @@ export class Moderation implements PlatformModule {
       action: row.action,
       reason: row.reason,
       expiresAt: row.expires_at,
+      resolvedAt: row.resolved_at,
       createdAt: row.created_at
     }));
+  }
+
+  async recent(
+    guildId: string,
+    limit = 50,
+    action?: ModerationAction
+  ): Promise<ModerationCase[]> {
+    const safeLimit = Math.min(Math.max(limit, 1), 200);
+    const result = await this.db.query<{
+      id: string;
+      guild_id: string;
+      target_user_id: string;
+      moderator_user_id: string;
+      action: ModerationAction;
+      reason: string | null;
+      expires_at: Date | null;
+      resolved_at: Date | null;
+      created_at: Date;
+    }>(
+      action
+        ? `SELECT id,guild_id,target_user_id,moderator_user_id,action,reason,expires_at,resolved_at,created_at
+           FROM moderation_cases
+           WHERE guild_id=$1 AND action=$2
+           ORDER BY created_at DESC
+           LIMIT $3`
+        : `SELECT id,guild_id,target_user_id,moderator_user_id,action,reason,expires_at,resolved_at,created_at
+           FROM moderation_cases
+           WHERE guild_id=$1
+           ORDER BY created_at DESC
+           LIMIT $2`,
+      action ? [guildId, action, safeLimit] : [guildId, safeLimit]
+    );
+
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      guildId: row.guild_id,
+      targetUserId: row.target_user_id,
+      moderatorUserId: row.moderator_user_id,
+      action: row.action,
+      reason: row.reason,
+      expiresAt: row.expires_at,
+      resolvedAt: row.resolved_at,
+      createdAt: row.created_at
+    }));
+  }
+
+  async resolveCase(guildId: string, caseId: number): Promise<boolean> {
+    const result = await this.db.query(
+      `UPDATE moderation_cases
+       SET resolved_at=COALESCE(resolved_at, now())
+       WHERE guild_id=$1 AND id=$2 AND resolved_at IS NULL`,
+      [guildId, caseId]
+    );
+    return result.rowCount === 1;
   }
 
   private async enabled(guildId: string): Promise<boolean> {
@@ -119,6 +183,79 @@ export class Moderation implements PlatformModule {
       [guildId]
     );
     return result.rows[0]?.enabled ?? true;
+  }
+
+  async dashboardChannelAction(
+    guildId: string,
+    channelId: string,
+    action: "clear" | "slowmode" | "lock" | "unlock",
+    value?: number
+  ): Promise<{ action: "clear" | "slowmode" | "lock" | "unlock"; channelId: string; affected?: number; seconds?: number }> {
+    if (!await this.enabled(guildId)) throw new Error("moderation_disabled");
+    if (!/^\d{15,25}$/.test(channelId)) throw new Error("invalid_channel");
+
+    const guild = this.client?.guilds.cache.get(guildId);
+    const channel = guild?.channels.cache.get(channelId);
+    if (!guild || !channel) throw new Error("channel_not_found");
+
+    const botMember = guild.members.me;
+    if (!botMember) throw new Error("bot_member_not_found");
+
+    const textChannel = channel.type === 0 || channel.type === 5 ? channel : null;
+    const manageableChannel = "permissionOverwrites" in channel ? channel : null;
+
+    if (action === "clear") {
+      if (!textChannel) throw new Error("text_channel_required");
+      const permissions = textChannel.permissionsFor(botMember);
+      if (!botMember.permissions.has(PermissionFlagsBits.ManageMessages) || !permissions?.has(PermissionFlagsBits.ManageMessages)) {
+        throw new Error("bot_missing_manage_messages");
+      }
+      const clearAmount = Number(value);
+      if (!Number.isInteger(clearAmount) || clearAmount < 1 || clearAmount > 100) throw new Error("invalid_clear_amount");
+      const deleted = await textChannel.bulkDelete(clearAmount, true);
+      return { action, channelId, affected: deleted.size };
+    }
+
+    if (!botMember.permissions.has(PermissionFlagsBits.ManageChannels) || !manageableChannel?.permissionsFor(botMember)?.has(PermissionFlagsBits.ManageChannels)) {
+      throw new Error("bot_missing_manage_channels");
+    }
+
+    if (action === "slowmode") {
+      if (!textChannel) throw new Error("text_channel_required");
+      const slowmodeSeconds = Number(value);
+      if (!Number.isInteger(slowmodeSeconds) || slowmodeSeconds < 0 || slowmodeSeconds > 21600) throw new Error("invalid_slowmode");
+      await textChannel.setRateLimitPerUser(slowmodeSeconds, "Configured by Vexa Control Center");
+      return { action, channelId, seconds: slowmodeSeconds };
+    }
+
+    if (!manageableChannel) throw new Error("channel_not_manageable");
+
+    const everyone = guild.roles.everyone;
+    if (action === "lock") {
+      const current = manageableChannel.permissionsFor(everyone)?.has(PermissionFlagsBits.SendMessages) ?? null;
+      await this.db.query(
+        "INSERT INTO moderation_channel_locks(guild_id,channel_id,previous_send_messages) VALUES($1,$2,$3) ON CONFLICT(guild_id,channel_id) DO NOTHING",
+        [guildId, channelId, current]
+      );
+      await manageableChannel.permissionOverwrites.edit(everyone, { SendMessages: false }, { reason: "Vexa Control Center channel lock" });
+      return { action, channelId };
+    }
+
+    if (action === "unlock") {
+      const stored = await this.db.query<{ previous_send_messages: boolean | null }>(
+        "SELECT previous_send_messages FROM moderation_channel_locks WHERE guild_id=$1 AND channel_id=$2",
+        [guildId, channelId]
+      );
+      const previous = stored.rows[0]?.previous_send_messages ?? null;
+      await manageableChannel.permissionOverwrites.edit(everyone, { SendMessages: previous }, { reason: "Discord Server Platform Control Center channel unlock" });
+      await this.db.query(
+        "DELETE FROM moderation_channel_locks WHERE guild_id=$1 AND channel_id=$2",
+        [guildId, channelId]
+      );
+      return { action, channelId };
+    }
+
+    throw new Error("invalid_channel_action");
   }
 
   async dashboardAction(

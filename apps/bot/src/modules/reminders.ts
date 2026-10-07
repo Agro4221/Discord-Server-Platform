@@ -17,8 +17,8 @@ export class Reminders implements PlatformModule {
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
     this.identityId = context.identityId;
-    this.unsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
-    this.timer = setInterval(() => void this.deliver(), 5_000);
+    this.unsubscribe = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
+    this.timer = setInterval(() => void this.deliver(), 10_000);
     this.timer.unref();
   }
 
@@ -72,8 +72,8 @@ export class Reminders implements PlatformModule {
     return result.rowCount === 1;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "remind") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "remind") return;
     if (!await moduleEnabled(this.db, interaction.guild!.id, "reminders", false)) {
       await interaction.reply({ content: "Модуль Reminders выключен.", ephemeral: true });
       return;

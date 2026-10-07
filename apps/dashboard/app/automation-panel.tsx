@@ -2,21 +2,33 @@
 
 import { useEffect, useState } from "react";
 
-type Resource = { id: string; name: string };
+type Resource = { id: string; name: string; type?: number };
 type Condition =
-  | { type: "contains" | "equals"; left: string; right: string }
+  | { type: "contains" | "equals" | "starts-with" | "ends-with"; left: string; right: string }
   | { type: "matches"; left: string; pattern: string }
-  | { type: "number-gte" | "number-lte"; left: string; right: number }
+  | { type: "number-gte" | "number-lte" | "number-eq" | "number-gt" | "number-lt"; left: string; right: number }
   | { type: "has-role"; userId: string; roleId: string }
   | { type: "channel-is"; channelId: string }
   | { type: "cooldown-clear"; key: string };
 
 type Action =
   | { type: "send-message"; channelId: string; content: string }
+  | { type: "create-channel"; name: string; channelType: "text" | "voice"; parentId: string | null }
   | { type: "dm-user"; userId: string; content: string }
   | { type: "add-role" | "remove-role"; userId: string; roleId: string }
   | { type: "timeout"; userId: string; durationSeconds: number; reason: string }
+  | { type: "warn"; userId: string; reason: string }
   | { type: "delete-message"; channelId: string; messageId: string }
+  | { type: "add-reaction" | "remove-reaction"; channelId: string; messageId: string; emoji: string }
+  | { type: "pin-message" | "unpin-message"; channelId: string; messageId: string }
+  | { type: "set-slowmode"; channelId: string; seconds: number }
+  | { type: "set-channel-topic"; channelId: string; topic: string }
+  | { type: "set-channel-name"; channelId: string; name: string }
+  | { type: "set-nickname"; userId: string; nickname: string }
+  | { type: "ban"; userId: string; reason: string }
+  | { type: "kick"; userId: string; reason: string }
+  | { type: "clear-cooldown"; key: string }
+  | { type: "set-cooldown"; key: string; durationSeconds: number }
   | { type: "log"; message: string };
 
 type Rule = {
@@ -32,13 +44,15 @@ type Rule = {
 
 const EVENTS = [
   "member.join","member.leave","member.role.add","member.role.remove",
-  "message.create","message.delete","message.edit","reaction.add",
+  "message.create","message.delete","message.edit","reaction.add","reaction.remove",
+  "channel.update","role.update",
   "voice.join","voice.leave","voice.move","moderation.case",
-  "ticket.create","ticket.close","giveaway.end","schedule"
+  "ticket.create","ticket.close","giveaway.end","schedule",
+  "channel.create","channel.delete","role.create","role.delete","member.ban","member.unban","security.incident"
 ] as const;
 
-const TEXT_FIELDS = ["content","userId","channelId","messageId","guildId"] as const;
-const NUMBER_FIELDS = ["memberCount","messageLength","mentionCount","previousLength","giveawayId","winnerCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"] as const;
+const TEXT_FIELDS = ["content","userId","channelId","previousChannelId","messageId","guildId"] as const;
+const NUMBER_FIELDS = ["memberCount","messageLength","mentionCount","previousLength","attachmentCount","embedCount","stickerCount","giveawayId","winnerCount","rolePosition","incidentId","actionCount","joinCount","timestamp","minute","hour","dayOfWeek","dayOfMonth"] as const;
 
 export function AutomationPanel({
   guildId,
@@ -51,6 +65,8 @@ export function AutomationPanel({
   roles: Resource[];
   onChanged?: () => void | Promise<void>;
 }) {
+  const textChannels = channels.filter((channel) => channel.type === 0 || channel.type === 5);
+  const categories = channels.filter((channel) => channel.type === 4);
   const [rules, setRules] = useState<Rule[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("Новое правило");
@@ -169,7 +185,7 @@ export function AutomationPanel({
     const next: Condition =
       type === "channel-is" ? { type, channelId: "" } :
       type === "matches" ? { type, left: "content", pattern: "" } :
-      type === "number-gte" || type === "number-lte" ? { type, left: "memberCount", right: 0 } :
+      type === "number-gte" || type === "number-lte" || type === "number-eq" || type === "number-gt" || type === "number-lt" ? { type, left: "memberCount", right: 0 } :
       type === "has-role" ? { type, userId: "@event", roleId: "" } :
       type === "cooldown-clear" ? { type, key: "" } :
       { type, left: "content", right: "" };
@@ -184,10 +200,22 @@ export function AutomationPanel({
   function replaceAction(index: number, type: Action["type"]) {
     const next: Action =
       type === "send-message" ? { type, channelId: "", content: "" } :
+      type === "create-channel" ? { type, name: "", channelType: "text", parentId: null } :
       type === "dm-user" ? { type, userId: "@event", content: "" } :
       type === "add-role" || type === "remove-role" ? { type, userId: "@event", roleId: "" } :
       type === "timeout" ? { type, userId: "@event", durationSeconds: 60, reason: "" } :
+      type === "warn" ? { type, userId: "@event", reason: "" } :
       type === "delete-message" ? { type, channelId: "@event", messageId: "@event" } :
+      type === "add-reaction" || type === "remove-reaction" ? { type, channelId: "@event", messageId: "@event", emoji: "👍" } :
+      type === "pin-message" || type === "unpin-message" ? { type, channelId: "@event", messageId: "@event" } :
+      type === "set-slowmode" ? { type, channelId: "@event", seconds: 0 } :
+      type === "set-channel-topic" ? { type, channelId: "@event", topic: "" } :
+      type === "set-channel-name" ? { type, channelId: "@event", name: "" } :
+      type === "set-nickname" ? { type, userId: "@event", nickname: "" } :
+      type === "ban" ? { type, userId: "@event", reason: "" } :
+      type === "kick" ? { type, userId: "@event", reason: "" } :
+      type === "clear-cooldown" ? { type, key: "" } :
+      type === "set-cooldown" ? { type, key: "", durationSeconds: 60 } :
       { type: "log", message: "" };
     setActions((current) => current.map((item, i) => i === index ? next : item));
   }
@@ -220,16 +248,21 @@ export function AutomationPanel({
           <div key={index} style={rowStyle}>
             <select value={condition.type} onChange={(e) => replaceCondition(index, e.target.value as Condition["type"])} style={inputStyle}>
               <option value="contains">contains</option>
+              <option value="starts-with">starts-with</option>
+              <option value="ends-with">ends-with</option>
               <option value="equals">equals</option>
               <option value="matches">matches</option>
               <option value="number-gte">number-gte</option>
               <option value="number-lte">number-lte</option>
+              <option value="number-eq">number-eq</option>
+              <option value="number-gt">number-gt</option>
+              <option value="number-lt">number-lt</option>
               <option value="has-role">has-role</option>
               <option value="channel-is">channel-is</option>
               <option value="cooldown-clear">cooldown-clear</option>
             </select>
 
-            {(condition.type === "contains" || condition.type === "equals" || condition.type === "matches") && (
+            {(condition.type === "contains" || condition.type === "equals" || condition.type === "starts-with" || condition.type === "ends-with" || condition.type === "matches") && (
               <>
                 <select value={condition.left} onChange={(e) => updateCondition(index, { left: e.target.value })} style={inputStyle}>
                   {TEXT_FIELDS.map((field) => <option key={field}>{field}</option>)}
@@ -244,7 +277,7 @@ export function AutomationPanel({
               </>
             )}
 
-            {(condition.type === "number-gte" || condition.type === "number-lte") && (
+            {(condition.type === "number-gte" || condition.type === "number-lte" || condition.type === "number-eq" || condition.type === "number-gt" || condition.type === "number-lt") && (
               <>
                 <select value={condition.left} onChange={(e) => updateCondition(index, { left: e.target.value })} style={inputStyle}>
                   {NUMBER_FIELDS.map((field) => <option key={field}>{field}</option>)}
@@ -266,7 +299,7 @@ export function AutomationPanel({
             {condition.type === "channel-is" && (
               <select value={condition.channelId} onChange={(e) => updateCondition(index, { channelId: e.target.value })} style={inputStyle}>
                 <option value="">Канал</option>
-                {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                {textChannels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
               </select>
             )}
 
@@ -287,16 +320,22 @@ export function AutomationPanel({
           <div key={"any-" + index} style={rowStyle}>
             <select value={condition.type} onChange={(e) => replaceCondition(index, e.target.value as Condition["type"], true)} style={inputStyle}>
               <option value="contains">contains</option>
+              <option value="starts-with">starts-with</option>
+              <option value="ends-with">ends-with</option>
               <option value="equals">equals</option>
               <option value="matches">matches</option>
               <option value="number-gte">number-gte</option>
               <option value="number-lte">number-lte</option>
+              <option value="number-eq">number-eq</option>
+              <option value="number-gt">number-gt</option>
+              <option value="number-lt">number-lt</option>
+              <option value="number-eq">number-eq</option>
               <option value="has-role">has-role</option>
               <option value="channel-is">channel-is</option>
               <option value="cooldown-clear">cooldown-clear</option>
             </select>
 
-            {(condition.type === "contains" || condition.type === "equals" || condition.type === "matches") && (
+            {(condition.type === "contains" || condition.type === "equals" || condition.type === "starts-with" || condition.type === "ends-with" || condition.type === "matches") && (
               <>
                 <select value={condition.left} onChange={(e) => updateCondition(index, { left: e.target.value }, true)} style={inputStyle}>
                   {TEXT_FIELDS.map((field) => <option key={field}>{field}</option>)}
@@ -311,7 +350,7 @@ export function AutomationPanel({
               </>
             )}
 
-            {(condition.type === "number-gte" || condition.type === "number-lte") && (
+            {(condition.type === "number-gte" || condition.type === "number-lte" || condition.type === "number-eq" || condition.type === "number-gt" || condition.type === "number-lt") && (
               <>
                 <select value={condition.left} onChange={(e) => updateCondition(index, { left: e.target.value }, true)} style={inputStyle}>
                   {NUMBER_FIELDS.map((field) => <option key={field}>{field}</option>)}
@@ -333,7 +372,7 @@ export function AutomationPanel({
             {condition.type === "channel-is" && (
               <select value={condition.channelId} onChange={(e) => updateCondition(index, { channelId: e.target.value }, true)} style={inputStyle}>
                 <option value="">Канал</option>
-                {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                {textChannels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
               </select>
             )}
 
@@ -360,11 +399,25 @@ export function AutomationPanel({
           <div key={index} style={{ display: "grid", gridTemplateColumns: "minmax(150px,180px) minmax(0,1fr) auto", gap: 8 }}>
             <select value={action.type} onChange={(e) => replaceAction(index, e.target.value as Action["type"])} style={inputStyle}>
               <option value="send-message">send-message</option>
+              <option value="create-channel">create-channel</option>
               <option value="dm-user">dm-user</option>
               <option value="add-role">add-role</option>
               <option value="remove-role">remove-role</option>
               <option value="timeout">timeout</option>
+              <option value="warn">warn</option>
               <option value="delete-message">delete-message</option>
+              <option value="add-reaction">add-reaction</option>
+              <option value="remove-reaction">remove-reaction</option>
+              <option value="pin-message">pin-message</option>
+              <option value="unpin-message">unpin-message</option>
+              <option value="set-slowmode">set-slowmode</option>
+              <option value="set-channel-topic">set-channel-topic</option>
+              <option value="set-channel-name">set-channel-name</option>
+              <option value="set-nickname">set-nickname</option>
+              <option value="ban">ban</option>
+              <option value="kick">kick</option>
+              <option value="clear-cooldown">clear-cooldown</option>
+              <option value="set-cooldown">set-cooldown</option>
               <option value="log">log</option>
             </select>
 
@@ -372,12 +425,33 @@ export function AutomationPanel({
               <div style={actionGrid}>
                 <select value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} style={inputStyle}>
                   <option value="">Канал</option>
+                  <option value="@event">Канал события</option>
                   {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
                 </select>
                 <input value={action.content} maxLength={2000} onChange={(e) => updateAction(index, { content: e.target.value })} placeholder="Текст · {user} {channel} {content}" style={inputStyle} />
               </div>
             )}
 
+            {action.type === "create-channel" && (
+              <div style={actionGrid}>
+                <input value={action.name} maxLength={100} onChange={(e) => updateAction(index, { name: e.target.value })} placeholder="Имя канала · ticket-{userId}" style={inputStyle} />
+                <select value={action.channelType} onChange={(e) => updateAction(index, { channelType: e.target.value as "text" | "voice" })} style={inputStyle}>
+                  <option value="text">Текстовый</option>
+                  <option value="voice">Голосовой</option>
+                </select>
+                <select value={action.parentId ?? ""} onChange={(e) => updateAction(index, { parentId: e.target.value || null })} style={inputStyle}>
+                  <option value="">Без категории</option>
+                  {categories.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            {action.type === "warn" && (
+              <div style={actionGrid}>
+                <input value={action.userId} maxLength={20} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event или User ID" style={inputStyle} />
+                <input value={action.reason} maxLength={500} onChange={(e) => updateAction(index, { reason: e.target.value })} placeholder="Причина предупреждения" style={inputStyle} />
+              </div>
+            )}
             {action.type === "dm-user" && (
               <div style={actionGrid}>
                 <input value={action.userId} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event или user ID" style={inputStyle} />
@@ -403,10 +477,100 @@ export function AutomationPanel({
               </div>
             )}
 
+            {action.type === "warn" && (
+              <div style={actionGrid}>
+                <input value={action.userId} maxLength={20} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event или User ID" style={inputStyle} />
+                <input value={action.reason} maxLength={500} onChange={(e) => updateAction(index, { reason: e.target.value })} placeholder="Причина предупреждения" style={inputStyle} />
+              </div>
+            )}
+
             {action.type === "delete-message" && (
               <div style={actionGrid}>
                 <input value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} placeholder="@event или channel ID" style={inputStyle} />
                 <input value={action.messageId} onChange={(e) => updateAction(index, { messageId: e.target.value })} placeholder="@event или message ID" style={inputStyle} />
+              </div>
+            )}
+
+            {(action.type === "add-reaction" || action.type === "remove-reaction") && (
+              <div style={actionGrid}>
+                <select value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} style={inputStyle}>
+                  <option value="@event">Канал события</option>
+                  {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                </select>
+                <input value={action.messageId} onChange={(e) => updateAction(index, { messageId: e.target.value })} placeholder="@event или message ID" style={inputStyle} />
+                <input value={action.emoji} maxLength={100} onChange={(e) => updateAction(index, { emoji: e.target.value })} placeholder="Emoji, например 👍" style={inputStyle} />
+              </div>
+            )}
+
+            {(action.type === "pin-message" || action.type === "unpin-message") && (
+              <div style={actionGrid}>
+                <select value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} style={inputStyle}>
+                  <option value="@event">Канал события</option>
+                  {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                </select>
+                <input value={action.messageId} onChange={(e) => updateAction(index, { messageId: e.target.value })} placeholder="@event или message ID" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "set-slowmode" && (
+              <div style={actionGrid}>
+                <select value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} style={inputStyle}>
+                  <option value="@event">Канал события</option>
+                  {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                </select>
+                <input type="number" min={0} max={21600} value={action.seconds} onChange={(e) => updateAction(index, { seconds: Number(e.target.value) })} style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "set-channel-topic" && (
+              <div style={actionGrid}>
+                <select value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} style={inputStyle}>
+                  <option value="@event">Канал события</option>
+                  {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                </select>
+                <input value={action.topic} maxLength={1024} onChange={(e) => updateAction(index, { topic: e.target.value })} placeholder="Новый topic" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "set-channel-name" && (
+              <div style={actionGrid}>
+                <select value={action.channelId} onChange={(e) => updateAction(index, { channelId: e.target.value })} style={inputStyle}>
+                  <option value="@event">Канал события</option>
+                  {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+                </select>
+                <input value={action.name} maxLength={100} onChange={(e) => updateAction(index, { name: e.target.value })} placeholder="Новое имя · ticket-{userId}" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "set-nickname" && (
+              <div style={actionGrid}>
+                <input value={action.userId} maxLength={20} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event or User ID" style={inputStyle} />
+                <input value={action.nickname} maxLength={32} onChange={(e) => updateAction(index, { nickname: e.target.value })} placeholder="Nickname · {user}" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "kick" && (
+              <div style={actionGrid}>
+                <input value={action.userId} maxLength={20} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event or User ID" style={inputStyle} />
+                <input value={action.reason} maxLength={500} onChange={(e) => updateAction(index, { reason: e.target.value })} placeholder="Причина kick" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "ban" && (
+              <div style={actionGrid}>
+                <input value={action.userId} maxLength={20} onChange={(e) => updateAction(index, { userId: e.target.value })} placeholder="@event or User ID" style={inputStyle} />
+                <input value={action.reason} maxLength={500} onChange={(e) => updateAction(index, { reason: e.target.value })} placeholder="Причина бана" style={inputStyle} />
+              </div>
+            )}
+
+            {action.type === "clear-cooldown" && (
+              <input value={action.key} maxLength={100} onChange={(e) => updateAction(index, { key: e.target.value })} placeholder="Cooldown key · {userId}" style={inputStyle} />
+            )}
+
+            {action.type === "set-cooldown" && (
+              <div style={actionGrid}>
+                <input value={action.key} maxLength={100} onChange={(e) => updateAction(index, { key: e.target.value })} placeholder="Cooldown key · {userId}" style={inputStyle} />
+                <input type="number" min={1} max={86400} value={action.durationSeconds} onChange={(e) => updateAction(index, { durationSeconds: Number(e.target.value) })} placeholder="Секунд" style={inputStyle} />
               </div>
             )}
 

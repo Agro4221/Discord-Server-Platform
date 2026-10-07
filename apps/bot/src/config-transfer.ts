@@ -25,7 +25,8 @@ const CONFIG_TABLES: ExportTable[] = [
   { table: "ticket_settings", fields: ["enabled","category_id","staff_role_id","transcript_channel_id"] },
   { table: "security_settings", fields: [
     "enabled","max_joins","window_seconds","max_destructive_actions",
-    "destructive_window_seconds","quarantine_role_id","log_channel_id"
+    "destructive_window_seconds","quarantine_role_id","log_channel_id",
+    "incident_duration_seconds","auto_quarantine","remove_executor_roles","executor_timeout_minutes","executor_ban_enabled","auto_lockdown"
   ] },
   { table: "verification_settings", fields: ["enabled","channel_id","verified_role_id","quarantine_role_id","log_channel_id","code_ttl_minutes"] },
   { table: "leveling_settings", fields: ["enabled","xp_per_message","cooldown_seconds","announce_level_up"] },
@@ -263,7 +264,8 @@ export class ConfigTransferService {
 
     await execute("security_settings", "security", [
       "enabled","max_joins","window_seconds","max_destructive_actions",
-      "destructive_window_seconds","quarantine_role_id","log_channel_id"
+      "destructive_window_seconds","quarantine_role_id","log_channel_id","incident_duration_seconds",
+      "auto_quarantine","remove_executor_roles","executor_timeout_minutes","executor_ban_enabled"
     ], {
       enabled: false,
       max_joins: 10,
@@ -271,7 +273,13 @@ export class ConfigTransferService {
       max_destructive_actions: 5,
       destructive_window_seconds: 20,
       quarantine_role_id: null,
-      log_channel_id: null
+      log_channel_id: null,
+      incident_duration_seconds: 300,
+      auto_quarantine: true,
+      remove_executor_roles: true,
+      executor_timeout_minutes: 0,
+      executor_ban_enabled: false,
+      auto_lockdown: false
     });
 
     await execute("verification_settings", "verification", [

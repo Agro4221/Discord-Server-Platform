@@ -4,29 +4,34 @@
 
 ## 1. Первый запуск на Windows
 
-Из корня репозитория:
+Основной локальный путь — native Windows runtime:
 
-    powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1
+    .\start-native.bat
 
-На первом запуске launcher создаёт .env и попросит только:
+По умолчанию запускаются PostgreSQL (установленный отдельно), один Lavalink и Bot.
+Control Center запускается только с `-Dashboard`:
 
-- Discord Bot Token
-- Discord Client ID
-- Dashboard admin password
+    .\start-native.bat -Dashboard
 
-Остальные локальные секреты генерируются автоматически.
+На первом запуске launcher просит только:
+- Discord Bot Token;
+- Discord Client ID.
 
-После запуска автоматически открывается:
+Автоматически генерируются локальные служебные секреты. **Пароля Dashboard и пользовательского login/session слоя больше нет.**
+
+Когда `-Dashboard` включён и сервисы готовы, Control Center открывается по адресу:
 
     http://127.0.0.1:3000/
 
-При успешном запуске `start-local.bat` закрывает окно launcher после открытия Control Center. При ошибке окно остаётся открытым, чтобы сообщение можно было прочитать.
+Второй Lavalink также необязателен:
 
-По умолчанию Dashboard и Management API доступны только с локального компьютера.
+    .\start-native.bat -Lavalink2
+
+Используй его только для сценариев с резервированием/failover.
 
 ## 2. Control Center
 
-После входа выбери сервер слева.
+После открытия Control Center выбери сервер слева.
 
 Control Center разделён на функциональные области, а не только на список модулей:
 
@@ -105,6 +110,20 @@ Music:
 - autoplay.
 
 ### Специализированные панели
+
+Moderation — поиск участников, warn/timeout/kick/ban/unban и журнал moderation cases.
+
+Command Policies — включение/выключение команд, slash/prefix, cooldown, help visibility и role/channel scopes.
+
+Leveling — role rewards и исключения для ролей/каналов.
+
+Tickets — список тикетов и закрытие с сохранением transcript.
+
+Starboard — канал публикации, threshold и ignore-параметры.
+
+Economy — CRUD магазина.
+
+Music — playback control, queue, seek, volume, repeat и autoplay.
 
 Role Panels — CRUD и публикация role panels.
 
@@ -296,15 +315,14 @@ Dashboard является основным способом редактиро�
 
 ## 6. Что не является «пропущенным» в Dashboard
 
-Некоторые операции сознательно command-first:
+Часть операций остаётся command-first по своей природе:
 
-- обычные moderation actions;
-- Economy user actions;
-- создание shop items;
-- Reminders;
-- часть первичной настройки slash workflows.
+- пользовательские Economy actions (`/daily`, `/pay`, `/buy` и т. п.);
+- пользовательские Reminders;
+- лёгкие Utility и Community Tools команды;
+- часть первичной настройки Discord workflows.
 
-Это функции бота, а не потерянная функциональность.
+Административные операции, которые уже имеют Core/Management API, по мере готовности выносятся в Control Center; Discord-команды остаются fallback-входом, а не единственным способом управления.
 
 ## 7. Что ещё требует живого окружения
 
@@ -324,6 +342,42 @@ Dashboard является основным способом редактиро�
 
 Проект уже объединяет основные категории, ради которых обычно используют несколько multipurpose Discord bots: moderation, AutoMod, role panels, welcome/verification, leveling, tickets, giveaways, feeds, starboard, economy, reminders, automation, analytics и music.
 
-При этом это ещё не буквальная feature-parity со всеми зрелыми ботами. Отдельно остаются более глубокие custom commands, расширенный logging, richer AutoMod policies, расширенный Automation catalog, более широкий Music provider/failover слой и fleet failover automation.
+При этом это не обещание буквальной feature-parity со всеми зрелыми ботами. Наш согласованный scope закрывает собственные административные и пользовательские функции; дальнейшие улучшения сверх него идут как отдельные feature-slice.
 
-Главная архитектурная цель уже соблюдена: локальный self-hosted Core + PostgreSQL + Dashboard + Lavalink, без необходимости покупать premium-функции у внешнего bot provider. Сравнение с другими ботами нужно понимать как набор заимствованных продуктовых идей и UX-паттернов, а не как обещание полной копии каждого сервиса.
+Главная архитектурная цель уже соблюдена: локальный self-hosted Core + PostgreSQL + Dashboard + Lavalink, без необходимости покупать premium-функции у внешнего bot provider. Сравнение с другими ботами нужно понимать как набор заимствованных продуктовых идей и UX-паттернов, а не как обещание полной копии каждого сервиса.## 2026-10-03 — Utility commands / AFK
+- The Community area now includes a Utility module for lightweight everyday server operations:
+  - Server/member information: `/serverinfo`, `/userinfo`, `/membercount`.
+  - Media/structure inspection: `/avatar`, `/roleinfo`, `/channelinfo`.
+  - AFK: `/afk set`, `/afk clear`, `/afk status`; prefix equivalents are also available.
+- AFK is persistent across bot restarts and reports an AFK user's reason when they are mentioned.
+
+### Utility / AFK hardening
+- AFK changes are included in durable audit telemetry.
+- AFK responses cap output and only explicitly allow mentions of affected users; stored reasons cannot create mass mentions.
+
+### Community Tools
+- Poll: /poll or !poll question | option1 | option2 | ...; supports 2-5 options and a configurable slash duration.
+- Suggestions: /suggest text or prefix equivalent; moderators can approve or deny from the buttons.
+- Sticky: /sticky set text /sticky clear; slash command also allows selecting a text channel.
+- Fun: /8ball, /choose, /roll and corresponding prefix commands.
+
+### Logging
+- Configure with `/logging setup channel enabled` or `!logging setup #канал`.
+- Dashboard exposes per-event switches for messages, members, voice, deleted channels/roles and bans.
+- Events are retained in the durable audit store as well as sent to the configured Discord log channel.
+
+
+## 2.1. Bot Registry
+
+В **Система → Bot Fleet** можно зарегистрировать или обновить Discord Bot Identity.
+
+При регистрации Dashboard передаёт токен только во внутренний Management API. Core проверяет токен через Discord, связывает его с фактическим Discord user ID бота и сохраняет credential в PostgreSQL в зашифрованном виде. Сам токен не возвращается Dashboard и не показывается в списке Fleet.
+
+После регистрации зашифрованный credential в PostgreSQL является источником истины при запуске выбранной identity. Значения Discord credentials из .env используются только как bootstrap, когда для этой identity ещё нет сохранённого credential. Поэтому старый токен в .env больше не перезаписывает токен, который был обновлён через Control Center.
+
+Важно: каждая BOT_IDENTITY_ID работает в отдельном Node-процессе. Регистрация secondary identity выполняется через Control Center, а локальный Fleet supervisor автоматически запускает/перезапускает включённые, credentialed identities. Само сохранение identity не выполняет синхронный запуск процесса внутри Dashboard request.
+
+
+## Music providers
+
+Music поддерживает автоматический поиск и явный выбор YouTube, YouTube Music, SoundCloud, Spotify и Яндекс Музыки. Spotify/Yandex работают через LavaSrc; для них можно включить соответствующие флаги и credentials в `.env`. Прямые ссылки на поддерживаемые сервисы передаются в Lavalink без преобразования на стороне Dashboard.

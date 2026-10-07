@@ -26,10 +26,42 @@ function baseEnv(): Record<string, string> {
     DISCORD_TOKEN: "token",
     DISCORD_CLIENT_ID: "123456789012345678",
     MANAGEMENT_API_KEY: "management-key",
-    DATABASE_URL: "postgresql://localhost/test",
-    LAVALINK_PASSWORD: "lavalink-password"
+    BOT_CREDENTIALS_ENCRYPTION_KEY: "ab".repeat(32),
+    DATABASE_URL: "postgresql://localhost/test"
   };
 }
+
+test("Music tooling config uses yt-dlp and FFmpeg defaults", () => {
+  withEnv({
+    ...baseEnv(),
+    YTDLP_PATH: undefined,
+    FFMPEG_PATH: undefined,
+    YTDLP_JS_RUNTIME: undefined,
+    YTDLP_COOKIES_FILE: undefined
+  }, () => {
+    const config = loadConfig();
+    assert.equal(config.ytDlpPath, "yt-dlp");
+    assert.equal(config.ffmpegPath, "ffmpeg");
+    assert.equal(config.ytDlpJsRuntime, "node");
+    assert.equal(config.ytDlpCookiesFile, undefined);
+  });
+});
+
+test("Music tooling config accepts explicit executable paths and cookies", () => {
+  withEnv({
+    ...baseEnv(),
+    YTDLP_PATH: "C:\\tools\\yt-dlp.exe",
+    FFMPEG_PATH: "C:\\ffmpeg\\bin\\ffmpeg.exe",
+    YTDLP_JS_RUNTIME: "deno",
+    YTDLP_COOKIES_FILE: "C:\\tools\\cookies.txt"
+  }, () => {
+    const config = loadConfig();
+    assert.equal(config.ytDlpPath, "C:\\tools\\yt-dlp.exe");
+    assert.equal(config.ffmpegPath, "C:\\ffmpeg\\bin\\ffmpeg.exe");
+    assert.equal(config.ytDlpJsRuntime, "deno");
+    assert.equal(config.ytDlpCookiesFile, "C:\\tools\\cookies.txt");
+  });
+});
 
 test("production rejects a public Management API bind", () => {
   withEnv({
@@ -77,5 +109,18 @@ test("invalid ports are rejected", () => {
     MANAGEMENT_API_PORT: "70000"
   }, () => {
     assert.throws(() => loadConfig(), /Invalid port environment variable/);
+  });
+});
+
+
+test("Discord credentials may be omitted for a DB-backed identity", () => {
+  withEnv({
+    ...baseEnv(),
+    DISCORD_TOKEN: undefined,
+    DISCORD_CLIENT_ID: undefined
+  }, () => {
+    const config = loadConfig();
+    assert.equal(config.discordToken, "");
+    assert.equal(config.discordClientId, "");
   });
 });

@@ -3,6 +3,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  PermissionFlagsBits,
   type ChatInputCommandInteraction,
   type Message
 } from "discord.js";
@@ -21,6 +22,57 @@ export class Giveaways implements PlatformModule {
   private identityId = "primary";
 
   constructor(private readonly db: Database) {}
+
+  async dashboardCreateGiveaway(
+    guildId: string,
+    channelId: string,
+    hostUserId: string,
+    prize: string,
+    winners: number,
+    minutes: number
+  ): Promise<number> {
+    if (!await moduleEnabled(this.db, guildId, "giveaways", false)) throw new Error("giveaways_disabled");
+    if (!/^\d{15,25}$/.test(channelId) || !/^\d{15,25}$/.test(hostUserId)) throw new Error("invalid_giveaway_target");
+    if (!prize.trim() || prize.length > 500) throw new Error("invalid_giveaway_prize");
+    if (!Number.isSafeInteger(winners) || winners < 1 || winners > 20) throw new Error("invalid_giveaway_winners");
+    if (!Number.isSafeInteger(minutes) || minutes < 1 || minutes > 10080) throw new Error("invalid_giveaway_duration");
+
+    const guild = this.client?.guilds.cache.get(guildId);
+    const channel = guild?.channels.cache.get(channelId);
+    if (!guild || !channel || !channel.isTextBased() || !("send" in channel)) throw new Error("text_channel_required");
+
+    const member = guild.members.me;
+    if (!member?.permissions.has(PermissionFlagsBits.SendMessages) || !channel.permissionsFor(member)?.has(PermissionFlagsBits.SendMessages)) {
+      throw new Error("bot_missing_send_messages");
+    }
+
+    const endsAt = new Date(Date.now() + minutes * 60_000);
+    const created = await this.db.query<{ id: string }>(
+      "INSERT INTO giveaways(guild_id,channel_id,host_user_id,prize,winners,ends_at,status) VALUES($1,$2,$3,$4,$5,$6,'running') RETURNING id",
+      [guildId, channelId, hostUserId, prize.trim(), winners, endsAt]
+    );
+    const id = created.rows[0]?.id;
+    if (!id) throw new Error("giveaway_id_missing");
+
+    try {
+      const message = await channel.send({
+        embeds: [new EmbedBuilder().setTitle("🎉 Giveaway").setDescription(
+          "**Приз:** " + prize.trim() + "\n**Победителей:** " + winners + "\n**До:** <t:" + Math.floor(endsAt.getTime() / 1000) + ":R>"
+        )],
+        components: [
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder().setCustomId("dsp:giveaway:enter:" + id).setLabel("Участвовать").setStyle(ButtonStyle.Success)
+          )
+        ]
+      });
+      await this.db.query("UPDATE giveaways SET message_id=$1 WHERE id=$2", [message.id, id]);
+      return Number(id);
+    } catch (error) {
+      await this.db.query("DELETE FROM giveaways WHERE id=$1 AND guild_id=$2", [id, guildId]).catch(() => undefined);
+      logger.error("Dashboard giveaway publication failed and was rolled back", { guildId, giveawayId: id, error: String(error) });
+      throw error;
+    }
+  }
 
   async list(guildId: string): Promise<Array<{
     id: number;
@@ -160,10 +212,10 @@ export class Giveaways implements PlatformModule {
     await this.recoverStaleStates();
     this.identityId = context.identityId;
     this.events = context.events;
-    const commandUnsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const commandUnsubscribe = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     const interactionUnsubscribe = context.events.on("interaction", (interaction) => this.onInteraction(interaction));
     this.unsubscribe = () => { commandUnsubscribe(); interactionUnsubscribe(); };
-    this.timer = setInterval(() => void this.sweep(), 5_000);
+    this.timer = setInterval(() => void this.sweep(), 10_000);
     this.timer.unref();
   }
 
@@ -228,8 +280,8 @@ export class Giveaways implements PlatformModule {
     return true;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "giveaway") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "giveaway") return;
     if (!await moduleEnabled(this.db, interaction.guild!.id, "giveaways", false)) {
       await interaction.reply({ content: "Модуль Giveaways выключен.", ephemeral: true });
       return;

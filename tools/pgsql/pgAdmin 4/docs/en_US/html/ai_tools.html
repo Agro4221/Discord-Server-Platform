@@ -1,0 +1,380 @@
+
+
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>AI Reports &#8212; pgAdmin 4 9.18 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/style.css?v=d36593c3" />
+    
+    <script src="_static/documentation_options.js?v=0b707c8b"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <script src="_static/sidebar.js"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Processes" href="processes.html" />
+    <link rel="prev" title="PSQL Tool" href="psql_tool.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="processes.html" title="Processes"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="psql_tool.html" title="PSQL Tool"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">pgAdmin 4 9.18 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="developer_tools.html" accesskey="U">Developer Tools</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">AI Reports</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="ai-reports">
+<span id="ai-tools"></span><h1><span class="target" id="index-0"></span>AI Reports<a class="headerlink" href="#ai-reports" title="Link to this heading">¶</a></h1>
+<p><strong>AI Reports</strong> is a feature that provides AI-powered database analysis and insights
+using Large Language Models (LLMs). Use the <em>Tools → AI Reports</em> menu to access
+the various AI-powered reports.</p>
+<p>The AI Reports feature allows you to:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Generate security reports to identify potential security vulnerabilities and configuration issues.</p></li>
+<li><p>Create performance reports with optimization recommendations for queries and configurations.</p></li>
+<li><p>Perform design reviews to analyze database schema structure and suggest improvements.</p></li>
+</ul>
+</div></blockquote>
+<p><strong>Prerequisites:</strong></p>
+<p>Before using AI Reports, you must:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p>Ensure AI features are enabled in the server configuration (set <code class="docutils literal notranslate"><span class="pre">LLM_ENABLED</span></code> to <code class="docutils literal notranslate"><span class="pre">True</span></code> in <code class="docutils literal notranslate"><span class="pre">config.py</span></code>).</p></li>
+<li><p>Configure an LLM provider in <a class="reference internal" href="preferences.html#preferences"><span class="std std-ref">Preferences → AI</span></a>.</p></li>
+</ol>
+</div></blockquote>
+<p><strong>Note:</strong></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>AI Reports using cloud providers (Anthropic, OpenAI) require an active internet connection.
+Local providers (Ollama, Docker Model Runner) do not require internet access.</p></li>
+<li><p>API usage may incur costs depending on your LLM provider’s pricing model.
+Local providers (Ollama, Docker Model Runner) are free to use.</p></li>
+<li><p>The quality and accuracy of reports depend on the LLM provider and model configured.</p></li>
+</ul>
+</div></blockquote>
+<section id="configuring-ai-reports">
+<h2>Configuring AI Reports<a class="headerlink" href="#configuring-ai-reports" title="Link to this heading">¶</a></h2>
+<p>To configure AI Reports, navigate to <em>File → Preferences → AI</em> (or click the <em>Settings</em>
+button and select <em>AI</em>).</p>
+<img alt="AI preferences" class="align-center" src="_images/preferences_ai.png" />
+<p>Select your preferred LLM provider from the dropdown:</p>
+<dl class="simple">
+<dt><strong>Anthropic</strong></dt><dd><p>Use Claude models from Anthropic, or any Anthropic-compatible API provider.</p>
+<ul class="simple">
+<li><p><strong>API URL</strong>: Custom API endpoint URL (leave empty for default: <a class="reference external" href="https://api.anthropic.com/v1">https://api.anthropic.com/v1</a>).</p></li>
+<li><p><strong>API Key File</strong>: Path to a file containing your Anthropic API key (obtain from <a class="reference external" href="https://console.anthropic.com/">https://console.anthropic.com/</a>). This path refers to the filesystem where the pgAdmin server is running (e.g., inside the container if using Docker). The <code class="docutils literal notranslate"><span class="pre">~</span></code> prefix is expanded to the home directory of the user running the pgAdmin server process. Optional when using a custom URL with a provider that does not require authentication.</p></li>
+<li><p><strong>Model</strong>: Select from available Claude models (e.g., claude-sonnet-4-20250514).</p></li>
+</ul>
+</dd>
+<dt><strong>OpenAI</strong></dt><dd><p>Use GPT models from OpenAI, or any OpenAI-compatible API provider (e.g.,
+LiteLLM, LM Studio, EXO, or other local inference servers).</p>
+<ul class="simple">
+<li><p><strong>API URL</strong>: Custom API endpoint URL (leave empty for default: <a class="reference external" href="https://api.openai.com/v1">https://api.openai.com/v1</a>). Include the <code class="docutils literal notranslate"><span class="pre">/v1</span></code> path prefix if required by your provider.</p></li>
+<li><p><strong>API Key File</strong>: Path to a file containing your OpenAI API key (obtain from <a class="reference external" href="https://platform.openai.com/">https://platform.openai.com/</a>). This path refers to the filesystem where the pgAdmin server is running (e.g., inside the container if using Docker). The <code class="docutils literal notranslate"><span class="pre">~</span></code> prefix is expanded to the home directory of the user running the pgAdmin server process. Optional when using a custom URL with a provider that does not require authentication.</p></li>
+<li><p><strong>Model</strong>: Select from available GPT models (e.g., gpt-4).</p></li>
+</ul>
+</dd>
+<dt><strong>Ollama</strong></dt><dd><p>Use locally-hosted open-source models via Ollama. Requires a running Ollama instance.</p>
+<ul class="simple">
+<li><p><strong>API URL</strong>: The URL of your Ollama server (default: <a class="reference external" href="http://localhost:11434">http://localhost:11434</a>).</p></li>
+<li><p><strong>Model</strong>: Enter the name of the Ollama model to use (e.g., llama2, mistral).</p></li>
+</ul>
+</dd>
+<dt><strong>Docker Model Runner</strong></dt><dd><p>Use models running in Docker Desktop’s built-in model runner (available in Docker Desktop 4.40+).
+No API key is required.</p>
+<ul class="simple">
+<li><p><strong>API URL</strong>: The URL of the Docker Model Runner API (default: <a class="reference external" href="http://localhost:12434">http://localhost:12434</a>).</p></li>
+<li><p><strong>Model</strong>: Select from available models or enter a custom model name.</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You can also use the <em>OpenAI</em> provider with a custom API URL for any
+OpenAI-compatible endpoint, including Docker Model Runner and other local
+inference servers.</p>
+</div>
+<p>After configuring your provider, click <em>Save</em> to apply the changes.</p>
+</section>
+<section id="data-handling-and-provider-selection">
+<span id="ai-data-handling"></span><h2>Data Handling and Provider Selection<a class="headerlink" href="#data-handling-and-provider-selection" title="Link to this heading">¶</a></h2>
+<p>When a cloud LLM provider is configured, pgAdmin transmits information about
+your database to that provider’s API. Depending on the feature in use, this may
+include schema definitions such as table, column, index and constraint names
+and data types; server and database configuration settings read from
+<code class="docutils literal notranslate"><span class="pre">pg_settings</span></code>; query text; and EXPLAIN plan output. The <em>AI Assistant</em> in the
+Query Tool is also able to run queries against your database, within a read-only
+transaction and limited to 1000 rows, so row data may be included where the
+assistant determines it is needed to answer a question.</p>
+<p>None of this is transmitted unless you invoke an AI feature, and none of it is
+transmitted at all when no provider has been configured, which is the default;
+when AI features have been disabled by the administrator through the
+<code class="docutils literal notranslate"><span class="pre">LLM_ENABLED</span></code> setting; or when a locally hosted provider such as Ollama or
+Docker Model Runner is configured.</p>
+<p>Each provider processes this data under its own terms of service, privacy policy
+and legal jurisdiction, and operates its infrastructure in locations of its own
+choosing. If you work in an environment subject to data residency requirements,
+procurement policies, or sector-specific rules governing the handling of
+database metadata, review both the provider’s terms and your own organisation’s
+policies before enabling a cloud provider.</p>
+<p>The providers listed in pgAdmin reflect the APIs that pgAdmin is able to
+communicate with. Their inclusion is not a recommendation, and no provider is
+enabled by default.</p>
+</section>
+<section id="security-reports">
+<h2>Security Reports<a class="headerlink" href="#security-reports" title="Link to this heading">¶</a></h2>
+<p>Security Reports analyze your PostgreSQL server, database, or schema for potential
+security vulnerabilities and configuration issues.</p>
+<p>To generate a security report:</p>
+<ol class="arabic simple">
+<li><p>In the <em>Browser</em> tree, select a server, database, or schema.</p></li>
+<li><p>Choose <em>Tools → AI Reports → Security</em> from the menu, or right-click the
+object and select <em>Security</em> from the context menu.</p></li>
+<li><p>The report will be generated and displayed in a new tab.</p></li>
+</ol>
+<img alt="AI security report" class="align-center" src="_images/ai_security_report.png" />
+<p><strong>Security Report Scope:</strong></p>
+<ul class="simple">
+<li><p><strong>Server Level</strong>: Analyzes server configuration, authentication settings, roles, and permissions.</p></li>
+<li><p><strong>Database Level</strong>: Reviews database-specific security settings, roles with database access, and object permissions.</p></li>
+<li><p><strong>Schema Level</strong>: Examines schema permissions, object ownership, and access controls.</p></li>
+</ul>
+<p>Each report includes:</p>
+<ul class="simple">
+<li><p><strong>Security Findings</strong>: Identified vulnerabilities or security concerns.</p></li>
+<li><p><strong>Risk Assessment</strong>: Severity levels for each finding (Critical, High, Medium, Low).</p></li>
+<li><p><strong>Recommendations</strong>: Specific actions to remediate security issues.</p></li>
+<li><p><strong>Best Practices</strong>: General security recommendations for PostgreSQL.</p></li>
+</ul>
+</section>
+<section id="performance-reports">
+<h2>Performance Reports<a class="headerlink" href="#performance-reports" title="Link to this heading">¶</a></h2>
+<p>Performance Reports analyze query performance, configuration settings, and provide
+optimization recommendations.</p>
+<p>To generate a performance report:</p>
+<ol class="arabic simple">
+<li><p>In the <em>Browser</em> tree, select a server or database.</p></li>
+<li><p>Choose <em>Tools → AI Reports → Performance</em> from the menu, or right-click the
+object and select <em>Performance</em> from the context menu.</p></li>
+<li><p>The report will be generated and displayed in a new tab.</p></li>
+</ol>
+<p><strong>Performance Report Scope:</strong></p>
+<ul class="simple">
+<li><p><strong>Server Level</strong>: Analyzes server configuration parameters, resource utilization, and overall server performance metrics.</p></li>
+<li><p><strong>Database Level</strong>: Reviews database-specific configuration, query performance, index usage, and table statistics.</p></li>
+</ul>
+<p>Each report includes:</p>
+<ul class="simple">
+<li><p><strong>Performance Metrics</strong>: Key performance indicators and statistics.</p></li>
+<li><p><strong>Configuration Analysis</strong>: Review of relevant configuration parameters.</p></li>
+<li><p><strong>Query Optimization</strong>: Recommendations for improving slow queries.</p></li>
+<li><p><strong>Index Recommendations</strong>: Suggestions for adding, removing, or modifying indexes.</p></li>
+<li><p><strong>Capacity Planning</strong>: Resource utilization trends and recommendations.</p></li>
+</ul>
+</section>
+<section id="design-review-reports">
+<h2>Design Review Reports<a class="headerlink" href="#design-review-reports" title="Link to this heading">¶</a></h2>
+<p>Design Review Reports analyze your database schema structure and suggest
+improvements for normalization, naming conventions, and best practices.</p>
+<p>To generate a design review report:</p>
+<ol class="arabic simple">
+<li><p>In the <em>Browser</em> tree, select a database or schema.</p></li>
+<li><p>Choose <em>Tools → AI Reports → Design</em> from the menu, or right-click the
+object and select <em>Design</em> from the context menu.</p></li>
+<li><p>The report will be generated and displayed in a new tab.</p></li>
+</ol>
+<p><strong>Design Review Scope:</strong></p>
+<ul class="simple">
+<li><p><strong>Database Level</strong>: Reviews overall database structure, schema organization, and cross-schema dependencies.</p></li>
+<li><p><strong>Schema Level</strong>: Analyzes tables, views, functions, and other objects within the schema.</p></li>
+</ul>
+<p>Each report includes:</p>
+<ul class="simple">
+<li><p><strong>Schema Structure Analysis</strong>: Review of table structures, relationships, and constraints.</p></li>
+<li><p><strong>Normalization Review</strong>: Recommendations for database normalization (1NF, 2NF, 3NF, etc.).</p></li>
+<li><p><strong>Naming Conventions</strong>: Suggestions for consistent naming patterns.</p></li>
+<li><p><strong>Data Type Usage</strong>: Review of data type choices and recommendations.</p></li>
+<li><p><strong>Index Design</strong>: Analysis of indexing strategy.</p></li>
+<li><p><strong>Best Practices</strong>: General PostgreSQL schema design recommendations.</p></li>
+</ul>
+</section>
+<section id="working-with-reports">
+<h2>Working with Reports<a class="headerlink" href="#working-with-reports" title="Link to this heading">¶</a></h2>
+<p>All AI reports are displayed in a dedicated panel with the following features:</p>
+<dl class="simple">
+<dt><strong>Report Display</strong></dt><dd><p>Reports are formatted as Markdown and rendered with syntax highlighting for SQL code.</p>
+</dd>
+</dl>
+<p><strong>Toolbar Actions</strong></p>
+<blockquote>
+<div><ul class="simple">
+<li><p><strong>Stop</strong> - Cancel the current report generation. This is useful if the report
+is taking too long or if you want to change parameters.</p></li>
+<li><p><strong>Regenerate</strong> - Generate a new report for the same object. Useful when you
+want to get a fresh analysis or if data has changed.</p></li>
+<li><p><strong>Download</strong> - Download the report as a Markdown (.md) file. The filename
+includes the report type, object name, and date for easy identification.</p></li>
+</ul>
+</div></blockquote>
+<dl class="simple">
+<dt><strong>Multiple Reports</strong></dt><dd><p>You can generate and view multiple reports simultaneously. Each report opens in
+a new tab, allowing you to compare reports across different servers, databases,
+or schemas.</p>
+</dd>
+<dt><strong>Report Management</strong></dt><dd><p>Each report tab can be closed individually by clicking the <em>X</em> in the tab.
+Panel titles show the object name and report type for easy identification.</p>
+</dd>
+<dt><strong>Copying Content</strong></dt><dd><p>You can select and copy text from reports to use in documentation or share with
+your team.</p>
+</dd>
+</dl>
+</section>
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt><strong>“AI features are disabled in the server configuration”</strong></dt><dd><p>The administrator has disabled AI features on the server. Contact your
+pgAdmin administrator to enable the <code class="docutils literal notranslate"><span class="pre">LLM_ENABLED</span></code> configuration option.</p>
+</dd>
+<dt><strong>“Please configure an LLM provider in Preferences”</strong></dt><dd><p>You need to configure an LLM provider before using AI Reports. See <em>Configuring AI Reports</em> above.</p>
+</dd>
+<dt><strong>“Please connect to the server/database first”</strong></dt><dd><p>You must establish a connection to the server or database before generating reports.</p>
+</dd>
+<dt><strong>API Connection Errors</strong></dt><dd><ul class="simple">
+<li><p>Verify your API key is correct (for Anthropic and OpenAI).</p></li>
+<li><p>Check your internet connection (for cloud providers).</p></li>
+<li><p>For Ollama, ensure the Ollama server is running and accessible.</p></li>
+<li><p>For Docker Model Runner, ensure Docker Desktop 4.40+ is running with the model runner enabled.</p></li>
+<li><p>Check that your firewall allows connections to the LLM provider’s API.</p></li>
+</ul>
+</dd>
+<dt><strong>Report Generation Fails</strong></dt><dd><ul class="simple">
+<li><p>Check the pgAdmin logs for detailed error messages.</p></li>
+<li><p>Verify the database connection is still active.</p></li>
+<li><p>Ensure the selected model is available for your account/subscription.</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">AI Reports</a><ul>
+<li><a class="reference internal" href="#configuring-ai-reports">Configuring AI Reports</a></li>
+<li><a class="reference internal" href="#data-handling-and-provider-selection">Data Handling and Provider Selection</a></li>
+<li><a class="reference internal" href="#security-reports">Security Reports</a></li>
+<li><a class="reference internal" href="#performance-reports">Performance Reports</a></li>
+<li><a class="reference internal" href="#design-review-reports">Design Review Reports</a></li>
+<li><a class="reference internal" href="#working-with-reports">Working with Reports</a></li>
+<li><a class="reference internal" href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+<h3><a href="index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="external_database.html">External database for pgAdmin user settings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="connecting.html">Connecting To A Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="managing_cluster_objects.html">Managing Cluster Objects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="managing_database_objects.html">Managing Database Objects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modifying_tables.html">Creating or Modifying a Table</a></li>
+<li class="toctree-l1"><a class="reference internal" href="management_basics.html">Management Basics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="backup_and_restore.html">Backup and Restore</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="developer_tools.html">Developer Tools</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="debugger.html">Debugger</a></li>
+<li class="toctree-l2"><a class="reference internal" href="query_tool.html">Query Tool</a></li>
+<li class="toctree-l2"><a class="reference internal" href="editgrid.html">View/Edit Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_diff.html">Schema Diff</a></li>
+<li class="toctree-l2"><a class="reference internal" href="erd_tool.html">ERD Tool</a></li>
+<li class="toctree-l2"><a class="reference internal" href="psql_tool.html">PSQL Tool</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">AI Reports</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="processes.html">Processes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pgagent.html">pgAgent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributions.html">pgAdmin Project Contributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_notes.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="licence.html">Licence</a></li>
+</ul>
+
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+<div id="sidebarbutton" title="Collapse sidebar">
+<span>«</span>
+</div>
+
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="processes.html" title="Processes"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="psql_tool.html" title="PSQL Tool"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">pgAdmin 4 9.18 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="developer_tools.html" >Developer Tools</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">AI Reports</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        <div class="related" role="navigation" aria-label="related navigation">
+          <ul>
+              <li class="left" style="margin-left: 10px">&#169; Copyright (C) 2013 - 2026, The pgAdmin Development Team.</li>
+            <li class="right" style="margin-right: 10px"><a href="genindex.html" title="General Index">index</a></li>
+            <li class="right" ><a href="processes.html" title="Processes">next</a> |</li>
+            <li class="right" ><a href="psql_tool.html" title="PSQL Tool">previous</a> |</li>
+          </ul>
+        </div>
+    </div>
+  </body>
+</html>

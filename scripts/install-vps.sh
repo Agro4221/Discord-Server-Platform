@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 INSTALL_DIR="${INSTALL_DIR:-/opt/discord-server-platform}"
-REPO_URL="${REPO_URL:-git@github.com:Agro4221/Discord-Server-Platform.git}"
+REPO_URL="${REPO_URL:-https://github.com/Agro4221/Discord-Server-Platform.git}"
 BRANCH="${BRANCH:-development}"
 
 if [[ "${EUID}" -ne 0 ]]; then
@@ -36,8 +36,6 @@ git pull --ff-only origin "${BRANCH}"
 
 read -r -p "Discord bot token: " DISCORD_TOKEN
 read -r -p "Discord client ID: " DISCORD_CLIENT_ID
-read -r -s -p "Dashboard admin password: " DASHBOARD_ADMIN_PASSWORD
-echo
 
 set_env() {
   local key="$1" value="$2" escaped
@@ -52,8 +50,7 @@ set_env() {
 set_env DISCORD_TOKEN "${DISCORD_TOKEN}"
 set_env DISCORD_CLIENT_ID "${DISCORD_CLIENT_ID}"
 set_env MANAGEMENT_API_KEY "$(openssl rand -hex 32)"
-set_env DASHBOARD_SESSION_SECRET "$(openssl rand -hex 48)"
-set_env DASHBOARD_ADMIN_PASSWORD "${DASHBOARD_ADMIN_PASSWORD}"
+set_env BOT_CREDENTIALS_ENCRYPTION_KEY "$(openssl rand -hex 32)"
 set_env POSTGRES_PASSWORD "$(openssl rand -hex 24)"
 set_env LAVALINK_PASSWORD "$(openssl rand -hex 24)"
 
@@ -61,9 +58,11 @@ chmod 600 .env
 docker compose config >/dev/null
 docker compose up -d --build
 
+
 for _ in $(seq 1 60); do
   if curl -fsS "http://127.0.0.1:${HEALTH_PORT:-3001}/health" >/dev/null; then
     echo "Discord Server Platform is running."
+    echo "Control Center: http://127.0.0.1:${DASHBOARD_PORT:-3000}/"
     exit 0
   fi
   sleep 2

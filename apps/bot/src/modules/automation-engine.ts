@@ -1,3 +1,4 @@
+import { ChannelType } from "discord.js";
 import type {
   ChatInputCommandInteraction,
   GuildMember,
@@ -14,12 +15,14 @@ import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
+import type { Moderation } from "./moderation.js";
 
 type RuntimeEvent = {
   type: AutomationEvent;
   guildId: string;
   userId?: string;
   channelId?: string;
+  previousChannelId?: string;
   content?: string;
   messageId?: string;
   numeric?: Record<string, number>;
@@ -27,9 +30,12 @@ type RuntimeEvent = {
 
 const SUPPORTED_EVENTS: AutomationEvent[] = [
   "member.join","member.leave","member.role.add","member.role.remove",
-  "message.create","message.delete","message.edit","reaction.add",
+  "message.create","message.delete","message.edit","reaction.add","reaction.remove",
+  "channel.update","role.update",
   "voice.join","voice.leave","voice.move","moderation.case",
-  "ticket.create","ticket.close","giveaway.end","schedule"
+  "ticket.create","ticket.close","giveaway.end","schedule",
+  "channel.create","channel.delete","role.create","role.delete",
+  "member.ban","member.unban","security.incident"
 ];
 
 export type AutomationRuleRecord = AutomationRule & {
@@ -39,16 +45,21 @@ export type AutomationRuleRecord = AutomationRule & {
 export class AutomationEngine implements PlatformModule {
   readonly name = "automation";
   private unsubscribe?: () => void;
-  private readonly rules = new Map<string, AutomationRule[]>();
+  private readonly rules = new Map<string, AutomationRuleRecord[]>();
+  private readonly ruleGuilds = new Set<string>();
   private client?: import("discord.js").Client;
   private readonly cooldowns = new Map<string, number>();
   private readonly keyedCooldowns = new Map<string, number>();
+  private readonly executionWindows = new Map<string, { startedAt: number; count: number }>();
   private scheduleTimer?: NodeJS.Timeout;
   private identityId = "primary";
   private executionCounter = 0;
   private lastScheduleMinute: number | null = null;
 
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    private readonly moderation?: Moderation
+  ) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
@@ -56,7 +67,7 @@ export class AutomationEngine implements PlatformModule {
     await this.reload();
 
     const unsubs = [
-      context.events.on("interaction.command", (interaction) => this.onCommand(interaction)),
+      context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction)),
       context.events.on("member.add", (member) =>
         this.execute({
           type: "member.join",
@@ -79,7 +90,12 @@ export class AutomationEngine implements PlatformModule {
         return this.execute({
           type: "message.delete", guildId: message.guildId, userId: message.author.id,
           channelId: message.channelId, content: message.content, messageId: message.id,
-          numeric: { messageLength: message.content.length }
+          numeric: {
+            messageLength: message.content.length,
+            attachmentCount: message.attachments.size,
+            embedCount: message.embeds.length,
+            stickerCount: message.stickers.size
+          }
         });
       }),
       context.events.on("message.update", ({ oldMessage, newMessage }) => {
@@ -87,14 +103,32 @@ export class AutomationEngine implements PlatformModule {
         return this.execute({
           type: "message.edit", guildId: newMessage.guildId, userId: newMessage.author.id,
           channelId: newMessage.channelId, content: newMessage.content, messageId: newMessage.id,
-          numeric: { messageLength: newMessage.content.length, previousLength: oldMessage.content.length }
+          numeric: {
+            messageLength: newMessage.content.length,
+            previousLength: oldMessage.content.length,
+            attachmentCount: newMessage.attachments.size,
+            embedCount: newMessage.embeds.length,
+            stickerCount: newMessage.stickers.size
+          }
         });
       }),
       context.events.on("reaction.add", ({ reaction, user }) => {
         if (!reaction.message.guildId) return;
         return this.execute({
           type: "reaction.add", guildId: reaction.message.guildId, userId: user.id,
-          channelId: reaction.message.channelId, messageId: reaction.message.id
+          channelId: reaction.message.channelId, messageId: reaction.message.id,
+          content: reaction.emoji.name ?? reaction.emoji.identifier,
+          numeric: { reactionCount: reaction.count ?? 0 }
+        });
+      }),
+
+      context.events.on("reaction.remove", ({ reaction, user }) => {
+        if (!reaction.message.guildId) return;
+        return this.execute({
+          type: "reaction.remove", guildId: reaction.message.guildId, userId: user.id,
+          channelId: reaction.message.channelId, messageId: reaction.message.id,
+          content: reaction.emoji.name ?? reaction.emoji.identifier,
+          numeric: { reactionCount: reaction.count ?? 0 }
         });
       }),
       context.events.on("voice.state", ({ oldState, newState }) => this.executeFromVoice(oldState, newState)),
@@ -105,6 +139,74 @@ export class AutomationEngine implements PlatformModule {
         type: "giveaway.end", guildId: event.guildId,
         numeric: { giveawayId: event.giveawayId, winnerCount: event.winners.length },
         content: event.winners.join(",")
+      })),
+      context.events.on("channel.create", (channel) => {
+        if (!channel.guildId) return;
+        return this.execute({
+          type: "channel.create",
+          guildId: channel.guildId,
+          channelId: channel.id,
+          content: channel.name ?? undefined
+        });
+      }),
+      context.events.on("channel.delete", (channel) => {
+        if (!channel.guildId) return;
+        return this.execute({
+          type: "channel.delete",
+          guildId: channel.guildId,
+          channelId: channel.id,
+          content: channel.name ?? undefined
+        });
+      }),
+      context.events.on("role.create", (role) => this.execute({
+        type: "role.create",
+        guildId: role.guild.id,
+        content: role.id,
+        numeric: { rolePosition: role.position }
+      })),
+      context.events.on("role.delete", (role) => this.execute({
+        type: "role.delete",
+        guildId: role.guild.id,
+        content: role.id,
+        numeric: { rolePosition: role.position }
+      })),
+
+      context.events.on("channel.update", ({ oldChannel, newChannel }) => {
+        if (!newChannel.guildId) return;
+        return this.execute({
+          type: "channel.update",
+          guildId: newChannel.guildId,
+          channelId: newChannel.id,
+          content: newChannel.name ?? undefined
+        });
+      }),
+      context.events.on("role.update", ({ oldRole, newRole }) => this.execute({
+        type: "role.update",
+        guildId: newRole.guild.id,
+        content: newRole.id
+      })),
+      context.events.on("member.ban", (event) => this.execute({
+        type: "member.ban",
+        guildId: event.guildId,
+        userId: event.userId,
+        content: event.userId
+      })),
+      context.events.on("member.unban", (event) => this.execute({
+        type: "member.unban",
+        guildId: event.guildId,
+        userId: event.userId,
+        content: event.userId
+      })),
+      context.events.on("security.incident", (event) => this.execute({
+        type: "security.incident",
+        guildId: event.guildId,
+        userId: event.userId,
+        content: event.eventType,
+        numeric: {
+          incidentId: event.incidentId,
+          actionCount: event.actionCount ?? 0,
+          joinCount: event.joinCount ?? 0
+        }
       }))
     ];
 
@@ -118,12 +220,60 @@ export class AutomationEngine implements PlatformModule {
     };
   }
 
+  async handlePrefixCommand(message: Message, commandName: string, args: string[]): Promise<boolean> {
+    if (commandName !== "automation") return false;
+    if (!message.guild) return false;
+
+    const sub = (args.shift() ?? "create").toLowerCase();
+    if (sub !== "create") {
+      await message.reply("Использование: !automation create <name> <event> #канал <response> [--channel=#канал] [--match=текст]");
+      return true;
+    }
+
+    const name = args.shift()?.trim();
+    const event = args.shift() as AutomationEvent | undefined;
+    const responseChannel = message.mentions.channels.first();
+    const optionalChannel = [...message.mentions.channels.values()][1] ?? null;
+    const matchToken = args.find((token) => token.startsWith("--match="));
+    const response = args
+      .filter((token) =>
+        token !== matchToken &&
+        !/^<#\d{15,25}>$/.test(token) &&
+        !/^--channel=<#\d{15,25}>$/.test(token) &&
+        !/^--channel=\d{15,25}$/.test(token)
+      )
+      .join(" ")
+      .trim();
+
+    const supported = new Set<AutomationEvent>(SUPPORTED_EVENTS);
+    const channelToken = args.find((token) => /^--channel=(?:<#\d{15,25}>|\d{15,25})$/.test(token));
+    const eventChannel = optionalChannel ?? (channelToken ? message.guild.channels.cache.get(channelToken.split("=")[1]!.replace(/[<#>]/g, "")) : null);
+    const match = matchToken ? matchToken.slice("--match=".length).trim() : null;
+
+    if (!name || !event || !supported.has(event) || !responseChannel || responseChannel.type !== 0 || !response) {
+      await message.reply("Пример: !automation create welcome member.join #general Добро пожаловать!");
+      return true;
+    }
+
+    const conditions: AutomationCondition[] = [];
+    if (eventChannel) conditions.push({ type: "channel-is", channelId: eventChannel.id });
+    if (match) conditions.push({ type: "contains", left: "content", right: match });
+
+    await this.createRule(message.guild.id, name, event, conditions, [
+      { type: "send-message", channelId: responseChannel.id, content: response.slice(0, 2000) }
+    ]);
+    await message.reply("Automation rule создано.");
+    return true;
+  }
+
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.rules.clear();
+    this.ruleGuilds.clear();
     this.cooldowns.clear();
     this.keyedCooldowns.clear();
+    this.executionWindows.clear();
     this.executionCounter = 0;
     this.lastScheduleMinute = null;
     if (this.scheduleTimer) clearInterval(this.scheduleTimer);
@@ -131,8 +281,8 @@ export class AutomationEngine implements PlatformModule {
     this.client = undefined;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "automation") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "automation") return;
 
     if (!interaction.memberPermissions?.has("ManageGuild")) {
       await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
@@ -266,10 +416,10 @@ export class AutomationEngine implements PlatformModule {
     );
 
     this.rules.clear();
+    this.ruleGuilds.clear();
 
     for (const row of result.rows) {
-      const list = this.rules.get(row.guild_id) ?? [];
-      list.push({
+      const rule: AutomationRuleRecord = {
         id: row.id,
         guildId: row.guild_id,
         name: row.name,
@@ -277,9 +427,14 @@ export class AutomationEngine implements PlatformModule {
         all: row.conditions ?? [],
         any: row.any_conditions ?? [],
         event: row.event,
-        actions: row.actions ?? []
-      });
-      this.rules.set(row.guild_id, list);
+        actions: row.actions ?? [],
+        cooldownSeconds: row.cooldown_seconds
+      };
+      const key = `${row.guild_id}:${row.event}`;
+      const list = this.rules.get(key) ?? [];
+      list.push(rule);
+      this.rules.set(key, list);
+      this.ruleGuilds.add(row.guild_id);
     }
   }
 
@@ -361,13 +516,23 @@ export class AutomationEngine implements PlatformModule {
   }
 
   private async emitSchedules(): Promise<void> {
-    await this.reload();
     const now = new Date();
     const minute = Math.floor(now.getTime() / 60_000);
     if (this.lastScheduleMinute === minute) return;
-    this.lastScheduleMinute = minute;
 
-    for (const guildId of this.rules.keys()) {
+    try {
+      await this.reload();
+    } catch (error) {
+      logger.warn("Automation schedule reload failed", {
+        identityId: this.identityId,
+        error: String(error)
+      });
+      return;
+    }
+
+    this.lastScheduleMinute = minute;
+    const guildIds = [...this.ruleGuilds];
+    for (const guildId of guildIds) {
       await this.execute({
         type: "schedule",
         guildId,
@@ -389,21 +554,24 @@ export class AutomationEngine implements PlatformModule {
         type: "voice.join",
         guildId: newState.guild.id,
         userId: newState.id,
-        channelId: newState.channelId
+        channelId: newState.channelId,
+        previousChannelId: undefined
       });
     } else if (!newState.channelId && oldState.channelId) {
       await this.execute({
         type: "voice.leave",
         guildId: newState.guild.id,
         userId: newState.id,
-        channelId: oldState.channelId
+        channelId: oldState.channelId,
+        previousChannelId: oldState.channelId
       });
     } else if (newState.channelId !== oldState.channelId) {
       await this.execute({
         type: "voice.move",
         guildId: newState.guild.id,
         userId: newState.id,
-        channelId: newState.channelId ?? undefined
+        channelId: newState.channelId ?? undefined,
+        previousChannelId: oldState.channelId ?? undefined
       });
     }
   }
@@ -411,14 +579,14 @@ export class AutomationEngine implements PlatformModule {
   private async execute(event: RuntimeEvent): Promise<void> {
     if (!await moduleEnabled(this.db, event.guildId, "automation", false)) return;
 
-    const rules = this.rules.get(event.guildId) ?? [];
+    const rules = this.rules.get(`${event.guildId}:${event.type}`) ?? [];
 
     for (const rule of rules) {
-      if (rule.event !== event.type) continue;
       if (!await this.conditionsMatch(rule.all, event)) continue;
       if (rule.any.length > 0 && !await this.conditionsAnyMatch(rule.any, event)) continue;
 
-      const cooldownSeconds = await this.cooldownFor(rule.id);
+      const cooldownSeconds = rule.cooldownSeconds;
+      if (!this.allowExecution(event.guildId)) continue;
       this.executionCounter += 1;
       if (this.executionCounter % 100 === 0) this.pruneCooldowns(Date.now());
       const cooldownKey = `${event.guildId}:${rule.id}:${event.userId ?? "global"}`;
@@ -442,6 +610,9 @@ export class AutomationEngine implements PlatformModule {
     }
     for (const [key, timestamp] of this.keyedCooldowns) {
       if (timestamp < now) this.keyedCooldowns.delete(key);
+    }
+    for (const [guildId, window] of this.executionWindows) {
+      if (window.startedAt + 60_000 < now) this.executionWindows.delete(guildId);
     }
 
     const maxKeys = 10_000;
@@ -468,12 +639,19 @@ export class AutomationEngine implements PlatformModule {
     }
   }
 
-  private async cooldownFor(ruleId: string): Promise<number> {
-    const result = await this.db.query<{ cooldown_seconds: number }>(
-      "SELECT cooldown_seconds FROM automation_rules WHERE id=$1",
-      [ruleId]
-    );
-    return result.rows[0]?.cooldown_seconds ?? 0;
+  private allowExecution(guildId: string): boolean {
+    const now = Date.now();
+    const window = this.executionWindows.get(guildId);
+    if (!window || now - window.startedAt >= 10_000) {
+      this.executionWindows.set(guildId, { startedAt: now, count: 1 });
+      return true;
+    }
+    if (window.count >= 100) {
+      logger.warn("Automation execution rate limited", { guildId, count: window.count, windowSeconds: 10 });
+      return false;
+    }
+    window.count += 1;
+    return true;
   }
 
   private async conditionsAnyMatch(conditions: AutomationCondition[], event: RuntimeEvent): Promise<boolean> {
@@ -492,6 +670,16 @@ export class AutomationEngine implements PlatformModule {
         case "contains": {
           const value = resolveTextField(event, condition.left);
           if (value === undefined || !value.toLocaleLowerCase().includes(condition.right.toLocaleLowerCase())) return false;
+          break;
+        }
+        case "starts-with": {
+          const value = resolveTextField(event, condition.left);
+          if (value === undefined || !value.toLocaleLowerCase().startsWith(condition.right.toLocaleLowerCase())) return false;
+          break;
+        }
+        case "ends-with": {
+          const value = resolveTextField(event, condition.left);
+          if (value === undefined || !value.toLocaleLowerCase().endsWith(condition.right.toLocaleLowerCase())) return false;
           break;
         }
         case "equals":
@@ -517,9 +705,25 @@ export class AutomationEngine implements PlatformModule {
           if (value === undefined || value > condition.right) return false;
           break;
         }
+        case "number-eq": {
+          const value = event.numeric?.[String(condition.left)];
+          if (value === undefined || value !== condition.right) return false;
+          break;
+        }
+        case "number-gt": {
+          const value = event.numeric?.[String(condition.left)];
+          if (value === undefined || value <= condition.right) return false;
+          break;
+        }
+        case "number-lt": {
+          const value = event.numeric?.[String(condition.left)];
+          if (value === undefined || value >= condition.right) return false;
+          break;
+        }
         case "has-role": {
           const guild = this.client?.guilds.cache.get(event.guildId);
-          const member = event.userId ? await guild?.members.fetch(event.userId).catch(() => null) : null;
+          const userId = resolveUserReference(condition.userId, event.userId);
+          const member = userId ? await guild?.members.fetch(userId).catch(() => null) : null;
           if (!member?.roles.cache.has(condition.roleId)) return false;
           break;
         }
@@ -544,7 +748,8 @@ export class AutomationEngine implements PlatformModule {
         }
 
         if (action.type === "send-message") {
-          const channel = client?.channels.cache.get(action.channelId);
+          const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
+          const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
           if (channel?.isTextBased() && "send" in channel) {
             await channel.send(renderTemplate(action.content, event));
           }
@@ -579,6 +784,39 @@ export class AutomationEngine implements PlatformModule {
           continue;
         }
 
+        if (action.type === "kick") {
+          const guild = client?.guilds.cache.get(event.guildId);
+          const userId = resolveUserReference(action.userId, event.userId);
+          const member = userId ? await guild?.members.fetch(userId).catch(() => null) : null;
+          if (member?.kickable) {
+            await member.kick(renderTemplate(action.reason, event));
+          }
+          continue;
+        }
+
+        if (action.type === "ban") {
+          const guild = client?.guilds.cache.get(event.guildId);
+          const userId = resolveUserReference(action.userId, event.userId);
+          const member = userId ? await guild?.members.fetch(userId).catch(() => null) : null;
+          if (member?.bannable) {
+            await member.ban({ reason: renderTemplate(action.reason, event) });
+          }
+          continue;
+        }
+
+        if (action.type === "warn") {
+          if (!this.moderation) throw new Error("automation_moderation_unavailable");
+          const userId = resolveUserReference(action.userId, event.userId);
+          if (userId) {
+            await this.moderation.automationWarn(
+              event.guildId,
+              userId,
+              renderTemplate(action.reason, event)
+            );
+          }
+          continue;
+        }
+
         if (action.type === "timeout") {
           const guild = client?.guilds.cache.get(event.guildId);
           const userId = resolveUserReference(action.userId, event.userId);
@@ -596,6 +834,89 @@ export class AutomationEngine implements PlatformModule {
           if (channel?.isTextBased() && "messages" in channel && messageId) {
             const message = await channel.messages.fetch(messageId).catch(() => null);
             await message?.delete();
+          }
+          continue;
+        }
+
+        if (action.type === "add-reaction" || action.type === "remove-reaction" || action.type === "pin-message" || action.type === "unpin-message") {
+          const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
+          const messageId = action.messageId === "@event" ? event.messageId : action.messageId;
+          const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
+          if (channel?.isTextBased() && "messages" in channel && messageId) {
+            const message = await channel.messages.fetch(messageId).catch(() => null);
+            if (message) {
+              if (action.type === "add-reaction") await message.react(action.emoji);
+              else if (action.type === "remove-reaction") await message.reactions.cache.get(action.emoji)?.remove();
+              else if (action.type === "pin-message") await message.pin("Automation rule");
+              else await message.unpin("Automation rule");
+            }
+          }
+          continue;
+        }
+
+        if (action.type === "create-channel") {
+          const guild = client?.guilds.cache.get(event.guildId);
+          if (!guild) continue;
+
+          const name = renderTemplate(action.name, event).trim().slice(0, 100);
+          if (!name) continue;
+
+          await guild.channels.create({
+            name,
+            type: action.channelType === "voice" ? ChannelType.GuildVoice : ChannelType.GuildText,
+            ...(action.parentId ? { parent: action.parentId } : {}),
+            reason: "Automation rule"
+          });
+          continue;
+        }
+
+        if (action.type === "set-slowmode") {
+          const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
+          const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
+          if (channel && "setRateLimitPerUser" in channel) {
+            await channel.setRateLimitPerUser(action.seconds, "Automation rule");
+          }
+          continue;
+        }
+
+        if (action.type === "set-channel-topic") {
+          const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
+          const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
+          if (channel && "setTopic" in channel) {
+            await channel.setTopic(renderTemplate(action.topic, event));
+          }
+          continue;
+        }
+
+        if (action.type === "clear-cooldown") {
+          const key = renderTemplate(action.key, event).trim();
+          if (key) this.keyedCooldowns.delete(event.guildId + ":" + key);
+          continue;
+        }
+
+        if (action.type === "set-cooldown") {
+          const key = renderTemplate(action.key, event).trim();
+          if (key) this.keyedCooldowns.set(event.guildId + ":" + key, Date.now() + action.durationSeconds * 1000);
+          continue;
+        }
+
+        if (action.type === "set-nickname") {
+          const guild = client?.guilds.cache.get(event.guildId);
+          const userId = resolveUserReference(action.userId, event.userId);
+          const member = userId ? await guild?.members.fetch(userId).catch(() => null) : null;
+          if (member?.manageable) {
+            const nickname = renderTemplate(action.nickname, event).trim().slice(0, 32);
+            await member.setNickname(nickname || null, "Automation rule");
+          }
+          continue;
+        }
+
+        if (action.type === "set-channel-name") {
+          const channelId = action.channelId === "@event" ? event.channelId : action.channelId;
+          const channel = channelId ? client?.channels.cache.get(channelId) : undefined;
+          if (channel && "setName" in channel) {
+            const name = renderTemplate(action.name, event).trim().slice(0, 100);
+            if (name) await channel.setName(name);
           }
           continue;
         }
@@ -623,6 +944,8 @@ export function validateAutomationRule(
   for (const condition of conditions) {
     switch (condition.type) {
       case "contains":
+      case "starts-with":
+      case "ends-with":
       case "equals":
         if (condition.left.length > 64 || condition.right.length > 200) throw new Error("automation_condition_too_long");
         break;
@@ -632,13 +955,18 @@ export function validateAutomationRule(
         break;
       case "number-gte":
       case "number-lte":
+      case "number-eq":
+      case "number-gt":
+      case "number-lt":
         if (String(condition.left).length > 64 || !Number.isFinite(condition.right)) throw new Error("invalid_numeric_condition");
         break;
       case "has-role":
-        if (!/^\\d{17,20}$/.test(condition.userId) || !/^\\d{17,20}$/.test(condition.roleId)) throw new Error("invalid_role_condition");
+        if ((!/^\d{17,20}$/.test(condition.userId) && condition.userId !== "@event") || !/^\d{17,20}$/.test(condition.roleId)) {
+          throw new Error("invalid_role_condition");
+        }
         break;
       case "channel-is":
-        if (!/^\\d{17,20}$/.test(condition.channelId)) throw new Error("invalid_condition_channel");
+        if (!/^\d{17,20}$/.test(condition.channelId)) throw new Error("invalid_condition_channel");
         break;
       case "cooldown-clear":
         if (!condition.key || condition.key.length > 100) throw new Error("invalid_cooldown_key");
@@ -649,24 +977,81 @@ export function validateAutomationRule(
   for (const action of actions) {
     switch (action.type) {
       case "send-message":
-        if (!/^\\d{17,20}$/.test(action.channelId) || !action.content || action.content.length > 2000) throw new Error("invalid_send_message_action");
+        if ((!/^\d{17,20}$/.test(action.channelId) && action.channelId !== "@event") || !action.content || action.content.length > 2000) {
+          throw new Error("invalid_send_message_action");
+        }
         break;
       case "dm-user":
-        if (!/^\\d{17,20}$/.test(action.userId) && action.userId !== "@event") throw new Error("invalid_dm_user");
+        if (!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") throw new Error("invalid_dm_user");
         if (!action.content || action.content.length > 2000) throw new Error("invalid_dm_content");
+        break;
+      case "create-channel":
+        if (!action.name || action.name.length > 100) throw new Error("invalid_create_channel_name");
+        if (action.channelType !== "text" && action.channelType !== "voice") throw new Error("invalid_create_channel_type");
+        if (action.parentId !== null && !/^\d{17,20}$/.test(action.parentId)) throw new Error("invalid_create_channel_parent");
+        break;
+      case "warn":
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !action.reason || action.reason.length > 500) {
+          throw new Error("invalid_warn_action");
+        }
         break;
       case "add-role":
       case "remove-role":
-        if ((!/^\\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !/^\\d{17,20}$/.test(action.roleId)) throw new Error("invalid_role_action");
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !/^\d{17,20}$/.test(action.roleId)) throw new Error("invalid_role_action");
+        break;
+      case "kick":
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !action.reason || action.reason.length > 500) {
+          throw new Error("invalid_kick_action");
+        }
+        break;
+      case "ban":
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !action.reason || action.reason.length > 500) {
+          throw new Error("invalid_ban_action");
+        }
         break;
       case "timeout":
-        if ((!/^\\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !Number.isInteger(action.durationSeconds) || action.durationSeconds < 1 || action.durationSeconds > 2419200 || !action.reason || action.reason.length > 500) {
+        if ((!/^\d{17,20}$/.test(action.userId) && action.userId !== "@event") || !Number.isInteger(action.durationSeconds) || action.durationSeconds < 1 || action.durationSeconds > 2419200 || !action.reason || action.reason.length > 500) {
           throw new Error("invalid_timeout_action");
         }
         break;
       case "delete-message":
-        if (action.channelId !== "@event" && !/^\\d{17,20}$/.test(action.channelId)) throw new Error("invalid_delete_channel");
-        if (action.messageId !== "@event" && !/^\\d{17,20}$/.test(action.messageId)) throw new Error("invalid_delete_message");
+        if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_delete_channel");
+        if (action.messageId !== "@event" && !/^\d{17,20}$/.test(action.messageId)) throw new Error("invalid_delete_message");
+        break;
+      case "add-reaction":
+      case "remove-reaction":
+        if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_reaction_channel");
+        if (action.messageId !== "@event" && !/^\d{17,20}$/.test(action.messageId)) throw new Error("invalid_reaction_message");
+        if (!action.emoji.trim() || action.emoji.length > 100) throw new Error("invalid_reaction_emoji");
+        break;
+      case "pin-message":
+      case "unpin-message":
+        if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_message_action_channel");
+        if (action.messageId !== "@event" && !/^\d{17,20}$/.test(action.messageId)) throw new Error("invalid_message_action_message");
+        break;
+      case "set-slowmode":
+        if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_slowmode_channel");
+        if (!Number.isInteger(action.seconds) || action.seconds < 0 || action.seconds > 21600) throw new Error("invalid_slowmode_seconds");
+        break;
+      case "set-channel-topic":
+        if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_topic_channel");
+        if (action.topic.length > 1024) throw new Error("automation_topic_too_long");
+        break;
+      case "set-nickname":
+        if (action.userId !== "@event" && !/^\d{17,20}$/.test(action.userId)) throw new Error("invalid_nickname_user");
+        if (action.nickname.length > 32) throw new Error("invalid_nickname");
+        break;
+      case "set-channel-name":
+        if (action.channelId !== "@event" && !/^\d{17,20}$/.test(action.channelId)) throw new Error("invalid_channel_name_channel");
+        if (!action.name.trim() || action.name.length > 100) throw new Error("invalid_channel_name");
+        break;
+      case "clear-cooldown":
+        if (!action.key || action.key.length > 100) throw new Error("invalid_clear_cooldown_key");
+        break;
+      case "set-cooldown":
+        if (!action.key || action.key.length > 100 || !Number.isInteger(action.durationSeconds) || action.durationSeconds < 1 || action.durationSeconds > 86400) {
+          throw new Error("invalid_set_cooldown_action");
+        }
         break;
       case "log":
         if (!action.message || action.message.length > 1000) throw new Error("invalid_log_action");
@@ -680,6 +1065,7 @@ function resolveTextField(event: RuntimeEvent, field: string): string | undefine
   if (field === "content") return event.content;
   if (field === "userId") return event.userId;
   if (field === "channelId") return event.channelId;
+  if (field === "previousChannelId") return event.previousChannelId;
   if (field === "messageId") return event.messageId;
   if (field === "guildId") return event.guildId;
   return undefined;

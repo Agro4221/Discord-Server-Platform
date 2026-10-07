@@ -13,3 +13,12 @@ coverage/
 .idea/
 
 .native-runtime/
+
+.postgres-data/
+_update-backup-*/
+backup-*/
+
+infrastructure/lavalink/lavalink.jar
+infrastructure/lavalink/plugins/
+
+tools/pgsql/pgAdmin 4/runtime/pgAdmin4.exe

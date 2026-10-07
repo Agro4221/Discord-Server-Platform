@@ -1,8 +1,50 @@
+## 2026-10-07 — Stream Alerts restored to proven light-stream-bot provider logic
+
+- Reworked `apps/bot/src/modules/stream-alerts.ts` to follow the proven implementation from the uploaded `Discord-Server-Platform-feature-light-stream-bot` build.
+- YouTube now checks the channel `/live` page directly through local `yt-dlp`; the YouTube Data API and `YOUTUBE_API_KEY` are no longer part of the detection path.
+- Removed the extra YouTube `--js-runtimes` / cookies arguments from Stream Alerts; those settings remain available to the Music subsystem only.
+- VK now follows the same proven order as the light build: public VK Video Live endpoint first, then local `yt-dlp` fallback.
+- Fixed YouTube target normalization so a bare `UC...` channel ID remains a channel ID instead of being converted to an `@handle`.
+- Kept the current platform features around the detector intact: PostgreSQL persistence, per-guild routing, role mentions, polling intervals, immediate startup polling, manual `Проверить`, fleet ownership/failover and Discord channel fallback.
+- Added regression coverage for YouTube/VK target construction without API credentials.
+
+## 2026-10-07 — Stream Alerts typecheck/runtime correction
+
+- Fixed the Stream Alerts yt-dlp fallback build: the missing local runProcess() helper is now implemented with timeout/error handling.
+- Exposed checkNow() through the Management API service contract and wiring, matching the already-added manual dashboard check endpoint.
+- Prevented YouTube fallback checks without an API key from failing afterward while persisting the stream state: channel ID persistence now does not force a YouTube API lookup when only local yt-dlp is configured.
+
+
+## 2026-10-06 — Native PostgreSQL startup robustness
+
+- Fixed `scripts/start-native.ps1` again after live Windows testing showed asynchronous `pg_ctl` startup could leave the launcher waiting indefinitely even when PostgreSQL startup handling was ambiguous.
+- Native launcher now starts the bundled `postgres.exe` directly with explicit host/port and redirected logs, then uses `pg_isready` as the readiness gate.
+- Native launcher now prints PostgreSQL stderr/log tails when readiness fails, making first-run diagnosis actionable instead of silently waiting.
+- No Docker dependency added; native mode remains the target runtime for the user's Windows gaming/streaming PC.
+
+
+
+## 2026-10-06 — Native first-run bootstrap correction
+
+- Fixed `scripts/start-native.ps1` so native mode automatically discovers the bundled PostgreSQL runtime under `tools\\pgsql\\bin`, starts the local `.postgres-data` cluster when stopped, initializes a missing cluster as UTF-8, and creates `discord_platform` when absent.
+- Added automatic download of PostgreSQL 18.6 portable binaries when the bundled runtime is missing.
+- Added automatic Lavalink 4.2.2 JAR bootstrap when `infrastructure/lavalink/lavalink.jar` is missing.
+- Added automatic Java 21 / Node.js 24.21.0 bootstrap through WinGet when the required runtime is missing.
+- Removed native launcher prompts for manually supplying a PostgreSQL connection string or Lavalink JAR path during normal first-run bootstrap.
+- Updated `docs/NATIVE-SETUP.md` to describe the one-command native bootstrap contract.
+
 # Engineering Work Log
 
 This file is the persistent continuity record for development across chats.
 
 ## 2026-09-19 — Repository bootstrap
+## 2026-10-04 — Product north-star clarification
+- Reaffirmed the project's central purpose: build our own self-hosted Discord bot/platform to replace the typical collection of third-party bots and paid premium subscriptions.
+- Reference feature pool explicitly includes the best useful functionality from **Carl-bot, Juniper, MEE6, ProBot, Jockie Music and similar Discord bots**, with equivalent or improved behavior implemented independently in our own codebase.
+- The goal is not to clone proprietary implementations. The goal is to select the strongest practical features from the ecosystem and unify them behind one bot, one configuration model, shared persistence, consistent permissions/audit, integrated Control Center and recovery model.
+- "Module exists" is therefore not the final product criterion. We must continue closing useful feature gaps until the platform can genuinely replace the external-bot stack for its intended scope.
+- The project should avoid artificial premium walls for its intended self-hosted feature set; users should not need third-party subscriptions to unlock the platform's core capabilities.
+
 - Confirmed private repository: Agro4221/Discord-Server-Platform.
 - Development branch created from main.
 - Product scope fixed as one coherent full build followed by continuous verification and later full stabilization.
@@ -199,4 +241,986 @@ Never write credentials, tokens or private user data here.
 - Added docs/NATIVE-SETUP.md, native environment documentation and ignored .native-runtime/ launcher state.
 - Docker local launcher now avoids image rebuilds on normal starts; -Rebuild performs an explicit no-cache image rebuild.
 - Recommended single-PC gaming/streaming path: native mode, one Lavalink, Dashboard off except during administration.
-- Live Windows runtime and actual Sea of Thieves + OBS + multi-RTMP load still require validation on the user's PC.
+- Live Windows runtime and actual Sea of Thieves + OBS + multi-RTMP load still require validation on the user's PC.## 2026-10-03 — Utility / AFK feature pass
+- Added the new `utility` module to the Core module registry and Dashboard catalog; it is enabled by default unless explicitly disabled for a guild.
+- Added `/serverinfo`, `/userinfo`, `/avatar`, `/membercount`, `/roleinfo`, `/channelinfo` plus `/afk set|clear|status`; matching prefix commands are wired through the existing command-policy router.
+- Added persistent AFK storage in migration 40, automatic AFK removal on the user's next normal message, and AFK mention notifications.
+- Added Utility metadata to Control Center so the module appears as a functional feature rather than an unclassified catalog item.
+- Added deterministic tests for AFK formatting/reason normalization and slash-command registration.
+- The container cannot resolve github.com, so local clone/build execution was unavailable. GitHub Actions CI for the immediately preceding test commit was observed in progress; the later cache-consistency fix requires a fresh green run before being called CI-verified.
+
+## 2026-10-03 — AFK audit and notification hardening
+- AFK state changes now use the existing durable audit pipeline as best-effort telemetry; an audit failure cannot turn a successful AFK operation into a command failure.
+- AFK mention responses cap combined output and explicitly restrict allowed mentions to the AFK users, preventing stored reasons from producing unintended role/everyone/here pings.
+- Final code head for this pass: `c554a216bccd56a16ee9965a57031663ca877dd0`.
+- Local execution remains unavailable in this container because DNS cannot resolve github.com. A fresh GitHub Actions run on the final head is the authoritative automated verification gate.
+
+## 2026-10-03 — Dashboard dependency security patch
+- GitHub Actions dependency audit identified a critical Next.js vulnerability affecting the previously pinned Dashboard version `16.3.3`.
+- Updated `apps/dashboard/package.json` to Next.js `16.3.8`, the patched version identified by the CI audit.
+- The security patch is independent of the Utility/AFK implementation; the final green CI run is required before treating this combined code state as verified.
+
+## 2026-10-03 — Community engagement feature pass
+- Added the Community Tools module with persistent polls, suggestion workflow, sticky messages and lightweight fun commands.
+- Polls support 2-5 options, one vote per user, live result refresh and automatic close/recovery after restart.
+- Suggestions support moderator approval/rejection buttons and durable status history.
+- Sticky messages persist across restart and are re-posted after new user messages in the configured channel.
+- Added migration 41, command-policy entries, prefix routing, Control Center metadata and regression coverage.
+
+## 2026-10-03 — Discord event logging
+- Added a dedicated Logging module for configurable passive Discord event logging.
+- Events covered: message delete/edit, member join/leave/update, voice joins/leaves/moves, channel deletion, role deletion and ban/unban.
+- Logging is persisted through the existing audit event store and delivered to a configured dedicated Discord channel.
+- Added migration 42, slash/prefix setup, Dashboard settings and Control Center metadata.
+
+
+## 2026-10-04 — Command routing and multi-bot failover hardening
+- Development head for this pass: `6c74c0f68e621ff44d7cbdf0089407f46a5b1301`.
+- Command-policy registry is now unique and covers every registered top-level slash command; the root `/leveling` command was added to policy control.
+- Prefix routing now has bidirectional regression coverage against `COMMAND_DEFINITIONS`; `!economy` and `!music` were added to the built-in router allowlist so all policy-declared prefix commands reach the dispatcher.
+- Custom-command slash aliases now route the root `/leveling` command through the shared dispatcher.
+- Secondary bot identities with `failover_enabled=true` now periodically claim stale guild assignments they are connected to, using the existing atomic `FOR UPDATE SKIP LOCKED` claim path; each fleet cycle refreshes assignments and still attempts the heartbeat when assignment refresh fails.
+- Added regression coverage for failover guard/claim behavior and guild filtering across passive Event Bus events.
+- CI run #1195 on the preceding command-policy/prefix-routing head passed. The final failover/alias head requires its own fresh green CI run before it is marked fully verified.
+
+
+## 2026-10-04 — Local Control Center expansion
+- Local-first operating model confirmed: Windows/local Control Center is the primary administration surface; VPS remains a future deployment target only.
+- Added persistent Logging dashboard storage parity for message bulk-delete, reactions, channel-update and role-update switches, with schema/storage contract regression coverage.
+- Added Economy Shop management, Leveling rewards/exclusions, Starboard configuration, Server Settings, Command Policies, Discord permission diagnostics and Moderation channel operations to the local Control Center.
+- Moderation channel operations reuse Core-side Discord permission checks and support clear, slowmode, lock and unlock with audit records.
+- Command Policies moved into System Center because they are a cross-cutting access-control service rather than a runtime module.
+- Added Community Tools administration for sticky messages, poll closing and suggestion approve/deny workflows.
+- Added Giveaway creation from Control Center with channel/host/prize/duration/winner validation, Discord publication and database rollback on publish failure.
+- Added Verification Center panel publishing from Control Center.
+- Current development head: `ab1f67805e8a164782e935c2422724a55f1c221f`.
+- Automated CI remains the verification gate for the latest head; live Discord behavior, real bot permissions, hierarchy and PostgreSQL failure injection remain environment-dependent acceptance tests.
+
+## 2026-10-04 — Control Center build-fix checkpoint
+- Atomic development head: `486e82260afa751c74bdcc305eea0a923f26c7eb`.
+- Fixed Giveaway Control Center wiring after Dashboard production-build validation: all existing `GiveawaysPanel` call sites now provide the text-channel resource list, and the panel label style is defined locally.
+- The same atomic change keeps the Dashboard capability metadata aligned with the existing AutoMod and Music operational panels.
+- CI run #1237 on the previous head failed only in Dashboard TypeScript/build validation because these exact Giveaway props/label contracts were not updated at all call sites; bot typecheck, 76 bot tests, domain build and bot build were successful.
+- The new atomic head is the next automated verification target. No live Discord acceptance is implied by CI.
+
+## 2026-10-04 — Control Center giveaway wiring verified
+- CI run **#1239** (`37150661360`) on development head `1007677fc855a8ea6b62ff1fa8274294a9db96d0` passed all automated stages.
+- Verified: dependency audit, source/deployment/observability checks, bot typecheck, **76/76 bot tests**, domain build, bot build and Dashboard production build.
+- The Giveaway panel prop/label fixes are therefore CI-verified; this still does not replace live Discord acceptance with real permissions and messages.
+
+## 2026-10-04 — AutoMod Control Center CRUD verified
+- CI run **#1242** (`37150878597`) passed on development head `0e79a64ab1cb0aa2c70ead8ae98b4950f2764b2a`.
+- AutoMod Rule Builder now supports rule editing, enable/disable toggles, validated threshold/window/timeout input and the complete detector set supported by Core.
+- Dashboard deletion of AutoMod rules now creates a durable `automod.rule.deleted` audit event.
+- Added regression coverage that unsupported rule detectors are rejected before database writes.
+
+## 2026-10-04 — Security Center verified
+- CI run **#1245** (`37151126039`) passed the full automated pipeline on development head `7ac4f4505479d518f8c55847466111124ca0ea6d`.
+- Security now has a dedicated Control Center surface with active-incident visibility, hierarchy/readiness diagnostics and guarded incident-closing operations.
+- Security snapshot access is exposed through the Management API and local Dashboard proxy; existing generic configuration remains available alongside the operational panel.
+
+## 2026-10-04 — Temporary Voice controls verified
+- CI run **#1249** (`37151439742`) passed on development head `9a442b65c77a3cabc497f94635ef4efc6bfd6527`.
+- Temporary Voice now exposes `/voice` and prefix controls for room info, lock/unlock, user limit, rename, ownership transfer and permit/reject access.
+- Command policy and prefix routing include the new `voice` command; slash command contract coverage was added.
+
+## 2026-10-04 — Temporary Voice Control Center verified
+- CI run **#1253** (`37151805934`) passed on development head `076a56031ca692f19b22fe98b7d91188c16a1541`.
+- Temporary Voice Control Center now shows active tracked rooms, owners and occupancy, and exposes manual reconciliation from the local Control Center.
+- Fixed the Dashboard JSX rendering of owner mentions; the production Dashboard build now passes.
+- Backend verification included **78/78 tests passing**, domain build and bot build.
+
+## 2026-10-04 — Welcome Control Center verified
+- CI run **#1256** (`37152023248`) passed on development head `b9d3ac96021adc3f5c45dd9c81c1a34c327beacd`.
+- Welcome now has a dedicated Control Center panel with Welcome/Goodbye template preview and test delivery to a selected or configured text channel.
+- Test delivery validates bot `ViewChannel`, `SendMessages` and `EmbedLinks` permissions and records `welcome.test.sent` in the audit log.
+- Preview/test placeholders use `@example-user`, so the test path does not ping a real member.
+
+## 2026-10-04 — Community Tools poll creator verified
+- CI run **#1260** (`37152201261`) passed on development head `9be19adc51f501af87057178a1689f51414c2e01`.
+- Community Tools Control Center now creates polls directly: target channel, question, 2–5 options and 1–10080 minute duration.
+- Core validates the target text/announcement channel and bot `ViewChannel`, `SendMessages`, and `EmbedLinks` permissions, rolls back the database row if Discord publication fails, and keeps the existing poll close timer.
+- Dashboard creation is audited as `poll.created`; existing close/status/sticky administration remains intact.
+
+## 2026-10-04 — Control Center consistency audit verified
+- CI run **#1262** (`37152334156`) passed on development head `c9fd897e4a5574119480e4dfc6fd7d434a20cae3` after adding `automod` to `PANEL_KEYS`.
+- Cross-module audit confirmed every `full` module has both a rendered operational branch and a `PANEL_KEYS` entry; there are no extra panel keys and no missing panel branches.
+- Community Tools poll creation remains CI-verified by run **#1260** (`37152201261`) on its feature head.
+
+## 2026-10-04 — Economy Admin verified
+- CI run **#1268** (`37153371438`) passed on development head `c8188f61840235c784560f7507d8276dee5acf59`.
+- Economy Control Center now exposes the top 100 persisted economy accounts and a protected admin balance editor.
+- Core validates Discord user IDs and PostgreSQL bigint-compatible non-negative balances before upserting; Dashboard writes are audited as `economy.balance.updated`.
+
+## 2026-10-04 — Command routing audit verified
+- CI run **#1272** (`37153758025`) passed on development head `e709c239a4bc3a852e7f55f719f47ba43e9cc54e`.
+- Routing audit caught a concrete Temporary Voice gap: `/voice` was implemented but not subscribed to the `interaction.command` event. The module now registers and removes that listener with its lifecycle.
+- Notification feed channel preflight and Role Panel channel permission preflight are also part of the hardened Core path.
+
+## 2026-10-04 — Local Dashboard authentication removal
+- Local Control Center no longer has an end-user login/logout flow or dashboard admin password/session secret.
+- Dashboard access remains local-first/loopback by default; server-side requests to the Management API remain protected by the internal bearer key.
+- Legacy login routes and page were removed.
+
+## 2026-10-04 — Bot Registry verified
+- Module 2A/2B complete.
+- Added encrypted Bot Identity credential storage, Control Center registration, Discord token validation and safe metadata-only Fleet responses.
+- PostgreSQL is now authoritative for runtime credentials; stale .env values cannot overwrite an existing stored credential.
+- CI run #1590 passed with 84/84 bot tests and all build/contract stages.
+- Next module: local Bot Fleet process orchestration so additional registered identities can actually run concurrently.
+
+
+## 2026-10-04 — Local Bot Fleet orchestration
+- Added `scripts/reconcile-fleet.ps1` for local Windows Fleet lifecycle.
+- Startup reconciles enabled secondary identities with stored credentials into `dsp-bot-fleet-<identity>` containers.
+- Down cleanup removes secondary fleet containers before Docker Compose shutdown.
+- Fleet reconciler logs lifecycle events to `data/logs/fleet-reconciler.log` without logging credentials.
+
+
+## 2026-10-04 — Local Fleet orchestration CI verified
+- CI run #1592 passed on `03ad5eec1c186b4a76af0cf7c7775457ba3bf4d4`.
+- Fleet launcher/reconciler static contract and all backend/frontend automated checks are green.
+- Documentation now explicitly distinguishes implemented local orchestration from live Windows/Discord acceptance.
+
+
+## 2026-10-04 — Security anti-nuke response expansion
+- Security module pass: extended anti-nuke event coverage to `channel.create` and `role.create`.
+- Kept the existing `destructive-burst` incident model to avoid unnecessary schema churn; event type is retained in incident/security-event metadata.
+- Added regression coverage for audit-log event mapping.
+
+
+## 2026-10-04 — Security anti-nuke checkpoint verified
+- Development HEAD at checkpoint: `9069f68ec96bd4e6d0a2efc96da9625d719b3399`.
+- CI run **#1596** passed the complete automated verification pipeline.
+- Security anti-nuke event coverage now includes channel/role creation as well as deletion and member bans; regression coverage verifies the audit-log event mapping.
+- Known limitation remains live Discord audit-log timing/permission/hierarchy validation.
+
+## 2026-10-04 — Music provider-aware search checkpoint
+- Development HEAD at current feature checkpoint: `035e23cc163871172cba9e0298d824876a74387c`.
+- Added a shared provider-aware search path for Dashboard and Discord Music play flows.
+- Supported search providers are `auto`, `youtube`, `youtube_music` and `soundcloud`; direct URLs remain passed through unchanged.
+- Added provider choices to `/play`, `/music play` and the local Music Control Center.
+- Added regression coverage for provider normalization, query construction and command registration.
+- CI run **#1603** passed typecheck, bot tests, domain/bot builds and Dashboard build.
+- Known limitation remains actual provider/plugin availability and live Lavalink behavior in the user's local runtime.
+
+### Next concrete work
+- Music — multi-node failover hardening: verify and strengthen automatic player migration/recovery when an active Lavalink node disconnects, including persistent player state and regression coverage.
+
+
+## 2026-10-04 — Music multi-node failover hardening checkpoint verified
+- Development HEAD: `7d62d0421d31ab3deebbca29d3c9412908b41543`.
+- CI run **#1608** passed the full automated pipeline.
+- Music failover now logs the relevant player node-change success/failure events from `lavalink-client`.
+- Active players are persisted when a Lavalink node disconnects, with explicit success/failure logging for the persistence attempt.
+- Control Center now exposes the player's active Lavalink node alongside total connected nodes.
+- Automatic player migration remains delegated to `lavalink-client`'s built-in node-migration mechanism; the platform layer adds state durability and observability around it.
+- Live node-loss/migration, queue continuity and audio continuity remain environment-dependent release-gate tests.
+### Next concrete work
+- Release-gate validation of Music multi-node failover: live node loss/recovery with queue, current track position and player state continuity.
+- Then continue the remaining broader fleet/release-gate validation without reopening already verified Music slices.
+
+
+## 2026-10-04 — AutoMod rule log-channel checkpoint verified
+- Development HEAD: `3a61ed05f3042a80eb60d5005eccc1ee7c5e1ff4`.
+- CI run **#1617** passed the full automated pipeline.
+- AutoMod rules now support an optional persisted log channel for `action=log`, with Management API validation that the target is text-based and sendable.
+- Control Center exposes the log-channel selector only for log actions.
+- Rule log delivery renders `{mention}`, `{user}` and `{channel}` with allowed mentions restricted to the triggering user.
+- Audit telemetry records the final `logDelivered` result once, after the delivery attempt; delivery failure is logged without breaking rule handling.
+- Live Discord permission/channel-delivery behavior remains an environment-dependent acceptance test.
+### Next concrete work
+- Continue the remaining AutoMod/Security response workflow depth, then return to the broader Fleet/release-gate matrix.
+
+
+## 2026-10-04 — AutoMod timeout moderation-case checkpoint verified
+- Development HEAD: `73af83405195e2c94c44f1f1740fe74ac2c66f76`.
+- CI run **#1623** passed the full automated pipeline.
+- AutoMod rule `action=timeout` now records a `moderation_cases` timeout case only after the Discord timeout succeeds, including an `expires_at` timestamp.
+- Base AutoMod detections configured with a timeout now use the same durable moderation-case path.
+- Both paths emit the existing `moderation.case` event after successful persistence; failed Discord timeouts do not create false cases.
+### Next concrete work
+- Continue the remaining AutoMod/Security response workflow depth, then return to broader Fleet/release-gate validation.
+
+## 2026-10-04 — AutoMod/Security consistency hardening
+- Development HEAD for this checkpoint: `83755f29b9ac747b278bce919d97397441a96d00`.
+- AutoMod rule-based `repeated-text` now honors `windowSeconds` for its effective detection window instead of counting every retained repeat equally.
+- The AutoMod repeated-text rule uses timestamped recent messages and keeps the existing guild-wide `repeatedWindowSeconds` as the safe upper bound; per-rule windows may narrow it.
+- Added deterministic regression coverage for repeated-text inside/outside the rule window.
+- Security incident resolution now returns an explicit success/failure result; `clearIncidents` reports only incidents that were actually marked resolved.
+- Added regression coverage for partial cleanup failure so the Control Center/command result cannot over-report closed incidents.
+- Verification state: fresh GitHub commit status currently exposes no checks for the latest direct development HEAD, so this checkpoint is **not** marked CI-verified yet.
+### Next concrete work
+- AutoMod: tighten the `action=log` configuration contract and review `warn` action semantics.
+- Security: decide/pin the intended lifecycle for executor roles removed by anti-nuke response and add persistence/restoration if the intended behavior is reversible.
+- Then deepen Music/Fleet failure-path coverage and move through the live Discord/Windows/Lavalink release-gate matrix.
+
+## 2026-10-04 — AutoMod log-rule contract hardening
+- Development HEAD for this feature checkpoint: `7121d7557063772d712c47006bdbb9845c99d1b9`.
+- AutoMod `action=log` rules now require a configured log channel at the Core service boundary.
+- Management API rejects `action=log` without a log channel with a deterministic HTTP 400 error before persistence.
+- Added regression coverage proving an invalid log rule performs zero database writes.
+- Previous AutoMod repeated-text window and Security partial-resolution fixes remain part of the same consistency-hardening pass.
+- Verification state: the repository integration currently exposes no attached CI status for this direct `development` HEAD, so this checkpoint is not called CI-verified until Actions reports a run.
+### Remaining after this slice
+- AutoMod: review `warn` action semantics and complete response-workflow edge cases.
+- Security: finalize executor-role removal/restoration semantics and durable restart behavior for destructive-burst history.
+- Music: deeper failover/queue/current-position continuity and multi-session failure paths.
+- Fleet: failover/reconciliation edge cases and multi-bot Windows/Docker acceptance.
+- Final release gate: live Discord permissions/hierarchy, real Lavalink/provider behavior, soak/chaos/recovery, clean-host deployment.
+
+## 2026-10-04 — Security detection-window hardening
+- Development code checkpoint: `a915418cab191a58100849aff95264b49311fb74`.
+- Security raid/destructive detection windows are now normalized to 5–3600 seconds when read from configuration, preventing invalid/oversized values from bypassing bounded cache retention.
+- In-memory Security event buckets now retain up to the full supported one-hour detection horizon instead of a hard-coded five minutes.
+- Added regression coverage for window lower/upper bounds and invalid values.
+- CI verification is still pending for the latest direct development HEAD.
+
+## 2026-10-04 — AutoMod independent rule windows + Security window hardening
+- AutoMod rule-based `repeated-text` now has timestamp-aware history independent from the base detector window, up to the supported one-hour history horizon; added regression coverage for a rule window larger than the global base window.
+- AutoMod `action=log` requires a configured log channel before persistence, with Management API rejection and zero-write regression coverage when missing.
+- Security incident clearing now returns only successfully resolved incident count.
+- Security raid/destructive detection windows are normalized to 5–3600 seconds; event-cache retention and audit-log lookback now cover the full supported hour instead of a hard five-minute ceiling.
+- CI run #1647 exposed a genuine TypeScript syntax corruption in the Security helper area; it was repaired before the current checkpoint. CI run #1651 then reached 93/94 tests and exposed the missing export of `clampSecurityIncidentDuration`; the helper export was restored in commit `f079a866aa2294ad211d7234fa6396c8c052e643`.
+- Latest code before this documentation checkpoint: `f079a866aa2294ad211d7234fa6396c8c052e643`.
+- Current verification state: a fresh CI run is active on the latest documentation checkpoint; no green claim is made until it completes.
+### Remaining after this pass
+- AutoMod: response-workflow edge cases / final warn semantics review.
+- Security: executor-role lifecycle semantics and durable destructive-history policy.
+- Music: deeper multi-node queue/current-position continuity and provider/runtime failure paths.
+- Fleet: reconciliation/failover failure paths and multi-bot Windows/Docker acceptance.
+- Release gate: live Discord permissions/hierarchy, Lavalink/provider behavior, soak/chaos/recovery and clean-host deployment.
+
+## 2026-10-04 — AutoMod Dashboard contract checkpoint
+- Dashboard AutoMod Rules form is now aligned with the Core/API `action=log` contract: selecting a log channel is mandatory for log rules.
+- Removed the stale `В текущий канал / только audit` option that contradicted the enforced persistence contract.
+- Restored the actual response-message template editor where a placeholder literal had been rendered in the UI.
+- Client-side validation now blocks saving a log rule without a log channel before making the request.
+- CI run #1657 passed the full pipeline on commit `4c2ba68c0c45700a7f1f13f48942c9452de2c7dc`.
+### Remaining after this checkpoint
+- Security: define and implement executor-role removal lifecycle, including whether it is reversible and how restart/reconciliation should behave.
+- AutoMod: richer response delivery/failure semantics and final warn behavior review.
+- Music: deeper failover/queue/current-position edge coverage.
+- Fleet: reconciliation/failover failure paths and multi-bot Windows/Docker acceptance.
+- Final live release gate: Discord permissions/hierarchy, Lavalink/provider behavior, soak/chaos/recovery and clean-host deployment.
+
+## 2026-10-04 — Security response accounting checkpoint
+- Security anti-nuke executor role removal now records only roles whose Discord removal operation actually succeeded.
+- `security.response-applied` audit/event metadata now contains both the accurate `removedRoles` count and `removedRoleIds`.
+- Added a pure helper and regression coverage proving failed role-removal operations are excluded from the reported result.
+- CI run #1663 passed the complete automated pipeline on commit `b62d5f9f811429dd25ec247623a761ba0985da6b`.
+### Remaining after this checkpoint
+- Security: define durable lifecycle semantics for executor-role removal/restoration and restart/reconciliation handling of destructive history.
+- AutoMod: response delivery edge cases and final warn behavior review.
+- Music: deeper failover/current-position/queue continuity.
+- Fleet: reconciliation/failover failure paths and multi-bot Windows/Docker acceptance.
+- Final live release gate: real Discord permissions/hierarchy, Lavalink/provider behavior, soak/chaos/recovery and clean-host deployment.
+
+## 2026-10-04 — Security restart-resilience checkpoint
+- Added regression coverage for `restoreActiveIncidents`: after restart, active raid/destructive incidents are restored from PostgreSQL, and when multiple active incidents of the same type exist for a guild, the one with the latest expiry is retained in memory.
+- CI run #1667 passed the complete automated pipeline on commit `87e893c2d7e3454b97a5cda3caf0d7109ef3f401`.
+- Security response accounting, detection-window bounds and AutoMod contract hardening from the preceding checkpoints remain verified.
+### Remaining after this checkpoint
+- Security: durable lifecycle policy for executor-role removals/restoration and whether destructive burst history needs durable reconstruction across restart.
+- AutoMod: richer response-delivery failure coverage and final warn semantics review.
+- Music: deeper failover/current-position/queue continuity and multi-session failure paths.
+- Fleet: reconciliation/failover failure paths and real multi-bot Windows/Docker acceptance.
+- Final live release gate: Discord permissions/hierarchy, real Lavalink/providers, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Security executor-role lifecycle + durable destructive history
+- Security now treats executor role stripping as a punitive, **non-reversible automatic action**: incident expiry/clear restores only temporary quarantine assignments.
+- Every successful executor-role removal now gets its own durable `security.executor-role-removed` event with incident, user, role and `reversible: false` metadata, while the aggregate `removedRoleIds` response record remains intact.
+- Every destructive action now gets a durable `destructive-action` event; startup reconstructs the in-memory anti-nuke history from the last supported one-hour window after process restart.
+- Destructive history reconstruction is capped at 50,000 rows and uses the existing durable `security_events` pipeline; no additional schema table was introduced.
+- Added deterministic regression coverage for destructive-history restart reconstruction and durable executor-role removal recording.
+- CI run #1675 passed the complete automated pipeline on commit `357052808974403abbfb1abb68586787798ae7c0` (105/105 bot tests passed).
+### Next concrete work
+- AutoMod: richer response-delivery failure coverage and final warn semantics review.
+- Music: deeper failover/current-position/queue continuity and multi-session failure paths.
+- Fleet: reconciliation/failover failure paths and real multi-bot Windows/Docker acceptance.
+- Final live release gate: Discord permissions/hierarchy, real Lavalink/providers, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Music failover durable-state checkpoint
+- Music `playerDestroy` no longer deletes `music_players` when a player still has a current track or queued tracks; this preserves the latest durable snapshot across Lavalink node-loss/failover destruction.
+- Empty players are still removed from durable storage, preserving explicit stop/idle cleanup behavior.
+- Added deterministic regression coverage for current-track, queued-track and empty-player retention decisions.
+- CI run #1677 passed the complete automated pipeline on commit `2d2cb93c064249ec24a628552482ecc69f05744a`.
+### Next concrete work
+- Music: deeper current-position/queue continuity and multi-session failure paths, especially resumed-player state reconciliation.
+- Fleet: reconciliation/failover failure paths and real multi-bot Windows/Docker acceptance.
+- Final live release gate: Discord permissions/hierarchy, real Lavalink/providers, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Music cold-recovery + Fleet stale-heartbeat checkpoint
+- Music now reconciles durable `music_players` after bot startup/node connection when Lavalink session resuming does not recreate the player; saved queue/current track, repeat, filters and approximate playback position are restored onto a connected node.
+- Active playback position is advanced from the last persisted snapshot while paused position remains fixed; restore is bounded to the track duration.
+- Queue-only durable sessions are also restarted, while empty snapshots are discarded.
+- Fleet status now marks stale `starting` and `ready` heartbeats as `degraded`; the Windows Fleet reconciler restarts a running secondary container when Fleet status is no longer healthy.
+- Added deterministic regression coverage for Music position/recovery decisions and stale Fleet heartbeat classification.
+- CI run #1682 passed the complete automated pipeline on commit `e8c8467d5d4c890199227a1634299606666fe0e0`.
+### Next concrete work
+- Music: harden multi-session/node-loss reconciliation and failure reporting without duplicating or losing queue state.
+- AutoMod: final warn/response delivery edge cases.
+- Fleet: multi-bot runtime/Discord acceptance and reconciliation failure injection.
+- Final live release gate: real Discord permissions/hierarchy, Lavalink/providers, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Music recovery finalization + AutoMod response edge verification
+- Music cold recovery now survives an unsuccessful Lavalink session resume without deleting a recoverable durable player snapshot; PostgreSQL state is reconciled onto a connected node when no resumed player exists.
+- Resume position is reconstructed from the persisted position/timestamp while active playback advances and paused playback remains fixed; position is bounded before seek.
+- Queue-only durable sessions are recoverable after restart, and player destruction preserves durable state while current/queued tracks remain.
+- AutoMod `warn` is now non-destructive: it creates a `warn` moderation case, attempts a warning response, and records `responseDelivered`; response delivery failure does not roll back the moderation case.
+- Fleet stale `starting`/ `ready` heartbeats are classified as degraded, and the local reconciler restarts unhealthy secondary containers.
+- CI run #1687 passed the complete automated pipeline on commit `38f35992d2553b779d51dadb01882517933aa3f3` after correcting the Music recovery regression test import.
+### Next concrete work
+- Fleet: reconciliation failure injection and multi-bot process restart/credential-state edge cases.
+- Music: multi-session/node-loss de-duplication and position/queue continuity under simultaneous failures.
+- Final live release gate: real Discord permissions/hierarchy, Lavalink/providers, Windows/Docker multi-bot runtime, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Fleet credential-rotation lifecycle checkpoint
+- Added durable `bot_heartbeats.restart_required` state so a credential rotation can request controlled restart of an already running secondary Bot Identity.
+- Normal heartbeat updates preserve an outstanding restart request; only the new process startup heartbeat explicitly clears it.
+- Management API now requests restart for rotated secondary credentials and returns `restartRequired`; Dashboard displays the pending restart state.
+- Fleet status treats a pending restart as `degraded`, so the local reconciler removes/restarts the stale secondary container instead of accepting the old process as healthy.
+- Added migration 48 plus deterministic regression coverage for restart-request preservation and clearing semantics.
+- CI run #1689 passed the complete automated pipeline on commit `9e328270f378fb81a7de86b821745b82e9a9ef19`.
+### Next concrete work
+- Fleet: failure injection around restart/start failures and stale heartbeat races; harden recovery without masking an unavailable Docker/runtime.
+- Music: simultaneous node-loss/session-recovery de-duplication and cross-identity queue continuity.
+- Final live release gate: real Discord permissions/hierarchy, Lavalink/providers, Windows/Docker multi-bot runtime, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Fleet reconciler failure propagation checkpoint
+- Local Fleet reconciliation now propagates Docker remove/start failures with a non-zero exit code after processing the rest of the desired fleet.
+- A failed `docker rm -f` no longer falls through into a second start attempt using the same container name; the failed identity is left for the next reconciliation cycle.
+- `-Down` also reports cleanup failures instead of always returning success.
+- CI run #1691 passed the complete automated pipeline on commit `7f7dae95a43028cde27f083c7b397c3a2a2a9da8`.
+### Next concrete work
+- Fleet: concurrent failover/assignment ownership and split-brain prevention across primary/secondary identities.
+- Music: simultaneous node-loss/session-recovery de-duplication.
+- Final live release gate: Discord permissions/hierarchy, Lavalink/providers, Windows/Docker multi-bot runtime, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Distributed Fleet ownership revalidation checkpoint
+- Event Bus now performs a short-lived durable ownership recheck after the fast local guild filter, using a 1-second cache to avoid a PostgreSQL query for every message/event.
+- Primary and secondary ownership semantics mirror the existing stale-heartbeat failover rules; after an atomic assignment change the old process stops receiving guild events on the next ownership-cache refresh instead of waiting for the 15-second Fleet refresh cycle.
+- Added regression coverage for async guild verification and its cache behavior.
+- CI run #1693 passed the complete automated pipeline on commit `6bf8e4423ef4f8fccd1bae497b5c66368bc9b5f0`.
+### Next concrete work
+- Music: simultaneous Lavalink node/session failures, duplicate recovery suppression and queue/current-state continuity across multi-node events.
+- Fleet: real Windows/Docker multi-bot acceptance plus remaining operational failure injection.
+- Final live release gate: Discord permissions/hierarchy, Lavalink/providers, soak/chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Music recovery concurrency checkpoint
+- Added a per-guild recovery gate shared by Lavalink `resumed` handling and PostgreSQL cold-recovery reconciliation.
+- Concurrent recovery paths for the same guild are now serialized, preventing duplicate `createPlayer` calls when node reconnect/resume and cold reconciliation overlap.
+- Added deterministic regression coverage for the recovery gate while keeping independent guilds recoverable concurrently.
+- CI run #1697 passed the complete automated pipeline on commit `345683759b315b0d775fc0752515b11b693a04fb`.
+### Next concrete work
+- Finalize live release-gate prerequisites: Discord permission/hierarchy checklist, Lavalink node-loss/expiry acceptance, Windows/Docker multi-bot runtime and soak/chaos/recovery.
+- Then perform the remaining release-readiness audit without reopening verified module contracts.
+
+
+## 2026-10-04 — Local shutdown failure propagation checkpoint
+- `scripts/start-local.ps1 -Down` now preserves and returns failures from both Fleet reconciliation cleanup and `docker compose down` instead of always exiting successfully.
+- This closes the local lifecycle reporting chain after the reconciler itself was hardened to propagate remove/start failures.
+- CI run #1699 passed the complete automated pipeline on commit `149d6ea598427d6ded426baa8b0624ca333bf2bd`.
+### Next concrete work
+- Static release-gate audit: command/permission contracts, health/readiness semantics, clean shutdown, deployment contract consistency and live-test boundaries.
+- Live acceptance remains external: real Discord permissions/hierarchy, Lavalink/node loss, Windows/Docker multi-bot runtime, soak/chaos/recovery.
+
+
+## 2026-10-04 — Local release-gate preflight checkpoint
+- Added `scripts/release-gate.ps1` as a non-destructive local preflight for the current deployment stack.
+- The gate checks Docker Compose reachability, Bot health (`ready` + Discord + PostgreSQL readiness), absence of module `down` states, authenticated Management API/Fleet state, credential/restart readiness for enabled identities, Dashboard reachability and both local Lavalink `/version` endpoints.
+- Added deployment-contract coverage so the release-gate script remains part of CI-checked infrastructure contracts.
+- CI run #1702 passed the complete automated pipeline on commit `ff052ebf277184e9164e77d7cfc3e2cc3a0d9c6f`.
+### Live release boundary
+- Automated code/deployment contracts are now green; remaining acceptance is genuinely environment-dependent: real Discord permissions/hierarchy, real Lavalink node loss/session expiry/audio continuity, Windows/Docker multi-bot runtime, chaos/recovery and clean-host deployment.
+
+
+## 2026-10-04 — Fleet Management API failure propagation checkpoint
+- Fleet reconciliation no longer reports success when the local Management API is unavailable: the reconciler logs the outage and returns exit code 1.
+- This prevents startup/maintenance automation from silently accepting an unreconciled secondary Bot Fleet.
+- Deployment contract now locks the failure-propagation behavior into CI.
+- CI #1705 passed the complete automated pipeline on commit `3b5206f50cb344d7092937e6add91d7718b01fb5`.
+### Next concrete work
+- Complete static release-gate audit and operational acceptance boundaries.
+- Live acceptance on the user's Windows/Docker/Discord/Lavalink environment remains the only blocker to the final runtime gate.
+
+
+## 2026-10-04 — Release-gate Fleet hygiene checkpoint
+- Local release gate now verifies all five core Compose services are actually running before proceeding.
+- It also rejects running orphaned `dsp-bot-fleet-*` containers that do not correspond to an enabled, credentialed secondary identity in the Management API.
+- This closes a local split-brain/stale-secondary visibility gap without mutating the Docker stack.
+- CI #1706 passed the complete automated pipeline on commit `3fa75c40548a6656d6a2f09f4c4b458f01198b59`.
+
+
+## 2026-10-04 — Release documentation contract cleanup
+- Updated Master Plan, implementation order and test strategy to match the implemented local Control Center security model: no end-user login/session/CSRF layer; Management API uses internal bearer authentication and rate limiting.
+- Removed stale OAuth/dashboard-session test expectations so future release work targets the real architecture.
+- CI #1706 passed the preceding release-gate hardening checkpoint.
+- CI #1708 passed the complete automated pipeline on the final release-gate hardening tree.
+
+
+## 2026-10-04 — Release-gate authentication verification
+- Management API unauthenticated Fleet requests are explicitly checked for HTTP 401 before the authenticated gate path is exercised.
+- CI #1708 passed the complete automated pipeline on commit `c37fc2ef7919544c32457574abf9c5707d0cdb1a`.
+### Current boundary
+- Repository-side release-gate hardening is complete for the implemented local architecture; remaining work is live environment acceptance.
+
+
+## 2026-10-04 — Native Windows runtime / Fleet checkpoint
+- Switched the documented everyday local workflow to native Windows; Docker is now explicitly optional.
+- Fixed native startup secret bootstrap: `BOT_CREDENTIALS_ENCRYPTION_KEY` is generated, while removed Dashboard session/auth state is no longer created.
+- Fixed native Dashboard wiring to use the configured `MANAGEMENT_API_PORT` instead of the Docker-default port.
+- Added `scripts/reconcile-fleet-native.ps1`: registered secondary identities are supervised as ordinary Node processes, with PID/log tracking, restart-request handling and fail-closed Management API access.
+- Added `scripts/release-gate-native.ps1` for read-only native runtime acceptance checks.
+- Updated native/local setup documentation and CI deployment contracts.
+
+
+## 2026-10-04 — Native release-gate / Control Center cleanup
+- Native release gate now checks `.native-runtime/fleet.pid` so a dead Fleet supervisor cannot be mistaken for a healthy native runtime.
+- Removed obsolete Dashboard logout action and `/login` redirect.
+- Added deployment-contract regression coverage for the removed end-user auth UI and native supervisor health check.
+- Synchronized Local Setup documentation with the native-first runtime and read-only native release gate.
+- CI #1717 passed the preceding Discord bot registration rate-limit checkpoint; this cleanup is the current verification target.
+
+
+## 2026-10-04 — Native diagnostics checkpoint
+- Added `scripts/native-diagnostics.ps1` as a read-only operator diagnostic for the native Windows runtime.
+- Supports optional Dashboard/Lavalink2 checks and machine-readable JSON output.
+- It reports process/PID state, Bot health, Management API authentication, Fleet readiness and Lavalink versions without printing secrets.
+
+
+## 2026-10-04 — Native runtime verification checkpoint
+- CI #1720 completed successfully on `ada6fa61abd7f267c79c8d5c86dc6dea05615bb9`.
+- Native Windows runtime/diagnostic tooling and the local no-login Control Center model are now CI-verified together.
+- README and Master Plan were synchronized so native Windows is the documented primary local path and Docker is explicitly optional.
+### Current boundary
+- Repository-side native/runtime hardening is green.
+- Remaining acceptance is genuinely machine/environment dependent: live Discord permissions/hierarchy, real secondary-bot process lifetime, Lavalink/node-loss audio recovery, chaos/soak and clean-host deployment.
+
+## 2026-10-04 — Feature completeness audit checkpoint
+- Performed an explicit inventory of the originally planned platform functionality instead of treating "Release Candidate" or green CI as proof that every planned feature is fully complete.
+- Confirmed that the major functional areas are already present in the repository: Discord Core/Event Bus/module lifecycle; PostgreSQL and migrations; Control Center; moderation/cases; Temporary Voice; tickets/transcripts; role panels; giveaways; starboard; economy/shop/ledger; reminders/AFK/utility; leveling; welcome/verification; notifications; analytics; backup/restore; import/export; Automation; AutoMod; Security/Anti-Raid/Anti-Nuke; Music/Lavalink; multi-bot Music routing/Fleet; Bot credential registration; and native Windows runtime tooling.
+- Confirmed that several areas are functionally implemented but still need breadth/depth or final acceptance before they can be called 100% complete: AutoMod/Security response-policy depth; broader Automation condition/action coverage; additional Music providers and full multi-node failover; full Fleet orchestration/failover hardening; complete VPS install/upgrade/production workflow; and E2E/chaos/soak/live runtime validation.
+- Important distinction recorded: a module being implemented is not the same as the entire planned feature set being exhausted, and automated CI is not the same as live Discord/Windows/Lavalink acceptance.
+- Do not declare the project "100% feature-complete" until the remaining functional extensions are either implemented or explicitly accepted as out-of-scope/known limitations and the corresponding release-gate tests are complete.
+- Current verified repository baseline remains commit `807af06529ff0a95313db2d5454475e8574dcf53` with CI #1720 green; this checkpoint adds documentation only.
+### Next concrete work
+- Continue feature completion by closing the remaining functional breadth gaps rather than generating more paperwork-only release checkpoints.
+- Keep live Discord/Windows/Lavalink/VPS acceptance separate from feature implementation status.
+
+
+## 2026-10-04 — Automation response breadth checkpoint
+- Expanded the Automation domain and builder with starts-with, ends-with and number-eq conditions.
+- Fixed event-relative has-role validation so the existing @event builder mode is accepted and resolved against the triggering user.
+- Fixed send-message validation so the existing @event channel mode is accepted by the Core validator.
+- Corrected the Automation ID validators from an over-escaped regex form to the intended Discord snowflake pattern.
+- Added the add-reaction action for reacting to the triggering or selected message from an automation rule.
+- Automation Dashboard now exposes the new condition/action primitives.
+- Added regression coverage for the new validation paths and event-relative automation configuration.
+- This is a targeted feature-breadth increment; live Discord permissions and reaction behavior remain part of the release-gate environment.
+### Next concrete work
+- Continue Automation breadth with additional safe event fields/actions, then close remaining Music/Fleet functional breadth gaps before the live release-gate cycle.
+
+
+## 2026-10-04 — Automation message controls checkpoint
+- Added remove-reaction, pin-message and unpin-message to the Automation action catalog.
+- Core supports event-relative or explicit message targets and keeps failures isolated per action.
+- Dashboard now exposes all three actions.
+- Regression coverage extends the validator with the new message-control references.
+
+## 2026-10-04 — Music playlist/search breadth checkpoint
+- Search results are now enqueued as a bounded multi-track set instead of silently discarding playlist results after the first track.
+- Added a 100-track safety cap for one search result.
+- Auto provider mode now falls back from YouTube text search to YouTube Music and SoundCloud when needed.
+- Slash, prefix and Dashboard playback paths share the same search/queue behavior.
+
+## 2026-10-04 — Music queue management checkpoint
+- Added remove, move and clear operations for the upcoming Music queue.
+- Slash command /music now exposes queue remove/move/clear; prefix mode supports !music remove/move/clear.
+- Management API validates and forwards the new queue operations.
+- Dashboard exposes queue clear, per-item remove and queue reordering.
+- Added regression coverage for user-facing queue position normalization.
+
+## 2026-10-04 — Music audio filters checkpoint
+- Added native Music filter presets: Off, Nightcore, Vaporwave, Karaoke, 8D/Rotation, Tremolo, Vibrato and Low Pass.
+- Filter changes are available through Discord /music filter, prefix !music filter, Management API and Dashboard.
+- Each preset resets previous built-in filters first so presets do not stack unexpectedly.
+- Dashboard now reflects the active filter state from Core.
+- Added regression coverage for filter preset normalization.
+
+## 2026-10-04 — Security audit coverage checkpoint
+- Added shared Discord audit-log entry ingestion to the platform event bus.
+- Security anti-nuke response now sees additional destructive actions that do not have a dedicated high-level Discord event: member kicks, webhooks, emojis, stickers, permission overwrites, member prune and integrations.
+- Existing channel/role create-delete and member ban handlers remain separate to avoid double-counting.
+- Added regression coverage for the extended AuditLogEvent mapping.
+
+## 2026-10-04 — Automation API parity checkpoint
+- Synchronized Management API Automation validation with the current Core/Dashboard catalog.
+- Added support for current Automation events, starts-with/ends-with/number-eq conditions, event-relative role/message targets and reaction/pin/unpin actions.
+- Added a dedicated management-api regression test covering accepted and rejected catalog entries.
+
+## 2026-10-04 — Fleet restart workflow checkpoint
+- Exposed the existing durable fleet restart request through Management API PATCH /api/fleet/:id.
+- Dashboard now lets an administrator request a restart for a secondary identity.
+- The operation only sets restart_required; an external/supervisor process remains responsible for performing the actual process restart.
+
+## 2026-10-04 — Automation event field breadth checkpoint
+- Message-created/edited/deleted Automation events now expose attachment, embed and sticker counts for numeric conditions.
+- Voice join/leave/move events expose the previous voice channel where applicable, enabling transition-aware rules.
+- Management API and Dashboard field catalogs are aligned with the runtime event payload.
+- Regression coverage now exercises the new numeric/text field selectors.
+
+## 2026-10-04 — Automation channel naming checkpoint
+- Added `set-channel-name` as a native Automation action.
+- Core validates channel references and a bounded non-empty channel name, then applies rendered names through the Discord channel API.
+- Management API and Dashboard expose the same action, keeping the builder/runtime/API catalogs aligned.
+- Regression coverage covers accepted channel-name actions and rejects blank/overlong names.
+
+## 2026-10-04 — Automation event/action breadth checkpoint
+- Added Automation handling for reaction.remove, channel.update and role.update events already emitted by Discord Core.
+- Added channel actions set-slowmode and set-channel-topic with event-relative or explicit channel targets.
+- Extended Dashboard and Management API validation to keep the catalog aligned.
+- Added validator regression coverage for the new channel actions.
+
+
+## 2026-10-04 — Cross-chat continuity context checkpoint
+- Added `docs/CHAT-CONTEXT.md` as the persistent transfer prompt for continuing the project in a new chat without re-explaining the architecture, product north star, verified feature breadth, remaining scope, workflow rules and current verification boundary.
+- The context explicitly preserves the core goal: one self-hosted bot/platform replacing the intended third-party bot stack (Carl-bot/Juniper/MEE6/ProBot/Jockie Music and similar) without artificial Premium walls.
+- It also records the modular work protocol: code the next concrete slice, regression-test it, log the result, and re-check CI before claiming verification.
+- Current continuity baseline is development HEAD `79dfbb13e33fe9b63c26fbf7bc84b744e6867f2b`; CI #1764 (run `37218825729`) was still in progress at the last observation and must be rechecked before being called green.
+- No credentials or private data were added to the context file.
+
+### Next concrete work
+- Re-check CI #1764 after the continuity-doc commit.
+- Continue feature completion with a concrete Security/AutoMod response-policy slice, then Automation breadth, Music failover/provider depth, Fleet hardening, VPS production tooling and final live acceptance.
+
+
+## 2026-10-04 — Security executor timeout response checkpoint
+- Added configurable executorTimeoutMinutes to the Security response policy, with a safe 0–40320 minute bound (0 disables the response).
+- When a destructive-burst executor reaches the existing response threshold and is Discord-moderatable, Security can now apply the configured timeout.
+- A successful Security timeout creates a durable moderation_cases timeout entry with expiration and emits the standard moderation.case event.
+- Timeout failure is fail-soft: the incident response continues without creating a false moderation case; response metadata records whether timeout actually succeeded.
+- Control Center schema/storage and config export/import now expose the new setting.
+- Migration 49 adds security_settings.executor_timeout_minutes.
+- Regression coverage was added for validation, configuration persistence and successful/failed executor timeout behavior.
+- Verification status: feature implementation is complete; fresh CI for the resulting development tree is required before marking the checkpoint green.
+
+### Next concrete work
+- Continue Security/AutoMod response-policy depth after CI verification, then broaden Automation conditions/actions and Music/Fleet failover breadth.
+
+## 2026-10-04 — Security executor timeout + Automation numeric breadth checkpoint
+- Security gained configurable `executorTimeoutMinutes` for confirmed destructive executors after the existing response threshold.
+- Successful Security timeout creates a durable moderation timeout case and emits the standard `moderation.case` event; Discord timeout failure does not create a false case.
+- Control Center Security schema/storage, migration 49 and config transfer were extended for the new policy.
+- Fixed an existing Automation Dashboard parity gap: `number-eq` now renders its numeric operands in both ALL and ANY condition builders.
+- Added strict Automation numeric conditions `number-gt` and `number-lt` across domain types, Core evaluation/validation, Management API and Dashboard.
+- Regression coverage covers strict numeric validation and the Security timeout policy/runtime.
+- During the numeric Automation API update, a partial-file overwrite was detected immediately and corrected by restoring the complete `management-api.ts` from the exact pre-change commit before reapplying the intended validator change.
+- Current development HEAD: `4c69d5644b5e35fd5497619c008642c74ece02dd`.
+- Fresh CI run #1783 is pending on this current tree; do not call it green until completion.
+
+### Next concrete work
+- After the current CI gate, continue Security/AutoMod response-policy depth, then broader Automation actions/fields and remaining Music/Fleet/VPS breadth.
+
+
+## 2026-10-04 — Security confirmed-executor ban response checkpoint
+- Added optional `executorBanEnabled` Security response policy, disabled by default.
+- When enabled and an executor reaches the existing Anti-Nuke response threshold, Security only bans members passing the existing owner/Administrator/manageability guards and requiring Discord `member.bannable`.
+- Successful ban creates the standard durable moderation `ban` case and emits `moderation.case`.
+- If ban enforcement fails, the response fails soft and the already-configured timeout remains available as fallback.
+- Control Center storage, config transfer and migration 50 were synchronized for the new policy; migration ordering remains monotonic (49 timeout, then 50 ban).
+- Regression coverage now proves successful ban produces a moderation case/event and prevents an unnecessary timeout after a successful ban.
+- Current development tree contains both Security response-depth work and Automation numeric breadth work; CI #1795 is the active verification run.
+
+### Next concrete work
+- Re-check CI #1795 after completion, then continue the remaining Security/AutoMod policy depth and broader Automation actions/fields.
+
+
+## 2026-10-04 — Security lockdown + Automation Dashboard repair checkpoint
+- Added optional Security `autoLockdown` response for active raid/destructive-burst incidents.
+- When enabled, Security records the prior `@everyone` SendMessages state and locks manageable text channels for the incident.
+- Lock ownership is durable per incident/channel and supports overlapping Security incidents without premature restoration.
+- Incident cleanup restores only channel locks owned by the resolving incident; failures keep the incident unresolved for retry/recovery.
+- Added migration 51 and Control Center/config-transfer persistence for `autoLockdown`.
+- Corrected migration ordering so versions 47–50 are monotonic.
+- Fixed the Automation Dashboard numeric-condition implementation after CI exposed a truncated `automation-panel.tsx`; the full 29KB builder was restored from the exact pre-regression commit and `number-eq/gt/lt` support was reapplied with the required TypeScript union/constructor coverage.
+- CI #1811 passed completely: dependency/audit checks, source/deployment contracts, bot typecheck, all 137 bot tests, domain build, bot build and Dashboard build.
+- Current development HEAD before this documentation commit: `ed4b68e96dc35e5c7f1379b6974e9521e8d4d949`.
+
+### Next concrete work
+- Continue Automation action breadth with named cooldown controls, then return to remaining Music/Fleet/VPS depth and final live/E2E validation.
+
+
+## 2026-10-04 — AutoMod / Automation / Fleet breadth checkpoint
+- CI #1824 passed completely on the Fleet Music failover tree.
+- Automation: named keyed cooldown actions `set-cooldown` and `clear-cooldown` are implemented across Domain, Core, Management API and Dashboard; runtime set→clear regression is green.
+- AutoMod: rule-level `ban` is implemented and verified. Ban deletes the triggering message, requires Discord bannable state, and creates the durable moderation ban case/event only after successful enforcement.
+- Fleet: stale Music voice assignments can now be durably claimed by primary or a failover-enabled secondary through a transactional `FOR UPDATE SKIP LOCKED` takeover that avoids duplicate guild+identity assignments.
+- Current development HEAD: `2f70a1ead925c9774519431e8fcd53210646d87b`.
+
+### Next concrete work
+- Continue Fleet orchestration depth, then remaining Music node/provider failover and VPS production tooling, followed by live/E2E/chaos/soak acceptance.
+
+## 2026-10-05 — Automation / Fleet verified checkpoint
+- CI #1837 passed completely on `d1e0b2114f67ebdf188bc11b6600e1ee6a93440b`: dependency/audit, source/deployment contracts, bot typecheck, tests and all builds.
+- Automation now has verified `set-nickname` and `ban` actions, alongside the existing role, timeout, message, reaction, pin, channel, cooldown and logging actions.
+- Fleet failover detail/audit work is present: guild and Music takeover paths retain previous identity context and emit durable failover audit events; CI #1829 verified the fixture fixes.
+- AutoMod rule-level `ban` remains green from CI #1823.
+### Next concrete work
+- Continue the functional Automation/moderation breadth rather than documentation-only checkpoints.
+
+
+## 2026-10-05 — Automation moderation breadth verified
+- CI #1839 passed completely: dependency/audit, source/deployment contracts, bot typecheck, tests and all builds.
+- Automation now has rule actions `set-nickname` and `ban` in Domain, Core, Management API and Dashboard.
+- `set-nickname` supports `@event` and explicit user IDs, the Discord 32-character nickname limit, hierarchy-safe `manageable` guard and clearing via an empty nickname.
+- `ban` supports `@event` and explicit user IDs, reason rendering and a 500-character reason limit; runtime requires Discord `bannable`.
+- Fleet failover detail/audit and AutoMod rule-level ban remain verified by earlier green runs.
+### Next concrete work
+- Continue functional breadth with remaining moderation/community actions, then return to Music/Fleet/VPS production depth and final live acceptance.
+
+
+## 2026-10-05 — Automation kick verified
+- CI #1845 passed completely: dependency/audit, source/deployment contracts, bot typecheck, tests and all builds.
+- Automation now has `kick` alongside `timeout`, `ban`, role management, nickname, message, reaction, channel, cooldown and logging actions.
+- Kick supports `@event` or explicit user IDs, rendered reasons up to 500 characters, and Discord `kickable` hierarchy protection.
+- Current development HEAD: `8e909adab460ae498c3258ec6cc59b2d55b7c820`.
+
+
+## 2026-10-05 — RC freeze and final automated gate preparation
+- Release candidate status is now explicitly frozen for live acceptance rather than expanded indefinitely.
+- Re-checked CI on the pre-freeze HEAD `8daf1401258d9c94d72bac491948cce8a2b12555`: run #1846 (37237396426) passed all automated stages.
+- Post-verification cleanup was intentionally limited to two concrete correctness/documentation issues: removed the duplicated author section in README and removed a duplicated `number-eq` option from the Automation Builder UI.
+- README and PROJECT-STATE now describe deeper AutoMod/Security/Automation/Music expansion as post-RC work rather than blocking the current release candidate.
+- Remaining release blockers are environment-dependent: real Discord smoke/E2E, Lavalink/fleet failover, native Windows runtime, VPS clean-host acceptance and controlled chaos/soak/security validation.
+- The next CI run must verify this final documentation/UI cleanup tree before the RC is treated as the final automated state.
+
+## 2026-10-05 — Performance / resource-efficiency pass
+- Hot-path moduleEnabled checks are now cached for 5 seconds with bounded storage and concurrent single-flight deduplication, preventing per-event SQL and cache-miss query storms.
+- Leveling now caches guild settings and exclusion lists, reuses the already-resolved message.member where available, and invalidates exclusion state after configuration changes.
+- Automation rules are indexed by guild + event, so each Discord event no longer scans unrelated rules; schedule reloads now occur once per minute instead of every scheduler tick.
+- Reduced non-critical background polling overhead: Fleet reconciliation 15s→30s, reminders 5s→10s, giveaways 5s→10s. These changes keep the existing features while allowing a bounded small detection delay.
+- AutoMod now caches configuration/rules, bounds repeat-message history to the actual active repeat window instead of retaining an hour by default, and avoids querying the rules table on every message.
+- Fixed a serious AutoMod false-violation path: a clean message that matched neither base detectors nor custom rules is no longer treated as a violation, deleted, or persisted as an event.
+- Analytics no longer writes one UPSERT per event/message. Events are accumulated in memory by guild/event/minute and flushed in batches every 5 seconds; pending counts are retained on DB failure, reports flush pending data first, and concurrent flush/shutdown paths share one Promise so the database cannot close before a write finishes.
+- Logging configuration is now cached for 10 seconds, removing repeated configuration reads from high-volume audit event handlers.
+- Docker Lavalink defaults were aligned with the native resource profile: 128m initial / 512m maximum heap per node, with .env overrides for machines that genuinely need more.
+- Added regression coverage for module-cache single-flight, batched Analytics writes, and clean AutoMod messages.
+- CI #2397 passed completely on e722a37cab679aada1ef3afd599c902a40bedd2a: dependency/audit, source/deployment contracts, bot typecheck, bot tests, domain build, bot build and Dashboard build.
+### Next concrete work
+- Runtime measurement on the real Windows machine: capture Bot RSS/heap, PostgreSQL CPU/connection use and Lavalink RSS during idle, normal chat and Music playback before making any aggressive Discord.js cache/concurrency changes.
+
+
+## 2026-10-05 — Cleanup contract follow-up
+- CI #2399 caught three stale deployment-contract assumptions left behind by the cleanup: obsolete secondary identity env placeholders and the deleted legacy Dashboard file.
+- Updated `scripts/check-deployment-contract.mjs` to validate the active `page.tsx -> control-center.tsx` entrypoint, reject removed credential placeholders and assert that deleted legacy Dashboard/Vexa files stay absent.
+- This is a correctness fix for the CI contract only; no implemented bot feature was removed.
+- Fresh CI verification after this follow-up is required before treating the cleanup head as green.
+
+
+## 2026-10-05 — Cleanup CI contract syntax fix
+- CI #2400 reached the deployment-contract step but failed because the new legacy-file absence check used a TypeScript type assertion inside the plain JavaScript `scripts/check-deployment-contract.mjs`.
+- Replaced the invalid assertion with a normal JavaScript `error.code === "ENOENT"` check.
+- The active Dashboard remains `page.tsx -> control-center.tsx`; no feature behavior changed.
+- Final cleanup CI must validate this corrected contract on the latest head.
+
+
+## 2026-10-05 — Cleanup baseline finalized
+- Cleanup now ends at code baseline `78a14d4cbb6b15ade0e7111e266eeff970a674e4`.
+- The deployment contract validates the active `page.tsx -> control-center.tsx` entrypoint, rejects obsolete secondary credential placeholders and asserts that deleted legacy Dashboard/Vexa files remain absent.
+- CI #2399, #2400, #2401 and #2402 failed only in this stale deployment-contract layer while the cleanup was being reconciled; the exact JavaScript syntax issue found in #2402 has been removed from both legacy-file absence checks.
+- No implemented bot feature was removed by this cleanup; deleted Dashboard files were unused legacy implementations, while the active Control Center remains intact.
+- Fresh CI on the finalized cleanup baseline is the remaining automated verification step.
+
+
+## 2026-10-05 — VPS bootstrap cleanup
+- Removed obsolete Dashboard admin-password/session prompts and secret generation from `scripts/install-vps.sh`.
+- VPS bootstrap now matches the current local architecture: Discord credentials are entered, Management API and Bot credential secrets are generated, and the local Control Center uses no end-user login.
+- Installer documentation output now points to the loopback Control Center after the health check.
+- Existing Docker/VPS feature set is preserved; this change only removes dead authentication state.
+
+## 2026-10-05 — Docker Lavalink footprint cleanup
+- Docker keeps the second Lavalink service behind the `failover` Compose profile instead of starting it on every normal launch.
+- The default Docker Music topology remains functional with one Lavalink node; `start-local.bat -Lavalink2` explicitly enables the second node and passes both nodes into `LAVALINK_NODES`.
+- Docker release-gate now checks only the primary node by default and validates the second node when `-RequireLavalink2` is requested.
+- The two-node failover capability is preserved; the normal local runtime no longer starts an unnecessary second JVM.
+
+## 2026-10-05 — Technical implementation freeze / start of verification phase
+- The agreed technical scope is now frozen.
+- Completed before testing: legacy Dashboard removal and Control Center consolidation; no-login local admin contract; Docker single-Lavalink default with opt-in failover node; VPS installer/upgrade self-healing secrets; Music Spotify/Yandex provider wiring through LavaSrc; Automation warn/channel-creation actions and scheduler-index fix; AutoMod detector breadth expansion; persisted moderation-channel lock cleanup.
+- Next phase is verification: repository CI, unit/regression coverage expansion, live Discord smoke, native Windows runtime, Lavalink failover, Fleet takeover, VPS clean-host, chaos/soak/security and performance measurements.
+- From this point, a code change should be driven by a failing test, a reproduced runtime defect or an explicitly approved scope addition.
+
+
+## 2026-10-05 — Verification baseline #2442
+- First post-freeze full CI baseline passed end-to-end: dependency audit, source/deployment/observability contracts, typecheck, bot tests, Domain build, Bot build and Dashboard build.
+- Two stale provider expectations were found and corrected in the initial test run; the next full baseline passed with the expanded Spotify/Yandex provider contract.
+- Added regression coverage for AutoMod burst/image-only/YouTube-only detectors, Automation warn/channel creation runtime, and persisted moderation channel-lock cleanup.
+- No new feature scope is being added from this point unless a failing test or reproducible runtime defect requires it.
+
+
+## 2026-10-06 — Native Control Center runtime controls
+
+- Native launcher now starts the full local platform by default, including Control Center; `-NoOpen` only suppresses browser opening and `-NoDashboard` remains available for explicit headless use.
+- Control Center bootstrap now reports Management API HTTP failures instead of silently rendering empty module data.
+- Added bounded in-process bot log buffer (500 entries) with sanitized metadata.
+- Added Management API runtime endpoints for recent bot logs and graceful primary-bot shutdown.
+- Added Control Center System page live bot log panel with 1.5s refresh and a confirmation-protected "Выключить бота" action.
+- Native launcher now exits its batch console on successful startup; failures keep the console available for diagnostics.
+- Updated native setup documentation for runtime logs, shutdown and launcher behavior.
+
+## 2026-10-06 — Native runtime defect fixes: Discord startup, Fleet failover and Management API serialization
+
+- Live native smoke reached a real Discord Gateway-ready state and connected the local Lavalink node; the earlier Discord REST timeout was no longer fatal to startup after moving slash-command registration behind `client.login()` and making command registration failures non-fatal.
+- Live Control Center logs exposed a Fleet SQL defect: the stale-guild failover CTE selected only `guild_id` while `RETURNING` referenced `candidates.bot_identity_id`. Both primary failover and secondary failover now select the current identity and match it in the UPDATE predicate.
+- Hardened Management API JSON responses against PostgreSQL/driver `bigint` values by serializing bigint values as strings.
+- Hardened Management API error handling so an already-ended response is never written again, preventing the observed `ERR_HTTP_HEADERS_SENT` cascade after the BigInt serialization failure.
+- These changes are verification-driven fixes; no new feature scope was added.
+
+## 2026-10-06 — Control Center shutdown response race fix
+- Live testing showed the "Выключить бота" action could report failure even though the shutdown request was accepted.
+- Root cause: Management API returned `200 OK` and immediately started graceful cleanup, which closed the API/process before the Dashboard proxy reliably consumed the response.
+- Shutdown now waits 250 ms after sending the response before beginning cleanup, then waits another 250 ms after cleanup before the final process exit.
+
+## 2026-10-06 — Control Center action/audit pipeline fix
+- Added the missing Dashboard `/api/guilds/[guildId]/audit` proxy required by the Control Center.
+- Made client-side audit refresh best-effort so a successful module/action/settings request is not reported as failed when audit refresh is unavailable.
+- This fixes the observed cascade where module toggles appeared broken because the subsequent audit request failed.
+
+## 2026-10-06 — Native Discord connection retry
+- Native live smoke reproduced a transient Discord `ConnectTimeoutError` during `client.login()`.
+- Bot startup now retries Discord Gateway login up to three times with a short delay and logs each attempt before treating the startup as failed.
+
+## 2026-10-06 — Fix local Dashboard write-action origin validation
+- Live testing showed module toggles and runtime shutdown both failed while GET endpoints remained reachable.
+- Root cause: `assertSameOrigin()` inferred HTTPS whenever `NODE_ENV=production`, but `next start` serves the native Control Center over local HTTP. Protected PUT/POST requests therefore returned `bad_origin`.
+- Origin validation now uses the actual request protocol/host, honoring `X-Forwarded-Proto` when present.
+
+
+## 2026-10-07 — Music/Temporary Voice rework started
+- Continuing from the current development state; no attempt is being made to backfill older unlogged work.
+- Required persistent logging: every substantial implementation, verification result, blocker and architecture decision from this task will be recorded in this file.
+- Requested Temporary Voice behavior:
+  - generated channel names must not add an internal `DSP` prefix;
+  - preserve the member-facing display name;
+  - use the maximum bitrate available to the guild, with the normal non-boosted ceiling of 96 kbps and no artificial boost.
+- Requested Music architecture change:
+  - remove the Lavalink runtime dependency;
+  - use local `yt-dlp` for YouTube discovery/stream resolution and `ffmpeg` for audio decoding;
+  - preserve the existing Discord/dashboard control surface where practical;
+  - keep queue, pause/resume, skip/stop, seek, volume, repeat, autoplay and recovery behavior covered by tests.
+- Initial repository inspection confirmed Temporary Voice already uses `guild.maximumBitrate`; current generated-name helper does not add DSP, but a defensive regression-safe prefix cleanup is still planned.
+- Initial repository inspection confirmed Music is currently implemented around `lavalink-client` and Lavalink node/session state, so the rework is architectural rather than a one-line provider swap.
+
+## 2026-10-07 — Temporary Voice + yt-dlp/FFmpeg Music rework completed
+
+- Current development HEAD: `c49dd0841f199d2c127b503c65d12accedecf730`.
+- Persistent logging rule was followed for this task; no attempt was made to backfill unrelated historical work.
+- Temporary Voice:
+  - generated names now defensively remove legacy `DSP |`, `DSP:` and `DSP_` prefixes while preserving ordinary member display names;
+  - channel creation continues to use the dedicated bitrate helper;
+  - bitrate is capped at `96_000` bps so Temporary Voice never silently consumes boosted-server bitrate capacity;
+  - regression coverage added for legacy DSP prefixes and the 96 kbps ceiling.
+- Music:
+  - replaced the Lavalink-based runtime with a local `yt-dlp + FFmpeg` engine using `@discordjs/voice`;
+  - YouTube search and URL/playlist resolution are performed by yt-dlp;
+  - direct audio stream decoding is performed by FFmpeg into 48 kHz stereo PCM for Discord;
+  - preserved queue, pause/resume, skip/stop, shuffle, repeat, seek, volume, autoplay, filters, controller buttons, persistent queue/player state, restart reconstruction and per-voice bot-identity routing;
+  - retained compatibility conversion for previously persisted Lavalink-style track records so old queue state can be reconstructed.
+- Runtime/deployment:
+  - removed `lavalink-client` and added `@discordjs/voice` + `@discordjs/opus`;
+  - removed Docker Lavalink services and the obsolete `infrastructure/lavalink/application.yml`;
+  - Docker bot image now installs FFmpeg and `yt-dlp[default]`;
+  - native launcher, diagnostics and release gate now install/check yt-dlp + FFmpeg instead of Java/Lavalink;
+  - environment/config, README, Master Plan, Local Setup, Native Setup, Project State and Chat Context were synchronized with the new Music architecture;
+  - Dashboard Music provider choices are now limited to Auto/YouTube and its status text identifies the local yt-dlp + FFmpeg engine.
+- Automated checks:
+  - updated Music regression tests to cover yt-dlp search normalization, FFmpeg arguments, queue helpers, autoplay, resume bounds, filters and local engine identity;
+  - updated Temporary Voice regression tests for DSP cleanup and the 96 kbps cap;
+  - repository code search currently returns no matches for `lavalink-client`, `LAVALINK`, `lavalinkHost`, `lavalinkPort`, `lavalinkNodes`, `youtube_music`, `soundcloud` or `yandex_music`.
+- Verification limitation:
+  - this execution environment has Node.js 22.16.0 while the repository targets Node.js 24.17+;
+  - direct repository cloning/install from the environment is unavailable because external GitHub DNS/network access is blocked;
+  - the GitHub Actions connector exposes read/rerun operations but did not produce a run for the current development push;
+  - temporary draft PR #6 was created solely to trigger the existing CI workflow and was immediately closed after GitHub reported no workflow/status checks;
+  - live Discord/YouTube playback and native Windows validation remain unverified in this environment.
+- Next concrete verification:
+  - run the normal CI workflow on the current development HEAD in a GitHub Actions-capable environment;
+  - run a real Windows smoke test with yt-dlp + FFmpeg;
+  - verify Temporary Voice creation name and 96 kbps bitrate on the user's server;
+  - perform live YouTube playback, seek, reconnect and restart recovery checks.
+
+
+## 2026-10-07 — Discord Voice Opus dependency alignment
+
+### What changed
+- Updated `apps/bot/package.json` from `@discordjs/opus ^0.4.0` to `^0.10.0`.
+- Reason: the installed `prism-media` dependency for `@discordjs/voice 0.19.2` reports `@discordjs/opus 0.4.0` as an invalid peer dependency; the current npm release is 0.10.0.
+
+### Verification status
+- Local `npm install` previously completed, but `npm ls @discordjs/voice @discordjs/opus --all` reported `@discordjs/opus@0.4.0` as invalid.
+- GitHub branch `development` now contains the dependency correction in commit `a7fe901f63f3c952bee4a75593f17264959703c6`.
+- Local machine still needs to refresh `apps/bot/package.json` and run `npm install` so `node_modules` uses the corrected Opus version.
+
+
+## 2026-10-07 — Music multi-source restoration + local verification failures logged
+
+### User requirement clarified
+- Music must not be limited to YouTube.
+- Required direct-source coverage includes TikTok, Яндекс Музыка, VK Музыка, Spotify and SoundCloud, with broader yt-dlp extractor coverage available through Auto/direct URLs.
+
+### Implementation changes
+- Restored Music provider choices: `auto`, `youtube`, `tiktok`, `yandex_music`, `vk_music`, `spotify`, `soundcloud`.
+- Direct URLs are passed to yt-dlp so supported extractors can resolve the source without a Lavalink service.
+- Added SoundCloud text search through yt-dlp's `scsearch` prefix.
+- Added automatic source detection for YouTube, TikTok, Yandex Music, VK, Spotify and SoundCloud URLs.
+- Added a Spotify track metadata bridge: Spotify track URLs are read through Spotify oEmbed and then resolved to a playable equivalent source. This avoids claiming direct Spotify audio extraction when the current yt-dlp tree classifies Spotify media as DRM-protected/unsupported.
+- Restored Dashboard provider options for the same source set.
+- Fixed local TypeScript defects found by the user's real `npm run typecheck`: missing `hasDj` calls, FFmpeg child-process typing, and use of a nonexistent `logger.debug` method.
+- Updated regression tests to remove obsolete Lavalink expectations and cover the multi-source provider set.
+
+### User-provided verification results
+- Node.js: `v24.21.0`.
+- npm: `11.19.0`.
+- FFmpeg is installed at `C:\\ffmpeg\\bin\\ffmpeg.exe` and reports a current 2026 build.
+- `@discordjs/opus@0.10.0` + `@discordjs/voice@0.19.2` install cleanly; `OpusEncoder` initializes successfully.
+- `npm run typecheck` previously failed with 5 concrete errors in `music-yt-dlp.ts`; these are now patched in `development`.
+- `npm test` previously reported 4 failures: three obsolete Lavalink/provider assertions and one FFmpeg argument expectation. Those tests are now patched to match the current architecture.
+- yt-dlp was installed through WinGet as version `2026.08.19`, along with Deno and a WinGet FFmpeg dependency. The current PowerShell session did not yet see the new PATH entry; a new shell is required before `yt-dlp` resolves by name.
+
+### Important external constraint
+- Current yt-dlp supported-site documentation includes TikTok, VK, Yandex Music and SoundCloud extractors, and explicitly notes that support can break when sites change. Spotify is currently listed among known DRM-protected services in yt-dlp's unsupported extractors, so Spotify is handled as metadata/input rather than as a direct audio stream. 
+
+### Next concrete verification
+- Open a new PowerShell session so the WinGet PATH update becomes visible.
+- Run `yt-dlp --version`, a non-downloading metadata lookup for representative provider URLs, then `npm run typecheck` and `npm test` again.
+- Run the native launcher and perform live Discord voice playback smoke tests for YouTube, TikTok, Yandex Music, VK, SoundCloud and a Spotify track link.
+
+
+## 2026-10-07 — Music helper export compatibility fix
+- User's full `npm run typecheck` passed after the multi-source Music changes.
+- User's `npm test` reached 146 passing tests and one test-file failure caused by `detectMusicSearchProvider` being implemented in `music-yt-dlp.ts` but omitted from the compatibility re-export in `music.ts`.
+- Fixed `apps/bot/src/modules/music.ts` to re-export `detectMusicSearchProvider`.
+- Next verification: refresh this one local file and rerun `npm test`.
+
+
+## 2026-10-07 — Music track normalization edge case
+- User's `npm test` reached 156 passing tests with one failure in `normalizeYtDlpEntry` because the fallback YouTube ID validator rejected the fixture ID `abc`.
+- Fixed the fallback URL construction to encode any non-empty extractor ID when a source-specific webpage URL is unavailable.
+- Next verification: refresh `apps/bot/src/modules/music-yt-dlp.ts` locally and rerun `npm test`; expected suite is 166 total tests with 9 integration/environment skips and no failures.
+
+
+## 2026-10-07 — Local Music verification green
+- User machine: Node.js 24.21.0, npm 11.19.0.
+- yt-dlp 2026.08.19 is installed and visible in the refreshed PowerShell PATH.
+- FFmpeg is installed and visible; the machine has both the existing C:\\ffmpeg\\bin build and the WinGet yt-dlp FFmpeg dependency.
+- `npm run typecheck`: PASS.
+- `npm test`: 166 total, 157 passed, 0 failed, 9 skipped.
+- The nine skipped tests are environment/database integration cases and did not fail the suite.
+- Local unit/regression verification for the current multi-source Music implementation is therefore green. Remaining verification is live provider playback and Discord runtime behavior.
+
+
+## 2026-10-07 — Music controller UX fix: no success spam + Repeat restored
+- Fixed Music controller button interactions to acknowledge Discord immediately with `deferUpdate()`, preventing the visible “Приложение не отвечает” state during DB/FFmpeg work.
+- Successful controller clicks no longer send ephemeral `✅ Готово.` messages; the controller message itself is updated as the visible state.
+- Error replies remain ephemeral and are sent only when an operation actually fails or the user lacks control permission.
+- Restored a Repeat button that cycles `off → track → queue → off`.
+- The Repeat button label and the Music embed now show the current repeat mode in Russian.
+- Regression coverage added for the repeat cycle helper.
+
+
+## 2026-10-07 — Prefix Music controller fallback fix
+- Fixed `!play` so the Music controller uses the channel where the prefix command was sent when no preferred Music text channel is configured.
+- The prefix path now explicitly refreshes the controller after queueing/starting playback, so a manual `!play` produces both the queue confirmation and the interactive Music panel.
+- Removed the generic `✅ Готово.` success reply from prefix Music control commands such as `!volume`, `!pause`, `!resume`, `!skip`, `!stop`, `!shuffle`, `!repeat`, `!seek` and `!autoplay`.
+- The controller message is now the success-state UI for these manual controls; user-facing replies remain only for commands that need textual output such as queue/nowplaying or actual errors.
+
+
+## 2026-10-07 — Music provider URL extraction hardening
+- Diagnosed live failures for direct VK and Yandex Music URLs: the metadata path relied only on yt-dlp `--flat-playlist` extraction, and VK's `vk.ru` mirror is not handled by the VK extractor.
+- Added `vk.ru` provider detection and normalization to `vk.com` before yt-dlp extraction.
+- Added a fallback full-source metadata extraction without `--flat-playlist` when direct URL extraction fails, covering album/playlist extractors such as Yandex Music.
+- Added regression coverage for the VK mirror and URL normalization.
+
+
+## 2026-10-07 — Music controller delivery hardening
+- Diagnosed why `!play` could report successful queueing while no Music panel appeared.
+- Controller delivery used only the Discord channel cache and silently swallowed send/edit/fetch errors, making the failure invisible.
+- Controller now falls back to `client.channels.fetch()` when the channel is not cached and logs fetch/edit/send failures.
+- Slash `play` now also assigns the command channel as the controller target when no preferred Music text channel is configured.
+
+## 2026-10-07 — Global Music search `!search` / `!srch`
+- Added prefix commands `!search <query>` and `!srch <query>`.
+- Search aggregates public web-indexed results across YouTube, TikTok, Yandex Music, VK Music, Spotify and SoundCloud.
+- Results are split into separate Discord sections for tracks and playlists/albums/sets.
+- Each result is a clickable URL that can be passed directly to `!play`; playback continues through the local yt-dlp + FFmpeg engine.
+- Because yt-dlp does not provide native text-search for every requested platform, global search uses public web indexing for discovery while yt-dlp remains responsible for direct-source extraction/playback.
+## 2026-10-07 — Music controller TypeScript nullability fix
+- Fixed a strict TypeScript error in the controller channel fallback: `channels.fetch()` failures now resolve to `undefined` instead of `null`, matching the inferred channel variable type.
+- This is a compile-time safety fix only; controller runtime behavior is unchanged.
+
+## 2026-10-07 — Music controller channel fetch type fix follow-up
+- Corrected the previous nullability patch: Discord `channels.fetch()` itself can return `null`, so the fetched value is now normalized with `?? undefined` before assignment.
+- This removes the remaining strict TypeScript `Channel | null | undefined` error without changing controller behavior.
+
+## 2026-10-07 — Music global search and controller verification passed
+- `npm run typecheck` passes for both `packages/domain` and `apps/bot` with zero TypeScript errors.
+- `npm test` passes: 167 total, 158 passed, 0 failed, 9 skipped.
+- The skipped cases are environment-dependent database/integration tests; no test failed.
+- Global Music search classification test passes alongside the existing Music, Temporary Voice, Security, Automation and platform test coverage.
+
+## 2026-10-07 — Music auto-leave timer fix
+- Found that `auto_leave_seconds` was implemented only after queue/track completion, so a newly created Music session with no track never started its idle-leave timer.
+- Found that `!stop` canceled the leave timer, allowing an empty Music session to remain connected indefinitely.
+- Fixed both paths: new Music sessions schedule auto-leave immediately, and `stop` now schedules the configured auto-leave instead of canceling it.
+
+## 2026-10-07 — Music controller delivery fallback
+- Strengthened controller publishing after observing successful `!play` replies without a visible Music panel.
+- Controller now retries with a plain Discord message plus buttons when the embed send/edit fails, which covers missing Embed Links permissions and similar embed-only failures.
+- `!play` and `/play` now pass their command text-channel as a fallback target when the configured preferred Music channel cannot be used.
+- Controller channel fetch/send/edit failures remain logged instead of being silently swallowed.
+
+## 2026-10-07 — Music search routing and playlist continuation fix
+- Found that `!search` / `!srch` were missing from the real `BUILTIN_PREFIX_COMMANDS` router, so the commands could be ignored before reaching the Music module.
+- Added both aliases to the prefix router and to the command-policy definitions as prefix-only Music commands.
+- Added an immediate search status reply, an 8-second timeout for each external web-index request, and more tolerant DuckDuckGo redirect parsing.
+- Fixed playlist progression so a failed track resolution is skipped and the queue continues instead of stopping after the first track.
+- Playlist progression now attempts the full bounded Music queue rather than stopping after ten failed entries.
+
+## 2026-10-07 — Music controller placement and search fallback
+- Music controller target selection now prioritizes the text channel where `!play` or `/play` was issued, preventing a configured preferred channel from hiding the player from the command channel.
+- Global Music search now has native yt-dlp discovery for YouTube and SoundCloud in addition to the web-index search for all configured providers.
+- Web search now tries DuckDuckGo Lite first and the HTML endpoint second, with per-request timeouts and graceful empty-provider fallback.
+
+## 2026-10-07 — Music global search TypeScript cleanup
+- Fixed the native YouTube/SoundCloud global-search result mapping by explicitly typing the final `track` parameter as `MusicTrack`.
+- This resolves the strict TypeScript `noImplicitAny` error without changing runtime search behavior.
+- Existing test suite remains green at 167 total, 158 passed, 0 failed, 9 skipped.
+
+## 2026-10-07 — Music controller ordering and playlist search hardening
+- Changed Music controller publishing so the controller is recreated as the newest Music message, keeping the player panel at the bottom of the channel instead of leaving `🎵 Добавлено в очередь.` after it.
+- `start()` no longer publishes the controller before the `!play`/`/play` confirmation; play handlers now send the confirmation first and then publish the controller.
+- Global playlist discovery now tries Google, Bing, DuckDuckGo Lite and DuckDuckGo HTML, while YouTube/SoundCloud keep their native yt-dlp search fallback.
+- Search-result URL decoding now handles common `uddg`, `q` and `url` redirect parameters.
+
+## 2026-10-07 — Stream Alerts hardening and diagnostics
+- Stream Alerts now performs an immediate poll after Discord reaches `ready` instead of waiting for the first interval tick.
+- Primary bot polling no longer drops unassigned guild alerts; fleet-assigned secondary alerts retain their existing ownership/failover behavior.
+- Discord alert delivery now fetches the target channel when it is not cached and falls back to a plain-text notification when an embed cannot be sent.
+- YouTube monitoring can now fall back to local `yt-dlp` live detection when the YouTube API key is absent or the API request fails.
+- Added a dashboard `Проверить` action for immediate provider diagnostics and exposed `lastCheckedAt` in the alert list.
+- Fixed the management API numeric alert-id route matcher so update/delete/manual-check requests reach the intended alert.
+- Added unit coverage for Stream Alerts provider availability, target normalization and interval bounds.
+
+## 2026-10-07 — Stream Alerts YouTube fallback and dashboard check UI
+- YouTube Stream Alerts now use local `yt-dlp` live detection when the YouTube Data API is unavailable or returns an error; the dashboard no longer blocks YouTube setup when only yt-dlp is available.
+- Added a manual `Проверить` action that immediately polls one alert and refreshes `lastOnline`, `lastCheckedAt` and `lastError`.
+- Updated the dashboard provider hint to reflect the YouTube API/yt-dlp fallback.

@@ -31,7 +31,7 @@ export class Starboard implements PlatformModule {
       this.onReaction(reaction, user)
     );
     const b = context.events.on("interaction.command", (interaction) =>
-      this.onCommand(interaction)
+      this.executeSlashCommand(interaction)
     );
 
     this.unsubscribe = () => {
@@ -40,13 +40,35 @@ export class Starboard implements PlatformModule {
     };
   }
 
+  async handlePrefixCommand(message: import("discord.js").Message, commandName: string, args: string[]): Promise<boolean> {
+    if (commandName !== "starboard") return false;
+    if (!message.guild) return false;
+
+    const sub = (args.shift() ?? "setup").toLowerCase();
+    if (sub !== "setup") {
+      await message.reply("Использование: !starboard setup #канал [threshold]");
+      return true;
+    }
+
+    const channel = message.mentions.channels.first();
+    const threshold = Number(args.find((token) => /^\d+$/.test(token)) ?? 3);
+    if (!channel || channel.type !== 0) {
+      await message.reply("Укажи текстовый канал: !starboard setup #канал 3");
+      return true;
+    }
+
+    await this.configure(message.guild.id, channel.id, threshold);
+    await message.reply("Starboard настроен и включён.");
+    return true;
+  }
+
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "starboard") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "starboard") return;
 
     if (!interaction.memberPermissions?.has("ManageGuild")) {
       await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
@@ -208,6 +230,38 @@ export class Starboard implements PlatformModule {
         error: String(error)
       });
     });
+  }
+
+  async dashboardConfig(guildId: string): Promise<{ channelId: string | null; threshold: number; ignoreSelfReaction: boolean; ignoreBots: boolean }> {
+    const config = await this.getConfig(guildId);
+    return config
+      ? config
+      : { channelId: null, threshold: 3, ignoreSelfReaction: true, ignoreBots: true };
+  }
+
+  async dashboardConfigure(guildId: string, patch: Partial<Omit<StarboardConfig, "channelId">> & { channelId?: string | null }): Promise<void> {
+    const current = await this.dashboardConfig(guildId);
+    const channelId = patch.channelId === undefined ? current.channelId : patch.channelId;
+    if (!channelId || !/^\d{15,25}$/.test(channelId)) throw new Error("starboard_channel_required");
+
+    const threshold = Math.min(Math.max(Math.floor(Number(patch.threshold ?? current.threshold)), 1), 100);
+    await this.db.query(
+      `INSERT INTO starboard_settings(guild_id,channel_id,threshold,ignore_self_reaction,ignore_bots)
+       VALUES($1,$2,$3,$4,$5)
+       ON CONFLICT(guild_id) DO UPDATE SET
+         channel_id=EXCLUDED.channel_id,
+         threshold=EXCLUDED.threshold,
+         ignore_self_reaction=EXCLUDED.ignore_self_reaction,
+         ignore_bots=EXCLUDED.ignore_bots,
+         updated_at=now()`,
+      [guildId, channelId, threshold, patch.ignoreSelfReaction ?? current.ignoreSelfReaction, patch.ignoreBots ?? current.ignoreBots]
+    );
+    await this.db.query(
+      `INSERT INTO guild_modules(guild_id,module_key,enabled)
+       VALUES($1,'starboard',true)
+       ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()`,
+      [guildId]
+    );
   }
 
   async configure(

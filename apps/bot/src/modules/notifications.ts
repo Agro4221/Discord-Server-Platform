@@ -64,6 +64,7 @@ export class Notifications implements PlatformModule {
   }
 
   async addFeed(guildId: string, channelId: string, url: string, intervalSeconds: number): Promise<NotificationFeedRecord> {
+    await assertSafeFeedTarget(this.client, guildId, channelId);
     await assertSafeFeedUrl(url);
     const safeInterval = Math.min(Math.max(Math.trunc(intervalSeconds), 60), 86_400);
     const result = await this.db.query<{ id: string }>(
@@ -84,8 +85,9 @@ export class Notifications implements PlatformModule {
   }
 
   async updateFeed(guildId: string, id: number, patch: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean }): Promise<boolean> {
-    if (patch.url !== undefined) await assertSafeFeedUrl(patch.url);
     const current = (await this.listFeeds(guildId)).find((item) => item.id === id);
+    if (patch.channelId !== undefined) await assertSafeFeedTarget(this.client, guildId, patch.channelId);
+    if (patch.url !== undefined) await assertSafeFeedUrl(patch.url);
     if (!current) return false;
     await this.db.query(
       `UPDATE notification_feeds
@@ -108,10 +110,44 @@ export class Notifications implements PlatformModule {
     return result.rowCount === 1;
   }
 
+  async handlePrefixCommand(message: import("discord.js").Message, commandName: string, args: string[]): Promise<boolean> {
+    if (commandName !== "feed") return false;
+    if (!message.guild) return false;
+
+    if (!await moduleEnabled(this.db, message.guild.id, "notifications", false)) {
+      await message.reply("Модуль Notifications выключен.");
+      return true;
+    }
+
+    const sub = (args.shift() ?? "add").toLowerCase();
+    if (sub !== "add") {
+      await message.reply("Использование: !feed add <https://feed> #канал [minutes]");
+      return true;
+    }
+
+    const url = args.find((token) => /^https:\/\//i.test(token));
+    const channel = message.mentions.channels.first();
+    const minutesToken = args.find((token) => /^\d+$/.test(token));
+    const minutes = minutesToken ? Number(minutesToken) : 5;
+
+    if (!url || !channel || channel.type !== ChannelType.GuildText) {
+      await message.reply("Пример: !feed add https://example.com/feed.xml #news 5");
+      return true;
+    }
+
+    try {
+      await this.addFeed(message.guild.id, channel.id, url, minutes * 60);
+      await message.reply("Feed добавлен. Проверка начнётся автоматически.");
+    } catch (error) {
+      await message.reply("Не удалось добавить feed: " + String(error).replace(/^Error:\s*/i, ""));
+    }
+    return true;
+  }
+
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
     this.identityId = context.identityId;
-    this.unsubscribe = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    this.unsubscribe = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     this.timer = setInterval(() => void this.pollAll(), 30_000);
     this.timer.unref();
   }
@@ -124,8 +160,8 @@ export class Notifications implements PlatformModule {
     this.client = undefined;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "feed") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "feed") return;
     if (!await moduleEnabled(this.db, interaction.guild!.id, "notifications", false)) {
       await interaction.reply({ content: "Модуль Notifications выключен.", ephemeral: true });
       return;
@@ -304,7 +340,7 @@ function normalizeFeedEntries(document: Record<string, any>): { key: string; tit
   });
 }
 
-async function assertSafeFeedUrl(raw: string): Promise<void> {
+export async function assertSafeFeedUrl(raw: string): Promise<void> {
   let url: URL;
   try {
     url = new URL(raw);
@@ -393,4 +429,21 @@ function ipv4FromMappedHex(value: string): string {
     (second >> 8) & 255,
     second & 255
   ].join(".");
+}
+
+
+async function assertSafeFeedTarget(
+  client: Client | undefined,
+  guildId: string,
+  channelId: string
+): Promise<void> {
+  if (!/^\d{15,25}$/.test(channelId)) throw new Error("invalid_feed_channel");
+  const guild = client?.guilds.cache.get(guildId);
+  const channel = guild?.channels.cache.get(channelId);
+  const me = guild?.members.me;
+  if (!guild || !channel || (channel.type !== 0 && channel.type !== 5)) throw new Error("feed_channel_invalid");
+  const permissions = channel.permissionsFor(me ?? guild.roles.everyone);
+  if (!me || !permissions?.has("ViewChannel") || !permissions.has("SendMessages")) {
+    throw new Error("feed_channel_forbidden");
+  }
 }

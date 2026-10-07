@@ -4,6 +4,71 @@ import { PermissionFlagsBits } from "discord.js";
 import { buildCommands } from "../src/discord/commands.js";
 import { Moderation } from "../src/modules/moderation.js";
 
+test("Moderation unlock clears the durable channel-lock record", async () => {
+  const queries: Array<{ text: string; values: readonly unknown[] }> = [];
+  const db = {
+    async query<T>(text: string, values: readonly unknown[] = []) {
+      queries.push({ text, values });
+      if (text.includes("SELECT previous_send_messages")) {
+        return { rows: [{ previous_send_messages: true }] as T[], rowCount: 1 };
+      }
+      return { rows: [] as T[], rowCount: 1 };
+    }
+  } as unknown as import("../src/database.js").Database;
+
+  const edited: Array<boolean | null> = [];
+  const moderation = new Moderation(db);
+  const state = moderation as unknown as {
+    client: {
+      guilds: {
+        cache: Map<string, {
+          channels: { cache: Map<string, unknown> };
+          members: { me: {
+            permissions: { has: (permission: unknown) => boolean };
+          } | null };
+          roles: { everyone: unknown };
+        }>;
+      };
+    };
+  };
+  state.client = {
+    guilds: {
+      cache: new Map([["guild-1", {
+        channels: {
+          cache: new Map([["123456789012345678", {
+            type: 0,
+            permissionsFor: () => ({ has: () => true }),
+            permissionOverwrites: {
+              edit: async (_role: unknown, permissions: { SendMessages: boolean | null }) => {
+                edited.push(permissions.SendMessages);
+              }
+            }
+          }]])
+        },
+        members: {
+          me: {
+            permissions: { has: () => true }
+          }
+        },
+        roles: { everyone: {} }
+      }]])
+    }
+  };
+
+  const result = await moderation.dashboardChannelAction(
+    "guild-1",
+    "123456789012345678",
+    "unlock"
+  );
+
+  assert.deepEqual(result, {
+    action: "unlock",
+    channelId: "123456789012345678"
+  });
+  assert.deepEqual(edited, [true]);
+  assert.ok(queries.some((query) => query.text.startsWith("DELETE FROM moderation_channel_locks")));
+});
+
 test("moderate slash command exposes unban", () => {
   const command = buildCommands().find((item) => item.name === "moderate");
   assert.ok(command);

@@ -9,7 +9,9 @@ import type { AppConfig } from "./config.js";
 import type { Database } from "./database.js";
 import type { ModuleContext, PlatformModule } from "./module.js";
 import { buildCommands } from "./discord/commands.js";
+import { moduleEnabled } from "./module-utils.js";
 import { logger } from "./logger.js";
+import type { CommandDispatcher } from "./command-dispatcher.js";
 
 export type CustomCommandAction = "response" | "alias" | "add_role" | "remove_role" | "toggle_role";
 
@@ -54,11 +56,16 @@ export class CustomCommandService implements PlatformModule {
   readonly name = "custom-commands";
   private unsubscribe?: () => void;
   private readonly cooldowns = new Map<string, number>();
+  private dispatcher?: CommandDispatcher;
 
   constructor(
     private readonly db: Database,
     private readonly config: AppConfig
   ) {}
+
+  attachDispatcher(dispatcher: CommandDispatcher): void {
+    this.dispatcher = dispatcher;
+  }
 
   async init(context: ModuleContext): Promise<void> {
     const a = context.events.on("interaction.command", (interaction) => this.handleSlash(interaction));
@@ -83,6 +90,7 @@ export class CustomCommandService implements PlatformModule {
   }
 
   async findPrefix(guildId: string, name: string): Promise<CustomCommandRecord | null> {
+    if (!await moduleEnabled(this.db, guildId, "custom-commands", true)) return null;
     const normalized = normalizeName(name);
     const result = await this.db.query<Record<string, unknown>>(
       `SELECT id,guild_id,name,aliases,description,enabled,prefix_enabled,slash_enabled,
@@ -326,10 +334,12 @@ export class CustomCommandService implements PlatformModule {
     }
 
     if (command.actionType === "alias") {
-      await interaction.reply({
-        content: "Alias-команды подключаются к встроенным командам через единый command router. Для этого custom command использует target " + (command.aliasTarget ?? "unknown") + ".",
-        ephemeral: true
-      });
+      const target = command.aliasTarget;
+      if (!target || !this.dispatcher) {
+        await interaction.reply({ content: "Alias target недоступен.", ephemeral: true });
+        return;
+      }
+      await this.dispatcher.executeSlash(interaction, target);
       return;
     }
 
@@ -345,10 +355,11 @@ export class CustomCommandService implements PlatformModule {
   }
 
   private async findSlash(guildId: string, name: string): Promise<CustomCommandRecord | null> {
+    if (!await moduleEnabled(this.db, guildId, "custom-commands", true)) return null;
     const result = await this.db.query<Record<string, unknown>>(
       `SELECT id,guild_id,name,aliases,description,enabled,prefix_enabled,slash_enabled,
               action_type,response,alias_target,allowed_role_ids,allowed_channel_ids,
-              cooldown_seconds,discord_command_id,created_at,updated_at
+              cooldown_seconds,role_id,discord_command_id,created_at,updated_at
        FROM custom_commands
        WHERE guild_id=$1 AND name=$2 AND enabled=true AND slash_enabled=true
        LIMIT 1`,
@@ -381,25 +392,35 @@ export class CustomCommandService implements PlatformModule {
       return;
     }
 
-    const builder = new SlashCommandBuilder()
-      .setName(command.name)
-      .setDescription(command.description || "Custom server command")
-      .addStringOption((option) =>
-        option.setName("args").setDescription("Optional command arguments")
-      );
+    const targetBuilder = command.actionType === "alias"
+      ? buildCommands().find((candidate) => candidate.name === command.aliasTarget)
+      : null;
+    if (command.actionType === "alias" && !targetBuilder) {
+      throw new Error("custom_command_alias_target_unknown");
+    }
+
+    const targetJson = targetBuilder?.toJSON();
+    const builder = targetJson
+      ? { ...targetJson, name: command.name, description: command.description || targetJson.description }
+      : new SlashCommandBuilder()
+          .setName(command.name)
+          .setDescription(command.description || "Custom server command")
+          .addStringOption((option) =>
+            option.setName("args").setDescription("Optional command arguments")
+          ).toJSON();
 
     const rest = new REST({ version: "10" }).setToken(this.config.discordToken);
     if (command.discordCommandId) {
       await rest.patch(
         Routes.applicationGuildCommand(this.config.discordClientId, guildId, command.discordCommandId),
-        { body: builder.toJSON() }
+        { body: builder }
       );
       return;
     }
 
     const created = await rest.post(
       Routes.applicationGuildCommands(this.config.discordClientId, guildId),
-      { body: builder.toJSON() }
+      { body: builder }
     ) as { id: string };
 
     await this.db.query(
@@ -458,12 +479,20 @@ function validateInput(input: CustomCommandInput): Required<Omit<CustomCommandIn
 
   const aliases = (input.aliases ?? []).map(normalizeName).filter(Boolean);
   if (aliases.some((alias) => !/^[a-z0-9_-]{1,32}$/.test(alias))) throw new Error("invalid_custom_command_alias");
+  const builtIn = new Set(buildCommands().map((command) => command.name));
+  if (builtIn.has(name) || aliases.some((alias) => builtIn.has(alias))) {
+    throw new Error("custom_command_name_conflicts_with_builtin");
+  }
   if (new Set([name, ...aliases]).size !== aliases.length + 1) throw new Error("duplicate_custom_command_alias");
 
   const description = (input.description ?? "").trim().slice(0, 100);
   const response = (input.response ?? "").slice(0, 2000);
   const actionType = input.actionType ?? "response";
   const aliasTarget = input.aliasTarget ? normalizeName(input.aliasTarget) : null;
+  if (actionType !== "alias" && aliasTarget) throw new Error("custom_command_alias_target_not_allowed");
+  if (actionType === "alias" && aliasTarget && !buildCommands().some((command) => command.name === aliasTarget)) {
+    throw new Error("custom_command_alias_target_unknown");
+  }
   const roleId = input.roleId ? input.roleId : null;
   if (actionType === "response" && !response) throw new Error("custom_command_response_required");
   if (actionType === "alias" && !aliasTarget) throw new Error("custom_command_alias_target_required");

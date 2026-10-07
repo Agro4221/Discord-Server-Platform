@@ -1,100 +1,50 @@
-# Implementation Strategy
+# Implementation & Completion Strategy
 
-The product is intentionally developed as one large coherent private build. We do not optimize for many public mini-releases.
+## Product north star
+The platform is a self-hosted replacement for the usual stack of third-party Discord bots and their premium subscriptions. We combine the most useful capabilities seen across Carl-bot, Juniper, MEE6, ProBot, Jockie Music and similar products into one integrated system.
+The implementation is our own. We borrow product ideas and UX patterns, not proprietary code.
 
-## Development phase — build the whole product
+## Completion rule
+A capability is considered complete only when it is wired through the appropriate layers:
 
-Implement the complete planned feature set and shared architecture before entering the formal stabilization cycle:
+- Domain/Core behaviour;
+- persistence where state must survive restart;
+- permission and hierarchy checks;
+- Management API where administration is required;
+- Control Center where an administrative UI is appropriate;
+- audit/recovery where applicable;
+- regression coverage.
+Discord commands remain fast/user-facing entry points. Control Center is the primary local administration surface.
 
-- Core Discord platform
-- Local dashboard
-- Temporary Voice
-- Moderation and infractions
-- AutoMod
-- Security / anti-raid / anti-nuke
-- Roles and role panels
-- Welcome / verification
-- Leveling
-- Tickets and forms
-- Giveaways
-- Starboard
-- Economy
-- Reminders / utility
-- Notifications / feeds
-- Automation engine
-- Music platform
-- Lavalink integration
-- YouTube and other provider adapters
-- Multi-guild music
-- Multi-bot identity management for multiple voice channels in one guild
-- Analytics
-- Export/import
-- Recovery/reconciliation
-- Backup/restore tooling
-- VPS/Docker deployment path
+## Current release phase
+The repository is in **release-candidate mode**. Functional expansion is not allowed to grow without a concrete reason.
 
-Verification is continuous and aggressive throughout development. Every subsystem gets static checks, unit tests, integration tests where applicable, negative-path tests, permission tests, persistence/restart checks, and regression coverage as soon as its behavior exists. We still keep a later feature-freeze stabilization phase, but defects are fixed immediately rather than deliberately accumulated. The final QA phase is for exhaustive cross-module, adversarial, chaos, soak, security and recovery verification across the complete product.
+Current release-gate work is environment-dependent:
 
-## Stabilization phase — test everything
+- live Discord E2E;
+- real Lavalink restart/resume and multi-node failover;
+- real multi-bot takeover;
+- native Windows runtime acceptance;
+- clean-host VPS install/upgrade;
+- controlled chaos/soak/security runs.
 
-After the feature set is functionally complete, freeze feature work and run a dedicated QA/stabilization pass.
+## Post-RC functional depth
+Only explicit, useful gaps should become new feature slices. The currently known breadth/depth areas are:
 
-### Functional testing
-Test every module through its normal UI and commands.
+1. deeper AutoMod/Security response policies;
+2. broader Automation conditions/actions;
+3. wider Music providers and full multi-node failover;
+4. deeper Fleet orchestration/failover;
+5. production VPS workflow hardening.
 
-### Integration testing
-Test cross-module workflows such as:
-- member joins -> verification -> role assignment
-- temporary voice -> ownership -> cleanup -> restart recovery
-- moderation -> infraction history -> escalation -> logging
-- ticket -> claim -> transcript -> close
-- music -> provider -> Lavalink -> player controls -> recovery
-- automation -> event -> conditions -> actions -> audit log
+## Work method
+Use small independent slices:
 
-### Failure testing
-Intentionally:
-- kill/restart bot
-- disconnect Discord Gateway
-- disconnect database
-- stop/restart Lavalink
-- remove managed Discord resources
-- remove required permissions
-- provide malformed dashboard input
-- cause provider timeouts/errors
-- simulate stale/orphaned state
+1. inspect the existing contract;
+2. implement one coherent change;
+3. add focused regression tests;
+4. run/verify CI;
+5. update continuity documentation;
+6. continue only after the slice is green.
 
-### Security testing
-- permission boundaries
-- dashboard authentication/RBAC
-- session handling
-- CSRF
-- rate limits
-- secret leakage checks
-- log redaction
-- dangerous automation combinations
-
-### Performance testing
-Measure:
-- startup
-- command latency
-- dashboard response times
-- DB query behavior
-- memory growth
-- concurrent guild activity
-- multiple music sessions
-
-### Recovery testing
-Verify the system can reconstruct durable state after process/service restarts and degrade gracefully when an external provider is unavailable.
-
-## Finalization
-
-Only after the stabilization cycle:
-1. Fix discovered defects.
-2. Re-run the affected and full regression suites.
-3. Run backup/restore drill.
-4. Produce local installation documentation.
-5. Produce optional VPS deployment documentation.
-6. Tag the first release candidate.
-7. Decide whether/when the project should become public.
-
-The first public version should be a coherent product, not a snapshot of unfinished development.
+Avoid mass rewrites and speculative abstraction. Preserve working functionality while removing redundant work, stale code and contradictory documentation.

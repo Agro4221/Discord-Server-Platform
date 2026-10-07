@@ -15,39 +15,6 @@ services:
       retries: 20
     networks: [dsp]
 
-  lavalink:
-    image: ghcr.io/lavalink-devs/lavalink:4.2.2
-    restart: unless-stopped
-    environment:
-      _JAVA_OPTIONS: "-Xms256m -Xmx768m"
-      LAVALINK_SERVER_PASSWORD: ${LAVALINK_PASSWORD:-change-me-local}
-    volumes:
-      - ./infrastructure/lavalink/application.yml:/opt/Lavalink/application.yml:ro
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS -H \"Authorization: $(printenv LAVALINK_SERVER_PASSWORD)\" http://127.0.0.1:2333/version >/dev/null"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
-      start_period: 20s
-    networks: [dsp]
-
-  lavalink2:
-    image: ghcr.io/lavalink-devs/lavalink:4.2.2
-    restart: unless-stopped
-    environment:
-      _JAVA_OPTIONS: "-Xms256m -Xmx768m"
-      LAVALINK_SERVER_PASSWORD: ${LAVALINK_PASSWORD:-change-me-local}
-      SERVER_PORT: 2334
-    volumes:
-      - ./infrastructure/lavalink/application.yml:/opt/Lavalink/application.yml:ro
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS -H \"Authorization: $(printenv LAVALINK_SERVER_PASSWORD)\" http://127.0.0.1:2334/version >/dev/null"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
-      start_period: 20s
-    networks: [dsp]
-
   bot:
     build:
       context: .
@@ -57,12 +24,8 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change-me-postgres}@postgres:5432/discord_platform
-      LAVALINK_HOST: lavalink
-      LAVALINK_PORT: 2333
-      LAVALINK_NODES: '[{"id":"local","host":"lavalink","port":2333,"password":"${LAVALINK_PASSWORD:-change-me-local}"},{"id":"local-2","host":"lavalink2","port":2334,"password":"${LAVALINK_PASSWORD:-change-me-local}"}]'
       HEALTH_HOST: 0.0.0.0
       MANAGEMENT_API_HOST: 0.0.0.0
-      DSP_CONTAINERIZED: "true"
       MANAGEMENT_API_KEY: ${MANAGEMENT_API_KEY}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3001/health >/dev/null"]
@@ -71,10 +34,6 @@ services:
       retries: 20
     depends_on:
       postgres:
-        condition: service_healthy
-      lavalink:
-        condition: service_healthy
-      lavalink2:
         condition: service_healthy
     ports:
       - "127.0.0.1:${HEALTH_PORT:-3001}:3001"
@@ -90,8 +49,6 @@ services:
       BOT_HEALTH_URL: http://bot:3001/health
       MANAGEMENT_API_URL: http://bot:3002
       MANAGEMENT_API_KEY: ${MANAGEMENT_API_KEY}
-      DASHBOARD_ADMIN_PASSWORD: ${DASHBOARD_ADMIN_PASSWORD:-}
-      DASHBOARD_AUTH_REQUIRED: ${DASHBOARD_AUTH_REQUIRED:-false}
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/"]
       interval: 10s

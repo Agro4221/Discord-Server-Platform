@@ -1,9 +1,12 @@
 import { PermissionFlagsBits, type ChatInputCommandInteraction, type Message } from "discord.js";
 import type { Database } from "../database.js";
 import type { ModuleContext, PlatformModule } from "../module.js";
+import type { PlatformEventBus } from "../events.js";
 import type { AuditLog } from "../audit.js";
 import { moduleEnabled } from "../module-utils.js";
 import { logger } from "../logger.js";
+
+type RecentMessage = { content: string; timestamp: number };
 
 type AutoModConfig = {
   enabled: boolean;
@@ -21,6 +24,31 @@ type AutoModConfig = {
   exemptRoleIds: string;
   deleteMessage: boolean;
   timeoutMinutes: number;
+};
+
+type AutoModRuleRuntime = {
+  detector: string;
+  threshold: number | null;
+  windowSeconds: number | null;
+  action: "delete" | "timeout" | "warn" | "log" | "ban";
+  timeoutMinutes: number;
+  affectedRoleIds: string[];
+  ignoredRoleIds: string[];
+  affectedChannelIds: string[];
+  ignoredChannelIds: string[];
+  ignoreModerators: boolean;
+  logChannelId: string | null;
+  messageTemplate: string;
+};
+
+type AutoModConfigCacheEntry = {
+  config: AutoModConfig;
+  expiresAt: number;
+};
+
+type AutoModRulesCacheEntry = {
+  rules: AutoModRuleRuntime[];
+  expiresAt: number;
 };
 
 const defaultConfig: AutoModConfig = {
@@ -45,28 +73,75 @@ export class AutoMod implements PlatformModule {
   readonly name = "automod";
   private unsubscribe?: () => void;
   private readonly recent = new Map<string, { content: string; timestamp: number }[]>();
+  private readonly configCache = new Map<string, AutoModConfigCacheEntry>();
+  private readonly rulesCache = new Map<string, AutoModRulesCacheEntry>();
   private inspectedMessages = 0;
   private auditLog?: AuditLog;
+  private events?: PlatformEventBus;
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.auditLog = context.auditLog;
+    this.events = context.events;
     const a = context.events.on("message.create", (message) => this.inspect(message));
-    const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
+    const b = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
     this.unsubscribe = () => { a(); b(); };
+  }
+
+  async handlePrefixCommand(message: import("discord.js").Message, commandName: string, args: string[]): Promise<boolean> {
+    if (commandName !== "automod") return false;
+    if (!message.guild) return false;
+
+    const sub = (args.shift() ?? "setup").toLowerCase();
+    if (sub !== "setup") {
+      await message.reply("Использование: !automod setup [--words=слово1,слово2] [--mentions=6] [--caps=0.85] [--repeats=5] [--window=10] [--delete|--no-delete] [--timeout=0]");
+      return true;
+    }
+
+    const values = new Map<string, string>();
+    let deleteMessage: boolean | undefined;
+    for (const token of args) {
+      const match = /^--([a-z-]+)=(.+)$/i.exec(token);
+      if (match) values.set(match[1]!.toLowerCase(), match[2]!);
+      else if (token.toLowerCase() === "--delete") deleteMessage = true;
+      else if (token.toLowerCase() === "--no-delete") deleteMessage = false;
+    }
+
+    const blocked = values.get("words");
+    const maxMentions = values.get("mentions");
+    const capsRatio = values.get("caps");
+    const repeats = values.get("repeats");
+    const window = values.get("window");
+    const timeout = values.get("timeout");
+
+    const patch: Partial<AutoModConfig> = { enabled: true };
+    if (blocked !== undefined) patch.blockedWords = blocked.split(/[,\n]/).map((item) => item.trim()).filter(Boolean).slice(0, 500);
+    if (maxMentions !== undefined && Number.isFinite(Number(maxMentions))) patch.maxMentions = Number(maxMentions);
+    if (capsRatio !== undefined && Number.isFinite(Number(capsRatio))) patch.maxCapsRatio = Number(capsRatio);
+    if (repeats !== undefined && Number.isFinite(Number(repeats))) patch.maxRepeatedMessages = Number(repeats);
+    if (window !== undefined && Number.isFinite(Number(window))) patch.repeatedWindowSeconds = Number(window);
+    if (timeout !== undefined && Number.isFinite(Number(timeout))) patch.timeoutMinutes = Number(timeout);
+    if (deleteMessage !== undefined) patch.deleteMessage = deleteMessage;
+
+    await this.configure(message.guild.id, patch);
+    await message.reply("AutoMod настроен и включён.");
+    return true;
   }
 
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.recent.clear();
+    this.configCache.clear();
+    this.rulesCache.clear();
     this.inspectedMessages = 0;
     this.auditLog = undefined;
+    this.events = undefined;
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "automod") return;
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "automod") return;
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
       await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
       return;
@@ -94,13 +169,14 @@ export class AutoMod implements PlatformModule {
     enabled: boolean;
     threshold: number | null;
     windowSeconds: number | null;
-    action: "delete" | "timeout" | "warn" | "log";
+    action: "delete" | "timeout" | "warn" | "log" | "ban";
     timeoutMinutes: number;
     affectedRoleIds: string[];
     ignoredRoleIds: string[];
     affectedChannelIds: string[];
     ignoredChannelIds: string[];
     ignoreModerators: boolean;
+    logChannelId: string | null;
     messageTemplate: string;
   }>> {
     const result = await this.db.query<{
@@ -109,16 +185,17 @@ export class AutoMod implements PlatformModule {
       enabled: boolean;
       threshold: string | number | null;
       window_seconds: number | null;
-      action: "delete" | "timeout" | "warn" | "log";
+      action: "delete" | "timeout" | "warn" | "log" | "ban";
       timeout_minutes: number;
       affected_role_ids: string[];
       ignored_role_ids: string[];
       affected_channel_ids: string[];
       ignored_channel_ids: string[];
       ignore_moderators: boolean;
+      log_channel_id: string | null;
       message_template: string;
     }>(
-      "SELECT id,detector,enabled,threshold,window_seconds,action,timeout_minutes,affected_role_ids,ignored_role_ids,affected_channel_ids,ignored_channel_ids,ignore_moderators,message_template FROM automod_rules WHERE guild_id=$1 ORDER BY detector",
+      "SELECT id,detector,enabled,threshold,window_seconds,action,timeout_minutes,affected_role_ids,ignored_role_ids,affected_channel_ids,ignored_channel_ids,ignore_moderators,log_channel_id,message_template FROM automod_rules WHERE guild_id=$1 ORDER BY detector",
       [guildId]
     );
 
@@ -135,6 +212,7 @@ export class AutoMod implements PlatformModule {
       affectedChannelIds: row.affected_channel_ids ?? [],
       ignoredChannelIds: row.ignored_channel_ids ?? [],
       ignoreModerators: row.ignore_moderators,
+      logChannelId: row.log_channel_id ?? null,
       messageTemplate: row.message_template
     }));
   }
@@ -146,30 +224,32 @@ export class AutoMod implements PlatformModule {
       enabled?: boolean;
       threshold?: number | null;
       windowSeconds?: number | null;
-      action?: "delete" | "timeout" | "warn" | "log";
+      action?: "delete" | "timeout" | "warn" | "log" | "ban";
       timeoutMinutes?: number;
       affectedRoleIds?: string[];
       ignoredRoleIds?: string[];
       affectedChannelIds?: string[];
       ignoredChannelIds?: string[];
       ignoreModerators?: boolean;
+      logChannelId?: string | null;
       messageTemplate?: string;
     }
   ): Promise<void> {
     const detector = input.detector.trim().toLowerCase();
     const supported = new Set([
-      "bad-words","links","invites","scam","repeated-text","caps","emotes",
-      "mentions","zalgo","honeypot","line-length","link-count","mention-count","emoji-count"
+      "bad-words","links","invites","scam","repeated-text","spam-burst","caps","emotes",
+      "mentions","zalgo","honeypot","image-only","youtube-only","line-length","link-count","mention-count","emoji-count"
     ]);
     if (!supported.has(detector)) throw new Error("unsupported_automod_detector");
 
     const action = input.action ?? "delete";
+    if (action === "log" && !input.logChannelId) throw new Error("automod_log_channel_required");
     const threshold = input.threshold === undefined || input.threshold === null ? null : Number(input.threshold);
-    const windowSeconds = input.windowSeconds === undefined || input.windowSeconds === null ? null : Math.floor(input.windowSeconds);
+    const windowSeconds = input.windowSeconds === undefined || input.windowSeconds === null ? null : clampAutoModWindowSeconds(input.windowSeconds);
     const timeoutMinutes = Math.min(Math.max(Math.floor(input.timeoutMinutes ?? 0),0),40320);
 
     await this.db.query(
-      "INSERT INTO automod_rules(guild_id,detector,enabled,threshold,window_seconds,action,timeout_minutes,affected_role_ids,ignored_role_ids,affected_channel_ids,ignored_channel_ids,ignore_moderators,message_template) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(guild_id,detector) DO UPDATE SET enabled=EXCLUDED.enabled,threshold=EXCLUDED.threshold,window_seconds=EXCLUDED.window_seconds,action=EXCLUDED.action,timeout_minutes=EXCLUDED.timeout_minutes,affected_role_ids=EXCLUDED.affected_role_ids,ignored_role_ids=EXCLUDED.ignored_role_ids,affected_channel_ids=EXCLUDED.affected_channel_ids,ignored_channel_ids=EXCLUDED.ignored_channel_ids,ignore_moderators=EXCLUDED.ignore_moderators,message_template=EXCLUDED.message_template,updated_at=now()",
+      "INSERT INTO automod_rules(guild_id,detector,enabled,threshold,window_seconds,action,timeout_minutes,affected_role_ids,ignored_role_ids,affected_channel_ids,ignored_channel_ids,ignore_moderators,log_channel_id,message_template) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT(guild_id,detector) DO UPDATE SET enabled=EXCLUDED.enabled,threshold=EXCLUDED.threshold,window_seconds=EXCLUDED.window_seconds,action=EXCLUDED.action,timeout_minutes=EXCLUDED.timeout_minutes,affected_role_ids=EXCLUDED.affected_role_ids,ignored_role_ids=EXCLUDED.ignored_role_ids,affected_channel_ids=EXCLUDED.affected_channel_ids,ignored_channel_ids=EXCLUDED.ignored_channel_ids,ignore_moderators=EXCLUDED.ignore_moderators,log_channel_id=EXCLUDED.log_channel_id,message_template=EXCLUDED.message_template,updated_at=now()",
       [
         guildId,
         detector,
@@ -183,6 +263,7 @@ export class AutoMod implements PlatformModule {
         cleanIds(input.affectedChannelIds),
         cleanIds(input.ignoredChannelIds),
         input.ignoreModerators !== false,
+        input.logChannelId ?? null,
         (input.messageTemplate ?? "").slice(0,1000)
       ]
     );
@@ -191,16 +272,22 @@ export class AutoMod implements PlatformModule {
       "INSERT INTO guild_modules(guild_id,module_key,enabled) VALUES($1,'automod',true) ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=true,updated_at=now()",
       [guildId]
     );
+    this.rulesCache.delete(guildId);
   }
 
   async deleteRule(guildId: string, id: number): Promise<boolean> {
     const result = await this.db.query("DELETE FROM automod_rules WHERE guild_id=$1 AND id=$2", [guildId,id]);
+    if (result.rowCount === 1) this.rulesCache.delete(guildId);
     return result.rowCount === 1;
   }
 
   async configure(guildId: string, patch: Partial<AutoModConfig>): Promise<void> {
     const current = await this.getConfig(guildId);
-    const next = { ...current, ...patch };
+    const next: AutoModConfig = {
+      ...current,
+      ...patch,
+      repeatedWindowSeconds: clampAutoModWindowSeconds(patch.repeatedWindowSeconds ?? current.repeatedWindowSeconds)
+    };
     await this.db.query(
       `INSERT INTO automod_settings
        (guild_id,enabled,blocked_words,max_mentions,max_caps_ratio,max_repeated_messages,
@@ -246,9 +333,17 @@ export class AutoMod implements PlatformModule {
        ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=now()`,
       [guildId, next.enabled]
     );
+    this.configCache.set(guildId, {
+      config: next,
+      expiresAt: Date.now() + 15_000
+    });
   }
 
   async getConfig(guildId: string): Promise<AutoModConfig> {
+    const now = Date.now();
+    const cached = this.configCache.get(guildId);
+    if (cached && cached.expiresAt > now) return cached.config;
+
     const result = await this.db.query<{
       enabled: boolean;
       blocked_words: string[] | null;
@@ -273,15 +368,21 @@ export class AutoMod implements PlatformModule {
       [guildId]
     );
     const row = result.rows[0];
-    if (!row) return defaultConfig;
+    if (!row) {
+      this.configCache.set(guildId, {
+        config: defaultConfig,
+        expiresAt: now + 15_000
+      });
+      return defaultConfig;
+    }
 
-    return {
+    const config: AutoModConfig = {
       enabled: row.enabled,
       blockedWords: row.blocked_words ?? [],
       maxMentions: row.max_mentions,
       maxCapsRatio: row.max_caps_ratio,
       maxRepeatedMessages: row.max_repeated_messages,
-      repeatedWindowSeconds: row.repeated_window_seconds,
+      repeatedWindowSeconds: clampAutoModWindowSeconds(row.repeated_window_seconds),
       blockLinks: row.block_links,
       blockInvites: row.block_invites,
       maxLinks: row.max_links,
@@ -292,6 +393,41 @@ export class AutoMod implements PlatformModule {
       deleteMessage: row.delete_message,
       timeoutMinutes: row.timeout_minutes
     };
+    this.configCache.set(guildId, {
+      config,
+      expiresAt: now + 15_000
+    });
+    return config;
+  }
+
+  private async getEnabledRules(guildId: string): Promise<AutoModRuleRuntime[]> {
+    const now = Date.now();
+    const cached = this.rulesCache.get(guildId);
+    if (cached && cached.expiresAt > now) return cached.rules;
+
+    const result = await this.db.query<AutoModRuleRuntime>(
+      "SELECT detector,threshold,window_seconds AS \"windowSeconds\",action,timeout_minutes AS \"timeoutMinutes\",affected_role_ids AS \"affectedRoleIds\",ignored_role_ids AS \"ignoredRoleIds\",affected_channel_ids AS \"affectedChannelIds\",ignored_channel_ids AS \"ignoredChannelIds\",ignore_moderators AS \"ignoreModerators\",log_channel_id AS \"logChannelId\",message_template AS \"messageTemplate\" FROM automod_rules WHERE guild_id=$1 AND enabled=true ORDER BY id",
+      [guildId]
+    );
+    const rules = result.rows.map((rule) => ({
+      detector: rule.detector,
+      threshold: rule.threshold === null ? null : Number(rule.threshold),
+      windowSeconds: rule.windowSeconds,
+      action: rule.action,
+      timeoutMinutes: rule.timeoutMinutes,
+      affectedRoleIds: rule.affectedRoleIds ?? [],
+      ignoredRoleIds: rule.ignoredRoleIds ?? [],
+      affectedChannelIds: rule.affectedChannelIds ?? [],
+      ignoredChannelIds: rule.ignoredChannelIds ?? [],
+      ignoreModerators: rule.ignoreModerators,
+      logChannelId: rule.logChannelId ?? null,
+      messageTemplate: rule.messageTemplate
+    }));
+    this.rulesCache.set(guildId, {
+      rules,
+      expiresAt: now + 15_000
+    });
+    return rules;
   }
 
   private async inspect(message: Message): Promise<void> {
@@ -301,24 +437,41 @@ export class AutoMod implements PlatformModule {
     const config = await this.getConfig(message.guild.id);
     if (!config.enabled) return;
 
-    const exemptChannels = new Set(config.exemptChannelIds.split(/[\\s,\\n]+/).map((id) => id.trim()).filter(Boolean));
+    const exemptChannels = new Set(config.exemptChannelIds.split(/[\s,\n]+/).map((id) => id.trim()).filter(Boolean));
     if (exemptChannels.has(message.channelId)) return;
 
-    const exemptRoles = new Set(config.exemptRoleIds.split(/[\\s,\\n]+/).map((id) => id.trim()).filter(Boolean));
+    const exemptRoles = new Set(config.exemptRoleIds.split(/[\s,\n]+/).map((id) => id.trim()).filter(Boolean));
     if (message.member && [...exemptRoles].some((roleId) => message.member!.roles.cache.has(roleId))) return;
 
     const content = message.content;
     const mentions = message.mentions.users.size + message.mentions.roles.size;
-    const key = `${message.guild.id}:${message.author.id}`;
+    const rules = await this.getEnabledRules(message.guild.id);
     const now = Date.now();
-    const bucket = this.recent.get(key) ?? [];
-    const cutoff = now - config.repeatedWindowSeconds * 1000;
-    const recent = bucket
-      .filter((item) => item.timestamp >= cutoff)
-      .slice(-19);
+    const repeatWindows = [
+      config.repeatedWindowSeconds,
+      ...rules
+        .filter((rule) => rule.detector === "repeated-text")
+        .map((rule) => rule.windowSeconds ?? config.repeatedWindowSeconds)
+    ].map(clampAutoModWindowSeconds);
+    const maxRepeatWindowSeconds = repeatWindows.length ? Math.max(...repeatWindows) : 0;
 
-    recent.push({ content: content.toLocaleLowerCase(), timestamp: now });
-    this.recent.set(key, recent);
+    const key = `${message.guild.id}:${message.author.id}`;
+    const bucket = this.recent.get(key) ?? [];
+    const history = maxRepeatWindowSeconds > 0
+      ? bucket
+          .filter((item) => item.timestamp >= now - maxRepeatWindowSeconds * 1000)
+          .slice(-99)
+      : [];
+
+    if (maxRepeatWindowSeconds > 0) {
+      history.push({ content: content.toLocaleLowerCase(), timestamp: now });
+      this.recent.set(key, history);
+    } else {
+      this.recent.delete(key);
+    }
+
+    const baseCutoff = now - config.repeatedWindowSeconds * 1000;
+    const recent = history.filter((item) => item.timestamp >= baseCutoff);
     this.inspectedMessages += 1;
     if (this.inspectedMessages % 100 === 0) this.pruneRecent(now);
 
@@ -329,101 +482,102 @@ export class AutoMod implements PlatformModule {
       recent.map((item) => item.content)
     );
 
-    if (!reason) return;
+    if (reason) {
+      await this.applyBaseViolation(message, reason, config);
+      return;
+    }
+    const roleIds = message.member?.roles.cache.map((role) => role.id) ?? [];
 
-    logger.info("AutoMod violation", {
-      guildId: message.guild.id,
-      userId: message.author.id,
-      reason,
-      messageId: message.id
-    });
+    for (const rule of rules) {
+      if (rule.ignoredChannelIds?.includes(message.channelId)) continue;
+      if (rule.detector === "honeypot" && !rule.affectedChannelIds?.includes(message.channelId)) continue;
+      if (rule.affectedChannelIds?.length && !rule.affectedChannelIds.includes(message.channelId)) continue;
+      if (rule.ignoredRoleIds?.some((id) => roleIds.includes(id))) continue;
+      if (rule.affectedRoleIds?.length && !rule.affectedRoleIds.some((id) => roleIds.includes(id))) continue;
 
+      if (
+        rule.ignoreModerators &&
+        message.member?.permissions.has(PermissionFlagsBits.ManageMessages)
+      ) continue;
+
+      if (!detectorMatches(rule, message, history, config)) {
+        continue;
+      }
+
+      await this.applyRule(message, {
+        detector: rule.detector,
+        action: rule.action,
+        timeoutMinutes: rule.timeoutMinutes,
+        logChannelId: rule.logChannelId,
+        messageTemplate: rule.messageTemplate
+      });
+      return;
+    }
+
+    return;
+  }
+
+  private async applyBaseViolation(
+    message: Message,
+    reason: string,
+    config: AutoModConfig
+  ): Promise<void> {
     let deleted = false;
     if (config.deleteMessage) {
-      try {
-        await message.delete();
-        deleted = true;
-      } catch (error) {
-        logger.warn("AutoMod message deletion failed", {
-          guildId: message.guild!.id,
-          userId: message.author.id,
-          messageId: message.id,
-          rule: reason,
-          error: String(error)
-        });
-      }
+      await message.delete().then(() => { deleted = true; }).catch(() => undefined);
     }
 
     let timedOut = false;
     if (config.timeoutMinutes > 0 && message.member?.moderatable) {
-      try {
-        await message.member.timeout(config.timeoutMinutes * 60_000, `AutoMod: ${reason}`);
-        timedOut = true;
-      } catch (error) {
-        logger.warn("AutoMod timeout failed", {
-          guildId: message.guild!.id,
-          userId: message.author.id,
-          messageId: message.id,
-          rule: reason,
-          timeoutMinutes: config.timeoutMinutes,
-          error: String(error)
-        });
-      }
+      await message.member
+        .timeout(config.timeoutMinutes * 60_000, "AutoMod: " + reason)
+        .then(() => { timedOut = true; })
+        .catch(() => undefined);
     }
 
     await this.db.query(
-      `INSERT INTO automod_events(guild_id,user_id,message_id,rule,created_at)
-       VALUES($1,$2,$3,$4,now())`,
-      [message.guild.id, message.author.id, message.id, reason]
-    ).catch((error) => {
-      logger.error("AutoMod violation persistence failed", {
-        guildId: message.guild!.id,
-        userId: message.author.id,
-        messageId: message.id,
-        rule: reason,
-        error: String(error)
-      });
-    });
+      "INSERT INTO automod_events(guild_id,user_id,message_id,rule,created_at) VALUES($1,$2,$3,$4,now())",
+      [message.guild!.id, message.author.id, message.id, reason]
+    ).catch(() => undefined);
 
-    const auditLog = this.auditLog;
-    if (auditLog) {
-      try {
-        await auditLog.record({
-          guildId: message.guild.id,
-          source: "system",
-          action: "automod.violation",
-          targetType: "user",
-          targetId: message.author.id,
-          metadata: {
-            messageId: message.id,
-            rule: reason,
-            deleted,
-            timedOut
-          }
-        });
-      } catch (error) {
-        logger.warn("AutoMod audit write failed", {
+    if (timedOut) {
+      const caseResult = await this.db.query<{ id: string }>(
+        "INSERT INTO moderation_cases(guild_id,target_user_id,moderator_user_id,action,reason,expires_at,created_at) VALUES($1,$2,'system','timeout',$3,$4,now()) RETURNING id",
+        [message.guild!.id, message.author.id, "AutoMod: " + reason, new Date(Date.now() + config.timeoutMinutes * 60_000)]
+      ).catch(() => null);
+      const caseId = caseResult?.rows[0]?.id;
+      if (caseId) {
+        await this.events?.emit("moderation.case", {
           guildId: message.guild!.id,
           userId: message.author.id,
-          messageId: message.id,
-          rule: reason,
-          error: String(error)
-        });
+          action: "timeout",
+          caseId: Number(caseId)
+        }).catch(() => undefined);
       }
     }
+
+    await this.auditLog?.record({
+      guildId: message.guild!.id,
+      source: "system",
+      action: "automod.violation",
+      targetType: "user",
+      targetId: message.author.id,
+      metadata: { messageId: message.id, rule: reason, deleted, timedOut }
+    }).catch(() => undefined);
   }
 
   private async applyRule(
     message: Message,
     rule: {
       detector: string;
-      action: "delete" | "timeout" | "warn" | "log";
+      action: "delete" | "timeout" | "warn" | "log" | "ban";
       timeoutMinutes: number;
+      logChannelId: string | null;
       messageTemplate: string;
     }
   ): Promise<boolean> {
     let deleted = false;
-    if (rule.action === "delete" || rule.action === "timeout" || rule.action === "warn") {
+    if (rule.action === "delete" || rule.action === "timeout" || rule.action === "ban") {
       try {
         await message.delete();
         deleted = true;
@@ -438,10 +592,34 @@ export class AutoMod implements PlatformModule {
       }
     }
 
-    if ((rule.action === "timeout" || rule.action === "warn") && rule.timeoutMinutes > 0 && message.member?.moderatable) {
-      await message.member.timeout(rule.timeoutMinutes * 60_000, "AutoMod: " + rule.detector).catch((error) =>
-        logger.warn("AutoMod rule timeout failed", { guildId:message.guild!.id,userId:message.author.id,detector:rule.detector,error:String(error) })
-      );
+    let timedOut = false;
+    let banned = false;
+    if (rule.action === "ban" && message.member?.bannable) {
+      await message.member
+        .ban({ reason: "AutoMod: " + rule.detector })
+        .then(() => { banned = true; })
+        .catch((error) =>
+          logger.warn("AutoMod rule ban failed", {
+            guildId: message.guild!.id,
+            userId: message.author.id,
+            detector: rule.detector,
+            error: String(error)
+          })
+        );
+    }
+
+    if (rule.action === "timeout" && rule.timeoutMinutes > 0 && message.member?.moderatable) {
+      await message.member
+        .timeout(rule.timeoutMinutes * 60_000, "AutoMod: " + rule.detector)
+        .then(() => { timedOut = true; })
+        .catch((error) =>
+          logger.warn("AutoMod rule timeout failed", {
+            guildId: message.guild!.id,
+            userId: message.author.id,
+            detector: rule.detector,
+            error: String(error)
+          })
+        );
     }
 
     await this.db.query(
@@ -449,27 +627,92 @@ export class AutoMod implements PlatformModule {
       [message.guild!.id,message.author.id,message.id,rule.detector]
     ).catch(() => undefined);
 
+    if (rule.action === "warn" || timedOut || banned) {
+      const action = banned ? "ban" : rule.action === "warn" ? "warn" : "timeout";
+      const expiresAt = timedOut ? new Date(Date.now() + rule.timeoutMinutes * 60_000) : null;
+      const caseResult = await this.db.query<{ id: string }>(
+        "INSERT INTO moderation_cases(guild_id,target_user_id,moderator_user_id,action,reason,expires_at,created_at) VALUES($1,$2,'system',$3,$4,$5,now()) RETURNING id",
+        [message.guild!.id, message.author.id, action, "AutoMod: " + rule.detector, expiresAt]
+      ).catch(() => null);
+
+      const caseId = caseResult?.rows[0]?.id;
+      if (caseId) {
+        await this.events?.emit("moderation.case", {
+          guildId: message.guild!.id,
+          userId: message.author.id,
+          action,
+          caseId: Number(caseId)
+        }).catch(() => undefined);
+      }
+    }
+
+    let responseDelivered = false;
+    let logDelivered = false;
+    if (rule.action === "log" && rule.logChannelId) {
+      const logChannel = message.guild!.channels.cache.get(rule.logChannelId);
+      if (logChannel?.isTextBased() && "send" in logChannel) {
+        const rendered = (rule.messageTemplate || (
+          "⚠️ AutoMod: **" + rule.detector + "** triggered for <@" + message.author.id + "> in <#" + message.channelId + "> (message " + message.id + ")."
+        ))
+          .replaceAll("{mention}", "<@" + message.author.id + ">")
+          .replaceAll("{user}", message.author.username)
+          .replaceAll("{channel}", "<#" + message.channelId + ">");
+        await logChannel.send({
+          content: rendered,
+          allowedMentions: { users: [message.author.id], roles: [], repliedUser: false }
+        }).then(() => { logDelivered = true; }).catch((error) => {
+          logger.warn("AutoMod log delivery failed", {
+            guildId: message.guild!.id,
+            userId: message.author.id,
+            messageId: message.id,
+            detector: rule.detector,
+            logChannelId: rule.logChannelId,
+            error: String(error)
+          });
+        });
+      }
+    }
+
+    const shouldSendResponse = rule.action === "warn" || Boolean(rule.messageTemplate);
+    if (shouldSendResponse && rule.action !== "log" && "send" in message.channel) {
+      const template = rule.messageTemplate || (
+        "⚠️ <@" + message.author.id + ">, AutoMod обнаружил нарушение **" + rule.detector + "**."
+      );
+      const rendered = template
+        .replaceAll("{mention}", "<@" + message.author.id + ">")
+        .replaceAll("{user}", message.author.username)
+        .replaceAll("{channel}", "<#" + message.channelId + ">");
+      await message.channel.send({
+        content: rendered,
+        allowedMentions: { users: [message.author.id], roles: [], repliedUser: false }
+      }).then(() => {
+        responseDelivered = true;
+      }).catch((error) => {
+        logger.warn("AutoMod response delivery failed", {
+          guildId: message.guild!.id,
+          userId: message.author.id,
+          messageId: message.id,
+          detector: rule.detector,
+          action: rule.action,
+          error: String(error)
+        });
+      });
+    }
+
     await this.auditLog?.record({
       guildId: message.guild!.id,
       source: "system",
       action: "automod.rule.triggered",
       targetType: "user",
       targetId: message.author.id,
-      metadata: { detector: rule.detector, action: rule.action, deleted }
+      metadata: { detector: rule.detector, action: rule.action, deleted, timedOut, banned, responseDelivered, logDelivered }
     }).catch(() => undefined);
 
-    if (rule.messageTemplate) {
-      const rendered = rule.messageTemplate
-        .replaceAll("{mention}", "<@" + message.author.id + ">")
-        .replaceAll("{user}", message.author.username)
-        .replaceAll("{channel}", "<#" + message.channelId + ">");
-      if ("send" in message.channel) await message.channel.send(rendered).catch(() => undefined);
-    }
     return true;
   }
 
   private pruneRecent(now: number): void {
-    const cutoff = now - 120_000;
+    const cutoff = now - 3_600_000;
     for (const [key, entries] of this.recent) {
       const latest = entries.at(-1)?.timestamp ?? 0;
       if (latest < cutoff) this.recent.delete(key);
@@ -496,10 +739,10 @@ function cleanIds(values?: string[]): string[] {
   return [...new Set((values ?? []).filter((value) => /^\d{15,25}$/.test(value)))].slice(0,100);
 }
 
-function detectorMatches(
+export function detectorMatches(
   rule: { detector: string; threshold: number | null; windowSeconds: number | null },
   message: Message,
-  recentMessages: readonly string[] = [],
+  recentMessages: readonly RecentMessage[] = [],
   config?: AutoModConfig
 ): boolean {
   const content = message.content;
@@ -524,6 +767,7 @@ function detectorMatches(
     case "mention-count":
       return (message.mentions.users.size + message.mentions.roles.size) > Number(rule.threshold ?? 6);
     case "emoji-count":
+    case "emotes":
       return ((content.match(/<a?:\w+:\d+>|\p{Extended_Pictographic}/gu) ?? []).length) > Number(rule.threshold ?? 20);
     case "line-length":
       return Math.max(0,...content.split(/\r?\n/).map((line) => line.length)) > Number(rule.threshold ?? 1000);
@@ -533,13 +777,41 @@ function detectorMatches(
       return /[\u0300-\u036f]{4,}/u.test(content);
     case "honeypot":
       return true;
+    case "spam-burst": {
+      const effectiveWindowSeconds = clampAutoModWindowSeconds(rule.windowSeconds ?? config?.repeatedWindowSeconds ?? 10);
+      const cutoff = Date.now() - effectiveWindowSeconds * 1000;
+      return recentMessages.filter((item) => item.timestamp >= cutoff).length >= Number(rule.threshold ?? 5);
+    }
+    case "image-only": {
+      const hasImage = [...message.attachments.values()].some((attachment) =>
+        attachment.contentType?.startsWith("image/") ||
+        /\.(?:png|jpe?g|gif|webp|bmp|avif)(?:$|\?)/i.test(attachment.url)
+      );
+      return hasImage && normalized.trim().length === 0;
+    }
+    case "youtube-only": {
+      const trimmed = content.trim();
+      if (!trimmed) return false;
+      const tokens = trimmed.split(/\s+/);
+      return tokens.length === 1 && /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/|youtu\.be\/)/i.test(tokens[0]!);
+    }
     case "repeated-text": {
-      const normalizedRecent = recentMessages.filter((item) => item === normalized);
+      const configuredWindow = clampAutoModWindowSeconds(config?.repeatedWindowSeconds ?? 10);
+      const effectiveWindowSeconds = clampAutoModWindowSeconds(rule.windowSeconds ?? configuredWindow);
+      const cutoff = Date.now() - effectiveWindowSeconds * 1000;
+      const normalizedRecent = recentMessages.filter(
+        (item) => item.timestamp >= cutoff && item.content === normalized
+      );
       return normalizedRecent.length >= Number(rule.threshold ?? 5);
     }
     default:
       return normalized.length > 0 && rule.detector === "content";
   }
+}
+
+export function clampAutoModWindowSeconds(value: number): number {
+  if (!Number.isFinite(value)) return 10;
+  return Math.min(Math.max(Math.trunc(value), 1), 3600);
 }
 
 export function parseAutoModIdList(value: string): Set<string> {

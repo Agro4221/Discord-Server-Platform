@@ -8,7 +8,40 @@ export function guildResources(client: Client, guildId: string) {
   const guild = client.guilds.cache.get(guildId);
   if (!guild) throw new Error("guild_not_found");
 
+  const botMember = guild.members.me;
+  const permissionNames = [
+    "ViewChannel",
+    "SendMessages",
+    "ManageMessages",
+    "ManageChannels",
+    "ManageRoles",
+    "KickMembers",
+    "BanMembers",
+    "ModerateMembers",
+    "Connect",
+    "Speak",
+    "MoveMembers",
+    "EmbedLinks",
+    "AttachFiles",
+    "ReadMessageHistory",
+    "ManageWebhooks"
+  ] as const;
+
+  const botPermissions = Object.fromEntries(
+    permissionNames.map((name) => [name, Boolean(botMember?.permissions.has(PermissionFlagsBits[name]))])
+  );
+
   return {
+    bot: botMember ? {
+      id: botMember.id,
+      tag: botMember.user.tag,
+      highestRole: {
+        id: botMember.roles.highest.id,
+        name: botMember.roles.highest.name,
+        position: botMember.roles.highest.position
+      },
+      permissions: botPermissions
+    } : null,
     channels: [...guild.channels.cache.values()]
       .filter((channel) =>
         [

@@ -13,6 +13,7 @@ type Alert = {
   enabled: boolean;
   intervalSeconds: number;
   lastOnline: boolean;
+  lastCheckedAt: string | null;
   lastError: string | null;
 };
 
@@ -99,6 +100,25 @@ export function StreamAlertsPanel({
     }
   }
 
+  async function checkNow(alert: Alert) {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/guilds/" + encodeURIComponent(guildId) + "/stream-alerts/" + alert.id, {
+        method: "POST",
+        headers: { "content-type": "application/json" }
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "stream_alert_check_failed");
+      await load();
+      await onChanged?.();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось проверить уведомление.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove(alert: Alert) {
     if (!window.confirm("Удалить это уведомление?")) return;
     setBusy(true);
@@ -124,7 +144,7 @@ export function StreamAlertsPanel({
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ fontSize: 12, opacity: 0.55 }}>
-        Для каждой подписки можно выбрать отдельный Discord-канал и роль для упоминания. Twitch и YouTube используют API-учётные данные бота.
+        Для каждой подписки можно выбрать отдельный Discord-канал и роль для упоминания. Twitch использует API-учётные данные. YouTube и VK проверяются локально через yt-dlp; YouTube API key не нужен.
       </div>
       {error && <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d" }}>{error}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "120px minmax(150px,1fr) minmax(140px,1fr) minmax(130px,1fr) 100px auto", gap: 8 }}>
@@ -153,7 +173,7 @@ export function StreamAlertsPanel({
           <strong>{alert.platform === "twitch" ? "Twitch" : alert.platform === "youtube" ? "YouTube" : "VK Live"}</strong>
           <div>
             <div style={{ fontWeight: 600 }}>{alert.target}</div>
-            <div style={{ fontSize: 11, opacity: 0.45 }}>{alert.lastOnline ? "🟢 LIVE" : "⚫ offline"}{alert.lastError ? " · " + alert.lastError : ""}</div>
+            <div style={{ fontSize: 11, opacity: 0.45 }}>{alert.lastOnline ? "🟢 LIVE" : "⚫ offline"}{alert.lastCheckedAt ? " · проверено " + new Date(alert.lastCheckedAt).toLocaleTimeString() : ""}{alert.lastError ? " · " + alert.lastError : ""}</div>
           </div>
           <select value={alert.channelId} onChange={(event) => void patch(alert, { channelId: event.target.value })} style={inputStyle}>
             {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
@@ -164,6 +184,7 @@ export function StreamAlertsPanel({
           </select>
           <input type="number" min={15} max={3600} value={alert.intervalSeconds} onChange={(event) => void patch(alert, { intervalSeconds: Number(event.target.value) })} style={inputStyle} />
           <div style={{ display: "flex", gap: 6 }}>
+            <button type="button" disabled={busy} onClick={() => void checkNow(alert)} style={button("secondary")}>Проверить</button>
             <button type="button" disabled={busy} onClick={() => void patch(alert, { enabled: !alert.enabled })} style={button("secondary")}>{alert.enabled ? "ON" : "OFF"}</button>
             <button type="button" disabled={busy} onClick={() => void remove(alert)} style={button("danger")}>Удалить</button>
           </div>

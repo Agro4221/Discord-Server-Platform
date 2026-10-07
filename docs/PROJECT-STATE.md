@@ -1,13 +1,20 @@
 # Project State
 
 ## Target
+Self-hosted Discord Server Platform whose central mission is to replace a typical collection of third-party bots and their premium subscriptions with one unified bot/platform under our control. The reference feature pool includes the best useful capabilities found across Carl-bot, Juniper, MEE6, ProBot, Jockie Music and similar bots, implemented independently in our own architecture without proprietary-code copying or artificial premium walls.
+
+**Product north star:** when a server needs moderation, AutoMod, security, utility, roles, community systems, tickets, automation, notifications, analytics or music, the default answer should be **our platform**, not another bot or another subscription.
+
 Self-hosted Discord Server Platform: local-first, resilient, modular, no artificial premium wall, simple UX, optional VPS deployment, optional multi-bot scaling for multiple voice channels.
 
 ## Current branch
 development
 
+## Verified test baseline
+`be0d73b41359b4601742f7051a99fddf544c9bc3`
+
 ## Current phase
-Release candidate — code/CI verified, ready for live Discord validation.
+Targeted post-RC rework — Temporary Voice naming/bitrate and the Music engine now use the requested local yt-dlp + FFmpeg architecture; multi-source provider support is restored; automated CI and live Windows/Discord validation remain.
 
 ## Working subsystems
 - Discord Core with typed event bus and module lifecycle.
@@ -15,7 +22,7 @@ Release candidate — code/CI verified, ready for live Discord validation.
 - Health/readiness endpoint and Discord connection supervision.
 - Durable audit log.
 - Local protected Management API.
-- Schema-driven Next.js Control Center with session auth, functional-area navigation, capability/function index, module toggles, Discord channel/role selectors, grouped settings forms, import/export, backup management, module actions and specialized admin panels.
+- Schema-driven Next.js Control Center with local-first access, functional-area navigation, capability/function index, module toggles, Discord channel/role selectors, grouped settings forms, import/export, backup management, module actions and specialized admin panels.
 - Moderation with case history.
 - Temporary Voice with idempotency, ownership and reconciliation.
 - AutoMod, Welcome, Verification, Leveling.
@@ -29,32 +36,46 @@ Release candidate — code/CI verified, ready for live Discord validation.
 - Security/Anti-Raid and destructive burst detection.
 - Notifications with HTTPS feed validation and SSRF protections.
 - Analytics minute buckets with Dashboard reporting.
-- Music/Lavalink foundation with persistent queue store and bot identity namespace.
+- Music via local yt-dlp + FFmpeg with persistent queue store, per-voice bot identity namespace and multi-source URL support (YouTube, TikTok, Yandex Music, VK, SoundCloud; Spotify track links bridge through metadata to a playable source).
 - Multi-bot identity persistence for separate-process fleet deployment, per-voice Music routing and identity-scoped background workers.
 - Config transfer and compressed local backups with guild-scoped restore/delete controls, including local/remote retention enforcement.
 - Docker Compose / Dockerfiles for local-to-VPS topology.
-- Native Windows local runtime for low-overhead gaming/streaming, with single-Lavalink default and opt-in Dashboard/second Lavalink.
+- Native Windows local runtime for low-overhead gaming/streaming, with yt-dlp + FFmpeg music and opt-in Dashboard.
 
-## Still under development
-- Full AutoMod rule editor and richer response policies beyond the current persisted rule set.
-- Full Security response workflow beyond the current anti-raid/quarantine/destructive-burst response.
-- Full Automation condition/action catalog beyond the currently supported safe builder.
-- Music provider breadth and multi-node failover validation beyond the current Lavalink foundation.
-- Full multi-bot fleet orchestration/failover automation beyond persisted assignments and health UI.
-- Full E2E/chaos/soak/security test suite and live Discord validation.
-- VPS installer/reverse-proxy production drill and clean-host acceptance.
+## Remaining verification work
+- Live Discord E2E smoke test on the user's real test server.
+- Live yt-dlp/FFmpeg playback across YouTube, TikTok, Yandex Music, VK and SoundCloud, plus Spotify-track metadata bridging and stream/recovery validation in the real runtime.
+- Multi-bot fleet takeover validation with real secondary identities.
+- Windows native launcher/runtime validation on the actual gaming/streaming PC.
+- VPS clean-host install/upgrade acceptance and secure remote-access/reverse-proxy drill.
+- Full E2E/chaos/soak/security runs in a controlled environment.
+
+The current implementation includes the agreed Automation action breadth, expanded AutoMod detector set, local yt-dlp + FFmpeg Music, native/Docker Fleet handling and VPS bootstrap/upgrade secret repair. Further feature additions after this freeze require an explicit scope decision.
 
 ## Verification
 - GitHub Actions CI runs on Node.js 24.17.
-- Source secret hygiene check is active.
-- Unit regression tests exist for health, module registry, event bus and dashboard schema.
-- Full dependency compilation is delegated to CI because this execution environment has Node.js 22.16.
-- Discord live E2E requires user-owned Discord test credentials and has not been run here.
+- Pre-cleanup baseline: CI #2398 passed the full automated pipeline on `80ee35ae005d356142f47d08da6ab998367386a2`.
+- Cleanup baseline `78a14d4cbb6b15ade0e7111e266eeff970a674e4` contains no removed legacy Dashboard/Vexa files; fresh CI validation is the release gate for this cleanup tree.
+- Source secret hygiene, deployment and observability checks are active.
+- Unit regression tests cover Core, module contracts and key Dashboard/runtime behaviour.
+- Full dependency compilation is delegated to CI because this execution environment has Node.js 22.16 while the repository targets Node.js 24.17+.
+- Discord live E2E and real yt-dlp/FFmpeg playback require the user's Discord test server and Windows runtime and have not been run here.
+
+- Latest rework code state before the continuity-log documentation commits: `c49dd0841f199d2c127b503c65d12accedecf730`.
+- The current Music architecture is local yt-dlp + FFmpeg; no Lavalink runtime/service/config remains in the active tree.
+- Temporary Voice channel creation is DSP-prefix-free and capped at 96 kbps.
 
 ## Continuity
 Read docs/WORK-LOG.md before continuing work in a new chat.
 Read docs/TEST-MATRIX.md before declaring a subsystem complete.
 Never commit credentials, bot tokens, provider secrets or private user data.
+
+## 2026-10-05 — Release-candidate gate checkpoint
+- Previous release-candidate gate baseline: `8daf1401258d9c94d72bac491948cce8a2b12555`.
+- GitHub Actions CI run #1846 (37237396426) completed successfully on this exact HEAD.
+- The green CI job completed dependency installation/audit, source hygiene, deployment and observability checks, bot typecheck, bot tests, domain build, bot build and Dashboard production build.
+- Functional development is now treated as frozen for the release candidate. New work should be driven by a live failure, a concrete correctness/security defect, or an explicitly chosen post-RC feature.
+- Remaining release-gate items are environment-dependent: real Discord smoke/E2E with YouTube playback, yt-dlp/FFmpeg recovery validation, multi-bot fleet takeover, Windows runtime, VPS clean-host acceptance and controlled chaos/soak/security validation.
 
 
 ## 2026-09-19 — Giveaway lifecycle hardening
@@ -165,4 +186,448 @@ Never commit credentials, bot tokens, provider secrets or private user data.
 - Existing specialized panels for Role Panels, Giveaways, Analytics, Automation, Notifications, Bot Fleet and Backups remain integrated.
 - Windows launcher `start-local.bat` closes automatically after a successful dashboard launch; failed startup still pauses to preserve diagnostics.
 - CI run #603 on this code state passed all stages: dependency install/audit, source/deployment/observability checks, bot typecheck/tests/build, domain build and Dashboard production build.
-- Live Windows launcher behavior (real browser open + terminal close) still requires validation on Windows; automated CI cannot validate desktop UX.
+- Live Windows launcher behavior (real browser open + terminal close) still requires validation on Windows; automated CI cannot validate desktop UX.## 2026-10-03 — Utility / AFK integration
+- The Core now contains a `utility` module covering server/member information, avatar/role/channel inspection and persistent AFK.
+- AFK state is durable in PostgreSQL and restored into an in-memory active-key cache on startup; normal messages clear the caller's AFK and mentions surface the stored reason.
+- Utility commands are included in the module catalog and command-policy definitions, and Control Center has a dedicated Utility entry under the Community area.
+- Added migration 40 (`persistent_afk`) and regression tests for utility command shapes and AFK helper behavior.
+- This is a feature addition, not a live Discord acceptance result; real Discord behavior still belongs to the live release-gate suite.
+
+## 2026-10-03 — AFK audit hardening
+- Utility AFK set/clear operations feed the durable audit log without making user-facing operations depend on audit persistence success.
+- AFK mention output is bounded and uses explicit user-only allowed mentions so stored reasons cannot trigger @everyone/@here/role notifications.
+- Final feature-pass head: `c554a216bccd56a16ee9965a57031663ca877dd0`; automated CI on this final head remains the verification gate.
+
+## 2026-10-03 — Next.js security update
+- Dashboard dependency `next` was updated from `16.3.3` to `16.3.8` after CI's high-severity dependency audit rejected the previous version.
+- No lockfile is tracked in the repository, so CI's `npm install` will resolve the patched version from the updated workspace manifest.
+
+## 2026-10-03 — Community Tools
+- Core now includes a Community Tools module for polls, suggestions, sticky messages and small fun commands.
+- Poll/suggestion state is persisted in PostgreSQL; poll timers are reconstructed at startup.
+- Community Tools is enabled by default in the catalog and can be disabled per guild like other modules.
+
+## 2026-10-03 — Discord event logging
+- Added the Logging module with persistent per-guild settings.
+- Passive Discord events can now be routed to a dedicated log channel while remaining available in durable audit history.
+
+## 2026-10-04 — Command routing / fleet continuity pass
+- Latest development code head: `6c74c0f68e621ff44d7cbdf0089407f46a5b1301`.
+- Added centralized command-policy parity checks, complete prefix allowlist coverage, root `/leveling` alias routing and automatic secondary-identity stale-guild failover.
+- Deterministic regression coverage was added for command registry consistency, failover guard/claim behavior and passive-event guild isolation.
+- CI on the preceding head passed; CI for the latest failover/alias head remains the active verification gate.
+
+
+## 2026-10-04 — Control Center architecture checkpoint
+- Control Center is now the intended local control plane for administrative operations; Discord commands remain fallback/user-facing entry points.
+- Specialized operations currently surfaced include Moderation, Role Panels, Tickets, Leveling, Giveaways, Economy Shop, Starboard, Community Tools, Stream Alerts, Notifications, Automation, Custom Commands, Analytics and Music, plus system-level Server Settings, Command Policies, Diagnostics, Fleet and Backups.
+- Generic module schemas continue to cover settings-heavy modules such as Temporary Voice, AutoMod, Welcome, Security, Verification, Logging and Music.
+- Verification now has a dedicated operational panel for publishing the verification message; user verification itself remains an end-user Discord interaction.
+- Giveaway creation is now available without Discord command entry; administrative giveaway lifecycle operations remain audited through Management API/Core.
+- Current development head: `ab1f67805e8a164782e935c2422724a55f1c221f`.
+
+## 2026-10-04 — Giveaway Dashboard wiring checkpoint
+- Development head: `486e82260afa751c74bdcc305eea0a923f26c7eb`.
+- Giveaway Control Center creation flow now has consistent channel-resource wiring across all Dashboard entrypoints.
+- AutoMod and Music capability metadata is aligned with their already-existing operational UI.
+- The preceding CI build failure was isolated to Dashboard TypeScript contracts around Giveaway panel props and a missing local style constant; backend typecheck/tests remained green.
+- Fresh CI verification is pending for the atomic checkpoint head.
+
+## 2026-10-04 — Control Center wiring verified
+- Development head `1007677fc855a8ea6b62ff1fa8274294a9db96d0` passed CI run **#1239** across the full verification pipeline.
+- Giveaway Control Center wiring is now confirmed by the production Dashboard build.
+- Backend regression suite remains at 76 passing tests.
+
+## 2026-10-04 — AutoMod CRUD verified
+- Development head `0e79a64ab1cb0aa2c70ead8ae98b4950f2764b2a` passed CI run **#1242**.
+- AutoMod is now a full Control Center surface: list, create/update, enable/disable and delete rules, with audit coverage for Dashboard deletion.
+
+## 2026-10-04 — Security Center verified
+- Development head `7ac4f4505479d518f8c55847466111124ca0ea6d` passed CI run **#1245**.
+- Security is now a full Control Center module with active incident monitoring and Discord readiness checks.
+
+## 2026-10-04 — Temporary Voice controls verified
+- Development head `9a442b65c77a3cabc497f94635ef4efc6bfd6527` passed CI run **#1249**.
+- Temporary Voice now supports user-facing room management through the Discord command surface while server setup remains Dashboard-configured.
+
+## 2026-10-04 — Temporary Voice Control Center verified
+- Development head `076a56031ca692f19b22fe98b7d91188c16a1541` passed CI run **#1253**.
+- Temporary Voice is now a full Control Center module plus Discord `/voice` room-control commands.
+- The local panel exposes active-room visibility and manual reconciliation; the runtime remains the source of truth for room ownership/state.
+
+## 2026-10-04 — Welcome Control Center verified
+- Development head `b9d3ac96021adc3f5c45dd9c81c1a34c327beacd` passed CI run **#1256**.
+- Welcome is now a full Control Center module while its Discord `/welcome setup` command remains the fallback/user-facing configuration path.
+
+## 2026-10-04 — Community Tools poll creator verified
+- Development head `9be19adc51f501af87057178a1689f51414c2e01` passed CI run **#1260**.
+- Community Tools is now a fuller Dashboard-first operational surface: create/close polls, moderate suggestions, and manage sticky messages.
+
+## 2026-10-04 — Control Center consistency audit
+- Development head `c9fd897e4a5574119480e4dfc6fd7d434a20cae3` passed CI run **#1262**.
+- Operational module metadata, panel keys and rendered panel branches are now internally consistent for all `full` modules.
+
+## 2026-10-04 — Economy Admin verified
+- Development head `c8188f61840235c784560f7507d8276dee5acf59` passed CI run **#1268**.
+- Economy is now a full operational module for both shop management and administrator balance control.
+
+## 2026-10-04 — Command routing checkpoint
+- Development head `e709c239a4bc3a852e7f55f719f47ba43e9cc54e` passed CI run **#1272**.
+- Temporary Voice slash routing is now connected through the same event-bus lifecycle used by other command-driven modules.
+
+## 2026-10-04 — Local Dashboard authentication removal
+- Local Control Center no longer has an end-user login/logout flow or dashboard admin password/session secret.
+- Dashboard access remains local-first/loopback by default; server-side requests to the Management API remain protected by the internal bearer key.
+- Legacy login routes and page were removed.
+
+## 2026-10-04 — Bot Registry verified
+- Development head: `54b0e7ff15c8b6718eb25d7abd0c90bee282f172`.
+- CI run #1590 passed the full automated verification pipeline with 84/84 bot tests, bot/domain/dashboard builds and all static deployment/observability contracts.
+- Local Control Center has no end-user login; Bot Fleet registration validates Discord credentials and stores them encrypted at rest.
+- Runtime resolution is database-first with environment bootstrap only when the selected identity has no stored credential.
+- Credential corruption fails closed rather than silently falling back to environment values.
+- Remaining Fleet gap: one process per BOT_IDENTITY_ID; multi-process/multi-client local orchestration is the next module.
+
+
+## 2026-10-04 — Local Bot Fleet orchestration
+- Registered enabled secondary Bot Identities are now reconciled by the Windows local launcher.
+- Each secondary identity runs in its own one-off Docker container on the local PC and shares the existing PostgreSQL/Lavalink Compose network.
+- Secondary containers use BOT_IDENTITY_ID only; credential lookup remains PostgreSQL-backed, so plaintext Discord tokens are not passed through the launcher.
+- Disabled or removed identities are cleaned up by the reconciler.
+- This is local process/container orchestration; VPS deployment remains a separate future topology concern.
+
+
+## 2026-10-04 — Local Fleet orchestration CI verified
+- Development head: `03ad5eec1c186b4a76af0cf7c7775457ba3bf4d4`.
+- CI run #1592 passed the full automated pipeline: source/deployment/observability contracts, bot typecheck/tests/build, domain build and Dashboard production build.
+- Local launcher now reconciles enabled secondary identities with stored credentials into separate `dsp-bot-fleet-*` containers.
+- Live Windows/Docker Desktop execution with real Discord identities remains the environment-dependent acceptance gate.
+
+
+## 2026-10-04 — Security anti-nuke response expansion
+- Security destructive-burst monitoring now also observes channel creation and role creation bursts, in addition to channel/role deletion and member bans.
+- Executor correlation maps the expanded event types to Discord audit-log categories before response actions are applied.
+- Existing quarantine/removal response and incident lifecycle are unchanged; live Discord validation remains required.
+
+
+## 2026-10-04 — Development checkpoints
+- Security anti-nuke expansion is CI-verified by run #1596.
+- Music provider-aware search routing is CI-verified by run #1603 on `035e23cc163871172cba9e0298d824876a74387c`.
+- Current next bounded development task: Music multi-node failover hardening and regression coverage.
+
+
+## 2026-10-04 — Music failover checkpoint
+- Provider-aware Music search routing and multi-node failover hardening are CI-verified.
+- Failover observability, disconnect-time player persistence and active-node visibility are implemented.
+- Current remaining Music limitation is live Lavalink node-loss/recovery acceptance with real Discord audio playback.
+- Next bounded scope: release-gate/live validation of failover continuity, followed by broader fleet/release-gate coverage.
+
+
+## 2026-10-04 — AutoMod log response checkpoint
+- AutoMod rule actions now include a durable, configurable log-channel response path.
+- Management API validates configured log channels; Control Center exposes the setting for `action=log` rules.
+- Log messages support `{mention}`, `{user}` and `{channel}` placeholders with explicit allowed-mentions restrictions.
+- The rule-trigger audit event includes the final delivery result without duplicate records.
+- CI run #1617 is green; live Discord delivery remains a release-gate acceptance item.
+
+
+## 2026-10-04 — AutoMod timeout audit checkpoint
+- Rule-based and base AutoMod timeouts now create durable moderation history only after successful Discord enforcement.
+- Timeout cases retain the effective AutoMod reason and expiration timestamp and emit the standard moderation event.
+- CI run #1623 is green; live Discord hierarchy/permission and timeout acceptance remains environment-dependent.
+
+## 2026-10-04 — AutoMod/Security consistency hardening
+- AutoMod `repeated-text` rule windows are now time-aware; per-rule `windowSeconds` can narrow the configured global repeat-history window.
+- Security manual incident clearing now reports only successfully resolved incidents.
+- Both changes have regression coverage.
+- Latest development HEAD: `83755f29b9ac747b278bce919d97397441a96d00`.
+- Automated verification is pending because the latest direct development HEAD currently has no attached CI checks.
+
+## 2026-10-04 — AutoMod response contract hardening
+- AutoMod repeated-text rule windows are time-aware and rule-specific within the configured global history window.
+- AutoMod log actions now require a valid configured log channel before persistence.
+- Security manual incident clearing reports only incidents successfully marked resolved.
+- Regression coverage exists for all three consistency fixes.
+- Current development HEAD: `7121d7557063772d712c47006bdbb9845c99d1b9`.
+- CI status for the direct development HEAD is currently pending/no attached check.
+
+## 2026-10-04 — Security detection-window checkpoint
+- Security detection windows are normalized to 5–3600 seconds.
+- Detection history retention now covers the full supported one-hour window.
+- Boundary regression coverage added.
+- Latest development code checkpoint: `a915418cab191a58100849aff95264b49311fb74`.
+
+## 2026-10-04 — Security/AutoMod hardening checkpoint
+- AutoMod repeat-rule windows are now independent from the base repeat detector window and bounded to one hour of retained history.
+- AutoMod log actions require a log channel before persistence.
+- Security incident-count reporting is accurate after partial cleanup failure.
+- Security detection/audit lookback supports the full configured one-hour window.
+- CI failures #1647 and #1651 were diagnosed from Actions logs and repaired; latest code fix: `f079a866aa2294ad211d7234fa6396c8c052e643`.
+
+## 2026-10-04 — AutoMod Dashboard checkpoint
+- Dashboard log-rule configuration now matches the enforced Core/API contract.
+- The response template field is rendered as an actual editable control instead of a stale placeholder.
+- CI #1657 is green for the complete automated pipeline.
+- Latest verified development commit: `4c2ba68c0c45700a7f1f13f48942c9452de2c7dc`.
+
+## 2026-10-04 — Security response accounting checkpoint
+- Executor role-removal reporting is now based on successful Discord operations rather than attempted removals.
+- Removed role IDs are persisted in security response event/audit metadata.
+- CI #1663 is green for the full automated pipeline.
+- Latest verified development code: `b62d5f9f811429dd25ec247623a761ba0985da6b`.
+
+## 2026-10-04 — Security restart-resilience checkpoint
+- Active Security incidents are regression-tested across process restart state restoration.
+- CI #1667 is green for the complete automated pipeline.
+- Latest verified development code: `87e893c2d7e3454b97a5cda3caf0d7109ef3f401`.
+
+
+## 2026-10-04 — Security executor-role lifecycle checkpoint
+- Executor-role stripping is explicitly non-reversible by automatic incident cleanup; only the configured temporary quarantine role is restored during incident resolution.
+- Successful stripped roles are durably recorded as per-role `security.executor-role-removed` events, including incident/user/role identifiers and the pinned non-reversible policy.
+- Destructive Security events are durably appended to `security_events` and reconstructed into the one-hour in-memory detection window after restart.
+- Added regression coverage for restart reconstruction and durable role-removal recording.
+- CI #1675 passed the complete automated pipeline, including 105/105 bot tests and all domain/bot/Dashboard builds.
+- Latest verified development code: `357052808974403abbfb1abb68586787798ae7c0`.
+
+
+## 2026-10-04 — Music failover durable-state checkpoint
+- Durable Music player snapshots are preserved when a destroyed player still contains a current or queued track, protecting failover/recovery state from premature deletion.
+- Empty-player destruction still clears durable state.
+- Regression coverage and CI #1677 verify the change; latest verified code: `2d2cb93c064249ec24a628552482ecc69f05744a`.
+
+
+## 2026-10-04 — Music cold-recovery + Fleet stale-heartbeat checkpoint
+- Music durable sessions are now reconciled after startup/node connection when no resumed Lavalink player exists; queue, current track, filters, repeat and approximate position are recovered from PostgreSQL.
+- Active playback position advances from the persisted snapshot timestamp and is bounded before resume; queued-only sessions can restart without requiring a current track.
+- Fleet exposes stale starting/ready heartbeats as degraded, allowing the Windows reconciler to restart a running unhealthy secondary container.
+- CI #1682 passed the complete automated pipeline; latest verified code: `e8c8467d5d4c890199227a1634299606666fe0e0`.
+
+
+## 2026-10-04 — Music recovery + AutoMod response finalization
+- Music durable player recovery now covers failed Lavalink session resume and cold reconstruction from PostgreSQL, including current track, queue, filters, repeat and approximate playback position.
+- Recoverable player state is retained during player destruction while current/queued tracks remain; queue-only sessions can be restarted.
+- AutoMod `warn` is now distinct from destructive actions: no delete/timeout is performed, a moderation case is created, and warning-response delivery is tracked explicitly.
+- Fleet stale `starting`/ `ready` heartbeats are exposed as degraded and trigger local reconciler restart of running secondary containers.
+- CI #1687 passed the complete automated pipeline; latest verified code: `38f35992d2553b779d51dadb01882517933aa3f3`.
+
+
+## 2026-10-04 — Fleet credential-rotation lifecycle checkpoint
+- Secondary credential rotation now raises a durable restart request in `bot_heartbeats` instead of relying on a timing window.
+- Existing-process heartbeat updates preserve the request; a freshly started process clears it via the explicit startup heartbeat.
+- Management API/Dashboard expose the pending restart state; Fleet reconciler restarts the affected secondary container.
+- Migration 48 and regression tests are verified by CI #1689.
+- Latest verified code: `9e328270f378fb81a7de86b821745b82e9a9ef19`.
+
+
+## 2026-10-04 — Fleet reconciler failure propagation checkpoint
+- Local Fleet cleanup/start failures are now surfaced through the reconciler exit code while other identities continue processing.
+- Failed container removal blocks the corresponding restart attempt for that cycle.
+- CI #1691 verified the change; latest code: `7f7dae95a43028cde27f083c7b397c3a2a2a9da8`.
+
+
+## 2026-10-04 — Distributed Fleet ownership revalidation checkpoint
+- Guild event routing now uses durable DB ownership revalidation with a 1-second cache after the existing in-memory fast filter, reducing the stale-owner split-brain window from the Fleet refresh interval to the ownership-cache interval.
+- Primary failover and secondary ownership rules remain consistent with stale-heartbeat semantics.
+- CI #1693 passed the complete automated pipeline; latest verified code: `6bf8e4423ef4f8fccd1bae497b5c66368bc9b5f0`.
+
+
+## 2026-10-04 — Music recovery concurrency checkpoint
+- Lavalink resumed-player restoration and PostgreSQL cold reconciliation now share a per-guild recovery gate, eliminating duplicate recovery races within a process.
+- CI #1697 passed typecheck, bot tests and all builds/contracts; latest verified code: `345683759b315b0d775fc0752515b11b693a04fb`.
+
+
+## 2026-10-04 — Local shutdown failure propagation checkpoint
+- Local launcher shutdown now propagates Fleet reconciler and Docker Compose cleanup failures through its process exit code.
+- CI #1699 verified the complete pipeline; latest verified code: `149d6ea598427d6ded426baa8b0624ca333bf2bd`.
+
+
+## 2026-10-04 — Local release-gate preflight checkpoint
+- Added a non-destructive `scripts/release-gate.ps1` covering Docker Compose, Bot health/readiness, Management API/Fleet, Dashboard and both local Lavalink nodes.
+- Deployment contract now verifies the gate script is present and contains its core checks.
+- CI #1702 passed the complete automated pipeline; latest verified code: `ff052ebf277184e9164e77d7cfc3e2cc3a0d9c6f`.
+- Remaining release work is environment-dependent rather than an unverified code TODO.
+
+
+## 2026-10-04 — Fleet Management API failure propagation checkpoint
+- Local Fleet reconciliation now fails closed when the authenticated Management API cannot be reached, returning non-zero status instead of masking the outage.
+- Deployment contract coverage enforces the failure path.
+- CI #1705 passed the complete automated pipeline; latest verified code: `3b5206f50cb344d7092937e6add91d7718b01fb5`.
+
+
+## 2026-10-04 — Release-gate Fleet hygiene checkpoint
+- Release gate verifies required local Compose services are running and rejects orphaned secondary Fleet containers.
+- This is read-only diagnostic logic; it does not start, stop or modify services.
+- CI #1706 passed the complete automated pipeline; latest verified code for this checkpoint: `3fa75c40548a6656d6a2f09f4c4b458f01198b59`.
+
+
+## 2026-10-04 — Release documentation contract cleanup
+- Architecture/test documentation now reflects the implemented local Dashboard model: no user login sessions or CSRF flow; sensitive operations are protected at the Management API bearer boundary.
+- No runtime behavior changed in this checkpoint.
+
+
+## 2026-10-04 — Release-gate authentication verification
+- Management API unauthenticated access is rejected by the local release gate before credentialed Fleet inspection.
+- CI #1708 passed the complete automated pipeline; latest verified development code: `c37fc2ef7919544c32457574abf9c5707d0cdb1a`.
+
+
+## 2026-10-04 — Native Windows runtime becomes the primary local path
+- Native Windows mode is now treated as the primary everyday local deployment path; Docker remains optional for VPS/reproducible deployment.
+- Native startup now generates the required `BOT_CREDENTIALS_ENCRYPTION_KEY` and no longer creates removed Dashboard end-user authentication state.
+- Native Dashboard Management API URL now follows `MANAGEMENT_API_PORT` instead of a hard-coded Docker-era port.
+- Added a native Fleet supervisor that starts/stops/restarts registered secondary Bot Identities as ordinary Windows processes using encrypted PostgreSQL credentials.
+- Added the native non-destructive release gate for Bot/Fleet/Management API/Dashboard/Lavalink readiness.
+- This checkpoint is designed for low-overhead local use and does not require Docker Desktop.
+- Automated verification for this checkpoint is the next CI target.
+
+
+## 2026-10-04 — Native release-gate / Control Center cleanup
+- Native release gate now requires the dedicated Fleet supervisor process to be alive in addition to the primary Bot process.
+- Removed the obsolete Control Center logout button/redirect; local Dashboard has no end-user login flow.
+- Deployment contract locks both checks against regression.
+- Local setup instructions now use native Windows as the normal local path and the native release gate as the operator preflight.
+- The preceding registration-rate-limit checkpoint was verified by CI #1717; this cleanup is the next verification target.
+
+
+## 2026-10-04 — Native diagnostics checkpoint
+- Added read-only `scripts/native-diagnostics.ps1` for native Windows runtime snapshots.
+- The report covers primary Bot/Fleet/Lavalink/Dashboard PID state, Bot health, Management API 401/authenticated access, Fleet identity readiness and Lavalink versions.
+- Plaintext and JSON modes both avoid printing credentials.
+- CI verification for this checkpoint is pending.
+
+
+## 2026-10-04 — Native runtime verification checkpoint
+- CI #1720 passed the complete automated pipeline for the native Windows acceptance tooling checkpoint.
+- Verified statically: native Fleet supervisor lifecycle, native release-gate PID checks, native diagnostics, no-login Control Center cleanup, endpoint-scoped bot-registration throttling and native-first documentation.
+- The repository-side local runtime path is now consistently documented as native Windows first; Docker remains optional for VPS/reproducible deployment.
+- Live target-machine acceptance remains the next boundary: real Discord Gateway/permissions, secondary-bot process behavior, Lavalink audio continuity, restart/chaos/soak and clean-host validation.
+
+## 2026-10-04 — Feature completeness audit checkpoint (historical)
+- This snapshot recorded the state **before** the subsequent technical completion pass.
+- It intentionally identified the then-open AutoMod/Security, Automation, Music, Fleet and VPS breadth gaps.
+- Those code-level gaps were subsequently closed during the 2026-10-05 implementation pass; the current authoritative status is the **Technical implementation freeze** near the top of this document.
+- The remaining boundary is now verification/live acceptance, not the missing foundational work listed by this historical snapshot.
+
+
+## 2026-10-04 — Automation breadth checkpoint
+- Automation now includes richer string-prefix/suffix and exact-numeric conditions plus a message reaction action.
+- Event-relative role checks and event-channel message delivery are aligned between the Dashboard UI and Core validation/runtime.
+- The Automation Discord ID validators now use the intended snowflake regex form.
+- The remaining Automation status is still broader than this slice: additional condition/action catalog depth and live validation remain outstanding.
+
+
+## 2026-10-04 — Automation message controls
+- Automation now supports remove-reaction plus pin/unpin message actions in the persisted rule model and Dashboard builder.
+
+## 2026-10-04 — Music playlist/search breadth
+- Multi-track Music search results are preserved up to a bounded 100-track queue insertion limit.
+- Auto text search can fall back across the built-in YouTube, YouTube Music and SoundCloud sources.
+
+## 2026-10-04 — Music queue management
+- Music now has explicit upcoming-queue remove, move and clear controls across Core, Dashboard, Management API and Discord commands.
+
+## 2026-10-04 — Music audio filters
+- Music now includes native built-in audio filter presets exposed consistently across Discord, API and Dashboard.
+
+## 2026-10-04 — Security audit coverage
+- Security now consumes dedicated Discord audit-log entry events for additional anti-nuke operations beyond channel/role creation/deletion and bans.
+
+## 2026-10-04 — Automation API parity
+- Management API validation is now aligned with the current Automation domain/runtime catalog, including the newer condition and message-action types.
+
+## 2026-10-04 — Fleet restart workflow
+- Fleet now exposes an operator-facing durable restart request for secondary identities.
+- Dashboard reflects the pending restart state already tracked by bot heartbeats.
+
+## 2026-10-04 — Automation event field breadth
+- Automation message events now expose attachment/embed/sticker counts and voice transitions expose the previous channel ID.
+- Runtime, Management API and Dashboard field catalogs remain synchronized; no migration was required.
+
+## 2026-10-04 — Automation channel naming
+- Automation can now rename the triggering or explicitly selected channel with `set-channel-name` and template rendering.
+- The action is wired through Domain, Core, Management API and Dashboard with validation and regression coverage.
+
+## 2026-10-04 — Automation event/action breadth
+- Automation now consumes reaction removal and channel/role update events and can apply slowmode/topic channel actions.
+
+
+## 2026-10-04 — Security executor timeout response checkpoint
+- Security now supports a configurable executor timeout as an additional Anti-Nuke response, alongside existing role stripping and quarantine.
+- executorTimeoutMinutes is persisted in security_settings, surfaced in the Control Center, and included in config export/import.
+- The response is hierarchy-safe: it only targets a member accepted by the existing manageable/administrator/owner guards and requires member.moderatable before timeout.
+- Successful timeout enforcement creates the normal durable moderation timeout case and emits moderation.case; failed Discord enforcement does not create a false case.
+- Migration 49 and regression tests cover the new policy.
+- Development feature commit: 0722ed241e3a677b27c73dac8bd41edc20e93c29.
+- Fresh CI verification is pending for this development tree.
+
+## 2026-10-04 — Security + Automation breadth checkpoint
+- Security response policy now supports an optional executor timeout in addition to the existing role stripping/quarantine response.
+- Automation now supports strict numeric comparisons `number-gt` and `number-lt`; the Dashboard builder renders `number-eq` correctly and exposes the new operators.
+- Core, Management API and Dashboard catalogs remain aligned for the supported Automation condition set.
+- Latest development HEAD: `4c69d5644b5e35fd5497619c008642c74ece02dd`.
+- CI #1783 is the active verification gate and is currently pending.
+
+
+## 2026-10-04 — Security response policy depth checkpoint
+- Security response policy now supports three independent escalation tools for confirmed destructive executors: manageable-role stripping, optional timeout and optional ban.
+- Ban is conservative by default (`false`) and is guarded by the same owner/Administrator/manageability/hierarchy model used by the existing response path.
+- Successful ban and timeout actions create durable moderation cases only after Discord enforcement succeeds.
+- Latest development HEAD before documentation update: `afeb5c184cbb1d19b1033c9600593f0274326453`.
+- CI #1795 is the active verification gate.
+
+
+## 2026-10-04 — Security lockdown + Automation Dashboard repair
+- Security now has optional incident lockdown of manageable text channels, persisted by incident/channel ownership and reversible during incident resolution.
+- Security response depth now includes role stripping, optional ban, timeout fallback and optional server lockdown.
+- Automation Dashboard now has a fully restored builder with strict numeric conditions `number-eq`, `number-gt`, and `number-lt` rendered in ALL and ANY builders.
+- CI #1811 is green on the feature tree.
+- Current documented HEAD: `ed4b68e96dc35e5c7f1379b6974e9521e8d4d949`.
+
+
+## 2026-10-04 — Verified Security / Automation / Fleet breadth
+- Security response depth now includes optional lockdown, executor timeout and executor ban/fallback.
+- Automation now has strict numeric comparisons and named cooldown set/clear controls.
+- AutoMod rule responses include delete, timeout, warn, log and verified ban.
+- Fleet now fails over both guild ownership and stale Music voice assignments.
+- CI #1824 is green on the current feature tree.
+
+## 2026-10-05 — Current verified implementation
+- Automation: `set-nickname` + `ban` are implemented end-to-end and covered by runtime/validation tests.
+- Fleet: stale guild and stale Music voice takeover are active; takeover records previous owner detail for durable audit.
+- AutoMod: rule-level `ban` is verified.
+- CI #1837 is green.
+
+
+## 2026-10-05 — Current verified state
+- Automation: `set-nickname` and `ban` are green under CI #1839.
+- Security, AutoMod and Fleet breadth previously verified remains active.
+- Current code tree has no known typecheck/test/build failures; live Discord hierarchy and multi-process failover remain environment-gate items.
+
+
+## 2026-10-05 — Latest verified Automation state
+- Automation moderation actions now include verified `timeout`, `ban` and `kick`.
+- `set-nickname`, named cooldown controls and the recent Fleet failover work remain green on the current tree.
+- CI #1845 is green.
+
+
+## 2026-10-05 — Documentation and legacy cleanup
+- Removed obsolete unused Dashboard implementations: `apps/dashboard/app/dashboard-client.tsx` and `apps/dashboard/app/discord-admin.tsx`. The active entrypoint is `apps/dashboard/app/page.tsx` -> `control-center.tsx`.
+- Removed superseded `docs/VEXA-ADMIN-BLUEPRINT.md`; current Dashboard architecture is documented by the live Control Center, Master Plan, Admin Guide and project state.
+- Corrected stale Dashboard-auth wording: local Control Center has no end-user login/session UI and no Dashboard admin password.
+- Corrected Multi-Bot documentation so primary credentials are bootstrapped from `.env`, while registered secondary credentials are encrypted in PostgreSQL.
+- Removed obsolete secondary identity token placeholders from `.env.example`.
+- Removed stale Vexa branding from the native Windows documentation/runtime messages.
+- Replaced the outdated implementation-order document with a current RC/completion strategy.
+- Compressed `docs/CHAT-CONTEXT.md` into a current handoff snapshot and aligned `docs/TEST-STRATEGY.md` with the checks the repository actually runs.
+- This cleanup does not remove any implemented feature or administrative capability.
+
+
+## 2026-10-05 — Technical implementation freeze
+- Closed the known code-level completion gaps identified during the pre-test pass: Automation warn + create-channel, Automation scheduler guild-index bug, persisted moderation channel-lock cleanup, expanded AutoMod detectors, Spotify/Yandex Music provider wiring, Docker optional Lavalink2 topology, VPS bootstrap/upgrade secret repair and cleanup of legacy Dashboard implementations/contracts.
+- Current work now switches from feature construction to verification. The next objective is to exercise the implemented system systematically and convert every real failure into a regression fix.
+
+
+## 2026-10-05 — First verification baseline
+- CI #2442 passed the complete repository verification pipeline on the first post-freeze runtime test baseline: source hygiene, deployment/observability contracts, typecheck, bot tests, domain build, bot build and Dashboard build.
+- The first test failure discovered after the freeze was stale Music provider expectations; those were updated to the now-supported Spotify/Yandex providers. New AutoMod detector and Automation runtime tests were added and pass.
+- Subsequent verification work is now focused on the live/runtime matrix; feature work remains frozen unless a test exposes a concrete defect.

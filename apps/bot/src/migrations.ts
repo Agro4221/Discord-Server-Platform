@@ -657,7 +657,207 @@ const migrations = [
       "CREATE UNIQUE INDEX IF NOT EXISTS uq_stream_alert_guild_target ON stream_alerts(guild_id,platform,target,channel_id);",
       "CREATE INDEX IF NOT EXISTS idx_stream_alerts_due ON stream_alerts(enabled,last_checked_at,interval_seconds);"
     ])
-  }
+  },
+  {
+    version: 40,
+    name: "persistent_afk",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS afk_users (",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  reason text NOT NULL DEFAULT 'Отошёл',",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,user_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_afk_users_guild ON afk_users(guild_id);"
+    ])
+  },
+  {
+    version: 41,
+    name: "community_tools",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS polls (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  message_id text,",
+      "  question text NOT NULL,",
+      "  options jsonb NOT NULL,",
+      "  ends_at timestamptz NOT NULL,",
+      "  closed boolean NOT NULL DEFAULT false,",
+      "  closed_at timestamptz,",
+      "  created_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_polls_guild_active ON polls(guild_id,closed,ends_at);",
+      "CREATE TABLE IF NOT EXISTS poll_votes (",
+      "  poll_id bigint NOT NULL REFERENCES polls(id) ON DELETE CASCADE,",
+      "  user_id text NOT NULL,",
+      "  option_index integer NOT NULL CHECK(option_index BETWEEN 0 AND 4),",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(poll_id,user_id)",
+      ");",
+      "CREATE TABLE IF NOT EXISTS suggestions (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  message_id text,",
+      "  user_id text NOT NULL,",
+      "  content text NOT NULL,",
+      "  status text NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','denied')),",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_suggestions_guild_status ON suggestions(guild_id,status,created_at DESC);",
+      "CREATE TABLE IF NOT EXISTS sticky_messages (",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  message text NOT NULL,",
+      "  enabled boolean NOT NULL DEFAULT true,",
+      "  last_message_id text,",
+      "  updated_at timestamptz NOT NULL DEFAULT now(),",
+      "  PRIMARY KEY(guild_id,channel_id)",
+      ");"
+    ])
+  },
+  {
+    version: 42,
+    name: "discord_event_logging",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS logging_settings (",
+      "  guild_id text PRIMARY KEY,",
+      "  enabled boolean NOT NULL DEFAULT false,",
+      "  channel_id text,",
+      "  message_delete boolean NOT NULL DEFAULT true,",
+      "  message_edit boolean NOT NULL DEFAULT true,",
+      "  member_join boolean NOT NULL DEFAULT true,",
+      "  member_leave boolean NOT NULL DEFAULT true,",
+      "  member_update boolean NOT NULL DEFAULT true,",
+      "  voice boolean NOT NULL DEFAULT true,",
+      "  channel_delete boolean NOT NULL DEFAULT true,",
+      "  role_delete boolean NOT NULL DEFAULT true,",
+      "  bans boolean NOT NULL DEFAULT true,",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_logging_settings_enabled ON logging_settings(enabled,guild_id);"
+    ])
+  },
+  {
+    version: 43,
+    name: "security_incident_lifecycle",
+    sql: q([
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS incident_duration_seconds integer NOT NULL DEFAULT 300 CHECK(incident_duration_seconds BETWEEN 60 AND 3600);",
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS auto_quarantine boolean NOT NULL DEFAULT true;",
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS remove_executor_roles boolean NOT NULL DEFAULT true;",
+      "CREATE TABLE IF NOT EXISTS security_incidents (",
+      "  id bigserial PRIMARY KEY,",
+      "  guild_id text NOT NULL,",
+      "  event_type text NOT NULL CHECK(event_type IN ('raid','destructive-burst')),",
+      "  started_at timestamptz NOT NULL DEFAULT now(),",
+      "  expires_at timestamptz NOT NULL,",
+      "  resolved_at timestamptz,",
+      "  metadata jsonb NOT NULL DEFAULT '{}'::jsonb",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_security_incidents_guild_active ON security_incidents(guild_id,expires_at DESC) WHERE resolved_at IS NULL;",
+      "CREATE TABLE IF NOT EXISTS security_quarantine_assignments (",
+      "  incident_id bigint NOT NULL REFERENCES security_incidents(id) ON DELETE CASCADE,",
+      "  guild_id text NOT NULL,",
+      "  user_id text NOT NULL,",
+      "  role_id text NOT NULL,",
+      "  assigned_at timestamptz NOT NULL DEFAULT now(),",
+      "  restored_at timestamptz,",
+      "  PRIMARY KEY(incident_id,user_id,role_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_security_quarantine_assignments_cleanup ON security_quarantine_assignments(incident_id,restored_at,user_id);"
+    ])
+  },
+  {
+    version: 44,
+    name: "bot_identity_failover",
+    sql: q([
+      "ALTER TABLE bot_identities ADD COLUMN IF NOT EXISTS failover_enabled boolean NOT NULL DEFAULT false;",
+      "CREATE INDEX IF NOT EXISTS idx_bot_identities_failover ON bot_identities(enabled,failover_enabled);"
+    ])
+  },
+  {
+    version: 45,
+    name: "logging_extended_events",
+    sql: q([
+      "ALTER TABLE logging_settings ADD COLUMN IF NOT EXISTS message_bulk_delete boolean NOT NULL DEFAULT true;",
+      "ALTER TABLE logging_settings ADD COLUMN IF NOT EXISTS reactions boolean NOT NULL DEFAULT true;",
+      "ALTER TABLE logging_settings ADD COLUMN IF NOT EXISTS channel_update boolean NOT NULL DEFAULT true;",
+      "ALTER TABLE logging_settings ADD COLUMN IF NOT EXISTS role_update boolean NOT NULL DEFAULT true;"
+    ])
+  }  ,{
+    version: 46,
+    name: "bot_credentials",
+    sql: q([
+      "CREATE TABLE IF NOT EXISTS bot_credentials (",
+      "  bot_identity_id text PRIMARY KEY REFERENCES bot_identities(id) ON DELETE CASCADE,",
+      "  token_ciphertext text NOT NULL,",
+      "  token_iv text NOT NULL,",
+      "  token_auth_tag text NOT NULL,",
+      "  token_fingerprint text NOT NULL,",
+      "  username text,",
+      "  global_name text,",
+      "  created_at timestamptz NOT NULL DEFAULT now(),",
+      "  updated_at timestamptz NOT NULL DEFAULT now()",
+      ");"
+    ])
+  },
+  {
+    version: 47,
+    name: "automod_log_channel",
+    sql: q([
+      "ALTER TABLE automod_rules ADD COLUMN IF NOT EXISTS log_channel_id text;"
+    ])
+  },
+  {
+    version: 48,
+    name: "fleet_restart_requests",
+    sql: q([
+      "ALTER TABLE bot_heartbeats ADD COLUMN IF NOT EXISTS restart_required boolean NOT NULL DEFAULT false;"
+    ])
+  },
+  {
+    version: 49,
+    name: "security_executor_timeout",
+    sql: q([
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS executor_timeout_minutes integer NOT NULL DEFAULT 0 CHECK(executor_timeout_minutes BETWEEN 0 AND 40320);"
+    ])
+  },
+  {
+    version: 50,
+    name: "security_executor_ban",
+    sql: q([
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS executor_ban_enabled boolean NOT NULL DEFAULT false;"
+    ])
+  },
+  {
+    version: 51,
+    name: "security_incident_lockdown",
+    sql: q([
+      "ALTER TABLE security_settings ADD COLUMN IF NOT EXISTS auto_lockdown boolean NOT NULL DEFAULT false;",
+      "CREATE TABLE IF NOT EXISTS security_channel_locks (",
+      "  incident_id bigint NOT NULL REFERENCES security_incidents(id) ON DELETE CASCADE,",
+      "  guild_id text NOT NULL,",
+      "  channel_id text NOT NULL,",
+      "  previous_send_messages boolean,",
+      "  owned boolean NOT NULL DEFAULT true,",
+      "  locked_at timestamptz NOT NULL DEFAULT now(),",
+      "  restored_at timestamptz,",
+      "  PRIMARY KEY(incident_id,channel_id)",
+      ");",
+      "CREATE INDEX IF NOT EXISTS idx_security_channel_locks_cleanup ON security_channel_locks(guild_id,channel_id,restored_at);"
+    ])
+  },
+  {
+    version: 52,
+    name: "automod_ban_action",
+    sql: q([
+      "ALTER TABLE automod_rules DROP CONSTRAINT IF EXISTS automod_rules_action_check;",
+      "ALTER TABLE automod_rules ADD CONSTRAINT automod_rules_action_check CHECK(action IN ('delete','timeout','warn','log','ban'));"
+    ])
+  },
 ] as const;
 
 export async function migrate(db: Database): Promise<void> {

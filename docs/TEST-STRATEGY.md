@@ -6,14 +6,11 @@ This project is treated as a reliability-critical system. Testing is not a final
 
 ### 1. Static verification
 - TypeScript strict type checking
-- linting
-- formatting
 - dependency audit
-- secret scanning
-- forbidden-file/path checks
+- source-secret hygiene checks
+- deployment/observability contract checks
 - schema validation
 - migration consistency
-- dead-code and unreachable-code checks where tooling supports them
 
 ### 2. Unit verification
 Every deterministic domain rule must have tests:
@@ -40,7 +37,7 @@ Verify real component boundaries:
 - Lavalink
 - worker jobs
 - filesystem/persistent volumes
-- OAuth login
+- protected Management API bearer flow
 - provider adapters
 
 ### 4. End-to-end verification
@@ -82,7 +79,6 @@ We intentionally try to break the system.
 - PostgreSQL unavailable
 - Lavalink unavailable
 - provider unavailable
-- OAuth unavailable
 - filesystem read/write failure
 
 ### Discord-state drift
@@ -119,9 +115,8 @@ We intentionally try to break the system.
 
 ### Security abuse
 - privilege escalation through role hierarchy
-- dashboard session fixation/hijacking attempts
-- CSRF attempts
-- replay of stale actions
+- Management API bearer-key leakage/replay attempts
+- replay of stale dashboard actions
 - unauthorized guild access
 - cross-guild data leakage
 - secret leakage in logs/errors

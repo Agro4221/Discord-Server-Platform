@@ -1,0 +1,276 @@
+
+
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Auto-Update of pgAdmin 4 Desktop Application &#8212; pgAdmin 4 9.18 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/style.css?v=d36593c3" />
+    
+    <script src="_static/documentation_options.js?v=0b707c8b"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <script src="_static/sidebar.js"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Server Deployment" href="server_deployment.html" />
+    <link rel="prev" title="Desktop Deployment" href="desktop_deployment.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="server_deployment.html" title="Server Deployment"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="desktop_deployment.html" title="Desktop Deployment"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">pgAdmin 4 9.18 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="getting_started.html" >Getting Started</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="deployment.html" >Deployment</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="desktop_deployment.html" accesskey="U">Desktop Deployment</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Auto-Update of pgAdmin 4 Desktop Application</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="auto-update-of-pgadmin-4-desktop-application">
+<h1>Auto-Update of pgAdmin 4 Desktop Application<a class="headerlink" href="#auto-update-of-pgadmin-4-desktop-application" title="Link to this heading">¶</a></h1>
+<p>pgAdmin 4’s desktop application includes an automated update system built using
+Electron’s <code class="docutils literal notranslate"><span class="pre">autoUpdater</span></code> module. This feature enables users to receive and install
+updates seamlessly, ensuring they always have access to the latest features and security fixes.</p>
+<section id="supported-platforms">
+<h2>Supported Platforms<a class="headerlink" href="#supported-platforms" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><strong>macOS:</strong> Fully supported with automatic updates enabled by default</p></li>
+<li><p><strong>Windows:</strong> Not supported</p></li>
+<li><p><strong>Linux:</strong> Not supported</p></li>
+</ul>
+</section>
+<section id="update-process-overview">
+<h2>Update Process Overview<a class="headerlink" href="#update-process-overview" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Check for Updates:</strong></p>
+<ul class="simple">
+<li><p>Automatic check on application startup</p></li>
+<li><p>Manual check available via pgAdmin 4 menu &gt; Check for Updates</p></li>
+<li><p>Uses Electron’s <code class="docutils literal notranslate"><span class="pre">autoUpdater</span></code> API to query update server</p></li>
+</ul>
+</li>
+<li><p><strong>Download Process:</strong></p>
+<ul class="simple">
+<li><p>Updates download automatically when detected</p></li>
+<li><p>Progress shown via notifications</p></li>
+<li><p>Background download prevents interruption of work</p></li>
+</ul>
+</li>
+<li><p><strong>Installation Flow:</strong></p>
+<ul class="simple">
+<li><p>User prompted to Install &amp; Restart or Restart Later when update ready</p></li>
+<li><p>Update applied during application restart</p></li>
+</ul>
+</li>
+</ol>
+<blockquote>
+<div><p>The flow chart for the update process is as follows:</p>
+<img alt="Auto-update Desktop App" class="align-center" src="_images/auto_update_desktop_app.png" />
+</div></blockquote>
+</section>
+<section id="user-interface-components">
+<h2>User Interface Components<a class="headerlink" href="#user-interface-components" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Notification Types:</strong></p>
+<ul class="simple">
+<li><p>Update available</p></li>
+<li><p>Download progress</p></li>
+<li><p>Update ready to install</p></li>
+<li><p>Error notifications</p></li>
+</ul>
+</li>
+<li><p><strong>Menu Integration:</strong></p>
+<ul class="simple">
+<li><p>Check for Updates option in pgAdmin 4 menu</p></li>
+<li><p>Restart to Update option when  update available</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="error-handling">
+<h2>Error Handling<a class="headerlink" href="#error-handling" title="Link to this heading">¶</a></h2>
+<p>The system includes comprehensive error handling:</p>
+<ol class="arabic simple">
+<li><p><strong>Network Errors:</strong></p>
+<ul class="simple">
+<li><p>Connection timeouts</p></li>
+<li><p>Download failures</p></li>
+<li><p>Server unavailability</p></li>
+</ul>
+</li>
+<li><p><strong>Installation Errors:</strong></p>
+<ul class="simple">
+<li><p>Corrupted downloads</p></li>
+</ul>
+</li>
+<li><p><strong>Recovery Mechanisms:</strong></p>
+<ul class="simple">
+<li><p>Fallback to manual update</p></li>
+<li><p>Error reporting to logs</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="security-considerations">
+<h2>Security Considerations<a class="headerlink" href="#security-considerations" title="Link to this heading">¶</a></h2>
+<p>The update system implements below security measures:</p>
+<ol class="arabic simple">
+<li><p><strong>Secure Communication:</strong></p>
+<ul class="simple">
+<li><p>Protected update metadata</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="platform-specific-notes">
+<h2>Platform-Specific Notes<a class="headerlink" href="#platform-specific-notes" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>macOS:</strong></p>
+<ul class="simple">
+<li><p>Uses native update mechanisms</p></li>
+<li><p>Requires signed packages</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://www.electronjs.org/docs/latest/api/auto-updater">Electron autoUpdater API Documentation</a></p></li>
+</ul>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Auto-Update of pgAdmin 4 Desktop Application</a><ul>
+<li><a class="reference internal" href="#supported-platforms">Supported Platforms</a></li>
+<li><a class="reference internal" href="#update-process-overview">Update Process Overview</a></li>
+<li><a class="reference internal" href="#user-interface-components">User Interface Components</a></li>
+<li><a class="reference internal" href="#error-handling">Error Handling</a></li>
+<li><a class="reference internal" href="#security-considerations">Security Considerations</a></li>
+<li><a class="reference internal" href="#platform-specific-notes">Platform-Specific Notes</a></li>
+<li><a class="reference internal" href="#references">References</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+<h3><a href="index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="getting_started.html">Getting Started</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="deployment.html">Deployment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="login.html">Login Page</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mfa.html">Enabling two-factor authentication (2FA)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_management.html">User Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="change_ownership.html">Change Ownership Dialog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="change_user_password.html">Change User Password Dialog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="restore_locked_user.html">Lock/Restore Account</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ldap.html">Enabling LDAP Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="kerberos.html">Enabling Kerberos Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="oauth2.html">Enabling OAUTH2 and OIDC Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="webserver.html">Enabling Webserver Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_interface.html">User Interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="menu_bar.html">Menu Bar</a></li>
+<li class="toctree-l2"><a class="reference internal" href="toolbar.html">Toolbar</a></li>
+<li class="toctree-l2"><a class="reference internal" href="toolbar.html#object-explorer-filter">Object Explorer Filter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tabbed_browser.html">Tabbed Browser</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tree_control.html">Tree Control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="preferences.html">Preferences</a></li>
+<li class="toctree-l2"><a class="reference internal" href="keyboard_shortcuts.html">Keyboard Shortcuts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_objects.html">Search objects</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="external_database.html">External database for pgAdmin user settings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="connecting.html">Connecting To A Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="managing_cluster_objects.html">Managing Cluster Objects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="managing_database_objects.html">Managing Database Objects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modifying_tables.html">Creating or Modifying a Table</a></li>
+<li class="toctree-l1"><a class="reference internal" href="management_basics.html">Management Basics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="backup_and_restore.html">Backup and Restore</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developer_tools.html">Developer Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processes.html">Processes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pgagent.html">pgAgent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributions.html">pgAdmin Project Contributions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_notes.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="licence.html">Licence</a></li>
+</ul>
+
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+<div id="sidebarbutton" title="Collapse sidebar">
+<span>«</span>
+</div>
+
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="server_deployment.html" title="Server Deployment"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="desktop_deployment.html" title="Desktop Deployment"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">pgAdmin 4 9.18 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="getting_started.html" >Getting Started</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="deployment.html" >Deployment</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="desktop_deployment.html" >Desktop Deployment</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Auto-Update of pgAdmin 4 Desktop Application</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        <div class="related" role="navigation" aria-label="related navigation">
+          <ul>
+              <li class="left" style="margin-left: 10px">&#169; Copyright (C) 2013 - 2026, The pgAdmin Development Team.</li>
+            <li class="right" style="margin-right: 10px"><a href="genindex.html" title="General Index">index</a></li>
+            <li class="right" ><a href="server_deployment.html" title="Server Deployment">next</a> |</li>
+            <li class="right" ><a href="desktop_deployment.html" title="Desktop Deployment">previous</a> |</li>
+          </ul>
+        </div>
+    </div>
+  </body>
+</html>

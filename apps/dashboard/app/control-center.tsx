@@ -3,12 +3,29 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { AnalyticsPanel } from "./analytics-panel";
+import { AutoModRulesPanel } from "./automod-rules-panel";
 import { AutomationPanel } from "./automation-panel";
 import { BackupPanel } from "./backup-panel";
 import { FleetPanel } from "./fleet-panel";
 import { GiveawaysPanel } from "./giveaways-panel";
 import { NotificationsPanel } from "./notifications-panel";
 import { RolePanelsEditor } from "./role-panels-editor";
+import { CustomCommandsPanel } from "./custom-commands-panel";
+import { StreamAlertsPanel } from "./stream-alerts-panel";
+import { EconomyShopPanel } from "./economy-shop-panel";
+import { ModerationPanel } from "./moderation-panel";
+import { MusicPanel } from "./music-panel";
+import { TicketsPanel } from "./tickets-panel";
+import { LevelingPanel } from "./leveling-panel";
+import { CommandPoliciesPanel } from "./command-policies-panel";
+import { StarboardPanel } from "./starboard-panel";
+import { ServerSettingsPanel } from "./server-settings-panel";
+import { DiscordDiagnosticsPanel } from "./discord-diagnostics-panel";
+import { CommunityToolsPanel } from "./community-tools-panel";
+import { VerificationPanel } from "./verification-panel";
+import { SecurityPanel } from "./security-panel";
+import { WelcomePanel } from "./welcome-panel";
+import { TemporaryVoicePanel } from "./temporary-voice-panel";
 
 type View = "overview" | "category" | "module" | "functions" | "system" | "audit";
 type Guild = { id: string; name: string; icon: string | null; memberCount?: number; channelCount?: number; roleCount?: number };
@@ -29,6 +46,12 @@ type Resource = { id: string; name: string; type?: number; position?: number; ma
 type AuditEvent = { action: string; target_id: string | null; created_at: string };
 type CatalogItem = { key: string; title: string; description: string };
 type Health = { status: string; discord: string; database: string } | null;
+type RuntimeLog = {
+  ts: string;
+  level: "INFO" | "WARN" | "ERROR";
+  message: string;
+  meta?: Record<string, unknown>;
+};
 
 type Category = {
   key: "moderation" | "server" | "community" | "automation" | "integrations" | "system";
@@ -83,7 +106,7 @@ const CATEGORIES: Category[] = [
     label: "Интеграции и медиа",
     eyebrow: "INTEGRATIONS & MEDIA",
     icon: "◌",
-    summary: "Ленты, музыка/Lavalink и аналитика активности."
+    summary: "Ленты, музыка/yt-dlp + FFmpeg и аналитика активности."
   },
   {
     key: "system",
@@ -108,7 +131,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Kick / Ban / Unban", description: "Модерационные действия с проверкой прав и иерархии." },
       { title: "История", description: "Просмотр последних moderation cases по пользователю." }
     ],
-    kind: "discord"
+    kind: "full"
   },
   automod: {
     icon: "⌁",
@@ -124,7 +147,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Исключения", description: "Исключение отдельных каналов и ролей." },
       { title: "Реакция", description: "Удаление сообщения и опциональный timeout." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   security: {
     icon: "◉",
@@ -139,7 +162,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Quarantine", description: "Поддержка quarantine-роли как защитного контура." },
       { title: "Hierarchy check", description: "Диагностика и проверка роли бота перед защитными действиями." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   "temporary-voice": {
     icon: "◌",
@@ -147,7 +170,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
     title: "Temporary Voice",
     summary: "Комнаты, создаваемые при входе в voice-триггер.",
     category: "server",
-    commands: ["/setup temp-voice"],
+    commands: ["/setup temp-voice", "/voice"],
     functions: [
       { title: "Create-on-join", description: "Создание временной комнаты при входе в триггер-канал." },
       { title: "Лимит участников", description: "Задание лимита комнаты по умолчанию." },
@@ -155,7 +178,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Категория", description: "Размещение создаваемых комнат в выбранной категории." },
       { title: "Recovery", description: "Reconciliation после рестарта и очистка освобождённых комнат." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   welcome: {
     icon: "✧",
@@ -164,12 +187,13 @@ const MODULE_META: Record<string, ModuleMeta> = {
     summary: "Приветствия, goodbye и отправка сообщений.",
     category: "server",
     commands: ["/welcome setup"],
+
     functions: [
       { title: "Welcome message", description: "Сообщение при входе нового участника." },
       { title: "DM", description: "Опциональная копия приветствия в личные сообщения." },
       { title: "Embeds", description: "Переключение embed-оформления сообщения." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   verification: {
     icon: "✓",
@@ -184,7 +208,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Verification panel", description: "Публикация пользовательского verification-панели." },
       { title: "Логи", description: "Отдельный канал для событий verification." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   roles: {
     icon: "♢",
@@ -213,7 +237,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Close / archive", description: "Закрытие тикета с обработкой stale-состояний." },
       { title: "Transcripts", description: "Публикация transcript в выделенный канал." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   leveling: {
     icon: "↗",
@@ -228,7 +252,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Rank", description: "Просмотр собственного или чужого ранга." },
       { title: "Leaderboard", description: "Таблица лидеров сервера." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   giveaways: {
     icon: "🎁",
@@ -257,7 +281,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Filtering", description: "Игнорирование собственных реакций и ботов." },
       { title: "Publishing", description: "Безопасная публикация с rollback при ошибке БД." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   economy: {
     icon: "◍",
@@ -272,7 +296,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Leaderboard", description: "Таблица самых богатых участников." },
       { title: "Shop", description: "Магазин с ролями, ценой и ограниченным stock." }
     ],
-    kind: "discord"
+    kind: "full"
   },
   reminders: {
     icon: "◷",
@@ -286,6 +310,84 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Retry / lease", description: "Фоновая доставка использует lease/retry semantics." }
     ],
     kind: "discord"
+  },
+  utility: {
+    icon: "⌘",
+    accent: "#8fc7e8",
+    title: "Utility",
+    summary: "Информация о сервере и участниках, аватары, роли, каналы и AFK.",
+    category: "community",
+    commands: ["/serverinfo", "/userinfo", "/avatar", "/membercount", "/roleinfo", "/channelinfo", "/afk set", "/afk clear", "/afk status"],
+    functions: [
+      { title: "Server info", description: "Статистика сервера: участники, роли, каналы, бусты и владелец." },
+      { title: "User info", description: "Карточка пользователя с датами создания/входа и ролями." },
+      { title: "Avatars", description: "Показ аватара выбранного участника в высоком качестве." },
+      { title: "Role / channel info", description: "Быстрый просмотр основных свойств роли или канала." },
+      { title: "Persistent AFK", description: "AFK сохраняется в PostgreSQL, автоматически снимается при возвращении и уведомляет о статусе при упоминании." }
+    ],
+    kind: "discord"
+  },
+  "stream-alerts": {
+    icon: "◍",
+    accent: "#6ea6ee",
+    title: "Stream Alerts",
+    summary: "Уведомления о начале трансляций Twitch, YouTube и VK Live.",
+    category: "integrations",
+    commands: ["/stream-alert"],
+    functions: [
+      { title: "Live notifications", description: "Отправка уведомления при переходе стримера в live." },
+      { title: "Providers", description: "Twitch, YouTube и VK Video Live через существующие provider adapters." },
+      { title: "Mentions", description: "Опциональное упоминание роли при старте трансляции." },
+      { title: "State / retry", description: "Хранение последнего состояния и повторная проверка после ошибок." }
+    ],
+    kind: "full"
+  },
+  "custom-commands": {
+    icon: "⌘",
+    accent: "#9cb6f4",
+    title: "Custom Commands",
+    summary: "Пользовательские команды, aliases, role actions и ограничения по каналам/ролям.",
+    category: "automation",
+    commands: ["custom commands", "prefix / slash"],
+    functions: [
+      { title: "Ответы", description: "Собственные команды с шаблонами {user}, {mention}, {server}, {channel}, {args}." },
+      { title: "Aliases", description: "Псевдонимы для существующих команд с единым доступом через prefix/slash." },
+      { title: "Role actions", description: "Выдача, снятие и toggle роли с проверкой иерархии." },
+      { title: "Ограничения", description: "Разрешённые роли, каналы и cooldown для каждой команды." }
+    ],
+    kind: "full"
+  },
+  logging: {
+    icon: "▤",
+    accent: "#d3a4f0",
+    title: "Logging",
+    summary: "Discord event logging в отдельный канал с выбором категорий.",
+    category: "system",
+    commands: ["/logging setup", "!logging setup"],
+    functions: [
+      { title: "Message logs", description: "Удаление, редактирование и массовое удаление сообщений." },
+      { title: "Reaction logs", description: "Добавление и снятие реакций с сообщениями." },
+      { title: "Member logs", description: "Вход, выход и изменения участников." },
+      { title: "Voice logs", description: "Входы, выходы и перемещения в voice." },
+      { title: "Server structure", description: "Создание, удаление и изменение каналов и ролей." },
+      { title: "Ban / Unban", description: "События блокировки и снятия блокировки." }
+    ],
+    kind: "settings"
+  },
+  "community-tools": {
+    icon: "✦",
+    accent: "#e6a86b",
+    title: "Community Tools",
+    summary: "Опросы, предложения, sticky-сообщения и небольшие fun-команды.",
+    category: "community",
+    commands: ["/poll", "/suggest", "/sticky set", "/sticky clear", "/8ball", "/choose", "/roll"],
+    functions: [
+      { title: "Опросы", description: "Интерактивные опросы до пяти вариантов с сохранением голосов и автоматическим завершением." },
+      { title: "Предложения", description: "Публикация предложений с кнопками одобрения/отклонения для модераторов." },
+      { title: "Sticky", description: "Закрепляемое сообщение, которое автоматически возвращается вниз канала после новых сообщений." },
+      { title: "Fun", description: "8-ball, выбор варианта и бросок кубиков без внешних сервисов." }
+    ],
+    kind: "full"
   },
   automation: {
     icon: "↯",
@@ -321,7 +423,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
     icon: "♫",
     accent: "#8bb8f0",
     title: "Music",
-    summary: "Lavalink, очередь, repeat, autoplay и per-voice routing.",
+    summary: "yt-dlp + FFmpeg, очередь, repeat, autoplay и per-voice routing.",
     category: "integrations",
     commands: ["/music play", "/music pause", "/music resume", "/music skip", "/music stop", "/music shuffle", "/music repeat", "/music autoplay", "/music seek", "/music queue", "/music nowplaying", "/music volume"],
     functions: [
@@ -329,10 +431,10 @@ const MODULE_META: Record<string, ModuleMeta> = {
       { title: "Queue", description: "Очередь, shuffle и повтор трека/очереди." },
       { title: "Autoplay", description: "Автоматическое продолжение после окончания очереди." },
       { title: "Voice access", description: "Управление привязано к voice-каналу или Manage Server." },
-      { title: "Lavalink health", description: "Статус модуля зависит от доступности узлов." },
+      { title: "Music tooling health", description: "Статус зависит от доступности yt-dlp и FFmpeg." },
       { title: "Multi-bot routing", description: "Отдельные bot identities могут обслуживать разные voice-каналы." }
     ],
-    kind: "settings"
+    kind: "full"
   },
   analytics: {
     icon: "▥",
@@ -349,7 +451,7 @@ const MODULE_META: Record<string, ModuleMeta> = {
   }
 };
 
-const PANEL_KEYS = new Set(["roles", "giveaways", "analytics", "automation", "notifications"]);
+const PANEL_KEYS = new Set(["moderation", "automod", "security", "temporary-voice", "roles", "giveaways", "analytics", "automation", "notifications", "custom-commands", "stream-alerts", "economy", "music", "tickets", "leveling", "starboard", "community-tools", "verification", "welcome"]);
 
 const panel = {
   background: "linear-gradient(180deg,#131720 0%,#0e1117 100%)",
@@ -380,7 +482,7 @@ export function ControlCenter() {
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [modules, setModules] = useState<ModuleState>({});
   const [schemas, setSchemas] = useState<Schema[]>([]);
-  const [resources, setResources] = useState<{ channels: Resource[]; roles: Resource[] }>({ channels: [], roles: [] });
+  const [resources, setResources] = useState<{ channels: Resource[]; roles: Resource[]; bot: { id: string; tag: string; highestRole: { id: string; name: string; position: number }; permissions: Record<string, boolean> } | null }>({ channels: [], roles: [], bot: null });
   const [selectedModule, setSelectedModule] = useState("");
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [originalValues, setOriginalValues] = useState<Record<string, unknown>>({});
@@ -393,6 +495,8 @@ export function ControlCenter() {
   const [savedAt, setSavedAt] = useState("");
   const [search, setSearch] = useState("");
   const [functionsOnly, setFunctionsOnly] = useState(false);
+  const [runtimeLogs, setRuntimeLogs] = useState<RuntimeLog[]>([]);
+  const [runtimeStopping, setRuntimeStopping] = useState(false);
 
   const selectedGuild = guilds.find((guild) => guild.id === guildId);
   const selectedSchema = useMemo(
@@ -424,21 +528,60 @@ export function ControlCenter() {
   }, [catalog, category, search]);
 
   useEffect(() => {
-    void Promise.all([
-      fetch("/api/guilds", { cache: "no-store" }).then(async (response) => response.json()),
-      fetch("/api/module-schemas", { cache: "no-store" }).then(async (response) => response.json()),
-      fetch("/api/health", { cache: "no-store" }).then(async (response) => response.json()).catch(() => null)
-    ])
-      .then(([guildResponse, schemaResponse, healthResponse]) => {
-        const nextGuilds = (guildResponse.guilds ?? []) as Guild[];
+    // Native runtime bootstrap is intentionally independent of guild selection.
+    async function loadBootstrap() {
+      try {
+        const [guildResponse, catalogResponse, schemaResponse] = await Promise.all([
+          fetch("/api/guilds", { cache: "no-store" }),
+          fetch("/api/runtime/catalog", { cache: "no-store" }),
+          fetch("/api/module-schemas", { cache: "no-store" })
+        ]);
+
+        const [guildBody, catalogBody, schemaBody] = await Promise.all([
+          guildResponse.json().catch(() => ({})),
+          catalogResponse.json().catch(() => ({})),
+          schemaResponse.json().catch(() => ({}))
+        ]);
+
+        if (!guildResponse.ok) {
+          throw new Error(String(guildBody.error ?? "guilds_failed"));
+        }
+        if (!catalogResponse.ok) {
+          throw new Error(String(catalogBody.error ?? "catalog_failed"));
+        }
+        if (!schemaResponse.ok) {
+          throw new Error(String(schemaBody.error ?? "module_schemas_failed"));
+        }
+
+        const nextCatalog = (catalogBody.catalog ?? []) as CatalogItem[];
+        const nextGuilds = (guildBody.guilds ?? []) as Guild[];
+
+        const healthResponse = await fetch("/api/health", { cache: "no-store" })
+          .then(async (response) => response.ok ? await response.json() : null)
+          .catch(() => null);
+
+        setCatalog(nextCatalog);
         setGuilds(nextGuilds);
         setGuildId((current) => current || nextGuilds[0]?.id || "");
-        setSchemas((schemaResponse.schemas ?? []) as Schema[]);
+        setSchemas((schemaBody.schemas ?? []) as Schema[]);
         setHealth(healthResponse);
-      })
-      .catch(() => setError("Не удалось загрузить Control Center."));
-  }, []);
+        setSelectedModule((current) => current || nextCatalog[0]?.key || "");
+        setError("");
+      } catch (reason) {
+        const code = reason instanceof Error ? reason.message : "bootstrap_failed";
+        const messages: Record<string, string> = {
+          unauthorized: "Control Center не может авторизоваться в Management API. Проверь MANAGEMENT_API_KEY.",
+          catalog_failed: "Management API не отдал каталог модулей платформы.",
+          module_schemas_failed: "Management API не отдал каталог настроек модулей.",
+          guilds_failed: "Management API не отдал список Discord-серверов.",
+          internal_error: "Management API вернул внутреннюю ошибку."
+        };
+        setError(messages[code] ?? "Не удалось связать Control Center с Management API: " + code);
+      }
+    }
 
+    void loadBootstrap();
+  }, []);
   useEffect(() => {
     if (!guildId) return;
     let cancelled = false;
@@ -480,7 +623,8 @@ export function ControlCenter() {
       setModules((moduleResponse?.modules ?? {}) as ModuleState);
       setResources({
         channels: (resourceResponse.channels ?? []) as Resource[],
-        roles: (resourceResponse.roles ?? []) as Resource[]
+        roles: (resourceResponse.roles ?? []) as Resource[],
+        bot: (resourceResponse.bot ?? null) as { id: string; tag: string; highestRole: { id: string; name: string; position: number }; permissions: Record<string, boolean> } | null
       });
       setAudit((auditResponse.events ?? []) as AuditEvent[]);
       setSelectedModule((current) => current || nextCatalog[0]?.key || "");
@@ -502,6 +646,44 @@ export function ControlCenter() {
       cancelled = true;
     };
   }, [guildId]);
+
+  useEffect(() => {
+    if (view !== "system") return;
+    let cancelled = false;
+
+    const loadLogs = async () => {
+      try {
+        const response = await fetch("/api/runtime/logs?limit=250", { cache: "no-store" });
+        if (!response.ok) return;
+        const body = await response.json().catch(() => ({}));
+        if (!cancelled) setRuntimeLogs((body.logs ?? []) as RuntimeLog[]);
+      } catch {}
+    };
+
+    void loadLogs();
+    const timer = window.setInterval(() => void loadLogs(), 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [view]);
+
+  async function shutdownBot() {
+    if (!window.confirm("Выключить Discord Server Platform Bot? Dashboard останется запущен.")) return;
+    setRuntimeStopping(true);
+    clearMessages();
+    try {
+      const response = await fetch("/api/runtime/shutdown", { method: "POST" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(String(body.error ?? "shutdown_failed"));
+      setNotice("Бот получил команду на штатное выключение. Control Center остаётся открытым.");
+      setHealth((current) => current ? { ...current, status: "stopping", discord: "down" } : current);
+    } catch {
+      setError("Не удалось выключить бота.");
+      setRuntimeStopping(false);
+    }
+  }
 
   useEffect(() => {
     if (!guildId || !selectedModule || !selectedSchema) return;
@@ -551,13 +733,19 @@ export function ControlCenter() {
     setSearch("");
   }
 
-  async function reloadAudit() {
+  async function reloadAudit(): Promise<void> {
     if (!guildId) return;
-    const response = await fetch(
-      "/api/guilds/" + encodeURIComponent(guildId) + "/audit?limit=60",
-      { cache: "no-store" }
-    );
-    if (response.ok) setAudit((await response.json()).events ?? []);
+    try {
+      const response = await fetch(
+        "/api/guilds/" + encodeURIComponent(guildId) + "/audit?limit=60",
+        { cache: "no-store" }
+      );
+      if (!response.ok) return;
+      const body = await response.json().catch(() => ({}));
+      setAudit((body.events ?? []) as AuditEvent[]);
+    } catch {
+      // Audit refresh is best-effort and must never make a successful action look failed.
+    }
   }
 
   async function toggle(moduleKey: string, enabled: boolean) {
@@ -677,11 +865,6 @@ export function ControlCenter() {
     }
   }
 
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
-  }
-
   const activeCategory = CATEGORIES.find((item) => item.key === category) ?? CATEGORIES[0];
   const changed = JSON.stringify(values) !== JSON.stringify(originalValues);
 
@@ -737,7 +920,6 @@ export function ControlCenter() {
               }}
             />
           </label>
-          <button type="button" onClick={() => void logout()} style={buttonStyle("secondary")}>Выйти</button>
         </header>
 
         {(notice || error) && (
@@ -794,6 +976,9 @@ export function ControlCenter() {
                 }}
                 onToggle={(key, value) => void toggle(key, value)}
                 saving={saving}
+                guildId={guildId}
+                resources={resources}
+                onChanged={reloadAudit}
               />
             )}
 
@@ -844,7 +1029,16 @@ export function ControlCenter() {
             )}
 
             {view === "system" && (
-              <SystemPage guildId={guildId} health={health} audit={audit} onAudit={() => setView("audit")} />
+              <SystemPage
+                guildId={guildId}
+                health={health}
+                audit={audit}
+                resources={resources}
+                runtimeLogs={runtimeLogs}
+                runtimeStopping={runtimeStopping}
+                onShutdown={() => void shutdownBot()}
+                onAudit={() => setView("audit")}
+              />
             )}
 
             {view === "audit" && <AuditPage audit={audit} />}
@@ -980,6 +1174,9 @@ function Overview(props: {
   onFunctions: () => void;
   onToggle: (key: string, value: boolean) => void;
   saving: boolean;
+  guildId: string;
+  resources: { channels: Resource[]; roles: Resource[] };
+  onChanged: () => void;
 }) {
   const ready = props.health?.status === "ready";
   const enabled = props.catalog.filter((item) => props.modules[item.key]);
@@ -1048,6 +1245,11 @@ function Overview(props: {
             );
           })}
         </div>
+      </section>
+
+      <section style={{ ...panel, padding: 20 }}>
+        <SectionHeader title="Server Settings" eyebrow="CORE CONFIG" />
+        <ServerSettingsPanel guildId={props.guildId} roles={props.resources.roles} channels={props.resources.channels.filter((item) => item.type === 0)} onChanged={props.onChanged} />
       </section>
 
       <section style={{ display: "grid", gridTemplateColumns: "minmax(0,1.35fr) minmax(320px,.85fr)", gap: 14 }}>
@@ -1363,6 +1565,99 @@ function ModulePage(props: {
         </section>
       )}
 
+      {props.module?.key === "starboard" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Starboard Center" eyebrow="OPERATIONS" />
+          <StarboardPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "community-tools" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Community Tools Center" eyebrow="OPERATIONS" />
+          <CommunityToolsPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0 || item.type === 5)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "moderation" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Moderation Center" eyebrow="OPERATIONS" />
+          <ModerationPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0 || item.type === 5)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "security" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Security Center" eyebrow="OPERATIONS" />
+          <SecurityPanel guildId={props.guildId} onChanged={props.onAudit} />
+        </section>
+      )}
+
+      {props.module?.key === "temporary-voice" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Temporary Voice Center" eyebrow="OPERATIONS" />
+          <TemporaryVoicePanel guildId={props.guildId} onChanged={props.onAudit} />
+        </section>
+      )}
+
+      {props.module?.key === "welcome" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Welcome Center" eyebrow="OPERATIONS" />
+          <WelcomePanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0 || item.type === 5)}
+            values={props.values}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "verification" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Verification Center" eyebrow="OPERATIONS" />
+          <VerificationPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+            {props.module?.key === "automod" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="AutoMod rule builder" eyebrow="OPERATIONS" />
+          <AutoModRulesPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            roles={props.resources.roles.filter((item) => item.manageable !== false)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "leveling" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Leveling Center" eyebrow="OPERATIONS" />
+          <LevelingPanel
+            guildId={props.guildId}
+            roles={props.resources.roles}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
       {props.module?.key === "roles" && (
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Role Panels" eyebrow="OPERATIONS" />
@@ -1378,7 +1673,7 @@ function ModulePage(props: {
       {props.module?.key === "giveaways" && (
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Giveaways" eyebrow="OPERATIONS" />
-          <GiveawaysPanel guildId={props.guildId} onChanged={props.onAudit} />
+          <GiveawaysPanel guildId={props.guildId} channels={props.resources.channels.filter((item) => item.type === 0)} onChanged={props.onAudit} />
         </section>
       )}
 
@@ -1389,15 +1684,68 @@ function ModulePage(props: {
         </section>
       )}
 
+      {props.module?.key === "custom-commands" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Custom Commands" eyebrow="OPERATIONS" />
+          <CustomCommandsPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            roles={props.resources.roles}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "economy" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Economy Shop" eyebrow="OPERATIONS" />
+          <EconomyShopPanel
+            guildId={props.guildId}
+            roles={props.resources.roles.filter((item) => item.manageable !== false)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "stream-alerts" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Stream Alerts" eyebrow="OPERATIONS" />
+          <StreamAlertsPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 0)}
+            roles={props.resources.roles}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
       {props.module?.key === "automation" && (
         <section style={{ ...panel, padding: 20 }}>
           <SectionHeader title="Automation builder" eyebrow="OPERATIONS" />
           <AutomationPanel
             guildId={props.guildId}
-            channels={props.resources.channels.filter((item) => item.type === 0)}
+            channels={props.resources.channels}
             roles={props.resources.roles.filter((item) => item.manageable !== false)}
             onChanged={props.onAudit}
           />
+        </section>
+      )}
+
+      {props.module?.key === "music" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Music Control Center" eyebrow="OPERATIONS" />
+          <MusicPanel
+            guildId={props.guildId}
+            channels={props.resources.channels.filter((item) => item.type === 2 || item.type === 13)}
+            onChanged={props.onAudit}
+          />
+        </section>
+      )}
+
+      {props.module?.key === "tickets" && (
+        <section style={{ ...panel, padding: 20 }}>
+          <SectionHeader title="Tickets Center" eyebrow="OPERATIONS" />
+          <TicketsPanel guildId={props.guildId} onChanged={props.onAudit} />
         </section>
       )}
 
@@ -1483,10 +1831,42 @@ function ModulePage(props: {
   );
 }
 
-function SystemPage(props: { guildId: string; health: Health; audit: AuditEvent[]; onAudit: () => void }) {
+function SystemPage(props: {
+  guildId: string;
+  health: Health;
+  audit: AuditEvent[];
+  resources: { channels: Resource[]; roles: Resource[]; bot: { id: string; tag: string; highestRole: { id: string; name: string; position: number }; permissions: Record<string, boolean> } | null };
+  runtimeLogs: RuntimeLog[];
+  runtimeStopping: boolean;
+  onShutdown: () => void;
+  onAudit: () => void;
+}) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <PageHeader eyebrow="SYSTEM" title="Система" description="Операционные инструменты экземпляра: fleet, здоровье Core, backups и аудит." />
+      <PageHeader
+        eyebrow="SYSTEM"
+        title="Система"
+        description="Операционные инструменты экземпляра: runtime, fleet, здоровье Core, backups, permissions и аудит."
+        right={
+          <button type="button" disabled={props.runtimeStopping} onClick={props.onShutdown} style={buttonStyle("danger")}>
+            {props.runtimeStopping ? "Выключаем…" : "Выключить бота"}
+          </button>
+        }
+      />
+      <RuntimeLogsPanel logs={props.runtimeLogs} />
+      <section style={{ ...panel, padding: 20 }}>
+        <SectionHeader title="Discord Diagnostics" eyebrow="PERMISSIONS & HIERARCHY" />
+        <DiscordDiagnosticsPanel bot={props.resources.bot} />
+      </section>
+      <section style={{ ...panel, padding: 20 }}>
+        <SectionHeader title="Command Policies" eyebrow="ACCESS CONTROL" />
+        <CommandPoliciesPanel
+          guildId={props.guildId}
+          roles={props.resources.roles}
+          channels={props.resources.channels.filter((item) => item.type === 0)}
+          onChanged={props.onAudit}
+        />
+      </section>
       <section style={{ ...panel, padding: 20 }}>
         <SectionHeader title="Bot Fleet" eyebrow="IDENTITIES" />
         <FleetPanel guildId={props.guildId} onChanged={props.onAudit} />
@@ -1509,6 +1889,47 @@ function SystemPage(props: { guildId: string; health: Health; audit: AuditEvent[
         {!props.audit.length && <Empty text="Журнал пуст." />}
       </section>
     </div>
+  );
+}
+
+function RuntimeLogsPanel(props: { logs: RuntimeLog[] }) {
+  return (
+    <section style={{ ...panel, padding: 20 }}>
+      <SectionHeader
+        title="Логи бота"
+        eyebrow="RUNTIME LOGS"
+        action={<span style={{ color: "#596577", fontSize: 9 }}>автообновление · {props.logs.length}</span>}
+      />
+      <div style={{
+        minHeight: 260,
+        maxHeight: 560,
+        overflow: "auto",
+        padding: 12,
+        borderRadius: 12,
+        background: "#090d13",
+        border: "1px solid #1f2732",
+        fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace"
+      }}>
+        {props.logs.length ? props.logs.map((entry, index) => (
+          <div key={entry.ts + entry.level + entry.message + index} style={{ padding: "6px 0", borderBottom: index === props.logs.length - 1 ? "none" : "1px solid #141a23" }}>
+            <div style={{ display: "flex", gap: 9, alignItems: "baseline", flexWrap: "wrap" }}>
+              <time style={{ color: "#4f5b6c", fontSize: 9 }}>{new Date(entry.ts).toLocaleString("ru-RU")}</time>
+              <span style={{
+                color: entry.level === "ERROR" ? "#f07d7d" : entry.level === "WARN" ? "#e1bd75" : "#72d29a",
+                fontSize: 9,
+                fontWeight: 750
+              }}>{entry.level}</span>
+              <span style={{ color: "#d6dbe4", fontSize: 10, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{entry.message}</span>
+            </div>
+            {entry.meta && Object.keys(entry.meta).length > 0 && (
+              <div style={{ marginTop: 3, color: "#657082", fontSize: 9, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                {JSON.stringify(entry.meta)}
+              </div>
+            )}
+          </div>
+        )) : <Empty text="Логи пока не поступили." />}
+      </div>
+    </section>
   );
 }
 

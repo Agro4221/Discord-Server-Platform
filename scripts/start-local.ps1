@@ -170,30 +170,17 @@ function Ensure-Docker {
 
 Ensure-Docker
 
-function Get-ValueLength([string]$Value) {
-  if ($null -eq $Value) { return 0 }
-  return $Value.Length
-}
-
-function Show-DashboardPasswordDiagnostics {
-  $hostPassword = Get-EnvValue "DASHBOARD_ADMIN_PASSWORD"
-  $hostLength = Get-ValueLength $hostPassword
-  Write-Host "Dashboard admin password configured in .env: $([bool](-not [string]::IsNullOrWhiteSpace($hostPassword))); length=$hostLength"
-
-  try {
-    $containerLength = docker compose exec -T dashboard sh -lc 'if [ -n "${DASHBOARD_ADMIN_PASSWORD+x}" ]; then printf "%s" "$DASHBOARD_ADMIN_PASSWORD" | wc -c; else printf "0"; fi'
-    if ($LASTEXITCODE -eq 0) {
-      Write-Host "Dashboard container password: configured; length=$($containerLength.Trim())"
-    } else {
-      Write-Host "Dashboard container password: could not inspect."
-    }
-  } catch {
-    Write-Host "Dashboard container password: could not inspect."
-  }
-}
-
 if ($Down) {
+  & powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\reconcile-fleet.ps1 -Down
+  $fleetExitCode = $LASTEXITCODE
   docker compose down
+  $composeExitCode = $LASTEXITCODE
+  if ($fleetExitCode -ne 0) {
+    exit $fleetExitCode
+  }
+  if ($composeExitCode -ne 0) {
+    exit $composeExitCode
+  }
   exit 0
 }
 
@@ -216,25 +203,10 @@ if ([string]::IsNullOrWhiteSpace($clientId)) {
   Set-EnvValue "DISCORD_CLIENT_ID" $clientId
 }
 
-$authRequired = Get-EnvValue "DASHBOARD_AUTH_REQUIRED"
-if ([string]::IsNullOrWhiteSpace($authRequired)) { $authRequired = "false" }
-
-$adminPassword = Get-EnvValue "DASHBOARD_ADMIN_PASSWORD"
-if ($authRequired -eq "true" -and [string]::IsNullOrWhiteSpace($adminPassword)) {
-  $adminPassword = Read-Host "Dashboard admin password"
-  if ([string]::IsNullOrWhiteSpace($adminPassword)) { throw "DASHBOARD_ADMIN_PASSWORD is required when Dashboard auth is enabled." }
-  Set-EnvValue "DASHBOARD_ADMIN_PASSWORD" $adminPassword
-}
-
-if ([string]::IsNullOrWhiteSpace((Get-EnvValue "DASHBOARD_AUTH_REQUIRED"))) {
-  Set-EnvValue "DASHBOARD_AUTH_REQUIRED" "false"
-}
-
 $generated = @{
   "MANAGEMENT_API_KEY" = 48
-  "DASHBOARD_SESSION_SECRET" = 48
+  "BOT_CREDENTIALS_ENCRYPTION_KEY" = 64
   "POSTGRES_PASSWORD" = 24
-  "LAVALINK_PASSWORD" = 24
 }
 foreach ($entry in $generated.GetEnumerator()) {
   $current = Get-EnvValue $entry.Key
@@ -245,7 +217,6 @@ foreach ($entry in $generated.GetEnumerator()) {
 }
 
 docker compose config | Out-Null
-
 $dbPassword = Get-EnvValue "POSTGRES_PASSWORD"
 if ([string]::IsNullOrWhiteSpace($dbPassword)) {
   throw "POSTGRES_PASSWORD is required."
@@ -291,18 +262,16 @@ if ($Rebuild) {
 }
 
 # Normal starts intentionally avoid an image rebuild so a gaming session does not
-# trigger a Next.js/Node/Java build unless the user explicitly asks for it.
-& docker compose up -d
+# trigger a Next.js/Node build unless the user explicitly asks for it.
+  & docker compose up -d
 $composeExitCode = $LASTEXITCODE
 if ($composeExitCode -ne 0) {
   Write-Host ""
   Write-Host "Docker Compose failed. Recent service logs:"
   docker compose ps
-  docker compose logs --tail=80 lavalink lavalink2 postgres bot dashboard
+  docker compose logs --tail=80 postgres bot dashboard
   throw "docker compose up failed with exit code $composeExitCode."
 }
-
-Show-DashboardPasswordDiagnostics
 
 $healthPort = Get-EnvValue "HEALTH_PORT"
 if ([string]::IsNullOrWhiteSpace($healthPort)) { $healthPort = "3001" }
@@ -343,6 +312,17 @@ for ($attempt = 1; $attempt -le 30; $attempt++) {
 if (-not $dashboardReady) {
   docker compose ps
   throw "Dashboard did not become available: $dashboardUrl"
+}
+
+Write-Host ""
+Write-Host "Reconciling registered secondary Bot Identities..."
+try {
+  & powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\reconcile-fleet.ps1
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Secondary Bot Fleet reconciliation returned exit code $LASTEXITCODE. Primary bot and Dashboard remain available."
+  }
+} catch {
+  Write-Warning "Secondary Bot Fleet reconciliation failed: $($_.Exception.Message)"
 }
 
 Write-Host ""

@@ -1,0 +1,151 @@
+[CmdletBinding()]
+param(
+  [switch]$SkipLavalink,
+  [switch]$RequireLavalink2
+)
+
+$ErrorActionPreference = "Stop"
+Set-Location (Join-Path $PSScriptRoot "..")
+
+function Get-EnvValue([string]$Name, [string]$Default = "") {
+  if (-not (Test-Path ".env")) { return $Default }
+  $prefix = [regex]::Escape($Name) + "="
+  foreach ($line in @(Get-Content ".env" | Where-Object { $_ -match "^$prefix" })) {
+    $value = $line.Substring($Name.Length + 1).Trim()
+    if ($value.Length -ge 2 -and $value.StartsWith("'") -and $value.EndsWith("'")) {
+      $value = $value.Substring(1, $value.Length - 2) -replace "\'", "'"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($value)) { return $value }
+  }
+  return $Default
+}
+
+function Assert-Ok([bool]$Condition, [string]$Message) {
+  if (-not $Condition) { throw "RELEASE GATE FAILED: $Message" }
+  Write-Host "OK: $Message"
+}
+
+function Get-Json([string]$Uri, [hashtable]$Headers = @{}) {
+  return Invoke-RestMethod -Uri $Uri -Headers $Headers -Method Get -TimeoutSec 10
+}
+
+$healthPort = Get-EnvValue "HEALTH_PORT" "3001"
+$managementPort = Get-EnvValue "MANAGEMENT_API_PORT" "3002"
+$dashboardPort = Get-EnvValue "DASHBOARD_PORT" "3000"
+$lavalinkHost = Get-EnvValue "LAVALINK_HOST" "127.0.0.1"
+$lavalinkPort = Get-EnvValue "LAVALINK_PORT" "2333"
+$lavalinkPassword = Get-EnvValue "LAVALINK_PASSWORD" ""
+
+Write-Host "=== Discord Server Platform local release gate ==="
+Write-Host "Health: $healthPort  Management: $managementPort  Dashboard: $dashboardPort"
+Write-Host ""
+
+& docker compose ps
+Assert-Ok ($LASTEXITCODE -eq 0) "Docker Compose project is reachable"
+
+$composeArgs = @("compose")
+if ($RequireLavalink2) { $composeArgs += @("--profile", "failover") }
+$composeArgs += @("ps", "--services")
+$runningServices = @(& docker @composeArgs 2>$null)
+Assert-Ok ($LASTEXITCODE -eq 0) "Docker Compose service inventory is available"
+
+function Assert-ContainerHealthy([string]$Service) {
+  $containerId = ((& docker compose ps -q $Service 2>$null) | Select-Object -First 1)
+  Assert-Ok ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($containerId)) ("Docker container exists for service: " + $Service)
+
+  $state = ((& docker inspect --format "{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}" $containerId 2>$null) | Select-Object -First 1)
+  Assert-Ok ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($state)) ("Docker state is inspectable for service: " + $Service)
+
+  $parts = $state.ToString().Trim().Split("|", 2)
+  Assert-Ok ($parts[0] -eq "running") ("Docker container is running: " + $Service)
+  Assert-Ok ($parts[1] -eq "healthy") ("Docker healthcheck is healthy: " + $Service)
+}
+
+$requiredServices = @("postgres", "lavalink", "bot", "dashboard")
+if ($RequireLavalink2) { $requiredServices += "lavalink2" }
+foreach ($service in $requiredServices) {
+  Assert-Ok ($runningServices -contains $service) ("Docker Compose service is running: " + $service)
+  Assert-ContainerHealthy $service
+}
+
+$health = Get-Json ("http://127.0.0.1:" + $healthPort + "/health")
+Assert-Ok ($health.status -eq "ready") "Bot health status is ready"
+Assert-Ok ($health.discord -eq "ready") "Discord Gateway is ready"
+Assert-Ok ($health.database -eq "ready") "Database is ready"
+
+$moduleStatuses = @($health.modules.psobject.Properties | ForEach-Object { [string]$_.Value })
+Assert-Ok (-not ($moduleStatuses -contains "down")) "No bot module reports down state"
+
+$managementKey = Get-EnvValue "MANAGEMENT_API_KEY"
+Assert-Ok (-not [string]::IsNullOrWhiteSpace($managementKey)) "Management API key is configured"
+
+try {
+  Invoke-WebRequest -Uri ("http://127.0.0.1:" + $managementPort + "/api/fleet") -UseBasicParsing -Method Get -TimeoutSec 10 | Out-Null
+  throw "Management API unexpectedly allowed an unauthenticated request"
+} catch {
+  $unauthorizedStatus = 0
+  if ($_.Exception.Response) {
+    try { $unauthorizedStatus = [int]$_.Exception.Response.StatusCode } catch { $unauthorizedStatus = 0 }
+  }
+  if ($unauthorizedStatus -eq 401) {
+    Write-Host "OK: Management API rejects unauthenticated requests"
+  } else {
+    throw "RELEASE GATE FAILED: Management API unauthenticated check returned status $unauthorizedStatus"
+  }
+}
+
+$headers = @{ Authorization = "Bearer " + $managementKey }
+$fleet = Get-Json ("http://127.0.0.1:" + $managementPort + "/api/fleet") $headers
+Assert-Ok ($null -ne $fleet.identities) "Fleet endpoint responds with identity state"
+
+$enabledIdentities = @($fleet.identities | Where-Object { $_.enabled -eq $true })
+
+$expectedFleetContainers = @{}
+foreach ($identity in @($fleet.identities)) {
+  if (
+    $identity.id -and
+    $identity.id -ne "primary" -and
+    $identity.enabled -eq $true -and
+    $identity.credentialConfigured -eq $true
+  ) {
+    $expectedFleetContainers["dsp-bot-fleet-$($identity.id)"] = $true
+  }
+}
+
+$runningFleetContainers = @(& docker ps --format "{{.Names}}" 2>$null | Where-Object { $_ -like "dsp-bot-fleet-*" })
+Assert-Ok ($LASTEXITCODE -eq 0) "Docker Fleet container inventory is available"
+foreach ($container in $runningFleetContainers) {
+  Assert-Ok ($expectedFleetContainers.ContainsKey($container)) ("No orphaned Fleet container is running: " + $container)
+}
+
+foreach ($identity in $enabledIdentities) {
+  Assert-Ok ($identity.credentialConfigured -eq $true) ("Identity " + $identity.id + " has stored credentials")
+  Assert-Ok ($identity.restartRequired -ne $true) ("Identity " + $identity.id + " has no pending restart")
+  Assert-Ok ($identity.status -eq "ready") ("Identity " + $identity.id + " reports ready")
+  Assert-Ok ($identity.connected -eq $true) ("Identity " + $identity.id + " reports connected")
+}
+
+try {
+  Invoke-WebRequest -Uri ("http://127.0.0.1:" + $dashboardPort + "/") -UseBasicParsing -TimeoutSec 10 | Out-Null
+  Write-Host "OK: Dashboard is reachable"
+} catch {
+  throw "RELEASE GATE FAILED: Dashboard is not reachable: $($_.Exception.Message)"
+}
+
+if (-not $SkipLavalink) {
+  Assert-Ok (-not [string]::IsNullOrWhiteSpace($lavalinkPassword)) "Lavalink password is configured"
+  $lavalinkHeaders = @{ Authorization = $lavalinkPassword }
+  $nodePorts = @($lavalinkPort)
+  if ($RequireLavalink2) { $nodePorts += 2334 }
+  foreach ($nodePort in $nodePorts) {
+    try {
+      $version = Get-Json ("http://" + $lavalinkHost + ":" + $nodePort + "/version") $lavalinkHeaders
+      Assert-Ok ($null -ne $version) ("Lavalink node " + $nodePort + " responds to /version")
+    } catch {
+      throw "RELEASE GATE FAILED: Lavalink node " + $nodePort + " is unavailable: " + $_.Exception.Message
+    }
+  }
+}
+
+Write-Host ""
+Write-Host "RELEASE GATE PASSED"

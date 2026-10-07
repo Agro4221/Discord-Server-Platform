@@ -89,10 +89,16 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
       { key: "windowSeconds", label: "Окно Anti-Raid, сек.", type: "number", min: 5, max: 300 },
       { key: "maxDestructiveActions", label: "Destructive actions до тревоги", type: "number", min: 2, max: 100 },
       { key: "destructiveWindowSeconds", label: "Окно destructive actions, сек.", type: "number", min: 5, max: 300 },
+      { key: "incidentDurationSeconds", label: "Длительность инцидента, сек.", type: "number", min: 60, max: 3600 },
+      { key: "autoQuarantine", label: "Автоматический quarantine", type: "boolean" },
+      { key: "removeExecutorRoles", label: "Снимать роли исполнителя при Anti-Nuke", type: "boolean" },
+      { key: "executorTimeoutMinutes", label: "Timeout исполнителя, минут", type: "number", min: 0, max: 40320 },
+      { key: "executorBanEnabled", label: "Ban исполнителя при Anti-Nuke", type: "boolean" },
+      { key: "autoLockdown", label: "Автоматический lockdown каналов при инциденте", type: "boolean" },
       { key: "quarantineRoleId", label: "Quarantine role", type: "role" },
       { key: "logChannelId", label: "Security log channel", type: "channel" }
     ],
-    actions: [{ id: "check-hierarchy", label: "Проверить role hierarchy", kind: "safe" }]
+    actions: []
   },
   {
     key: "leveling",
@@ -128,6 +134,26 @@ export const DASHBOARD_SETTINGS: readonly ModuleSettingsSchema[] = [
     ]
   },
   {
+    key: "logging",
+    title: "Logging",
+    fields: [
+      { key: "channelId", label: "Канал логов", type: "channel" },
+      { key: "messageDelete", label: "Удаление сообщений", type: "boolean" },
+      { key: "messageEdit", label: "Изменение сообщений", type: "boolean" },
+      { key: "messageBulkDelete", label: "Массовое удаление сообщений", type: "boolean" },
+      { key: "reactions", label: "Добавление/снятие реакций", type: "boolean" },
+      { key: "memberJoin", label: "Вход участников", type: "boolean" },
+      { key: "memberLeave", label: "Выход участников", type: "boolean" },
+      { key: "memberUpdate", label: "Изменение участников", type: "boolean" },
+      { key: "voice", label: "Voice activity", type: "boolean" },
+      { key: "channelDelete", label: "Удаление каналов", type: "boolean" },
+      { key: "channelUpdate", label: "Изменение каналов", type: "boolean" },
+      { key: "roleDelete", label: "Удаление ролей", type: "boolean" },
+      { key: "roleUpdate", label: "Изменение ролей", type: "boolean" },
+      { key: "bans", label: "Ban / Unban", type: "boolean" }
+    ]
+  },
+  {
     key: "music",
     title: "Music / Lavalink",
     fields: [
@@ -145,7 +171,7 @@ type StorageSpec = {
   columns: Record<string, string>;
 };
 
-const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
+export const DASHBOARD_SETTINGS_STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
   "temporary-voice": {
     table: "guild_settings",
     columns: {
@@ -206,6 +232,12 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       windowSeconds: "window_seconds",
       maxDestructiveActions: "max_destructive_actions",
       destructiveWindowSeconds: "destructive_window_seconds",
+      incidentDurationSeconds: "incident_duration_seconds",
+      autoQuarantine: "auto_quarantine",
+      removeExecutorRoles: "remove_executor_roles",
+      executorTimeoutMinutes: "executor_timeout_minutes",
+      executorBanEnabled: "executor_ban_enabled",
+      autoLockdown: "auto_lockdown",
       quarantineRoleId: "quarantine_role_id",
       logChannelId: "log_channel_id"
     }
@@ -238,6 +270,25 @@ const STORAGE: Partial<Record<ModuleKey, StorageSpec>> = {
       threshold: "threshold",
       ignoreSelfReaction: "ignore_self_reaction",
       ignoreBots: "ignore_bots"
+    }
+  },
+  logging: {
+    table: "logging_settings",
+    columns: {
+      channelId: "channel_id",
+      messageDelete: "message_delete",
+      messageEdit: "message_edit",
+      messageBulkDelete: "message_bulk_delete",
+      reactions: "reactions",
+      memberJoin: "member_join",
+      memberLeave: "member_leave",
+      memberUpdate: "member_update",
+      voice: "voice",
+      channelDelete: "channel_delete",
+      channelUpdate: "channel_update",
+      roleDelete: "role_delete",
+      roleUpdate: "role_update",
+      bans: "bans"
     }
   },
   music: {
@@ -338,7 +389,7 @@ export class DashboardSettingsService {
   }
 
   async get(guildId: string, moduleKey: ModuleKey): Promise<Record<string, unknown>> {
-    const spec = STORAGE[moduleKey];
+    const spec = DASHBOARD_SETTINGS_STORAGE[moduleKey];
     if (!spec) return {};
 
     const columns = Object.values(spec.columns);
@@ -365,7 +416,7 @@ export class DashboardSettingsService {
     values: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
     const schema = DASHBOARD_SETTINGS.find((item) => item.key === moduleKey);
-    const spec = STORAGE[moduleKey];
+    const spec = DASHBOARD_SETTINGS_STORAGE[moduleKey];
     if (!schema || !spec) throw new Error("settings_not_supported");
 
     const current = await this.get(guildId, moduleKey);

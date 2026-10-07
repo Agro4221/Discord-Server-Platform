@@ -20,4 +20,7 @@ if not "%EXIT_CODE%"=="0" (
   pause
 )
 
+if "%EXIT_CODE%"=="0" (
+  endlocal & exit 0
+)
 endlocal & exit /b %EXIT_CODE%

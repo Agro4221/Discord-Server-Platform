@@ -24,6 +24,106 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .setDescription("Check platform health"),
 
     new SlashCommandBuilder()
+      .setName("serverinfo")
+      .setDescription("Show server information"),
+
+    new SlashCommandBuilder()
+      .setName("userinfo")
+      .setDescription("Show user information")
+      .addUserOption((o) => o.setName("user").setDescription("Optional user")),
+
+    new SlashCommandBuilder()
+      .setName("avatar")
+      .setDescription("Show a user's avatar")
+      .addUserOption((o) => o.setName("user").setDescription("Optional user")),
+
+    new SlashCommandBuilder()
+      .setName("membercount")
+      .setDescription("Show server member count"),
+
+    new SlashCommandBuilder()
+      .setName("roleinfo")
+      .setDescription("Show role information")
+      .addRoleOption((o) => o.setName("role").setDescription("Role").setRequired(true)),
+
+    new SlashCommandBuilder()
+      .setName("channelinfo")
+      .setDescription("Show channel information")
+      .addChannelOption((o) => o.setName("channel").setDescription("Optional channel")),
+
+    new SlashCommandBuilder()
+      .setName("afk")
+      .setDescription("Set or clear your AFK status")
+      .addSubcommand((sub) =>
+        sub
+          .setName("set")
+          .setDescription("Set AFK status")
+          .addStringOption((o) => o.setName("reason").setDescription("Optional reason").setMaxLength(300))
+      )
+      .addSubcommand((sub) =>
+        sub.setName("clear").setDescription("Clear AFK status")
+      )
+      .addSubcommand((sub) =>
+        sub.setName("status").setDescription("Show your AFK status")
+      ),
+
+    new SlashCommandBuilder()
+      .setName("poll")
+      .setDescription("Create a community poll")
+      .addStringOption((o) => o.setName("question").setDescription("Question").setMaxLength(240).setRequired(true))
+      .addStringOption((o) => o.setName("option1").setDescription("Option 1").setMaxLength(76).setRequired(true))
+      .addStringOption((o) => o.setName("option2").setDescription("Option 2").setMaxLength(76).setRequired(true))
+      .addStringOption((o) => o.setName("option3").setDescription("Option 3").setMaxLength(76))
+      .addStringOption((o) => o.setName("option4").setDescription("Option 4").setMaxLength(76))
+      .addStringOption((o) => o.setName("option5").setDescription("Option 5").setMaxLength(76))
+      .addIntegerOption((o) => o.setName("minutes").setDescription("Duration in minutes").setMinValue(1).setMaxValue(10080)),
+
+    new SlashCommandBuilder()
+      .setName("suggest")
+      .setDescription("Submit a server suggestion")
+      .addStringOption((o) => o.setName("text").setDescription("Suggestion").setMaxLength(1500).setRequired(true)),
+
+    new SlashCommandBuilder()
+      .setName("sticky")
+      .setDescription("Manage a sticky message")
+      .addSubcommand((sub) =>
+        sub
+          .setName("set")
+          .setDescription("Set a sticky message")
+          .addStringOption((o) => o.setName("text").setDescription("Sticky text").setMaxLength(2000).setRequired(true))
+          .addChannelOption((o) => o.setName("channel").setDescription("Optional target channel").addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+      )
+      .addSubcommand((sub) =>
+        sub.setName("clear").setDescription("Clear sticky from the current channel")
+      ),
+
+    new SlashCommandBuilder()
+      .setName("8ball")
+      .setDescription("Ask the magic 8-ball")
+      .addStringOption((o) => o.setName("question").setDescription("Optional question").setMaxLength(500)),
+
+    new SlashCommandBuilder()
+      .setName("choose")
+      .setDescription("Choose one of several options")
+      .addStringOption((o) => o.setName("options").setDescription("Options separated by | or comma").setMaxLength(1000).setRequired(true)),
+
+    new SlashCommandBuilder()
+      .setName("roll")
+      .setDescription("Roll dice")
+      .addStringOption((o) => o.setName("dice").setDescription("Notation such as 2d6 or 1d20").setMaxLength(20)),
+
+    new SlashCommandBuilder()
+      .setName("logging")
+      .setDescription("Configure Discord event logging")
+      .addSubcommand((sub) =>
+        sub
+          .setName("setup")
+          .setDescription("Configure the log channel")
+          .addChannelOption((o) => o.setName("channel").setDescription("Log channel").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+          .addBooleanOption((o) => o.setName("enabled").setDescription("Enable event logging"))
+      ),
+
+    new SlashCommandBuilder()
       .setName("level")
       .setDescription("Show your leveling rank")
       .addUserOption((o) => o.setName("user").setDescription("Optional user")),
@@ -66,7 +166,16 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
     new SlashCommandBuilder()
       .setName("play")
       .setDescription("Play a track or playlist")
-      .addStringOption((o) => o.setName("query").setDescription("Song, URL or playlist").setMaxLength(2000).setRequired(true)),
+      .addStringOption((o) => o.setName("query").setDescription("Song, URL or playlist").setMaxLength(2000).setRequired(true))
+      .addStringOption((o) => o.setName("provider").setDescription("Music source / URL type").addChoices(
+        { name: "Auto", value: "auto" },
+        { name: "YouTube", value: "youtube" },
+        { name: "TikTok", value: "tiktok" },
+        { name: "Яндекс Музыка", value: "yandex_music" },
+        { name: "VK Музыка", value: "vk_music" },
+        { name: "Spotify", value: "spotify" },
+        { name: "SoundCloud", value: "soundcloud" }
+      )),
     new SlashCommandBuilder().setName("pause").setDescription("Pause music"),
     new SlashCommandBuilder().setName("resume").setDescription("Resume music"),
     new SlashCommandBuilder().setName("skip").setDescription("Skip the current track"),
@@ -106,6 +215,38 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .addIntegerOption((o) => o.setName("seconds").setDescription("0-21600").setMinValue(0).setMaxValue(21600).setRequired(true)),
     new SlashCommandBuilder().setName("lock").setDescription("Lock the current channel"),
     new SlashCommandBuilder().setName("unlock").setDescription("Unlock the current channel"),
+
+    new SlashCommandBuilder()
+      .setName("voice")
+      .setDescription("Control your temporary voice room")
+      .addSubcommand((sub) => sub.setName("info").setDescription("Show your temporary room"))
+      .addSubcommand((sub) => sub.setName("lock").setDescription("Lock new connections"))
+      .addSubcommand((sub) => sub.setName("unlock").setDescription("Allow new connections"))
+      .addSubcommand((sub) => sub
+        .setName("limit")
+        .setDescription("Set room user limit")
+        .addIntegerOption((o) => o.setName("limit").setDescription("0 = unlimited").setMinValue(0).setMaxValue(99).setRequired(true))
+      )
+      .addSubcommand((sub) => sub
+        .setName("name")
+        .setDescription("Rename your room")
+        .addStringOption((o) => o.setName("name").setDescription("Room name").setMaxLength(100).setRequired(true))
+      )
+      .addSubcommand((sub) => sub
+        .setName("transfer")
+        .setDescription("Transfer room ownership")
+        .addUserOption((o) => o.setName("user").setDescription("New owner").setRequired(true))
+      )
+      .addSubcommand((sub) => sub
+        .setName("permit")
+        .setDescription("Allow a user into the room")
+        .addUserOption((o) => o.setName("user").setDescription("User").setRequired(true))
+      )
+      .addSubcommand((sub) => sub
+        .setName("reject")
+        .setDescription("Block a user from the room")
+        .addUserOption((o) => o.setName("user").setDescription("User").setRequired(true))
+      ),
 
     new SlashCommandBuilder()
       .setName("setup")
@@ -501,7 +642,8 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addIntegerOption((o) => o.setName("destructive-window").setDescription("Destructive action window in seconds").setMinValue(5).setMaxValue(300))
           .addRoleOption((o) => o.setName("quarantine-role").setDescription("Optional quarantine role"))
           .addChannelOption((o) => o.setName("log-channel").setDescription("Security log channel").addChannelTypes(ChannelType.GuildText))
-      ),
+      )
+      .addSubcommand((sub) => sub.setName("clear").setDescription("Close active security incidents")),
     new SlashCommandBuilder()
       .setName("feed")
       .setDescription("External notification feeds")
@@ -512,55 +654,6 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
           .addStringOption((o) => o.setName("url").setDescription("HTTPS feed URL").setMaxLength(2000).setRequired(true))
           .addChannelOption((o) => o.setName("channel").setDescription("Destination channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
           .addIntegerOption((o) => o.setName("minutes").setDescription("Polling interval").setMinValue(1).setMaxValue(1440))
-      ),
-    new SlashCommandBuilder()
-      .setName("music")
-      .setDescription("Music player")
-      .addSubcommand((sub) =>
-        sub
-          .setName("play")
-          .setDescription("Play a song or search YouTube")
-          .addStringOption((o) => o.setName("query").setDescription("Song, artist, URL or playlist").setMaxLength(2000).setRequired(true))
-      )
-      .addSubcommand((sub) => sub.setName("pause").setDescription("Pause playback"))
-      .addSubcommand((sub) => sub.setName("resume").setDescription("Resume playback"))
-      .addSubcommand((sub) => sub.setName("skip").setDescription("Skip current track"))
-      .addSubcommand((sub) => sub.setName("stop").setDescription("Stop and clear queue"))
-      .addSubcommand((sub) => sub.setName("shuffle").setDescription("Shuffle the queue"))
-      .addSubcommand((sub) =>
-        sub
-          .setName("repeat")
-          .setDescription("Set repeat mode")
-          .addStringOption((o) =>
-            o.setName("mode")
-              .setDescription("Repeat mode")
-              .addChoices(
-                { name: "Off", value: "off" },
-                { name: "Track", value: "track" },
-                { name: "Queue", value: "queue" }
-              )
-              .setRequired(true)
-          )
-      )
-      .addSubcommand((sub) =>
-        sub
-          .setName("autoplay")
-          .setDescription("Enable or disable autoplay")
-          .addBooleanOption((o) => o.setName("enabled").setDescription("Autoplay state"))
-      )
-      .addSubcommand((sub) =>
-        sub
-          .setName("seek")
-          .setDescription("Seek within the current track")
-          .addIntegerOption((o) => o.setName("seconds").setDescription("Position in seconds").setMinValue(0).setMaxValue(86400).setRequired(true))
-      )
-      .addSubcommand((sub) => sub.setName("queue").setDescription("Show queue"))
-      .addSubcommand((sub) => sub.setName("nowplaying").setDescription("Show current track"))
-      .addSubcommand((sub) =>
-        sub
-          .setName("volume")
-          .setDescription("Show/change volume")
-          .addIntegerOption((o) => o.setName("value").setDescription("0-200").setMinValue(0).setMaxValue(200))
       ),
     new SlashCommandBuilder()
       .setName("automation")
@@ -582,7 +675,14 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
                 { name: "Message created", value: "message.create" },
                 { name: "Voice joins", value: "voice.join" },
                 { name: "Voice leaves", value: "voice.leave" },
-                { name: "Voice moves", value: "voice.move" }
+                { name: "Voice moves", value: "voice.move" },
+                { name: "Channel created", value: "channel.create" },
+                { name: "Channel deleted", value: "channel.delete" },
+                { name: "Role created", value: "role.create" },
+                { name: "Role deleted", value: "role.delete" },
+                { name: "Member banned", value: "member.ban" },
+                { name: "Member unbanned", value: "member.unban" },
+                { name: "Security incident", value: "security.incident" }
               )
               .setRequired(true)
           )
@@ -615,9 +715,10 @@ export async function handleCommand(
   interaction: ChatInputCommandInteraction,
   db: Database,
   temporaryVoice: TemporaryVoice,
-  moderation: Moderation
+  moderation: Moderation,
+  commandName = interaction.commandName
 ): Promise<void> {
-  if (interaction.commandName === "help") {
+  if (commandName === "help") {
     const rows = await db.query<{ command_name: string; help_visible: boolean }>(
       "SELECT command_name,help_visible FROM command_policies WHERE guild_id=$1 AND enabled=true AND slash_enabled=true AND help_visible=true ORDER BY command_name",
       [interaction.guild!.id]
@@ -636,7 +737,7 @@ export async function handleCommand(
     return;
   }
 
-  if (interaction.commandName === "ping") {
+  if (commandName === "ping") {
     const start = performance.now();
     let database = "ok";
     try {
@@ -653,33 +754,33 @@ export async function handleCommand(
 
   if (!interaction.inGuild()) return;
 
-  if (interaction.commandName === "clear") {
+  if (commandName === "clear") {
     await moderation.purge(interaction, interaction.options.getInteger("amount", true));
     return;
   }
-  if (interaction.commandName === "slowmode") {
+  if (commandName === "slowmode") {
     await moderation.slowmode(interaction, interaction.options.getInteger("seconds", true));
     return;
   }
-  if (interaction.commandName === "lock") {
+  if (commandName === "lock") {
     await moderation.lockChannel(interaction);
     return;
   }
-  if (interaction.commandName === "unlock") {
+  if (commandName === "unlock") {
     await moderation.unlockChannel(interaction);
     return;
   }
 
-  if (["ban", "timeout", "kick", "warn", "unban"].includes(interaction.commandName)) {
+  if (["ban", "timeout", "kick", "warn", "unban"].includes(commandName)) {
     const target = interaction.options.getUser("user", true);
     const reason = interaction.options.getString("reason", true);
 
-    if (interaction.commandName === "warn") {
+    if (commandName === "warn") {
       await moderation.warn(interaction, target, reason);
       return;
     }
 
-    if (interaction.commandName === "unban") {
+    if (commandName === "unban") {
       await moderation.unban(interaction, target, reason);
       return;
     }
@@ -690,7 +791,7 @@ export async function handleCommand(
       return;
     }
 
-    if (interaction.commandName === "kick") {
+    if (commandName === "kick") {
       await moderation.kick(interaction, member, reason);
       return;
     }
@@ -702,7 +803,7 @@ export async function handleCommand(
       return;
     }
 
-    if (interaction.commandName === "timeout") {
+    if (commandName === "timeout") {
       await moderation.timeout(interaction, member, durationMinutes, reason);
     } else {
       await moderation.ban(interaction, member, reason, durationMinutes);
@@ -710,7 +811,7 @@ export async function handleCommand(
     return;
   }
 
-  if (interaction.commandName === "setup") {
+  if (commandName === "setup") {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
       await interaction.reply({ content: "Недостаточно прав: Manage Server.", ephemeral: true });
       return;
@@ -760,7 +861,7 @@ export async function handleCommand(
     return;
   }
 
-  if (interaction.commandName !== "moderate") return;
+  if (commandName !== "moderate") return;
 
   const subcommand = interaction.options.getSubcommand();
   const target = interaction.options.getUser("user", true);

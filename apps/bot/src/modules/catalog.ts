@@ -16,7 +16,11 @@ export type ModuleKey =
   | "stream-alerts"
   | "automation"
   | "music"
-  | "analytics";
+  | "analytics"
+  | "utility"
+  | "community-tools"
+  | "logging"
+  | "custom-commands";
 
 export const MODULE_CATALOG: readonly {
   key: ModuleKey;
@@ -36,7 +40,11 @@ export const MODULE_CATALOG: readonly {
   { key: "giveaways", title: "Giveaways", description: "Giveaway campaigns", defaultEnabled: false },
   { key: "starboard", title: "Starboard", description: "Community starboard", defaultEnabled: false },
   { key: "economy", title: "Economy", description: "Server economy and shop", defaultEnabled: false },
-  { key: "reminders", title: "Reminders", description: "Reminders, AFK and utilities", defaultEnabled: false },
+  { key: "reminders", title: "Reminders", description: "Scheduled personal reminders", defaultEnabled: false },
+  { key: "utility", title: "Utility", description: "Server and member information plus AFK", defaultEnabled: true },
+  { key: "community-tools", title: "Community Tools", description: "Polls, suggestions, sticky messages and fun commands", defaultEnabled: true },
+  { key: "logging", title: "Logging", description: "Discord event logging to a dedicated channel", defaultEnabled: false },
+  { key: "custom-commands", title: "Custom Commands", description: "User-defined commands, aliases and role actions", defaultEnabled: true },
   { key: "notifications", title: "Notifications", description: "External feed notifications", defaultEnabled: false },
   { key: "stream-alerts", title: "Stream Alerts", description: "Twitch, YouTube and VK Video Live start notifications", defaultEnabled: false },
   { key: "automation", title: "Automation", description: "Event / condition / action workflows", defaultEnabled: false },

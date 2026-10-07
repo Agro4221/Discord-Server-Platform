@@ -1,259 +1,108 @@
-# 🤖 Discord Server Platform
+# Discord Server Platform
 
-> Самостоятельно размещаемая платформа для управления Discord-серверами: модерация, временные голосовые комнаты, автоматизация, тикеты, роли, розыгрыши, экономика, уведомления, музыка и единый Control Center.
+> 🎯 **Главная цель проекта:** создать собственного универсального Discord-бота/платформу, которая объединяет лучшие полезные возможности обычных и премиум-ботов вроде **Carl-bot, Juniper, MEE6, ProBot, Jockie Music** и аналогичных решений — чтобы серверу не требовалась куча сторонних ботов и тем более платные подписки за базовые/расширенные функции.
 >
-> Идея проекта — собрать не набор разрозненных Discord-команд, а **модульную серверную платформу**, которую можно запускать локально на Windows или разворачивать в Docker/VPS-сценарии.
+> При этом проект не копирует чужой код или закрытые реализации: мы собираем собственную единую архитектуру и реализуем нужные возможности самостоятельно, добавляя нормальную интеграцию, настройки, безопасность, persistence и Control Center.
 
-![TypeScript](https://img.shields.io/badge/TypeScript-Node.js-3178C6?logo=typescript&logoColor=white)
-![Discord](https://img.shields.io/badge/Discord-API-5865F2?logo=discord&logoColor=white)
-![Next.js](https://img.shields.io/badge/Next.js-Control%20Center-000000?logo=next.js&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-supported-2496ED?logo=docker&logoColor=white)
-![Windows](https://img.shields.io/badge/Windows-native-0078D6?logo=windows&logoColor=white)
+Self-hosted Discord server platform for administration, moderation, community features, automation, temporary voice rooms, notifications and music.
 
-> 🚧 **Статус:** **Release Candidate / Кандидат в релиз для live-проверки**
->
-> Основная серверная часть, Control Center, база данных, модули и CI-проверки уже собраны. При этом полноценная live-проверка Discord, длительные тесты, clean-host Windows/VPS и часть advanced-сценариев ещё требуют отдельной валидации.
+> Current state: release candidate for live validation. CI/typecheck/tests/builds cover the implemented feature set, including the native Windows runtime path; live Discord/Windows acceptance and optional VPS validation remain environment-dependent.
 
-## ✨ Что уже есть
+## Implemented
 
-| Возможность | Статус |
-|---|---|
-| 🤖 Discord Core | ✅ |
-| 🗄️ PostgreSQL + migrations | ✅ |
-| 🖥️ Next.js Control Center | ✅ |
-| 🛡️ Moderation cases | ✅ |
-| 🔊 Temporary Voice | ✅ |
-| 🎫 Tickets + transcripts | ✅ |
-| 🎭 Role Panels | ✅ |
-| 🎁 Giveaways | ✅ |
-| 💰 Economy + shop + ledger | ✅ |
-| ⏰ Reminders | ✅ |
-| ⭐ Starboard | ✅ |
-| 🔔 Notifications | ✅ |
-| 📊 Analytics | ✅ |
-| 💾 Backups / restore | ✅ |
-| 🐳 Docker topology | ✅ |
-| 🪟 Native Windows runtime | ✅ |
+- Discord core with typed event bus and module lifecycle.
+- PostgreSQL persistence and versioned migrations.
+- Health/readiness endpoint and Gateway connection supervision.
+- Durable audit logging.
+- Protected local Management API.
+- Next.js local Control Center without end-user login, with functional navigation, module settings, capability/function index, Bot Fleet management, import/export and backup management.
+- Moderation with case history, warnings, timeout, kick, ban and unban.
+- Temporary Voice with ownership, idempotency and restart reconciliation.
+- AutoMod, Welcome, Verification and Leveling.
+- Tickets with modal intake, staff claim, close and transcript.
+- Role Panels with hierarchy/tamper checks and dashboard CRUD/publishing.
+- Giveaways with durable entries, scheduling, history, end/reroll operations and rollback handling.
+- Economy, Reminders and Starboard.
+- Automation engine with persisted rules/cooldowns and a constrained dashboard builder.
+- Security / Anti-Raid and destructive-burst detection.
+- Notifications with HTTPS feed validation and SSRF protections.
+- Analytics with durable minute buckets and dashboard reporting.
+- Music with local yt-dlp + FFmpeg playback, persistent queue state, per-voice routing and multi-source URL support across YouTube, TikTok, Yandex Music, VK, SoundCloud and Spotify-track bridging.
+- Multi-bot identity persistence, per-voice Music routing and optional atomic guild failover.
+- Custom Commands with prefix/slash configuration, aliases, role actions and Dashboard CRUD.
+- Community Tools with polls, suggestions, sticky messages and fun commands.
+- Stream Alerts Dashboard operations for Twitch, YouTube and VK Video Live.
+- Config import/export and compressed local backups.
+- Docker Compose plus Dockerfiles for local-to-VPS topology.
+- Native Windows startup scripts for a low-overhead local runtime.
 
-## 🟡 Что ещё развивается
+## Still under development / needs live validation
 
-| Компонент | Статус | Что осталось |
+| Area | Status | What is missing |
 |---|---|---|
-| AutoMod | 🟡 | Более гибкий editor и policy workflow |
-| Security / Anti-Raid | 🟡 | Полный response / quarantine workflow |
-| Automation | 🟡 | Более широкий набор условий и действий |
-| Music / Lavalink | 🟡 | Дополнительные providers и failover validation |
-| Multi-bot fleet | 🟡 | Полная оркестрация и failover |
-| E2E / chaos / soak | 🟡 | Полный live и long-running цикл |
-| VPS | 🟡 | Clean-host acceptance |
-| Windows UX | 🟡 | Реальная desktop-валидация |
+| AutoMod | ✅ | Rule builder and persisted rule execution implemented; live Discord validation remains |
+| Security | ✅ | Persistent incident lifecycle, quarantine recovery and manual clear implemented; live validation remains |
+| Automation | ✅ | Expanded event catalog and bounded execution guard implemented; live validation remains |
+| Music | ✅ | yt-dlp + FFmpeg multi-source engine implemented; live provider/Windows playback validation remains |
+| Multi-bot fleet | 🟡 | Live Windows/Docker acceptance; launcher orchestration and DB-backed credentials implemented |
+| E2E / chaos / soak | 🟡 | Full live and long-running validation |
+| VPS deployment | 🟡 | Clean-host installer/reverse-proxy acceptance drill |
+| Windows UX | 🟡 | Real launcher/browser behavior validation |
+| Live Discord integrations | 🟡 | Requires user-owned Discord test environment |
 
-## 🏗️ Архитектура
-
-~~~text
-              ┌────────────────────────────┐
-              │     Next.js Control Center │
-              └─────────────┬──────────────┘
-                            │
-                            ▼
-              ┌────────────────────────────┐
-              │  Protected Management API  │
-              └─────────────┬──────────────┘
-                            │
-                            ▼
-              ┌────────────────────────────┐
-              │        Discord Core        │
-              └─────┬───────┬───────┬──────┘
-                    │       │       │
-              ┌─────▼─┐ ┌───▼───┐ ┌─▼─────────┐
-              │Modules│ │Event  │ │Background │
-              │       │ │Bus    │ │Workers    │
-              └─────┬─┘ └───┬───┘ └────┬──────┘
-                    │       │          │
-                    └───────┴────┬─────┘
-                                 ▼
-                         ┌──────────────┐
-                         │  PostgreSQL  │
-                         └──────────────┘
-~~~
-
-## 🧩 Platform overview
-
-~~~mermaid
-flowchart TB
-    ADMIN["Admin / User"] --> DASH["Next.js Control Center"]
-    DASH --> API["Protected Management API"]
-    API --> CORE["Discord Core"]
-
-    CORE --> MOD["Moderation"]
-    CORE --> VOICE["Temporary Voice"]
-    CORE --> AUTO["Automation"]
-    CORE --> COMMUNITY["Community"]
-    CORE --> TICKETS["Tickets"]
-    CORE --> MUSIC["Music / Lavalink"]
-    CORE --> NOTIFY["Notifications"]
-    CORE --> SECURITY["Security / Anti-Raid"]
-
-    CORE --> REG["Module Registry + Event Bus"]
-    CORE --> DB["PostgreSQL"]
-    CORE --> AUDIT["Audit Log"]
-    WORKERS["Background Workers"] --> DB
-~~~
-
-## 📦 Repository structure
+## Architecture
 
 ~~~text
 apps/
-├─ bot/              # Discord runtime
-├─ dashboard/        # Next.js Control Center
-└─ worker/           # background jobs
+├── bot
+├── dashboard
+└── worker
 
 packages/
-└─ domain/           # shared domain logic
+├── domain
+└── ...
 
 infrastructure/
-└─ docker/           # container topology
+└── docker
 
 docs/
-└─ ...               # architecture, setup and testing docs
+└── architecture, setup, operations and test strategy
 ~~~
 
-## 🔄 Типичный сценарий
+The detailed design is documented in docs/MASTER-PLAN.md, docs/IMPLEMENTATION-ORDER.md, docs/QUALITY-BAR.md and docs/TEST-STRATEGY.md.
 
-~~~mermaid
-sequenceDiagram
-    participant U as User
-    participant D as Dashboard
-    participant A as Management API
-    participant C as Discord Core
-    participant DB as PostgreSQL
-    participant G as Discord
+## Security
 
-    U->>D: Изменение настройки
-    D->>A: Authenticated request
-    A->>C: Validate + execute
-    C->>DB: Persist + audit
-    C->>G: Discord API
-    G-->>C: Result
-    C-->>D: Status
-    D-->>U: Result + diagnostics
-~~~
+Real credentials belong only in .env or another secret store.
 
-## 🛠️ Основные подсистемы
+Never commit:
 
-**Moderation** — кейсы, предупреждения, timeout, kick, ban, unban и история.
+- Discord bot tokens;
+- OAuth client secrets;
+- database passwords;
+- provider API keys;
+- Management API bearer keys;
+- backup credentials;
+- runtime databases or user data.
 
-**Temporary Voice** — временные голосовые комнаты с ownership/idempotency и reconciliation.
+The repository includes an automated source-hygiene check for obvious credential patterns.
 
-**Community** — tickets, role panels, giveaways, economy, reminders, starboard и другие серверные функции.
+## Verification
 
-**Automation** — событийно-условная система для автоматизации действий.
+The project uses GitHub Actions for dependency installation/audit, source/deployment/observability checks, bot typecheck/tests/build, domain build and dashboard build.
 
-**Security / Anti-Raid** — защитные сценарии вокруг подозрительной активности и ограничений действий.
+Automated verification is not a substitute for a live Discord server, real provider credentials or a clean-host VPS/Windows acceptance test.
 
-**Notifications** — внешние feed/webhook-сценарии с HTTPS/SSRF-проверками.
+## Local deployment
 
-**Music** — интеграция через Lavalink.
-
-**Control Center** — управление сервером, конфигурацией, модулями, ролями, каналами, backup/import/export и диагностикой.
-
-## 🚀 Быстрый старт
-
-Основной локальный сценарий:
+The primary local workflow is the native Windows launcher, designed to avoid Docker Desktop/WSL overhead on a gaming or streaming PC:
 
 ~~~powershell
-scripts/start-local.ps1
+.\start-native.bat
 ~~~
 
-Также доступна Docker-топология проекта.
+Add `-Dashboard` for the local Control Center. Docker Compose remains an optional deployment topology for reproducible environments and VPS use. See docs/LOCAL-SETUP.md and docs/NATIVE-SETUP.md.
 
-Перед первым live-запуском необходимо подготовить собственные Discord credentials и локальное окружение. Рекомендуется сначала пройти автоматические проверки, затем выполнить live-проверку на тестовом сервере.
+## Public snapshot
 
-## 🧪 Проверка
-
-~~~mermaid
-flowchart LR
-    SRC["Source"] --> H["Secret / hygiene checks"]
-    H --> TYPE["Typecheck"]
-    TYPE --> TEST["Unit / regression tests"]
-    TEST --> BUILD["Builds"]
-    BUILD --> LIVE["Live Discord validation"]
-    LIVE --> SOAK["E2E / chaos / soak"]
-~~~
-
-GitHub Actions покрывает автоматические этапы. Реальная Discord-аутентификация и длительные сценарии зависят от пользовательского сервера и окружения.
-
-## 🔐 Безопасность
-
-Проект предполагает, что внешний Discord-контент, webhook/feed-данные и пользовательский ввод недоверен.
-
-Отдельное внимание уделено:
-
-- защищённому Management API;
-- audit log;
-- проверкам внешних URL;
-- SSRF-защите для notification/feed сценариев;
-- валидации конфигурации;
-- разделению административных действий и Discord runtime.
-
-Секреты и локальные credentials не должны попадать в Git.
-
-## 🗺️ Roadmap
-
-~~~mermaid
-flowchart LR
-    A["Release candidate"] --> B["Live Discord validation"]
-    B --> C["E2E / chaos / soak"]
-    C --> D["Cleaner Windows deployment"]
-    D --> E["VPS acceptance"]
-    E --> F["Stable platform release"]
-~~~
-
-Долгосрочная цель — получить модульную Discord-платформу, которую можно запускать локально, переносить на сервер и расширять без превращения проекта в монолит.
-
-## 👤 Об авторе / About the author
-
-Я **Jostik (GitHub: [@Agro4221](https://github.com/Agro4221))**, начинающий разработчик, который учится через реальные проекты. Мне интересны **AI, нейростримеры, автоматизация, стриминг, Discord/Telegram и создание собственных инструментов**.
-
-Сейчас я постепенно набираюсь опыта в Python, TypeScript, API, LLM, базах данных, асинхронности, аудио/видео и архитектуре приложений. Эти проекты — часть моего практического обучения: я стараюсь не просто повторять готовые примеры, а разбираться, как всё работает, и собирать собственные системы.
-
-## 🔗 Ссылки / Links
-
-- 💬 **Discord-сервер:** [присоединиться](https://discord.gg/ZK38tXnhhq) — сервер ещё находится в разработке.
-- 📣 **Telegram:** [анонсы стримов и новости](https://t.me/+zb5pGLoWFbhhMTYy)
-- 💜 **DonatePay:** [поддержать автора](https://new.donatepay.ru/@Jostik001)
-- ❤️ **DonationAlerts:** [поддержать автора](https://www.donationalerts.com/r/i_jostik_i)
-
-Поддержка не обязательна, но помогает продолжать разработку и эксперименты с проектами.
-
-## 📚 Документация
-
-~~~text
-docs/MASTER-PLAN.md
-docs/PROJECT-STATE.md
-docs/ADMIN-GUIDE.md
-docs/LOCAL-SETUP.md
-docs/TEST-STRATEGY.md
-docs/TEST-MATRIX.md
-~~~
-
-## 👤 Об авторе / About the author
-
-Я **Jostik (GitHub: [@Agro4221](https://github.com/Agro4221))**, начинающий разработчик, который учится через реальные проекты. Мне интересны **AI, нейростримеры, автоматизация, стриминг, Discord/Telegram и создание собственных инструментов**.
-
-Сейчас я постепенно набираюсь опыта в Python, TypeScript, API, LLM, базах данных, асинхронности, аудио/видео и архитектуре больших приложений. Эти репозитории — часть этого пути: я стараюсь не просто повторять готовые примеры, а разбираться, как всё работает, и собирать собственные системы.
-
-## 🔗 Ссылки / Links
-
-- 💬 **Discord-сервер:** [присоединиться](https://discord.gg/ZK38tXnhhq) — сервер ещё находится в разработке.
-- 📣 **Telegram:** [анонсы стримов и новости](https://t.me/+zb5pGLoWFbhhMTYy)
-- 💜 **DonatePay:** [поддержать автора](https://new.donatepay.ru/@Jostik001)
-- ❤️ **DonationAlerts:** [поддержать автора](https://www.donationalerts.com/r/i_jostik_i)
-
-Поддержка не обязательна, но помогает продолжать разработку и эксперименты с проектами.
-
-
----
-
-**Jostik**
+This repository is prepared as an engineering project, with secrets, runtime state and historical private repository history removed from the public Git graph. The code and documentation intentionally distinguish implemented behavior from planned or environment-dependent functionality.

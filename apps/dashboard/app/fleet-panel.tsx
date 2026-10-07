@@ -6,11 +6,14 @@ type FleetIdentity = {
   id: string;
   clientId: string;
   enabled: boolean;
+  failoverEnabled: boolean;
   presenceName: string | null;
   connected: boolean;
   status: "starting" | "ready" | "degraded" | "stopped";
   lastSeenAt: string | null;
   guildCount: number;
+  credentialConfigured: boolean;
+  restartRequired: boolean;
 };
 
 type Resource = { id: string; name: string; type?: number };
@@ -31,6 +34,13 @@ export function FleetPanel({
   const [busy, setBusy] = useState(false);
   const [musicBusy, setMusicBusy] = useState(false);
   const [error, setError] = useState("");
+  const [registration, setRegistration] = useState({
+    identityId: "",
+    clientId: "",
+    token: "",
+    presenceName: ""
+  });
+  const [registrationBusy, setRegistrationBusy] = useState(false);
 
   async function loadFleet() {
     const response = await fetch("/api/fleet", { cache: "no-store" });
@@ -81,6 +91,32 @@ export function FleetPanel({
     [musicAssignments, voiceChannels]
   );
 
+  async function registerBot() {
+    setRegistrationBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/fleet/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          identityId: registration.identityId,
+          clientId: registration.clientId || undefined,
+          token: registration.token,
+          presenceName: registration.presenceName || undefined
+        })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "bot_registration_failed");
+      setRegistration((current) => ({ ...current, token: "" }));
+      await loadFleet();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось зарегистрировать Discord bot.");
+    } finally {
+      setRegistrationBusy(false);
+    }
+  }
+
   async function assignGuild() {
     if (!guildId || !selected) return;
     setBusy(true);
@@ -97,6 +133,48 @@ export function FleetPanel({
       await onChanged?.();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Не удалось назначить bot identity.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function requestRestart() {
+    if (!selected || selected === "primary") return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/fleet/" + encodeURIComponent(selected), {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ requestRestart: true })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "fleet_restart_request_failed");
+      await loadFleet();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось запросить перезапуск identity.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleFailover(enabled: boolean) {
+    if (!selected) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/fleet/" + encodeURIComponent(selected), {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ failoverEnabled: enabled })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "fleet_failover_update_failed");
+      await loadFleet();
+      await onChanged?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось изменить failover.");
     } finally {
       setBusy(false);
     }
@@ -149,17 +227,82 @@ export function FleetPanel({
       <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center" }}>
         <div>
           <div style={{ fontWeight: 700 }}>Bot Fleet</div>
-          <div style={{ marginTop: 3, opacity: 0.45, fontSize: 11 }}>Распределение guild и Music voice-каналов по отдельным bot-процессам.</div>
+          <div style={{ marginTop: 3, opacity: 0.45, fontSize: 11 }}>Распределение guild, Music voice-каналов и опциональный автоматический failover по heartbeat.</div>
         </div>
         <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
           <select value={selected} onChange={(event) => setSelected(event.target.value)} style={inputStyle}>
             {items.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.id} · {item.status} · {item.guildCount} guilds
+                {item.id} · {item.status} · {item.guildCount} guilds · {item.credentialConfigured ? "token ✓" : "token —"}{item.restartRequired ? " · restart pending" : ""}
               </option>
             ))}
           </select>
           <button type="button" disabled={busy || !selected} onClick={() => void assignGuild()} style={buttonStyle}>Назначить guild</button>
+          {selected && selected !== "primary" && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void requestRestart()}
+              style={buttonStyle}
+            >
+              {items.find((item) => item.id === selected)?.restartRequired ? "Перезапуск запрошен" : "Запросить перезапуск"}
+            </button>
+          )}
+
+          {selected && selected !== "primary" && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void toggleFailover(items.find((item) => item.id === selected)?.failoverEnabled !== true)}
+              style={buttonStyle}
+            >
+              {items.find((item) => item.id === selected)?.failoverEnabled ? "Failover ON" : "Failover OFF"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #202530" }}>
+        <div style={{ fontSize: 12, fontWeight: 700 }}>Регистрация Discord bot</div>
+        <div style={{ marginTop: 4, fontSize: 11, opacity: 0.45 }}>
+          Токен проверяется через Discord API, затем шифруется перед сохранением в PostgreSQL. Токен никогда не возвращается в Dashboard. Для уже запущенного процесса смена токена применяется после перезапуска.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
+          <input
+            value={registration.identityId}
+            onChange={(event) => setRegistration((current) => ({ ...current, identityId: event.target.value }))}
+            placeholder="Identity ID, например primary или music2"
+            style={inputStyle}
+          />
+          <input
+            value={registration.clientId}
+            onChange={(event) => setRegistration((current) => ({ ...current, clientId: event.target.value }))}
+            placeholder="Client ID (необязательно)"
+            inputMode="numeric"
+            style={inputStyle}
+          />
+          <input
+            type="password"
+            value={registration.token}
+            onChange={(event) => setRegistration((current) => ({ ...current, token: event.target.value }))}
+            placeholder="Discord Bot Token"
+            autoComplete="off"
+            style={{ ...inputStyle, gridColumn: "1 / -1" }}
+          />
+          <input
+            value={registration.presenceName}
+            onChange={(event) => setRegistration((current) => ({ ...current, presenceName: event.target.value }))}
+            placeholder="Название presence (необязательно)"
+            style={inputStyle}
+          />
+          <button
+            type="button"
+            disabled={registrationBusy || !registration.identityId.trim() || !registration.token}
+            onClick={() => void registerBot()}
+            style={{ ...buttonStyle, opacity: registrationBusy ? 0.6 : 1 }}
+          >
+            {registrationBusy ? "Проверка и сохранение…" : "Зарегистрировать / обновить"}
+          </button>
         </div>
       </div>
 
@@ -221,7 +364,7 @@ export function FleetPanel({
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
           {items.map((item) => (
             <span key={item.id} style={{ padding: "5px 8px", borderRadius: 999, border: "1px solid #2a2f3a", fontSize: 11, opacity: item.enabled ? 0.82 : 0.42 }}>
-              {item.id}: {item.status}{item.lastSeenAt ? " · " + new Date(item.lastSeenAt).toLocaleTimeString() : ""}
+              {item.id}: {item.status}{item.failoverEnabled ? " · failover" : ""}{item.restartRequired ? " · restart pending" : ""}{item.lastSeenAt ? " · " + new Date(item.lastSeenAt).toLocaleTimeString() : ""}
             </span>
           ))}
         </div>

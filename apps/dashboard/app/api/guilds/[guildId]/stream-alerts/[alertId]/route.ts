@@ -10,6 +10,14 @@ const headers = {
   "content-type": "application/json"
 };
 
+export async function POST(request: Request, context: { params: Promise<{ guildId: string; alertId: string }> }) {
+  if (!await currentSession()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  try { assertSameOrigin(request); } catch { return NextResponse.json({ error: "bad_origin" }, { status: 403 }); }
+  const { guildId, alertId } = await context.params;
+  const response = await fetch(upstream("/api/guilds/" + encodeURIComponent(guildId) + "/stream-alerts/" + encodeURIComponent(alertId)), { method: "POST", headers, body: await request.text() });
+  return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": "application/json; charset=utf-8" } });
+}
+
 export async function PUT(request: Request, context: { params: Promise<{ guildId: string; alertId: string }> }) {
   if (!await currentSession()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   try { assertSameOrigin(request); } catch { return NextResponse.json({ error: "bad_origin" }, { status: 403 }); }

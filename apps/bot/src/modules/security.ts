@@ -18,59 +18,142 @@ type SecurityConfig = {
   destructiveWindowSeconds: number;
   quarantineRoleId: string | null;
   logChannelId: string | null;
+  incidentDurationSeconds: number;
+  autoQuarantine: boolean;
+  removeExecutorRoles: boolean;
+  executorTimeoutMinutes: number;
+  executorBanEnabled: boolean;
+  autoLockdown: boolean;
 };
 
 export class Security implements PlatformModule {
   readonly name = "security";
   private unsubscribe?: () => void;
   private readonly joins = new Map<string, { timestamp: number; userId: string }[]>();
-  private readonly raidActiveUntil = new Map<string, number>();
-  private readonly destructiveActiveUntil = new Map<string, number>();
+  private readonly raidIncidents = new Map<string, { id: number; expiresAt: number }>();
+  private readonly destructiveIncidents = new Map<string, { id: number; expiresAt: number }>();
   private readonly alertAt = new Map<string, number>();
   private readonly destructive = new Map<string, { timestamp: number; type: string }[]>();
   private client?: import("discord.js").Client;
   private auditLog?: import("../audit.js").AuditLog;
+  private events?: import("../events.js").PlatformEventBus;
+  private incidentTimer?: NodeJS.Timeout;
 
   constructor(private readonly db: Database) {}
 
   async init(context: ModuleContext): Promise<void> {
     this.client = context.client;
     this.auditLog = context.auditLog;
+    this.events = context.events;
     await this.restoreActiveIncidents();
+    await this.restoreDestructiveHistory();
+    await this.sweepIncidents();
+    this.incidentTimer = setInterval(() => void this.sweepIncidents(), 15_000);
+    this.incidentTimer.unref();
     const a = context.events.on("member.add", (member) => this.onJoin(member));
-    const b = context.events.on("interaction.command", (interaction) => this.onCommand(interaction));
-    const c = context.events.on("channel.delete", (channel) => this.onDestructive(channel.guildId, "channel.delete"));
-    const d = context.events.on("role.delete", (role) => this.onDestructive(role.guild.id, "role.delete"));
-    const e = context.events.on("member.ban", ({ guildId, userId }) => this.onDestructive(guildId, "member.ban", userId));
-    this.unsubscribe = () => { a(); b(); c(); d(); e(); };
+    const b = context.events.on("interaction.command", (interaction) => this.executeSlashCommand(interaction));
+    const c = context.events.on("channel.create", (channel) => this.onDestructive(channel.guildId, "channel.create"));
+    const d = context.events.on("channel.delete", (channel) => this.onDestructive(channel.guildId, "channel.delete"));
+    const e = context.events.on("role.create", (role) => this.onDestructive(role.guild.id, "role.create"));
+    const f = context.events.on("role.delete", (role) => this.onDestructive(role.guild.id, "role.delete"));
+    const g = context.events.on("member.ban", ({ guildId, userId }) => this.onDestructive(guildId, "member.ban", userId));
+    const h = context.events.on("audit.entry", ({ guild, entry }) => {
+      const mapped = securityAuditDestructiveType(entry.action);
+      if (!mapped) return;
+      void this.onDestructive(guild.id, mapped.type, mapped.targetUserId);
+    });
+    this.unsubscribe = () => { a(); b(); c(); d(); e(); f(); g(); h(); };
   }
 
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.joins.clear();
-    this.raidActiveUntil.clear();
-    this.destructiveActiveUntil.clear();
+    this.raidIncidents.clear();
+    this.destructiveIncidents.clear();
     this.alertAt.clear();
     this.destructive.clear();
+    if (this.incidentTimer) clearInterval(this.incidentTimer);
+    this.incidentTimer = undefined;
     this.auditLog = undefined;
+    this.events = undefined;
     this.client = undefined;
   }
 
+  async handlePrefixCommand(message: import("discord.js").Message, commandName: string, args: string[]): Promise<boolean> {
+    if (commandName !== "security") return false;
+    if (!message.guild) return false;
+
+    const sub = (args.shift() ?? "setup").toLowerCase();
+    if (sub !== "setup") {
+      await message.reply("Использование: !security setup <max-joins> <window> [max-destructive] [destructive-window] [@quarantine-role] [#log-channel]");
+      return true;
+    }
+
+    const numeric = args.filter((arg) => /^\d+$/.test(arg)).map(Number);
+    const maxJoins = numeric[0];
+    const windowSeconds = numeric[1];
+    if (!Number.isFinite(maxJoins) || !Number.isFinite(windowSeconds)) {
+      await message.reply("Пример: !security setup 10 20 5 20 @Quarantine #security-log");
+      return true;
+    }
+
+    const roles = [...message.mentions.roles.values()];
+    const channels = [...message.mentions.channels.values()];
+    const botPosition = message.guild.members.me?.roles.highest.position ?? 0;
+    const quarantineRole = roles[0] ?? null;
+    if (quarantineRole && (quarantineRole.managed || quarantineRole.position >= botPosition)) {
+      await message.reply("Quarantine role недоступна из-за role hierarchy.");
+      return true;
+    }
+
+    await this.configure(message.guild.id, {
+      enabled: true,
+      maxJoins,
+      windowSeconds,
+      maxDestructiveActions: numeric[2] ?? 5,
+      destructiveWindowSeconds: numeric[3] ?? 20,
+      quarantineRoleId: quarantineRole?.id ?? null,
+      logChannelId: channels[0]?.id ?? null
+    });
+    await message.reply("Security настроен и включён.");
+    return true;
+  }
+
   private async config(guildId: string): Promise<SecurityConfig> {
-    const result = await this.db.query<{ enabled: boolean; max_joins: number; window_seconds: number; max_destructive_actions: number; destructive_window_seconds: number; quarantine_role_id: string | null; log_channel_id: string | null }>(
-      "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id FROM security_settings WHERE guild_id=$1",
+    const result = await this.db.query<{
+      enabled: boolean;
+      max_joins: number;
+      window_seconds: number;
+      max_destructive_actions: number;
+      destructive_window_seconds: number;
+      quarantine_role_id: string | null;
+      log_channel_id: string | null;
+      incident_duration_seconds: number;
+      auto_quarantine: boolean;
+      remove_executor_roles: boolean;
+      executor_timeout_minutes: number;
+      executor_ban_enabled: boolean;
+      auto_lockdown: boolean;
+    }>(
+      "SELECT enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id,incident_duration_seconds,auto_quarantine,remove_executor_roles,executor_timeout_minutes,executor_ban_enabled,auto_lockdown FROM security_settings WHERE guild_id=$1",
       [guildId]
     );
     const row = result.rows[0];
     return {
       enabled: row?.enabled ?? false,
-      maxJoins: row?.max_joins ?? 10,
-      windowSeconds: row?.window_seconds ?? 20,
-      maxDestructiveActions: row?.max_destructive_actions ?? 5,
-      destructiveWindowSeconds: row?.destructive_window_seconds ?? 20,
+      maxJoins: Math.max(1, Math.trunc(row?.max_joins ?? 10)),
+      windowSeconds: clampSecurityWindowSeconds(row?.window_seconds ?? 20),
+      maxDestructiveActions: Math.max(1, Math.trunc(row?.max_destructive_actions ?? 5)),
+      destructiveWindowSeconds: clampSecurityWindowSeconds(row?.destructive_window_seconds ?? 20),
       quarantineRoleId: row?.quarantine_role_id ?? null,
-      logChannelId: row?.log_channel_id ?? null
+      logChannelId: row?.log_channel_id ?? null,
+      incidentDurationSeconds: row?.incident_duration_seconds ?? 300,
+      autoQuarantine: row?.auto_quarantine ?? true,
+      removeExecutorRoles: row?.remove_executor_roles ?? true,
+      executorTimeoutMinutes: clampSecurityExecutorTimeoutMinutes(row?.executor_timeout_minutes ?? 0),
+      executorBanEnabled: row?.executor_ban_enabled ?? false,
+      autoLockdown: row?.auto_lockdown ?? false
     };
   }
 
@@ -78,69 +161,410 @@ export class Security implements PlatformModule {
     const current = await this.config(guildId);
     const next = { ...current, ...patch };
     await this.db.query(
-      `INSERT INTO security_settings(guild_id,enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,quarantine_role_id,log_channel_id)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8)
-       ON CONFLICT(guild_id) DO UPDATE SET
-       enabled=EXCLUDED.enabled,max_joins=EXCLUDED.max_joins,window_seconds=EXCLUDED.window_seconds,
-       max_destructive_actions=EXCLUDED.max_destructive_actions,destructive_window_seconds=EXCLUDED.destructive_window_seconds,
-       quarantine_role_id=EXCLUDED.quarantine_role_id,log_channel_id=EXCLUDED.log_channel_id,updated_at=now()`,
-      [guildId,next.enabled,Math.min(Math.max(next.maxJoins,2),200),Math.min(Math.max(next.windowSeconds,5),300),
-       Math.min(Math.max(next.maxDestructiveActions,2),100),Math.min(Math.max(next.destructiveWindowSeconds,5),300),
-       next.quarantineRoleId,next.logChannelId]
+      `INSERT INTO security_settings(
+        guild_id,enabled,max_joins,window_seconds,max_destructive_actions,destructive_window_seconds,
+        quarantine_role_id,log_channel_id,incident_duration_seconds,auto_quarantine,remove_executor_roles,executor_timeout_minutes,executor_ban_enabled,auto_lockdown
+      )
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      ON CONFLICT(guild_id) DO UPDATE SET
+        enabled=EXCLUDED.enabled,
+        max_joins=EXCLUDED.max_joins,
+        window_seconds=EXCLUDED.window_seconds,
+        max_destructive_actions=EXCLUDED.max_destructive_actions,
+        destructive_window_seconds=EXCLUDED.destructive_window_seconds,
+        quarantine_role_id=EXCLUDED.quarantine_role_id,
+        log_channel_id=EXCLUDED.log_channel_id,
+        incident_duration_seconds=EXCLUDED.incident_duration_seconds,
+        auto_quarantine=EXCLUDED.auto_quarantine,
+        remove_executor_roles=EXCLUDED.remove_executor_roles,
+        executor_timeout_minutes=EXCLUDED.executor_timeout_minutes,
+        executor_ban_enabled=EXCLUDED.executor_ban_enabled,
+        auto_lockdown=EXCLUDED.auto_lockdown,
+        updated_at=now()`,
+      [
+        guildId,
+        next.enabled,
+        Math.min(Math.max(next.maxJoins, 2), 200),
+        Math.min(Math.max(next.windowSeconds, 5), 300),
+        Math.min(Math.max(next.maxDestructiveActions, 2), 100),
+        Math.min(Math.max(next.destructiveWindowSeconds, 5), 300),
+        next.quarantineRoleId,
+        next.logChannelId,
+        clampSecurityIncidentDuration(next.incidentDurationSeconds),
+        next.autoQuarantine,
+        next.removeExecutorRoles,
+        clampSecurityExecutorTimeoutMinutes(next.executorTimeoutMinutes),
+        next.executorBanEnabled,
+        next.autoLockdown
+      ]
     );
     await this.db.query(
       `INSERT INTO guild_modules(guild_id,module_key,enabled)
        VALUES($1,'security',$2)
        ON CONFLICT(guild_id,module_key) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=now()`,
-      [guildId,next.enabled]
+      [guildId, next.enabled]
     );
   }
 
-  private async restoreActiveIncidents(): Promise<void> {
-    const result = await this.db.query<{
-      guild_id: string;
-      event_type: "raid-detected" | "destructive-burst";
-      created_at: Date | string;
-      metadata: { windowSeconds?: number };
-    }>(
-      "SELECT guild_id,event_type,created_at,metadata FROM security_events WHERE event_type IN ('raid-detected','destructive-burst') AND created_at >= now() - interval '5 minutes' ORDER BY created_at DESC LIMIT 10000"
-    );
+  private async applyIncidentLockdown(guild: import("discord.js").Guild, incidentId: number, config: SecurityConfig): Promise<void> {
+    if (!config.autoLockdown) return;
 
-    const now = Date.now();
-    for (const row of result.rows) {
-      const createdAt = new Date(row.created_at).getTime();
-      if (!Number.isFinite(createdAt)) continue;
+    const botMember = guild.members.me;
+    if (!botMember?.permissions.has(PermissionFlagsBits.ManageChannels)) return;
+    const everyone = guild.roles.everyone;
 
-      const configuredWindowSeconds =
-        typeof row.metadata?.windowSeconds === "number" && Number.isFinite(row.metadata.windowSeconds)
-          ? row.metadata.windowSeconds
-          : 20;
-      const cooldown = securityIncidentCooldownUntil(createdAt, configuredWindowSeconds);
-      if (cooldown <= now) continue;
+    for (const channel of guild.channels.cache.values()) {
+      if (!channel.isTextBased() || !("permissionOverwrites" in channel)) continue;
+      const channelPermissions = channel.permissionsFor(botMember);
+      if (!channelPermissions?.has(PermissionFlagsBits.ManageChannels)) continue;
 
-      if (row.event_type === "raid-detected") {
-        const current = this.raidActiveUntil.get(row.guild_id) ?? 0;
-        if (cooldown > current) this.raidActiveUntil.set(row.guild_id, cooldown);
-      } else {
-        const current = this.destructiveActiveUntil.get(row.guild_id) ?? 0;
-        if (cooldown > current) this.destructiveActiveUntil.set(row.guild_id, cooldown);
+      try {
+        const existing = await this.db.query<{ incident_id: string }>(
+          "SELECT incident_id FROM security_channel_locks WHERE guild_id=$1 AND channel_id=$2 AND restored_at IS NULL LIMIT 1",
+          [guild.id, channel.id]
+        );
+        const owned = existing.rows.length === 0;
+        const previous = channel.permissionsFor(everyone)?.has(PermissionFlagsBits.SendMessages) ?? null;
+
+        await this.db.query(
+          "INSERT INTO security_channel_locks(incident_id,guild_id,channel_id,previous_send_messages,owned) VALUES($1,$2,$3,$4,$5) ON CONFLICT(incident_id,channel_id) DO NOTHING",
+          [incidentId, guild.id, channel.id, owned ? previous : null, owned]
+        );
+
+        if (owned) {
+          await channel.permissionOverwrites.edit(
+            everyone,
+            { SendMessages: false },
+            { reason: "Security incident lockdown" }
+          );
+        }
+      } catch (error) {
+        logger.warn("Security incident channel lockdown failed", {
+          guildId: guild.id,
+          incidentId,
+          channelId: channel.id,
+          error: String(error)
+        });
       }
     }
   }
 
-  private async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (!interaction.inGuild() || interaction.commandName !== "security") return;
+  private async restoreActiveIncidents(): Promise<void> {
+    this.raidIncidents.clear();
+    this.destructiveIncidents.clear();
+
+    const result = await this.db.query<{
+      id: string;
+      guild_id: string;
+      event_type: "raid" | "destructive-burst";
+      expires_at: Date | string;
+    }>(
+      "SELECT id,guild_id,event_type,expires_at FROM security_incidents WHERE resolved_at IS NULL AND expires_at > now() ORDER BY expires_at DESC LIMIT 10000"
+    );
+
+    for (const row of result.rows) {
+      const expiresAt = new Date(row.expires_at).getTime();
+      if (!Number.isFinite(expiresAt)) continue;
+      const incident = { id: Number(row.id), expiresAt };
+      if (row.event_type === "raid") {
+        const current = this.raidIncidents.get(row.guild_id);
+        if (!current || incident.expiresAt > current.expiresAt) this.raidIncidents.set(row.guild_id, incident);
+      } else {
+        const current = this.destructiveIncidents.get(row.guild_id);
+        if (!current || incident.expiresAt > current.expiresAt) this.destructiveIncidents.set(row.guild_id, incident);
+      }
+    }
+  }
+
+  private async restoreDestructiveHistory(): Promise<void> {
+    this.destructive.clear();
+
+    const result = await this.db.query<{
+      guild_id: string;
+      event_type: string;
+      metadata: Record<string, unknown>;
+      created_at: Date | string;
+    }>(
+      "SELECT guild_id,event_type,metadata,created_at FROM security_events WHERE event_type='destructive-action' AND created_at >= now()-interval '1 hour' ORDER BY created_at DESC LIMIT 50000"
+    );
+
+    const cutoff = Date.now() - 3_600_000;
+    const rows = [...result.rows].reverse();
+    for (const row of rows) {
+      const timestamp = new Date(row.created_at).getTime();
+      if (!Number.isFinite(timestamp) || timestamp < cutoff) continue;
+      const bucket = this.destructive.get(row.guild_id) ?? [];
+      bucket.push({ timestamp, type: row.metadata?.type ? String(row.metadata.type) : row.event_type });
+      this.destructive.set(row.guild_id, bucket);
+    }
+    this.pruneBuckets(Date.now());
+  }
+
+  private async sweepIncidents(): Promise<void> {
+    const expired = await this.db.query<{
+      id: string;
+      guild_id: string;
+      event_type: "raid" | "destructive-burst";
+    }>(
+      "SELECT id,guild_id,event_type FROM security_incidents WHERE resolved_at IS NULL AND expires_at <= now() ORDER BY id LIMIT 100"
+    );
+
+    for (const row of expired.rows) {
+      await this.resolveIncident(Number(row.id), row.guild_id).catch((error) => {
+        logger.warn("Security incident cleanup failed", {
+          guildId: row.guild_id,
+          incidentId: row.id,
+          error: String(error)
+        });
+      });
+    }
+
+    await this.restoreActiveIncidents();
+  }
+
+  private async openIncident(
+    guildId: string,
+    eventType: "raid" | "destructive-burst",
+    config: SecurityConfig,
+    metadata: Record<string, unknown>
+  ): Promise<{ id: number; expiresAt: number }> {
+    const duration = clampSecurityIncidentDuration(config.incidentDurationSeconds);
+    const result = await this.db.query<{ id: string; expires_at: Date | string }>(
+      "INSERT INTO security_incidents(guild_id,event_type,expires_at,metadata) VALUES($1,$2,now()+make_interval(secs => $3),$4::jsonb) RETURNING id,expires_at",
+      [guildId, eventType, duration, JSON.stringify(metadata)]
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error("security_incident_create_failed");
+    const incident = { id: Number(row.id), expiresAt: new Date(row.expires_at).getTime() };
+    if (eventType === "raid") this.raidIncidents.set(guildId, incident);
+    else this.destructiveIncidents.set(guildId, incident);
+    return incident;
+  }
+
+  private async resolveIncident(incidentId: number, guildId: string): Promise<boolean> {
+    const guild = this.client?.guilds.cache.get(guildId);
+    if (!guild) return false;
+
+    const assignments = await this.db.query<{
+      user_id: string;
+      role_id: string;
+    }>(
+      "SELECT user_id,role_id FROM security_quarantine_assignments WHERE incident_id=$1 AND restored_at IS NULL",
+      [incidentId]
+    );
+
+    let cleanupFailed = false;
+    for (const assignment of assignments.rows) {
+      let member: GuildMember | null = null;
+      try {
+        member = await guild.members.fetch(assignment.user_id);
+      } catch (error) {
+        const code = typeof error === "object" && error !== null && "code" in error
+          ? Number((error as { code?: unknown }).code)
+          : undefined;
+        if (code !== 10007) {
+          cleanupFailed = true;
+          logger.warn("Security quarantine member fetch failed", {
+            guildId,
+            incidentId,
+            userId: assignment.user_id,
+            error: String(error)
+          });
+          continue;
+        }
+      }
+
+      const role = guild.roles.cache.get(assignment.role_id);
+      const otherAssignments = await this.db.query<{ incident_id: string }>(
+        "SELECT incident_id FROM security_quarantine_assignments WHERE guild_id=$1 AND user_id=$2 AND role_id=$3 AND incident_id<>$4 AND restored_at IS NULL LIMIT 1",
+        [guildId, assignment.user_id, assignment.role_id, incidentId]
+      );
+
+      if (!otherAssignments.rows.length && member && role && member.roles.cache.has(role.id)) {
+        try {
+          await member.roles.remove(role, "Security incident ended");
+        } catch (error) {
+          cleanupFailed = true;
+          logger.warn("Security quarantine role removal failed", {
+            guildId,
+            incidentId,
+            userId: assignment.user_id,
+            roleId: assignment.role_id,
+            error: String(error)
+          });
+          continue;
+        }
+      }
+
+      await this.db.query(
+        "UPDATE security_quarantine_assignments SET restored_at=now() WHERE incident_id=$1 AND user_id=$2 AND role_id=$3",
+        [incidentId, assignment.user_id, assignment.role_id]
+      );
+    }
+
+    const lockAssignments = await this.db.query<{
+      channel_id: string;
+      previous_send_messages: boolean | null;
+      owned: boolean;
+    }>(
+      "SELECT channel_id,previous_send_messages,owned FROM security_channel_locks WHERE incident_id=$1 AND restored_at IS NULL",
+      [incidentId]
+    );
+
+    for (const assignment of lockAssignments.rows) {
+      if (assignment.owned) {
+        const otherLock = await this.db.query<{ incident_id: string }>(
+          "SELECT incident_id FROM security_channel_locks WHERE guild_id=$1 AND channel_id=$2 AND incident_id<>$3 AND restored_at IS NULL AND owned=true LIMIT 1",
+          [guildId, assignment.channel_id, incidentId]
+        );
+        if (!otherLock.rows.length) {
+          const channel = guild.channels.cache.get(assignment.channel_id);
+          if (channel?.isTextBased() && "permissionOverwrites" in channel) {
+            try {
+              await channel.permissionOverwrites.edit(
+                guild.roles.everyone,
+                { SendMessages: assignment.previous_send_messages },
+                { reason: "Security incident ended" }
+              );
+            } catch (error) {
+              cleanupFailed = true;
+              logger.warn("Security lockdown channel restore failed", {
+                guildId,
+                incidentId,
+                channelId: assignment.channel_id,
+                error: String(error)
+              });
+              continue;
+            }
+          }
+        }
+      }
+
+      await this.db.query(
+        "UPDATE security_channel_locks SET restored_at=now() WHERE incident_id=$1 AND channel_id=$2 AND restored_at IS NULL",
+        [incidentId, assignment.channel_id]
+      );
+    }
+
+    if (cleanupFailed) return false;
+
+    const result = await this.db.query(
+      "UPDATE security_incidents SET resolved_at=now() WHERE id=$1 AND guild_id=$2 AND resolved_at IS NULL",
+      [incidentId, guildId]
+    );
+    if (result.rowCount !== 1) return false;
+
+    if (this.raidIncidents.get(guildId)?.id === incidentId) this.raidIncidents.delete(guildId);
+    if (this.destructiveIncidents.get(guildId)?.id === incidentId) this.destructiveIncidents.delete(guildId);
+
+    await this.audit(guildId, "security.incident-resolved", { incidentId });
+    return true;
+  }
+
+  async dashboardSnapshot(guildId: string): Promise<{
+    incidents: Array<{ id: number; eventType: string; expiresAt: string }>;
+    hierarchy: Awaited<ReturnType<Security["checkHierarchy"]>>;
+  }> {
+    return {
+      incidents: await this.getActiveIncidents(guildId),
+      hierarchy: await this.checkHierarchy(guildId)
+    };
+  }
+
+  async clearIncidents(guildId: string): Promise<number> {
+    const result = await this.db.query<{ id: string }>(
+      "SELECT id FROM security_incidents WHERE guild_id=$1 AND resolved_at IS NULL ORDER BY id",
+      [guildId]
+    );
+    let cleared = 0;
+    for (const row of result.rows) {
+      if (await this.resolveIncident(Number(row.id), guildId)) cleared += 1;
+    }
+    return cleared;
+  }
+
+  async getActiveIncidents(guildId: string): Promise<Array<{ id: number; eventType: string; expiresAt: string }>> {
+    const result = await this.db.query<{ id: string; event_type: string; expires_at: Date | string }>(
+      "SELECT id,event_type,expires_at FROM security_incidents WHERE guild_id=$1 AND resolved_at IS NULL AND expires_at > now() ORDER BY expires_at DESC",
+      [guildId]
+    );
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      eventType: row.event_type,
+      expiresAt: new Date(row.expires_at).toISOString()
+    }));
+  }
+
+  private async trackQuarantine(
+    incidentId: number,
+    member: GuildMember,
+    config: SecurityConfig
+  ): Promise<void> {
+    if (!config.autoQuarantine || !config.quarantineRoleId) return;
+    if (!member.manageable || member.id === member.guild.ownerId || member.permissions.has(PermissionFlagsBits.Administrator)) return;
+
+    const botMember = member.guild.members.me;
+    const role = member.guild.roles.cache.get(config.quarantineRoleId);
+    if (!botMember || !role || role.managed || role.position >= botMember.roles.highest.position) return;
+
+    const existingSecurityAssignment = await this.db.query<{ incident_id: string }>(
+      "SELECT incident_id FROM security_quarantine_assignments WHERE guild_id=$1 AND user_id=$2 AND role_id=$3 AND restored_at IS NULL LIMIT 1",
+      [member.guild.id, member.id, role.id]
+    );
+
+    if (member.roles.cache.has(role.id)) {
+      if (existingSecurityAssignment.rows.length) {
+        await this.db.query(
+          "INSERT INTO security_quarantine_assignments(incident_id,guild_id,user_id,role_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING",
+          [incidentId, member.guild.id, member.id, role.id]
+        );
+      }
+      return;
+    }
+
+    try {
+      await member.roles.add(role, "Security quarantine");
+    } catch (error) {
+      logger.warn("Security quarantine role assignment failed", {
+        guildId: member.guild.id,
+        userId: member.id,
+        roleId: role.id,
+        error: String(error)
+      });
+      return;
+    }
+
+    await this.db.query(
+      "INSERT INTO security_quarantine_assignments(incident_id,guild_id,user_id,role_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING",
+      [incidentId, member.guild.id, member.id, role.id]
+    );
+  }
+
+  async executeSlashCommand(interaction: ChatInputCommandInteraction, commandName = interaction.commandName): Promise<void> {
+    if (!interaction.inGuild() || commandName !== "security") return;
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
       await interaction.reply({ content: "Нужны права Manage Server.", ephemeral: true });
       return;
     }
-    if (interaction.options.getSubcommand() !== "setup") return;
+
+    const sub = interaction.options.getSubcommand();
+    if (sub === "clear") {
+      const cleared = await this.clearIncidents(interaction.guild!.id);
+      await interaction.reply({
+        content: cleared ? `Закрыто инцидентов: ${cleared}.` : "Активных Security-инцидентов нет.",
+        ephemeral: true
+      });
+      return;
+    }
+    if (sub !== "setup") return;
+
     const logChannelOption = interaction.options.getChannel("log-channel");
     const logChannel = logChannelOption ? interaction.guild!.channels.cache.get(logChannelOption.id) : null;
     if (logChannelOption && (!logChannel || logChannel.type !== 0)) {
       await interaction.reply({ content: "Security log channel должен быть текстовым.", ephemeral: true });
       return;
     }
+
     await this.configure(interaction.guild!.id, {
       enabled: true,
       maxJoins: interaction.options.getInteger("max-joins", true),
@@ -163,16 +587,20 @@ export class Security implements PlatformModule {
     bucket.push({ timestamp: now, userId: member.id });
     this.joins.set(member.guild.id, bucket);
     this.pruneBuckets(now);
-    const activeUntil = this.raidActiveUntil.get(member.guild.id) ?? 0;
+    const activeIncident = this.raidIncidents.get(member.guild.id);
     const raidTriggered = bucket.length >= config.maxJoins;
-    if (now < activeUntil) {
-      await this.quarantine(member, config);
+    if (activeIncident && now < activeIncident.expiresAt) {
+      await this.trackQuarantine(activeIncident.id, member, config);
       return;
     }
     if (!raidTriggered) return;
 
-    this.raidActiveUntil.set(member.guild.id, now + Math.max(config.windowSeconds * 1000, 60000));
-    const raidMetadata = { joins: bucket.length, windowSeconds: config.windowSeconds };
+    const incident = await this.openIncident(member.guild.id, "raid", config, {
+      joins: bucket.length,
+      windowSeconds: config.windowSeconds
+    });
+    await this.applyIncidentLockdown(member.guild, incident.id, config);
+    const raidMetadata = { joins: bucket.length, windowSeconds: config.windowSeconds, incidentId: incident.id, incidentDurationSeconds: config.incidentDurationSeconds };
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'raid-detected',$2::jsonb)",
       [member.guild.id,JSON.stringify(raidMetadata)]
@@ -182,11 +610,51 @@ export class Security implements PlatformModule {
       "security.raid-detected",
       raidMetadata
     );
+    await this.events?.emit("security.incident", {
+      guildId: member.guild.id,
+      incidentId: incident.id,
+      eventType: "raid",
+      joinCount: bucket.length
+    });
     for (const entry of bucket) {
       const target = member.guild.members.cache.get(entry.userId) ?? await member.guild.members.fetch(entry.userId).catch(() => null);
-      if (target) await this.quarantine(target, config);
+      if (target) await this.trackQuarantine(incident.id, target, config);
     }
     await this.alert(member.guild.id, config, `Anti-Raid: ${bucket.length} входов за ${config.windowSeconds} сек.`);
+  }
+
+  private async recordDestructiveAction(guildId: string, type: string, targetUserId?: string): Promise<void> {
+    try {
+      await this.db.query(
+        "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'destructive-action',$2::jsonb)",
+        [guildId, JSON.stringify({ type, targetUserId: targetUserId ?? null })]
+      );
+    } catch (error) {
+      logger.warn("Security destructive history write failed", { guildId, type, error: String(error) });
+    }
+  }
+
+  private async recordExecutorRoleRemoval(
+    guildId: string,
+    incidentId: number,
+    userId: string,
+    roleId: string,
+    roleName: string
+  ): Promise<void> {
+    try {
+      await this.db.query(
+        "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'security.executor-role-removed',$2::jsonb)",
+        [guildId, JSON.stringify({ incidentId, userId, roleId, roleName, reversible: false })]
+      );
+    } catch (error) {
+      logger.warn("Security executor-role history write failed", {
+        guildId,
+        incidentId,
+        userId,
+        roleId,
+        error: String(error)
+      });
+    }
   }
 
   private async onDestructive(guildId: string | null, type: string, targetUserId?: string): Promise<void> {
@@ -194,27 +662,37 @@ export class Security implements PlatformModule {
     const config = await this.config(guildId);
     if (!config.enabled) return;
     const now = Date.now();
+    void this.recordDestructiveAction(guildId, type, targetUserId);
     const cutoff = now - config.destructiveWindowSeconds * 1000;
     const bucket = (this.destructive.get(guildId) ?? []).filter((entry) => entry.timestamp >= cutoff);
     bucket.push({ timestamp: now, type });
     this.destructive.set(guildId, bucket);
     this.pruneBuckets(now);
-    const activeUntil = this.destructiveActiveUntil.get(guildId) ?? 0;
-    if (!shouldTriggerSecurityIncident(now, activeUntil, bucket.length, config.maxDestructiveActions)) return;
+    const activeIncident = this.destructiveIncidents.get(guildId);
+    if (!shouldTriggerSecurityIncident(now, activeIncident?.expiresAt ?? 0, bucket.length, config.maxDestructiveActions)) return;
 
-    this.destructiveActiveUntil.set(
-      guildId,
-      now + Math.max(config.destructiveWindowSeconds * 1000, 60000)
-    );
-    const burstMetadata = { type, actions: bucket.length, windowSeconds: config.destructiveWindowSeconds };
+    const incident = await this.openIncident(guildId, "destructive-burst", config, {
+      type,
+      actions: bucket.length,
+      windowSeconds: config.destructiveWindowSeconds
+    });
+    const incidentGuild = this.client?.guilds.cache.get(guildId);
+    if (incidentGuild) await this.applyIncidentLockdown(incidentGuild, incident.id, config);
+    const burstMetadata = { type, actions: bucket.length, windowSeconds: config.destructiveWindowSeconds, incidentId: incident.id, incidentDurationSeconds: config.incidentDurationSeconds };
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'destructive-burst',$2::jsonb)",
       [guildId,JSON.stringify(burstMetadata)]
     );
     await this.audit(guildId, "security.destructive-burst", burstMetadata);
+    await this.events?.emit("security.incident", {
+      guildId,
+      incidentId: incident.id,
+      eventType: "destructive-burst",
+      actionCount: bucket.length
+    });
     const executors = await this.findRecentExecutors(guildId, type, targetUserId, config.destructiveWindowSeconds);
     for (const executor of executors) {
-      await this.respondToExecutor(guildId, executor.userId, config, type, executor.count);
+      await this.respondToExecutor(guildId, executor.userId, config, type, executor.count, incident.id);
     }
     await this.alert(guildId, config, `Security: обнаружено ${bucket.length} destructive actions за ${config.destructiveWindowSeconds} сек.`);
   }
@@ -271,7 +749,7 @@ export class Security implements PlatformModule {
   }
 
   private pruneBuckets(now: number): void {
-    const cutoff = now - 300_000;
+    const cutoff = now - 3_600_000;
     for (const [guildId, entries] of this.joins) {
       const latest = entries.at(-1)?.timestamp ?? 0;
       if (latest < cutoff) this.joins.delete(guildId);
@@ -281,11 +759,11 @@ export class Security implements PlatformModule {
       if (latest < cutoff) this.destructive.delete(guildId);
     }
 
-    for (const [guildId, until] of this.raidActiveUntil) {
-      if (until <= now) this.raidActiveUntil.delete(guildId);
+    for (const [guildId, incident] of this.raidIncidents) {
+      if (incident.expiresAt <= now) this.raidIncidents.delete(guildId);
     }
-    for (const [guildId, until] of this.destructiveActiveUntil) {
-      if (until <= now) this.destructiveActiveUntil.delete(guildId);
+    for (const [guildId, incident] of this.destructiveIncidents) {
+      if (incident.expiresAt <= now) this.destructiveIncidents.delete(guildId);
     }
     for (const [guildId, at] of this.alertAt) {
       if (at <= now - 60_000) this.alertAt.delete(guildId);
@@ -340,25 +818,6 @@ export class Security implements PlatformModule {
     }
   }
 
-  private async quarantine(member: GuildMember, config: SecurityConfig): Promise<void> {
-    if (
-      !config.quarantineRoleId ||
-      !member.manageable ||
-      member.id === member.guild.ownerId ||
-      member.permissions.has(PermissionFlagsBits.Administrator)
-    ) return;
-    const botMember = member.guild.members.me;
-    const role = member.guild.roles.cache.get(config.quarantineRoleId);
-    if (!botMember || !role || role.position >= botMember.roles.highest.position) return;
-    await member.roles.add(role, "Security quarantine").catch((error) => {
-      logger.warn("Security quarantine role assignment failed", {
-        guildId: member.guild.id,
-        userId: member.id,
-        roleId: role.id,
-        error: String(error)
-      });
-    });
-  }
 
   private async findRecentExecutors(
     guildId: string,
@@ -370,10 +829,7 @@ export class Security implements PlatformModule {
     if (!guild) return [];
     await new Promise((resolve) => setTimeout(resolve, 350));
 
-    const auditType =
-      type === "channel.delete" ? AuditLogEvent.ChannelDelete :
-      type === "role.delete" ? AuditLogEvent.RoleDelete :
-      AuditLogEvent.MemberBanAdd;
+    const auditType = securityAuditLogEventType(type);
     const logs = await guild.fetchAuditLogs({ limit: 25, type: auditType }).catch((error) => {
       logger.warn("Security audit-log fetch failed", { guildId, type, error: String(error) });
       return null;
@@ -391,7 +847,7 @@ export class Security implements PlatformModule {
     return [...counts.entries()].map(([userId, count]) => ({ userId, count }));
   }
 
-  private async respondToExecutor(guildId: string, userId: string, config: SecurityConfig, type: string, executorCount: number): Promise<void> {
+  private async respondToExecutor(guildId: string, userId: string, config: SecurityConfig, type: string, executorCount: number, incidentId: number): Promise<void> {
     const guild = this.client?.guilds.cache.get(guildId);
     const member = guild ? await guild.members.fetch(userId).catch(() => null) : null;
     if (
@@ -405,31 +861,97 @@ export class Security implements PlatformModule {
     if (!botMember) return;
 
     const responseThreshold = securityResponseThreshold(config.maxDestructiveActions);
-    const removable = executorCount >= responseThreshold &&
+    const removable = config.removeExecutorRoles && executorCount >= responseThreshold &&
       !member.permissions.has(PermissionFlagsBits.Administrator)
       ? member.roles.cache.filter(
           (role) => !role.managed && role.id !== guild.id && role.position < botMember.roles.highest.position
         )
       : member.roles.cache.filter(() => false);
-    for (const role of removable.values()) {
-      await member.roles.remove(role, "Security destructive burst response").catch((error) => {
+
+    const removedRoleIds = await removeSecurityExecutorRoles(
+      [...removable.values()],
+      async (role) => {
+        await member.roles.remove(role, "Security destructive burst response");
+      },
+      (role, error) => {
         logger.warn("Security role removal failed", {
           guildId,
           userId,
           roleId: role.id,
           error: String(error)
         });
-      });
+      }
+    );
+
+    for (const roleId of removedRoleIds) {
+      const role = removable.get(roleId);
+      if (role) {
+        void this.recordExecutorRoleRemoval(guildId, incidentId, userId, role.id, role.name);
+      }
     }
 
-    await this.quarantine(member, config);
+    let banned = false;
+    if (config.executorBanEnabled && executorCount >= responseThreshold && member.bannable) {
+      try {
+        await member.ban({ reason: "Security destructive burst response" });
+        banned = true;
+        const caseResult = await this.db.query<{ id: string }>(
+          "INSERT INTO moderation_cases(guild_id,target_user_id,moderator_user_id,action,reason,expires_at,created_at) VALUES($1,$2,'system','ban',$3,NULL,now()) RETURNING id",
+          [guildId, userId, "Security: destructive burst (" + type + ")"]
+        ).catch((error) => {
+          logger.warn("Security ban moderation case write failed", { guildId, userId, incidentId, error: String(error) });
+          return null;
+        });
+        const caseId = caseResult?.rows[0]?.id;
+        if (caseId) {
+          await this.events?.emit("moderation.case", {
+            guildId, userId, action: "ban", caseId: Number(caseId)
+          }).catch((error) => logger.warn("Security ban moderation event failed", {
+            guildId, userId, incidentId, error: String(error)
+          }));
+        }
+      } catch (error) {
+        logger.warn("Security executor ban failed", { guildId, userId, incidentId, error: String(error) });
+      }
+    }
+
+    let timedOut = false;
+    if (!banned && config.executorTimeoutMinutes > 0 && executorCount >= responseThreshold && member.moderatable) {
+      try {
+        await member.timeout(config.executorTimeoutMinutes * 60_000, "Security destructive burst response");
+        timedOut = true;
+        const caseResult = await this.db.query<{ id: string }>(
+          "INSERT INTO moderation_cases(guild_id,target_user_id,moderator_user_id,action,reason,expires_at,created_at) VALUES($1,$2,'system','timeout',$3,$4,now()) RETURNING id",
+          [guildId, userId, "Security: destructive burst (" + type + ")", new Date(Date.now() + config.executorTimeoutMinutes * 60_000)]
+        ).catch((error) => {
+          logger.warn("Security timeout moderation case write failed", { guildId, userId, incidentId, error: String(error) });
+          return null;
+        });
+        const caseId = caseResult?.rows[0]?.id;
+        if (caseId) {
+          await this.events?.emit("moderation.case", {
+            guildId, userId, action: "timeout", caseId: Number(caseId)
+          }).catch((error) => logger.warn("Security timeout moderation event failed", {
+            guildId, userId, incidentId, error: String(error)
+          }));
+        }
+      } catch (error) {
+        logger.warn("Security executor timeout failed", { guildId, userId, incidentId, timeoutMinutes: config.executorTimeoutMinutes, error: String(error) });
+      }
+    }
+
+    await this.trackQuarantine(incidentId, member, config);
 
     const responseMetadata = {
       userId,
       trigger: type,
       executorCount,
-      removedRoles: removable.size,
-      quarantine: Boolean(config.quarantineRoleId)
+      removedRoles: removedRoleIds.length,
+      removedRoleIds,
+      quarantine: Boolean(config.quarantineRoleId),
+      banned,
+      timedOut,
+      timeoutMinutes: timedOut ? config.executorTimeoutMinutes : 0
     };
     await this.db.query(
       "INSERT INTO security_events(guild_id,event_type,metadata) VALUES($1,'response-applied',$2::jsonb)",
@@ -443,6 +965,23 @@ export class Security implements PlatformModule {
       userId
     );
   }
+}
+
+export async function removeSecurityExecutorRoles<T extends { id: string }>(
+  roles: readonly T[],
+  removeRole: (role: T) => Promise<void>,
+  onFailure?: (role: T, error: unknown) => void
+): Promise<string[]> {
+  const removedRoleIds: string[] = [];
+  for (const role of roles) {
+    try {
+      await removeRole(role);
+      removedRoleIds.push(role.id);
+    } catch (error) {
+      onFailure?.(role, error);
+    }
+  }
+  return removedRoleIds;
 }
 
 export function shouldTriggerSecurityIncident(
@@ -462,6 +1001,90 @@ export function securityResponseThreshold(maxDestructiveActions: number): number
   return Math.max(2, Math.ceil(maxDestructiveActions / 2));
 }
 
+export function securityAuditDestructiveType(action: AuditLogEvent): { type: string; targetUserId?: string } | null {
+  switch (action) {
+    case AuditLogEvent.MemberKick:
+      return { type: "member.kick" };
+    case AuditLogEvent.WebhookCreate:
+      return { type: "webhook.create" };
+    case AuditLogEvent.WebhookDelete:
+      return { type: "webhook.delete" };
+    case AuditLogEvent.WebhookUpdate:
+      return { type: "webhook.update" };
+    case AuditLogEvent.EmojiCreate:
+      return { type: "emoji.create" };
+    case AuditLogEvent.EmojiDelete:
+      return { type: "emoji.delete" };
+    case AuditLogEvent.EmojiUpdate:
+      return { type: "emoji.update" };
+    case AuditLogEvent.StickerCreate:
+      return { type: "sticker.create" };
+    case AuditLogEvent.StickerDelete:
+      return { type: "sticker.delete" };
+    case AuditLogEvent.StickerUpdate:
+      return { type: "sticker.update" };
+    case AuditLogEvent.ChannelOverwriteCreate:
+      return { type: "channel.overwrite.create" };
+    case AuditLogEvent.ChannelOverwriteUpdate:
+      return { type: "channel.overwrite.update" };
+    case AuditLogEvent.ChannelOverwriteDelete:
+      return { type: "channel.overwrite.delete" };
+    case AuditLogEvent.MemberPrune:
+      return { type: "member.prune" };
+    case AuditLogEvent.IntegrationCreate:
+      return { type: "integration.create" };
+    case AuditLogEvent.IntegrationDelete:
+      return { type: "integration.delete" };
+    case AuditLogEvent.IntegrationUpdate:
+      return { type: "integration.update" };
+    default:
+      return null;
+  }
+}
+
+export function securityAuditLogEventType(type: string): AuditLogEvent {
+  switch (type) {
+    case "channel.create": return AuditLogEvent.ChannelCreate;
+    case "channel.delete": return AuditLogEvent.ChannelDelete;
+    case "role.create": return AuditLogEvent.RoleCreate;
+    case "role.delete": return AuditLogEvent.RoleDelete;
+    case "member.ban": return AuditLogEvent.MemberBanAdd;
+    case "member.kick": return AuditLogEvent.MemberKick;
+    case "webhook.create": return AuditLogEvent.WebhookCreate;
+    case "webhook.delete": return AuditLogEvent.WebhookDelete;
+    case "webhook.update": return AuditLogEvent.WebhookUpdate;
+    case "emoji.create": return AuditLogEvent.EmojiCreate;
+    case "emoji.delete": return AuditLogEvent.EmojiDelete;
+    case "emoji.update": return AuditLogEvent.EmojiUpdate;
+    case "sticker.create": return AuditLogEvent.StickerCreate;
+    case "sticker.delete": return AuditLogEvent.StickerDelete;
+    case "sticker.update": return AuditLogEvent.StickerUpdate;
+    case "channel.overwrite.create": return AuditLogEvent.ChannelOverwriteCreate;
+    case "channel.overwrite.update": return AuditLogEvent.ChannelOverwriteUpdate;
+    case "channel.overwrite.delete": return AuditLogEvent.ChannelOverwriteDelete;
+    case "member.prune": return AuditLogEvent.MemberPrune;
+    case "integration.create": return AuditLogEvent.IntegrationCreate;
+    case "integration.delete": return AuditLogEvent.IntegrationDelete;
+    case "integration.update": return AuditLogEvent.IntegrationUpdate;
+    default: throw new Error("Unsupported security audit event type: " + type);
+  }
+}
+
 export function securityAuditLookbackCutoff(now: number, windowSeconds: number): number {
-  return now - Math.min(Math.max(windowSeconds, 5), 300) * 1000;
+  return now - clampSecurityWindowSeconds(windowSeconds) * 1000;
+}
+
+export function clampSecurityExecutorTimeoutMinutes(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(Math.max(Math.trunc(value), 0), 40320);
+}
+
+export function clampSecurityWindowSeconds(value: number): number {
+  if (!Number.isFinite(value)) return 20;
+  return Math.min(Math.max(Math.trunc(value), 5), 3600);
+}
+
+export function clampSecurityIncidentDuration(value: number): number {
+  if (!Number.isFinite(value)) return 300;
+  return Math.min(Math.max(Math.trunc(value), 60), 3600);
 }
