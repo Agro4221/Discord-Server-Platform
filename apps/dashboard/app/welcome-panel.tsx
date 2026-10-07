@@ -92,7 +92,7 @@ export function WelcomePanel(props: {
       </div>
 
       <section style={box}>
-        <div style={eyebrow}>PREVIEW</div>
+        <div style={eyebrow}>ПРЕДПРОСМОТР</div>
         <div style={{ marginTop: 7, padding: 11, borderRadius: 10, background: "#0b1016", border: "1px solid #252d38", color: "#dce2ea", fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
           {preview || "Шаблон пуст."}
         </div>
