@@ -146,8 +146,8 @@ export function NotificationsPanel({
   return (
     <div style={{ display: "grid", gap: 13 }}>
       <div>
-        <h3 style={{ margin: 0, fontSize: 17 }}>Notifications / RSS / Atom</h3>
-        <div style={{ marginTop: 5, opacity: 0.45, fontSize: 12 }}>Только HTTPS. Feed poller проверяет SSRF и ограничивает размер ответа.</div>
+        <h3 style={{ margin: 0, fontSize: 17 }}>Уведомления из RSS / Atom</h3>
+        <div style={{ marginTop: 5, opacity: 0.45, fontSize: 12 }}>Поддерживаются только HTTPS-источники. Бот регулярно проверяет ленту, защищает сервер от небезопасных адресов и ограничивает размер ответа.</div>
       </div>
 
       {error && <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d" }}>{error}</div>}
@@ -163,7 +163,7 @@ export function NotificationsPanel({
       </div>
 
       {feeds.length === 0 ? (
-        <div style={{ opacity: 0.42, padding: "8px 0" }}>Feed'ов пока нет.</div>
+        <div style={{ opacity: 0.42, padding: "8px 0" }}>Источников пока нет.</div>
       ) : feeds.map((feed) => (
         <div key={feed.id} style={{ padding: "10px 0", borderBottom: "1px solid #1d212b", display: "grid", gap: 8 }}>
           {editingId === feed.id ? (
@@ -188,7 +188,7 @@ export function NotificationsPanel({
               </div>
               <div style={{ display: "flex", gap: 6 }}>
                 <button type="button" disabled={busy} onClick={() => startEdit(feed)} style={buttonStyle("secondary")}>Изменить</button>
-                <button type="button" disabled={busy} onClick={() => void toggle(feed)} style={buttonStyle("secondary")}>{feed.enabled ? "ON" : "OFF"}</button>
+                <button type="button" disabled={busy} onClick={() => void toggle(feed)} style={buttonStyle("secondary")}>{feed.enabled ? "Включено" : "Выключено"}</button>
                 <button type="button" disabled={busy} onClick={() => void remove(feed)} style={buttonStyle("danger")}>Удалить</button>
               </div>
             </div>
