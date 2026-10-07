@@ -157,7 +157,7 @@ export function MusicPanel({
       <section style={panel}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div>
-            <div style={{ fontSize: 9, letterSpacing: 1.2, color: "#687486" }}>PLAYER</div>
+            <div style={{ fontSize: 9, letterSpacing: 1.2, color: "#687486" }} >ПЛЕЕР</div>
             <h3 style={{ margin: "4px 0 0", fontSize: 16 }}>
               {state.current?.title ?? "Ничего не играет"}
             </h3>
@@ -167,9 +167,9 @@ export function MusicPanel({
           </div>
 
           <div style={{ color: "#7f8b9e", fontSize: 10, textAlign: "right" }}>
-            <div>{state.nodeCount ? "Local yt-dlp + FFmpeg" : "Music engine unavailable"}</div>
-            <div>Engine: {state.nodeId ?? "не определён"}</div>
-            <div>{state.voiceChannelId ? "Voice: " + state.voiceChannelId : "Voice не подключён"}</div>
+            <div>{state.nodeCount ? "Local yt-dlp + FFmpeg" : "Музыкальный движок недоступен"}</div>
+            <div>Движок: {state.nodeId ?? "не определён"}</div>
+            <div>{state.voiceChannelId ? "Голосовой канал: " + state.voiceChannelId : "Голосовой канал не выбран"}</div>
           </div>
         </div>
 
@@ -181,7 +181,7 @@ export function MusicPanel({
             style={inputStyle}
           />
           <select value={provider} onChange={(event) => setProvider(event.target.value as MusicProvider)} style={inputStyle}>
-            <option value="auto">Auto</option>
+            <option value="auto">Автоматически</option>
             <option value="youtube">YouTube</option>
             <option value="tiktok">TikTok</option>
             <option value="yandex_music">Яндекс Музыка</option>
@@ -190,7 +190,7 @@ export function MusicPanel({
             <option value="soundcloud">SoundCloud</option>
           </select>
           <select value={voiceChannelId} onChange={(event) => setVoiceChannelId(event.target.value)} style={inputStyle}>
-            <option value="">Voice-канал…</option>
+            <option value="">Выберите голосовой канал…</option>
             {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
           </select>
           <button type="button" disabled={busy} onClick={() => void play()} style={button("primary")}>
@@ -211,14 +211,14 @@ export function MusicPanel({
             onChange={(event) => void applyFilter(event.target.value as MusicFilter)}
             style={{ ...inputStyle, width: 155 }}
           >
-            <option value="off">Filter: Off</option>
+            <option value="off">Эффекты: выключены</option>
             <option value="nightcore">Nightcore</option>
             <option value="vaporwave">Vaporwave</option>
             <option value="karaoke">Karaoke</option>
-            <option value="rotation">8D / Rotation</option>
+            <option value="rotation">8D / вращение</option>
             <option value="tremolo">Tremolo</option>
             <option value="vibrato">Vibrato</option>
-            <option value="lowpass">Low Pass</option>
+            <option value="lowpass">Низкие частоты</option>
           </select>
           <select
             value={state.repeatMode}
@@ -226,9 +226,9 @@ export function MusicPanel({
             onChange={(event) => void control("repeat", { mode: event.target.value })}
             style={{ ...inputStyle, width: 130 }}
           >
-            <option value="off">Repeat: off</option>
-            <option value="track">Repeat: track</option>
-            <option value="queue">Repeat: queue</option>
+            <option value="off">Повтор: выключен</option>
+            <option value="track">Повтор: текущего трека</option>
+            <option value="queue">Повтор: всей очереди</option>
           </select>
         </div>
 
@@ -264,7 +264,7 @@ export function MusicPanel({
             placeholder="сек."
             style={inputStyle}
           />
-          <button type="button" disabled={busy || !state.current} onClick={() => void doSeek()} style={button("secondary")}>Seek</button>
+          <button type="button" disabled={busy || !state.current} onClick={() => void doSeek()} style={button("secondary")} >Перейти к позиции</button>
         </div>
 
         <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 11, color: "#95a0b1", fontSize: 10 }}>
@@ -279,7 +279,7 @@ export function MusicPanel({
       </section>
 
       <section style={panel}>
-        <div style={{ fontSize: 9, letterSpacing: 1.2, color: "#687486" }}>QUEUE</div>
+        <div style={{ fontSize: 9, letterSpacing: 1.2, color: "#687486" }} >ОЧЕРЕДЬ</div>
         <h3 style={{ margin: "4px 0 10px", fontSize: 15 }}>Очередь</h3>
         {state.queue.length === 0 ? (
           <div style={{ color: "#687386", fontSize: 11 }}>Очередь пуста.</div>
