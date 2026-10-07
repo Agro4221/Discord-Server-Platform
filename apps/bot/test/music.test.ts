@@ -5,6 +5,7 @@ import {
   buildFfmpegArgs,
   buildFfmpegFilter,
   buildMusicSearchTarget,
+  detectMusicSearchProvider,
   canControlMusic,
   musicPlayerNodeId,
   musicResumePosition,
@@ -32,12 +33,22 @@ test("Music repeat and provider validators accept only supported values", () => 
   assert.equal(normalizeMusicRepeatMode("loop"), null);
   assert.equal(normalizeMusicSearchProvider("auto"), "auto");
   assert.equal(normalizeMusicSearchProvider("YouTube"), "youtube");
-  assert.equal(normalizeMusicSearchProvider("spotify"), null);
+  assert.equal(normalizeMusicSearchProvider("spotify"), "spotify");
+  assert.equal(normalizeMusicSearchProvider("tiktok"), "tiktok");
+  assert.equal(normalizeMusicSearchProvider("yandex_music"), "yandex_music");
+  assert.equal(normalizeMusicSearchProvider("vk_music"), "vk_music");
+  assert.equal(normalizeMusicSearchProvider("soundcloud"), "soundcloud");
+  assert.equal(normalizeMusicSearchProvider("invalid"), null);
 });
 
-test("yt-dlp search targets preserve URLs and build YouTube searches", () => {
+test("yt-dlp search targets cover supported text-search sources and direct URLs", () => {
   assert.equal(buildMusicSearchTarget("auto", "Daft Punk"), "ytsearch1:Daft Punk");
   assert.equal(buildMusicSearchTarget("youtube", "Daft Punk", 5), "ytsearch5:Daft Punk");
+  assert.equal(buildMusicSearchTarget("soundcloud", "Daft Punk", 3), "scsearch3:Daft Punk");
+  assert.equal(buildMusicSearchTarget("tiktok", "Daft Punk"), null);
+  assert.equal(buildMusicSearchTarget("yandex_music", "Daft Punk"), null);
+  assert.equal(buildMusicSearchTarget("vk_music", "Daft Punk"), null);
+  assert.equal(buildMusicSearchTarget("spotify", "Daft Punk"), null);
   assert.equal(buildMusicSearchTarget("auto", " https://youtu.be/example "), "https://youtu.be/example");
   assert.equal(buildMusicSearchTarget("auto", "   "), null);
 });
@@ -53,12 +64,43 @@ test("yt-dlp entries normalize into durable tracks", () => {
       url: "https://www.youtube.com/watch?v=abc"
     }
   );
+  assert.deepEqual(
+    normalizeYtDlpEntry({ id: "yandex-id", title: "Song", uploader: "Artist", duration: 12, webpage_url: "https://music.yandex.ru/album/1/track/2" }),
+    {
+      id: "yandex-id",
+      title: "Song",
+      author: "Artist",
+      durationMs: 12000,
+      url: "https://music.yandex.ru/album/1/track/2"
+    }
+  );
+  assert.deepEqual(
+    normalizeYtDlpEntry({ id: "source-id", title: "Song", artist: "Artist", duration: 1 }, undefined, "https://www.tiktok.com/@artist/video/123"),
+    {
+      id: "source-id",
+      title: "Song",
+      author: "Artist",
+      durationMs: 1000,
+      url: "https://www.tiktok.com/@artist/video/123"
+    }
+  );
   assert.equal(normalizeYtDlpEntry(null), null);
+});
+
+test("music provider URLs are auto-detected", () => {
+  assert.equal(detectMusicSearchProvider("https://www.youtube.com/watch?v=abc"), "youtube");
+  assert.equal(detectMusicSearchProvider("https://www.tiktok.com/@artist/video/1"), "tiktok");
+  assert.equal(detectMusicSearchProvider("https://music.yandex.ru/album/1/track/2"), "yandex_music");
+  assert.equal(detectMusicSearchProvider("https://vk.com/audio123_456"), "vk_music");
+  assert.equal(detectMusicSearchProvider("https://open.spotify.com/track/abc"), "spotify");
+  assert.equal(detectMusicSearchProvider("https://soundcloud.com/artist/track"), "soundcloud");
+  assert.equal(detectMusicSearchProvider("https://example.com/video/1"), "auto");
+  assert.equal(detectMusicSearchProvider("not-a-url"), null);
 });
 
 test("FFmpeg pipeline emits raw Discord PCM at 48 kHz stereo", () => {
   const args = buildFfmpegArgs("https://example.test/audio", 12_000, "lowpass");
-  assert.deepEqual(args.slice(-8), ["-af", "lowpass=f=12000", "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1"]);
+  assert.deepEqual(args.slice(-9), ["-af", "lowpass=f=12000", "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1"]);
   assert.ok(args.includes("-ss"));
   assert.equal(buildFfmpegFilter("off"), null);
   assert.ok(buildFfmpegFilter("nightcore"));
