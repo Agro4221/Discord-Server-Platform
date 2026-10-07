@@ -12,6 +12,20 @@ export type StreamAlertRecord = {
   lastStreamKey:string|null; lastOnline:boolean; lastCheckedAt:string|null; lastError:string|null;
 };
 type LiveInfo={key:string;title:string;url:string;author:string;thumbnail?:string};
+type ProcessResult={code:number|null;stdout:string;stderr:string};
+async function runProcess(command:string,args:string[],timeoutMs:number):Promise<ProcessResult>{
+  return await new Promise<ProcessResult>((resolve)=>{
+    const child=spawn(command,args,{windowsHide:true});
+    let stdout="";let stderr="";let settled=false;
+    const finish=(result:ProcessResult)=>{if(settled)return;settled=true;clearTimeout(timer);resolve(result);};
+    child.stdout.on("data",(chunk:Buffer|string)=>{stdout+=chunk.toString();});
+    child.stderr.on("data",(chunk:Buffer|string)=>{stderr+=chunk.toString();});
+    child.once("error",(error)=>finish({code:null,stdout,stderr:stderr+String(error)}));
+    child.once("close",(code)=>finish({code,stdout,stderr}));
+    const timer=setTimeout(()=>{child.kill();finish({code:null,stdout,stderr:stderr+"\nprocess_timeout"});},timeoutMs);
+  });
+}
+
 export type StreamAlertsConfig={twitchClientId?:string;twitchClientSecret?:string;youtubeApiKey?:string;vkApiBaseUrl:string;pollIntervalSeconds:number;ytDlpPath:string;ytDlpJsRuntime?:string;ytDlpCookiesFile?:string};
 
 export class StreamAlerts implements PlatformModule {
@@ -138,7 +152,7 @@ export class StreamAlerts implements PlatformModule {
       const targetId=alert.platform==="twitch"
         ? await this.resolveTwitchUserId(alert.target)
         : alert.platform==="youtube"
-          ? await this.resolveYouTubeChannelId(alert.target,alert.target_id)
+          ? (alert.target_id??(/^UC[A-Za-z0-9_-]{20,}$/.test(alert.target)?alert.target:null))
           : alert.target_id;
       await this.db.query(
         "UPDATE stream_alerts SET target_id=$1,last_stream_key=$2,last_online=$3,last_error=NULL,updated_at=now() WHERE id=$4 AND guild_id=$5",
