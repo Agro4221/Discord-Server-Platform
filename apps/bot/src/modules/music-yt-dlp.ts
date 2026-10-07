@@ -442,7 +442,7 @@ function parseDuckDuckGoMusicResults(html:string,provider:MusicSearchProvider,do
 }
 function decodeDuckUrl(value:string):string{try{const u=new URL(value);const redirected=u.searchParams.get("uddg");return redirected?decodeURIComponent(redirected):value;}catch{return value;}}
 function decodeHtml(value:string):string{return value.replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">");}
-function formatMusicSearchHits(items:MusicSearchHit[]):string{return items.map((item,index)=>(index+1)+". ["+item.title.replace(/[\\[\\]\\(\\)]/g,"")+"]("+item.url+") · "+musicProviderLabel(item.provider)).join("\n").slice(0,3900);}
+function formatMusicSearchHits(items:MusicSearchHit[]):string{return items.map((item,index)=>(index+1)+". ["+item.title.replace(/[\\[\\]\\(\\)]/g,"")+"]("+item.url+") · "+musicProviderLabel(item.provider)).join("\n").slice(0,1000);}
 function musicProviderLabel(provider:MusicSearchProvider):string{return provider==="yandex_music"?"Яндекс Музыка":provider==="vk_music"?"VK Музыка":provider==="youtube"?"YouTube":provider==="tiktok"?"TikTok":provider==="spotify"?"Spotify":provider==="soundcloud"?"SoundCloud":"Music";}
 
 
