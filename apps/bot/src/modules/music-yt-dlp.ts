@@ -360,14 +360,16 @@ export class YtDlpMusicEngine implements PlatformModule {
     const terms=kind==="playlist"?"playlist album set":target.trackQuery;
     const q=("site:"+target.domain+" "+query+" "+terms).trim().slice(0,500);
     const urls=[
+      "https://www.google.com/search?q="+encodeURIComponent(q)+"&num=10&filter=0",
+      "https://www.bing.com/search?q="+encodeURIComponent(q)+"&count=10",
       "https://lite.duckduckgo.com/lite/?q="+encodeURIComponent(q)+"&kl=wt-wt",
       "https://html.duckduckgo.com/html/?q="+encodeURIComponent(q)+"&kl=wt-wt"
     ];
     for(const url of urls){
       try{
-        const response=await fetch(url,{headers:{"user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) Discord-Server-Platform/1.0","accept":"text/html"},signal:AbortSignal.timeout(8000)});
+        const response=await fetch(url,{headers:{"user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36","accept":"text/html"} ,signal:AbortSignal.timeout(8000)});
         if(!response.ok)continue;
-        const hits=parseDuckDuckGoMusicResults(await response.text(),target.provider,target.domain,kind);
+        const hits=parseSearchEngineMusicResults(await response.text(),target.provider,target.domain,kind);
         if(hits.length)return hits;
       }catch{}
     }
@@ -485,7 +487,7 @@ export function classifyMusicSearchUrl(url:string):{provider:MusicSearchProvider
   }catch{}
   return null;
 }
-function parseDuckDuckGoMusicResults(html:string,provider:MusicSearchProvider,domain:string,kind:MusicSearchHitKind):MusicSearchHit[]{
+function parseSearchEngineMusicResults(html:string,provider:MusicSearchProvider,domain:string,kind:MusicSearchHitKind):MusicSearchHit[]{
   const hits:MusicSearchHit[]=[];
   const re=new RegExp("<a[^>]+href\\s*=\\s*[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)</a>","gi");
   let m:RegExpExecArray|null;
@@ -503,8 +505,8 @@ function decodeDuckUrl(value:string):string{
   try{
     const raw=value.startsWith("//")?"https:"+value:value;
     const u=new URL(raw,"https://html.duckduckgo.com");
-    const redirected=u.searchParams.get("uddg");
-    return redirected||value;
+    const redirected=u.searchParams.get("uddg")??u.searchParams.get("q")??u.searchParams.get("url");
+    return redirected?decodeURIComponent(redirected):value;
   }catch{return value;}
 }
 function decodeHtml(value:string):string{return value.replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">");}
