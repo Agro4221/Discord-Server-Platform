@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 type VoiceChannel = { id: string; name: string; type?: number };
 type Track = { title: string; author: string; durationMs: number };
-type MusicProvider = "auto" | "youtube" | "youtube_music" | "soundcloud" | "spotify" | "yandex_music";
+type MusicProvider = "auto" | "youtube";
 type MusicFilter = "off" | "nightcore" | "vaporwave" | "karaoke" | "rotation" | "tremolo" | "vibrato" | "lowpass";
 type MusicState = {
   enabled: boolean;
@@ -145,7 +145,7 @@ export function MusicPanel({
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ color: "#707b8d", fontSize: 11, lineHeight: 1.55 }}>
-        Локальный Music Control Center работает через тот же Lavalink/Core слой, что и Discord-команды.
+        Локальный Music Control Center работает через тот же yt-dlp + FFmpeg engine, что и Discord-команды.
       </div>
 
       {error && (
@@ -167,8 +167,8 @@ export function MusicPanel({
           </div>
 
           <div style={{ color: "#7f8b9e", fontSize: 10, textAlign: "right" }}>
-            <div>{state.nodeCount} Lavalink node{state.nodeCount === 1 ? "" : "s"}</div>
-            <div>Active node: {state.nodeId ?? "не определён"}</div>
+            <div>{state.nodeCount ? "Local yt-dlp + FFmpeg" : "Music engine unavailable"}</div>
+            <div>Engine: {state.nodeId ?? "не определён"}</div>
             <div>{state.voiceChannelId ? "Voice: " + state.voiceChannelId : "Voice не подключён"}</div>
           </div>
         </div>
@@ -313,7 +313,7 @@ function formatMusicError(error: unknown): string {
   const code = error instanceof Error ? error.message : "music_failed";
   const messages: Record<string, string> = {
     music_disabled: "Модуль Music выключен.",
-    music_unavailable: "Music/Lavalink недоступен.",
+    music_unavailable: "Music/yt-dlp + FFmpeg недоступен.",
     voice_channel_required: "Нужен голосовой канал.",
     music_voice_assigned_elsewhere: "Этот voice-канал закреплён за другим bot identity.",
     music_voice_not_assigned: "Этот secondary bot не закреплён за выбранным voice-каналом.",
