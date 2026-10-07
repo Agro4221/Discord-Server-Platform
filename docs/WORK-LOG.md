@@ -1,3 +1,9 @@
+## 2026-10-07 — Stream Alerts typecheck/runtime correction
+
+- Fixed the Stream Alerts yt-dlp fallback build: the missing local runProcess() helper is now implemented with timeout/error handling.
+- Exposed checkNow() through the Management API service contract and wiring, matching the already-added manual dashboard check endpoint.
+- Prevented YouTube fallback checks without an API key from failing afterward while persisting the stream state: channel ID persistence now does not force a YouTube API lookup when only local yt-dlp is configured.
+
 
 ## 2026-10-06 — Native PostgreSQL startup robustness
 
