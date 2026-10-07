@@ -167,9 +167,14 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .setName("play")
       .setDescription("Play a track or playlist")
       .addStringOption((o) => o.setName("query").setDescription("Song, URL or playlist").setMaxLength(2000).setRequired(true))
-      .addStringOption((o) => o.setName("provider").setDescription("Search source").addChoices(
+      .addStringOption((o) => o.setName("provider").setDescription("Music source / URL type").addChoices(
         { name: "Auto", value: "auto" },
-         { name: "YouTube", value: "youtube" }
+        { name: "YouTube", value: "youtube" },
+        { name: "TikTok", value: "tiktok" },
+        { name: "Яндекс Музыка", value: "yandex_music" },
+        { name: "VK Музыка", value: "vk_music" },
+        { name: "Spotify", value: "spotify" },
+        { name: "SoundCloud", value: "soundcloud" }
       )),
     new SlashCommandBuilder().setName("pause").setDescription("Pause music"),
     new SlashCommandBuilder().setName("resume").setDescription("Resume music"),
