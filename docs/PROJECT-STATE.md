@@ -36,7 +36,7 @@ Technical implementation freeze — current agreed feature scope is implemented;
 - Security/Anti-Raid and destructive burst detection.
 - Notifications with HTTPS feed validation and SSRF protections.
 - Analytics minute buckets with Dashboard reporting.
-- Music/Lavalink foundation with persistent queue store and bot identity namespace.
+- Music via local yt-dlp + FFmpeg with persistent queue store and bot identity namespace.
 - Multi-bot identity persistence for separate-process fleet deployment, per-voice Music routing and identity-scoped background workers.
 - Config transfer and compressed local backups with guild-scoped restore/delete controls, including local/remote retention enforcement.
 - Docker Compose / Dockerfiles for local-to-VPS topology.
