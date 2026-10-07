@@ -13,6 +13,7 @@ import {
   normalizeMusicQueueMove,
   normalizeMusicQueuePosition,
   normalizeMusicRepeatMode,
+  nextMusicRepeatMode,
   normalizeMusicSearchProvider,
   normalizeYtDlpEntry,
   shouldAutoplayAfterQueueEnd,
@@ -31,6 +32,9 @@ test("Music repeat and provider validators accept only supported values", () => 
   assert.equal(normalizeMusicRepeatMode("track"), "track");
   assert.equal(normalizeMusicRepeatMode("queue"), "queue");
   assert.equal(normalizeMusicRepeatMode("loop"), null);
+  assert.equal(nextMusicRepeatMode("off"), "track");
+  assert.equal(nextMusicRepeatMode("track"), "queue");
+  assert.equal(nextMusicRepeatMode("queue"), "off");
   assert.equal(normalizeMusicSearchProvider("auto"), "auto");
   assert.equal(normalizeMusicSearchProvider("YouTube"), "youtube");
   assert.equal(normalizeMusicSearchProvider("spotify"), "spotify");
