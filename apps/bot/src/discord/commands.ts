@@ -169,7 +169,7 @@ export function buildCommands(): Array<SlashCommandBuilder | SlashCommandSubcomm
       .addStringOption((o) => o.setName("query").setDescription("Song, URL or playlist").setMaxLength(2000).setRequired(true))
       .addStringOption((o) => o.setName("provider").setDescription("Search source").addChoices(
         { name: "Auto", value: "auto" },
-        { name: "Яндекс Музыка", value: "yandex_music" }
+         { name: "YouTube", value: "youtube" }
       )),
     new SlashCommandBuilder().setName("pause").setDescription("Pause music"),
     new SlashCommandBuilder().setName("resume").setDescription("Resume music"),
