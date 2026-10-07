@@ -173,7 +173,12 @@ export function ModerationPanel({
       setError("Укажи целое числовое значение.");
       return;
     }
-    if ((channelAction === "clear" || channelAction === "lock") && !window.confirm("Выполнить " + channelAction + " для выбранного канала?")) return;
+    const confirmationMessage = channelAction === "clear"
+      ? "Очистить сообщения в выбранном канале? Это удалит последние сообщения, доступные боту."
+      : channelAction === "lock"
+        ? "Закрыть выбранный канал для обычной отправки сообщений?"
+        : "";
+    if (confirmationMessage && !window.confirm(confirmationMessage)) return;
 
     setBusy(true);
     setError("");
@@ -290,20 +295,36 @@ export function ModerationPanel({
       </section>
 
       <section style={channelStyle}>
-        <div style={{ fontSize: 9, letterSpacing: 1.2, color: "#687486" }}>CHANNEL OPERATIONS</div>
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(190px,1fr) 120px 110px auto", gap: 8, marginTop: 9 }}>
-          <select value={channelId} onChange={(event) => setChannelId(event.target.value)} style={inputStyle}>
-            <option value="">Текстовый канал…</option>
+        <div style={{ fontSize: 9, letterSpacing: 1.2, color: "#687486" }}>ОПЕРАЦИИ КАНАЛА</div>
+        <div style={{ marginTop: 7, color: "#7e8999", fontSize: 10, lineHeight: 1.5 }}>
+          Быстрые действия для выбранного текстового канала. Они применяются только к этому каналу.
+          «Очистить сообщения» удаляет сообщения, «Медленный режим» задаёт паузу между сообщениями,
+          «Закрыть канал» запрещает обычную отправку, а «Открыть канал» снимает это ограничение.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(190px,1fr) 180px 165px auto", gap: 8, marginTop: 10 }}>
+          <select value={channelId} onChange={(event) => setChannelId(event.target.value)} style={inputStyle} aria-label="Текстовый канал для операции">
+            <option value="">Выберите текстовый канал…</option>
             {channels.map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}
           </select>
-          <select value={channelAction} onChange={(event) => setChannelAction(event.target.value as typeof channelAction)} style={inputStyle}>
-            <option value="clear">Clear</option>
-            <option value="slowmode">Slowmode</option>
-            <option value="lock">Lock</option>
-            <option value="unlock">Unlock</option>
+          <select value={channelAction} onChange={(event) => setChannelAction(event.target.value as typeof channelAction)} style={inputStyle} aria-label="Операция для канала">
+            <option value="clear">Очистить сообщения</option>
+            <option value="slowmode">Медленный режим</option>
+            <option value="lock">Закрыть канал</option>
+            <option value="unlock">Открыть канал</option>
           </select>
-          <input type="number" value={channelValue} min={0} max={21600} disabled={channelAction !== "clear" && channelAction !== "slowmode"} onChange={(event) => setChannelValue(event.target.value)} placeholder="Значение" style={inputStyle} />
-          <button type="button" disabled={busy} onClick={() => void channelExecute()} style={button("secondary")}>Выполнить</button>
+          <div>
+            <input type="number" value={channelValue} min={0} max={21600} disabled={channelAction !== "clear" && channelAction !== "slowmode"} onChange={(event) => setChannelValue(event.target.value)} placeholder={channelAction === "clear" ? "Количество сообщений" : "Секунды задержки"} aria-label={channelAction === "clear" ? "Количество сообщений" : "Задержка в секундах"} style={inputStyle} />
+            <div style={{ marginTop: 4, color: "#5e6979", fontSize: 8 }}>
+              {channelAction === "clear"
+                ? "Сколько последних сообщений попытаться удалить."
+                : channelAction === "slowmode"
+                  ? "От 0 до 21600 секунд между сообщениями."
+                  : "Для этой операции значение не требуется."}
+            </div>
+          </div>
+          <button type="button" disabled={busy} onClick={() => void channelExecute()} style={button("secondary")}>
+            {busy ? "Выполняем…" : "Применить"}
+          </button>
         </div>
       </section>
 
