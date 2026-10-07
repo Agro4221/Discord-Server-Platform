@@ -24,8 +24,6 @@ function renderStreamAlertTemplate(template:string,values:Record<string,string|n
 function escapeDiscordText(value:string):string{
   return value.replace(/[\\*_~|>]/g,"\\$&").replaceAll(String.fromCharCode(96),"\\"+String.fromCharCode(96));
 }
-async function runProcess").replaceAll(String.fromCharCode(96),"\\\"+String.fromCharCode(96));
-}
 async function runProcess(command:string,args:string[],timeoutMs:number):Promise<ProcessResult>{
   return await new Promise<ProcessResult>((resolve)=>{
     const child=spawn(command,args,{windowsHide:true});
