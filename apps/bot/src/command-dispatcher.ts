@@ -108,7 +108,7 @@ export class CommandDispatcher {
     if (target === "ticket") return (message, commandName) => this.tickets.handlePrefixCommand(message, commandName);
     if (target === "roles") return (message, commandName, args) => this.rolePanels.handlePrefixCommand(message, commandName, args);
     if (target === "giveaway") return (message, commandName, args) => this.giveaways.handlePrefixCommand(message, commandName, args);
-    if (["music","play","pause","resume","skip","stop","shuffle","playlist","queue","nowplaying","repeat","seek","volume","autoplay"].includes(target)) {
+    if (["music","play","pause","resume","skip","stop","shuffle","playlist","queue","nowplaying","repeat","seek","volume","autoplay","search","srch"].includes(target)) {
       return (message, commandName, args) => this.music.handlePrefixCommand(message, commandName, args);
     }
     return null;
@@ -171,7 +171,7 @@ export class CommandDispatcher {
     if (target === "ticket") return (interaction, commandName) => this.tickets.executeSlashCommand(interaction, commandName);
     if (target === "roles") return (interaction, commandName) => this.rolePanels.executeSlashCommand(interaction, commandName);
     if (target === "giveaway") return (interaction, commandName) => this.giveaways.executeSlashCommand(interaction, commandName);
-    if (["music","play","pause","resume","skip","stop","shuffle","playlist","queue","nowplaying","repeat","seek","volume","autoplay"].includes(target)) {
+    if (["music","play","pause","resume","skip","stop","shuffle","playlist","queue","nowplaying","repeat","seek","volume","autoplay","search","srch"].includes(target)) {
       return (interaction, commandName) => this.music.executeSlashCommand(interaction, commandName);
     }
     if (target === "analytics") return (interaction, commandName) => this.analytics.executeSlashCommand(interaction, commandName);
