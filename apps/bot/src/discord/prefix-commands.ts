@@ -10,7 +10,7 @@ export const BUILTIN_PREFIX_COMMANDS = new Set([
   "level", "rank", "top",
   "ban", "unban", "kick", "timeout", "warn", "history", "clear", "slowmode", "lock", "unlock",
   "play", "pause", "resume", "skip", "stop", "shuffle",
-  "playlist", "queue", "nowplaying", "repeat", "seek", "volume", "autoplay",
+  "playlist", "queue", "nowplaying", "repeat", "seek", "volume", "autoplay", "search", "srch",
   "balance", "daily", "leaderboard", "pay", "shop", "buy", "remind", "ticket", "roles", "giveaway",
   "automod", "welcome", "security", "verify", "starboard", "feed", "automation", "economy", "music",
   "serverinfo", "userinfo", "avatar", "membercount", "roleinfo", "channelinfo", "afk",
