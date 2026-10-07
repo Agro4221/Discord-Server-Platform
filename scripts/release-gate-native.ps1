@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [switch]$Dashboard,
+  [switch]$Dashboard
 )
 
 $ErrorActionPreference = "Stop"
