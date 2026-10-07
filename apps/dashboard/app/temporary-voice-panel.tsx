@@ -83,7 +83,7 @@ export function TemporaryVoicePanel(props: {
           Активных временных комнат: <strong style={{ color: "#e7ebf2" }}>{rooms.length}</strong>
         </div>
         <button type="button" disabled={busy} onClick={() => void reconcile()} style={buttonStyle}>
-          {busy ? "Сверяем…" : "Reconcile сейчас"}
+          {busy ? "Сверяем…" : "Сверить комнаты сейчас"}
         </button>
         <button type="button" disabled={busy || loading} onClick={() => void load()} style={buttonStyleSecondary}>
           Обновить
@@ -91,7 +91,7 @@ export function TemporaryVoicePanel(props: {
       </div>
 
       <section style={box}>
-        <div style={eyebrow}>ACTIVE ROOMS</div>
+        <div style={eyebrow}>АКТИВНЫЕ ВРЕМЕННЫЕ КОМНАТЫ</div>
         {loading ? (
           <div style={muted}>Загружаем…</div>
         ) : rooms.length === 0 ? (
