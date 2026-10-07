@@ -99,7 +99,7 @@ export function GiveawaysPanel({ guildId, channels, onChanged }: { guildId: stri
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div>
-        <h3 style={{ margin: 0, fontSize: 17 }}>Giveaways</h3>
+        <h3 style={{ margin: 0, fontSize: 17 }}>Розыгрыши</h3>
         <div style={{ marginTop: 5, opacity: 0.45, fontSize: 12 }}>
           Активные и завершённые кампании. End и reroll защищены подтверждением и аудируются.
         </div>
@@ -108,21 +108,21 @@ export function GiveawaysPanel({ guildId, channels, onChanged }: { guildId: stri
       {error && <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d" }}>{error}</div>}
 
       <section style={panelBox}>
-        <div style={label}>CREATE GIVEAWAY</div>
+        <div style={label}>СОЗДАНИЕ РОЗЫГРЫША</div>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(180px,1fr) 110px 110px", gap: 8, marginTop: 9 }}>
           <select value={channelId} onChange={(e) => setChannelId(e.target.value)} style={inputStyle}><option value="">Канал…</option>{channels.map((c) => <option key={c.id} value={c.id}>#{c.name}</option>)}</select>
-          <input value={minutes} onChange={(e) => setMinutes(e.target.value)} type="number" min={1} max={10080} placeholder="Минут" style={inputStyle} />
+          <input value={minutes} onChange={(e) => setMinutes(e.target.value)} type="number" min={1} max={10080} placeholder="Длительность, минут" style={inputStyle} />
           <input value={winners} onChange={(e) => setWinners(e.target.value)} type="number" min={1} max={20} placeholder="Победители" style={inputStyle} />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "180px minmax(220px,1fr) auto", gap: 8, marginTop: 8 }}>
-          <input value={hostUserId} onChange={(e) => setHostUserId(e.target.value)} inputMode="numeric" placeholder="Host user ID" style={inputStyle} />
+          <input value={hostUserId} onChange={(e) => setHostUserId(e.target.value)} inputMode="numeric" placeholder="Discord ID организатора" style={inputStyle} />
           <input value={prize} onChange={(e) => setPrize(e.target.value)} maxLength={500} placeholder="Приз" style={inputStyle} />
           <button type="button" disabled={busy} onClick={() => void create()} style={buttonStyle("primary")}>Создать</button>
         </div>
       </section>
 
       {items.length === 0 ? (
-        <div style={{ opacity: 0.42 }}>Giveaway-кампаний пока нет.</div>
+        <div style={{ opacity: 0.42 }}>Розыгрышей пока нет.</div>
       ) : (
         <div style={{ display: "grid", gap: 10 }}>
           {items.map((item) => (
@@ -148,7 +148,7 @@ export function GiveawaysPanel({ guildId, channels, onChanged }: { guildId: stri
                     <button type="button" disabled={busy} onClick={() => void action(item.id, "end")} style={buttonStyle("danger")}>Завершить</button>
                   )}
                   {item.status === "finished" && (
-                    <button type="button" disabled={busy} onClick={() => void action(item.id, "reroll")} style={buttonStyle("secondary")}>Reroll</button>
+                    <button type="button" disabled={busy} onClick={() => void action(item.id, "reroll")} style={buttonStyle("secondary")} >Переиграть победителей</button>
                   )}
                 </div>
               </div>
