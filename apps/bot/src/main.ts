@@ -313,6 +313,7 @@ async function main(): Promise<void> {
     streamAlerts: {
       list: async (guildId) => streamAlerts.list(guildId),
       providers: () => streamAlerts.providers(),
+      checkNow: async (guildId, alertId) => streamAlerts.checkNow(guildId, alertId),
       create: async (guildId, input) => streamAlerts.create(guildId, input),
       update: async (guildId, alertId, input) => streamAlerts.update(guildId, alertId, input),
       delete: async (guildId, alertId) => streamAlerts.delete(guildId, alertId)
