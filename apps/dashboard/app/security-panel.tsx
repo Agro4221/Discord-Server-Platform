@@ -93,7 +93,7 @@ export function SecurityPanel(props: {
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button type="button" disabled={Boolean(busy)} onClick={() => void action("check-hierarchy")} style={buttonStyle("secondary")}>
-          {busy === "check-hierarchy" ? "Проверяем…" : "Проверить hierarchy"}
+          {busy === "check-hierarchy" ? "Проверяем…" : "Проверить иерархию ролей"}
         </button>
         <button type="button" disabled={Boolean(busy) || incidents.length === 0} onClick={() => void action("clear-incidents")} style={buttonStyle("danger")}>
           {busy === "clear-incidents" ? "Обрабатываем…" : "Закрыть инциденты"}
@@ -101,7 +101,7 @@ export function SecurityPanel(props: {
       </div>
 
       <section style={box}>
-        <div style={eyebrow}>ACTIVE INCIDENTS</div>
+        <div style={eyebrow}>АКТИВНЫЕ ИНЦИДЕНТЫ</div>
         {loading ? <div style={muted}>Загружаем…</div> : incidents.length === 0 ? (
           <div style={muted}>Активных инцидентов нет.</div>
         ) : (
@@ -120,15 +120,15 @@ export function SecurityPanel(props: {
       </section>
 
       <section style={box}>
-        <div style={eyebrow}>DISCORD READINESS</div>
+        <div style={eyebrow}>ГОТОВНОСТЬ DISCORD</div>
         {loading ? <div style={muted}>Загружаем…</div> : hierarchy ? (
           <div style={{ display: "grid", gap: 7 }}>
             <CheckRow label="Бот присутствует" ok={hierarchy.botPresent} />
-            <CheckRow label="Manage Roles" ok={hierarchy.manageRoles} />
-            <CheckRow label="Quarantine role настроена" ok={hierarchy.quarantineRoleConfigured} />
-            <CheckRow label="Quarantine role управляется ботом" ok={hierarchy.quarantineRoleManageable} />
-            <CheckRow label="Security log channel настроен" ok={hierarchy.logChannelConfigured} />
-            <CheckRow label="Security log channel доступен" ok={hierarchy.logChannelSendable} />
+            <CheckRow label="Управление ролями" ok={hierarchy.manageRoles} />
+            <CheckRow label="Роль карантина настроена" ok={hierarchy.quarantineRoleConfigured} />
+            <CheckRow label="Бот может управлять ролью карантина" ok={hierarchy.quarantineRoleManageable} />
+            <CheckRow label="Канал журнала безопасности настроен" ok={hierarchy.logChannelConfigured} />
+            <CheckRow label="Боту доступен канал журнала безопасности" ok={hierarchy.logChannelSendable} />
           </div>
         ) : <div style={muted}>Диагностика ещё не выполнена.</div>}
       </section>
