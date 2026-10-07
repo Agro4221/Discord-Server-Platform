@@ -15,6 +15,7 @@ import {
   normalizeMusicRepeatMode,
   nextMusicRepeatMode,
   normalizeMusicSearchProvider,
+  normalizeMusicSourceUrl,
   normalizeYtDlpEntry,
   shouldAutoplayAfterQueueEnd,
   MAX_MUSIC_ENQUEUE_TRACKS
@@ -96,6 +97,8 @@ test("music provider URLs are auto-detected", () => {
   assert.equal(detectMusicSearchProvider("https://www.tiktok.com/@artist/video/1"), "tiktok");
   assert.equal(detectMusicSearchProvider("https://music.yandex.ru/album/1/track/2"), "yandex_music");
   assert.equal(detectMusicSearchProvider("https://vk.com/audio123_456"), "vk_music");
+  assert.equal(detectMusicSearchProvider("https://vk.ru/audio123_456_b741016853a7cbcc8b"), "vk_music");
+  assert.equal(normalizeMusicSourceUrl("https://vk.ru/audio123_456_b741016853a7cbcc8b"), "https://vk.com/audio123_456_b741016853a7cbcc8b");
   assert.equal(detectMusicSearchProvider("https://open.spotify.com/track/abc"), "spotify");
   assert.equal(detectMusicSearchProvider("https://soundcloud.com/artist/track"), "soundcloud");
   assert.equal(detectMusicSearchProvider("https://example.com/video/1"), "auto");
