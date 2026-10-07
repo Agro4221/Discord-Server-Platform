@@ -1003,3 +1003,41 @@ Never write credentials, tokens or private user data here.
   - keep queue, pause/resume, skip/stop, seek, volume, repeat, autoplay and recovery behavior covered by tests.
 - Initial repository inspection confirmed Temporary Voice already uses `guild.maximumBitrate`; current generated-name helper does not add DSP, but a defensive regression-safe prefix cleanup is still planned.
 - Initial repository inspection confirmed Music is currently implemented around `lavalink-client` and Lavalink node/session state, so the rework is architectural rather than a one-line provider swap.
+
+## 2026-10-07 — Temporary Voice + yt-dlp/FFmpeg Music rework completed
+
+- Current development HEAD: `c49dd0841f199d2c127b503c65d12accedecf730`.
+- Persistent logging rule was followed for this task; no attempt was made to backfill unrelated historical work.
+- Temporary Voice:
+  - generated names now defensively remove legacy `DSP |`, `DSP:` and `DSP_` prefixes while preserving ordinary member display names;
+  - channel creation continues to use the dedicated bitrate helper;
+  - bitrate is capped at `96_000` bps so Temporary Voice never silently consumes boosted-server bitrate capacity;
+  - regression coverage added for legacy DSP prefixes and the 96 kbps ceiling.
+- Music:
+  - replaced the Lavalink-based runtime with a local `yt-dlp + FFmpeg` engine using `@discordjs/voice`;
+  - YouTube search and URL/playlist resolution are performed by yt-dlp;
+  - direct audio stream decoding is performed by FFmpeg into 48 kHz stereo PCM for Discord;
+  - preserved queue, pause/resume, skip/stop, shuffle, repeat, seek, volume, autoplay, filters, controller buttons, persistent queue/player state, restart reconstruction and per-voice bot-identity routing;
+  - retained compatibility conversion for previously persisted Lavalink-style track records so old queue state can be reconstructed.
+- Runtime/deployment:
+  - removed `lavalink-client` and added `@discordjs/voice` + `@discordjs/opus`;
+  - removed Docker Lavalink services and the obsolete `infrastructure/lavalink/application.yml`;
+  - Docker bot image now installs FFmpeg and `yt-dlp[default]`;
+  - native launcher, diagnostics and release gate now install/check yt-dlp + FFmpeg instead of Java/Lavalink;
+  - environment/config, README, Master Plan, Local Setup, Native Setup, Project State and Chat Context were synchronized with the new Music architecture;
+  - Dashboard Music provider choices are now limited to Auto/YouTube and its status text identifies the local yt-dlp + FFmpeg engine.
+- Automated checks:
+  - updated Music regression tests to cover yt-dlp search normalization, FFmpeg arguments, queue helpers, autoplay, resume bounds, filters and local engine identity;
+  - updated Temporary Voice regression tests for DSP cleanup and the 96 kbps cap;
+  - repository code search currently returns no matches for `lavalink-client`, `LAVALINK`, `lavalinkHost`, `lavalinkPort`, `lavalinkNodes`, `youtube_music`, `soundcloud` or `yandex_music`.
+- Verification limitation:
+  - this execution environment has Node.js 22.16.0 while the repository targets Node.js 24.17+;
+  - direct repository cloning/install from the environment is unavailable because external GitHub DNS/network access is blocked;
+  - the GitHub Actions connector exposes read/rerun operations but did not produce a run for the current development push;
+  - temporary draft PR #6 was created solely to trigger the existing CI workflow and was immediately closed after GitHub reported no workflow/status checks;
+  - live Discord/YouTube playback and native Windows validation remain unverified in this environment.
+- Next concrete verification:
+  - run the normal CI workflow on the current development HEAD in a GitHub Actions-capable environment;
+  - run a real Windows smoke test with yt-dlp + FFmpeg;
+  - verify Temporary Voice creation name and 96 kbps bitrate on the user's server;
+  - perform live YouTube playback, seek, reconnect and restart recovery checks.
