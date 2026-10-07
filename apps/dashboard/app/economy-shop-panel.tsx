@@ -216,7 +216,7 @@ export function EconomyShopPanel({
       </div>
 
       <section style={sectionBox}>
-        <div style={label}>ECONOMY ACCOUNTS</div>
+        <div style={label}>БАЛАНСЫ УЧАСТНИКОВ</div>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(190px,1fr) 180px auto", gap: 8, marginTop: 9 }}>
           <input
             value={accountUserId}
@@ -350,7 +350,7 @@ export function EconomyShopPanel({
             <div>
               <div style={{ fontWeight: 650 }}>
                 #{item.id} · {item.name}
-                {!item.enabled && <span style={{ marginLeft: 7, fontSize: 9, color: "#7f8998" }}>OFF</span>}
+                {!item.enabled && <span style={{ marginLeft: 7, fontSize: 9, color: "#7f8998" }}>Выключено</span>}
               </div>
               <div style={{ marginTop: 4, color: "#687386", fontSize: 10, lineHeight: 1.45 }}>
                 {item.description || "Без описания"}
