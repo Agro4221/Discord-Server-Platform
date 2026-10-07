@@ -433,7 +433,7 @@ function parseDuckDuckGoMusicResults(html:string,provider:MusicSearchProvider,do
   while((m=re.exec(html))&&hits.length<8){
     const url=decodeDuckUrl(decodeHtml(m[1]??""));
     const title=decodeHtml(String(m[2]??"").replace(/<[^>]+>/g," ")).replace(/\\s+/g," ").trim();
-    if(!/^https?:\\/\\//i.test(url)||!url.toLowerCase().includes(domain))continue;
+    if(!isHttpUrl(url)||!url.toLowerCase().includes(domain))continue;
     const classified=classifyMusicSearchUrl(url);if(!classified||classified.provider!==provider||classified.kind!==kind)continue;
     if(hits.some(item=>item.url===url))continue;
     hits.push({provider,kind,title:title.slice(0,180)||url,url});
