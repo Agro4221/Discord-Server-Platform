@@ -111,21 +111,21 @@ export function RolePanelsEditor({
   return (
     <div style={{ display: "grid", gap: 18 }}>
       <div>
-        <h3 style={{ margin: 0, fontSize: 18 }}>Role Panels</h3>
+        <h3 style={{ margin: 0, fontSize: 18 }}>Панели ролей</h3>
         <div style={{ marginTop: 6, opacity: 0.48, fontSize: 12 }}>Панель публикуется в выбранный текстовый канал и использует кнопки для выдачи/снятия ролей.</div>
       </div>
       {error && <div style={{ padding: 10, borderRadius: 10, background: "#32191b", border: "1px solid #63292d" }}>{error}</div>}
       <input value={title} maxLength={100} onChange={(event) => setTitle(event.target.value)} placeholder="Заголовок панели" style={inputStyle} />
       <select value={channelId} onChange={(event) => setChannelId(event.target.value)} style={inputStyle}>
-        <option value="">Выбери текстовый канал</option>
+        <option value="">Выберите текстовый канал</option>
         {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
       </select>
       <div style={{ display: "grid", gap: 9 }}>
         {panelRoles.map((entry, index) => (
           <div key={index} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr) auto", gap: 8 }}>
             <select value={entry.roleId} onChange={(event) => updateRole(index, { roleId: event.target.value, label: entry.label || roles.find((r) => r.id === event.target.value)?.name || "" })} style={inputStyle}>
-              <option value="">Выбери роль</option>
-              {roles.map((role) => <option key={role.id} value={role.id}>{role.name}{role.manageable === false ? " · hierarchy" : ""}</option>)}
+              <option value="">Выберите роль</option>
+              {roles.map((role) => <option key={role.id} value={role.id}>{role.name}{role.manageable === false ? " · роль выше бота" : ""}</option>)}
             </select>
             <input value={entry.label} maxLength={80} onChange={(event) => updateRole(index, { label: event.target.value })} placeholder="Текст кнопки" style={inputStyle} />
             <button type="button" disabled={saving || panelRoles.length === 1} onClick={() => setPanelRoles((current) => current.filter((_, i) => i !== index))} style={buttonStyle("secondary")}>×</button>
