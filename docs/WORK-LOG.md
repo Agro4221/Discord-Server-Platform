@@ -1203,3 +1203,8 @@ Never write credentials, tokens or private user data here.
 - Added a dashboard `Проверить` action for immediate provider diagnostics and exposed `lastCheckedAt` in the alert list.
 - Fixed the management API numeric alert-id route matcher so update/delete/manual-check requests reach the intended alert.
 - Added unit coverage for Stream Alerts provider availability, target normalization and interval bounds.
+
+## 2026-10-07 — Stream Alerts YouTube fallback and dashboard check UI
+- YouTube Stream Alerts now use local `yt-dlp` live detection when the YouTube Data API is unavailable or returns an error; the dashboard no longer blocks YouTube setup when only yt-dlp is available.
+- Added a manual `Проверить` action that immediately polls one alert and refreshes `lastOnline`, `lastCheckedAt` and `lastError`.
+- Updated the dashboard provider hint to reflect the YouTube API/yt-dlp fallback.
