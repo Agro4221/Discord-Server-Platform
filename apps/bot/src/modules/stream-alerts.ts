@@ -53,7 +53,7 @@ export class StreamAlerts implements PlatformModule {
   }
 
   providers():{twitch:boolean;youtube:boolean;vk:boolean}{
-    return {twitch:Boolean(this.config.twitchClientId&&this.config.twitchClientSecret),youtube:Boolean(this.config.youtubeApiKey||this.config.ytDlpPath),vk:true};
+    return {twitch:Boolean(this.config.twitchClientId&&this.config.twitchClientSecret),youtube:Boolean(this.config.ytDlpPath),vk:true};
   }
 
   async list(guildId:string):Promise<StreamAlertRecord[]>{
@@ -181,28 +181,10 @@ export class StreamAlerts implements PlatformModule {
     }
 
     if(platform==="youtube"){
-      if(this.config.youtubeApiKey){
-        try{
-          const channelId=await this.resolveYouTubeChannelId(target,targetId);
-          const q=new URLSearchParams({part:"snippet",channelId,eventType:"live",type:"video",maxResults:"1",key:this.config.youtubeApiKey});
-          const r=await fetch("https://www.googleapis.com/youtube/v3/search?"+q.toString(),{signal:AbortSignal.timeout(10000)});
-          if(r.ok){
-            const body=await r.json() as {items?:Array<{id?:{videoId?:string};snippet?:{title?:string;channelTitle?:string;thumbnails?:{high?:{url?:string}}}}>};
-            const item=body.items?.[0];const videoId=item?.id?.videoId;
-            if(videoId)return {key:"youtube:"+videoId,title:item?.snippet?.title??"YouTube Live",url:"https://www.youtube.com/watch?v="+videoId,author:item?.snippet?.channelTitle??target,thumbnail:item?.snippet?.thumbnails?.high?.url};
-            return null;
-          }
-          logger.warn("YouTube API live check failed; using yt-dlp fallback",{target,status:r.status});
-        }catch(error){logger.warn("YouTube API live check failed; using yt-dlp fallback",{target,error:String(error)});}
-      }
       return await this.fetchYouTubeLiveViaYtDlp(target,targetId);
     }
 
-    const r=await fetch(this.config.vkApiBaseUrl+"/blog/"+encodeURIComponent(target)+"/public_video_stream",{headers:{"user-agent":"DiscordServerPlatform/0.1"},signal:AbortSignal.timeout(10000)});
-    if(!r.ok)throw new Error("vk_live_http_"+r.status);
-    const body=await r.json() as {title?:string;data?:Array<{vid?:string}>};
-    const live=body.data?.[0];
-    return live?.vid?{key:"vk:"+live.vid,title:body.title??"VK Видео Live",url:"https://live.vkvideo.ru/"+target,author:target}:null;
+    return await this.fetchVkLive(target);
   }
 
   private async resolveTwitchUserId(login:string):Promise<string|null>{
@@ -218,33 +200,96 @@ export class StreamAlerts implements PlatformModule {
   }
 
   private async fetchYouTubeLiveViaYtDlp(target:string,targetId:string|null):Promise<LiveInfo|null>{
-    const source=targetId?"https://www.youtube.com/channel/"+targetId+"/live":target.startsWith("@")?"https://www.youtube.com/"+target+"/live":target.startsWith("http")?target.replace(/\/?$/,"")+"/live":"https://www.youtube.com/@"+target+"/live";
-    const args=["--ignore-config","--no-warnings","--no-update","--js-runtimes",this.config.ytDlpJsRuntime??"node","--dump-single-json","--flat-playlist","--playlist-items","1","--skip-download"];
-    if(this.config.ytDlpCookiesFile)args.push("--cookies",this.config.ytDlpCookiesFile);
-    args.push(source);
-    const result=await runProcess(this.config.ytDlpPath,args,15000);
-    if(result.code!==0){if(/not currently live|not live|no video/i.test(result.stderr))return null;throw new Error("youtube_ytdlp_http_failed");}
-    let parsed:any;try{parsed=JSON.parse(result.stdout);}catch{return null;}
-    const entries=Array.isArray(parsed.entries)?parsed.entries:[parsed];
-    const live=entries.find((entry:any)=>entry&&String(entry.live_status??"").toLowerCase()==="is_live"&&entry.id)??(String(parsed.live_status??"").toLowerCase()==="is_live"?parsed:null);
-    if(!live?.id)return null;
-    const id=String(live.id);const channel=String(live.channel??live.uploader??target);const url=String(live.webpage_url??live.original_url??"https://www.youtube.com/watch?v="+id);
+    const liveUrl=buildYouTubeLiveUrl(target,targetId);
+    const result=await runProcess(this.config.ytDlpPath,[
+      liveUrl,
+      "--flat-playlist",
+      "--playlist-end","1",
+      "--dump-single-json",
+      "--skip-download",
+      "--no-warnings"
+    ],30000);
+
+    if(result.code!==0){
+      if(/not currently live|not live|offline|no live|does not currently have a live/i.test(result.stderr))return null;
+      throw new Error("youtube_ytdlp_failed:"+result.stderr.slice(0,400));
+    }
+
+    let data:any;
+    try{data=JSON.parse(result.stdout);}
+    catch{throw new Error("youtube_ytdlp_invalid_json");}
+
+    const entry=Array.isArray(data.entries)?data.entries[0]:undefined;
+    const id=data.id??entry?.id;
+    if(!id)return null;
+
+    const liveStatus=String(data.live_status??entry?.live_status??"").toLowerCase();
+    const isLive=data.is_live===true||entry?.is_live===true||liveStatus==="is_live"||liveStatus==="live"||!liveStatus;
+    if(!isLive)return null;
+
+    const url=data.webpage_url??entry?.webpage_url??entry?.url??("https://www.youtube.com/watch?v="+id);
     logger.info("YouTube live detected via yt-dlp",{target,videoId:id});
-    return {key:"youtube:"+id,title:String(live.title??"YouTube Live"),url,author:channel,thumbnail:typeof live.thumbnail==="string"?live.thumbnail:undefined};
+    return {
+      key:"youtube:"+id,
+      title:data.title??entry?.title??"YouTube Live",
+      url,
+      author:String(data.channel??entry?.channel??data.uploader??entry?.uploader??target),
+      thumbnail:data.thumbnail??entry?.thumbnail
+    };
   }
 
-  private async resolveYouTubeChannelId(target:string,targetId:string|null):Promise<string>{
-    if(targetId)return targetId;
-    if(/^UC[A-Za-z0-9_-]{20,}$/.test(target))return target;
-    if(!this.config.youtubeApiKey)throw new Error("youtube_api_key_missing");
-    const handle=target.startsWith("@")?target:"@"+target;
-    const q=new URLSearchParams({part:"id",forHandle:handle,key:this.config.youtubeApiKey});
-    const r=await fetch("https://www.googleapis.com/youtube/v3/channels?"+q.toString(),{signal:AbortSignal.timeout(10000)});
-    if(!r.ok)throw new Error("youtube_channel_http_"+r.status);
-    const body=await r.json() as {items?:Array<{id?:string}>};
-    const id=body.items?.[0]?.id;
-    if(!id)throw new Error("youtube_channel_not_found");
-    return id;
+  private async fetchVkLive(target:string):Promise<LiveInfo|null>{
+    const slug=normalizeVkStreamTarget(target);
+    if(!slug)throw new Error("vk_channel_required");
+
+    const apiUrl=this.config.vkApiBaseUrl+"/blog/"+encodeURIComponent(slug)+"/public_video_stream";
+    try{
+      const r=await fetch(apiUrl,{
+        headers:{
+          Referer:"https://live.vkvideo.ru/"+encodeURIComponent(slug),
+          "user-agent":"stream-bot-lite/0.1"
+        },
+        signal:AbortSignal.timeout(10000)
+      });
+      if(r.ok){
+        const body=await r.json() as {title?:string;data?:Array<{vid?:string}>};
+        const live=body.data?.[0];
+        if(live?.vid){
+          return {key:"vk:"+live.vid,title:body.title??"VK Видео Live",url:"https://live.vkvideo.ru/"+encodeURIComponent(slug),author:slug};
+        }
+        return null;
+      }
+    }catch(error){
+      logger.warn("VK API check failed; using yt-dlp fallback",{target,error:String(error)});
+    }
+
+    const liveUrl="https://live.vkvideo.ru/"+encodeURIComponent(slug);
+    const result=await runProcess(this.config.ytDlpPath,[
+      liveUrl,
+      "--dump-single-json",
+      "--skip-download",
+      "--no-warnings"
+    ],30000);
+
+    if(result.code!==0){
+      if(/not live|offline|no live|does not currently have a live/i.test(result.stderr))return null;
+      throw new Error("vk_ytdlp_failed:"+result.stderr.slice(0,400));
+    }
+
+    let data:any;
+    try{data=JSON.parse(result.stdout);}
+    catch{throw new Error("vk_ytdlp_invalid_json");}
+
+    const isLive=data.is_live===true||data.live_status==="is_live"||data.live_status==="live";
+    if(!isLive||!data.id)return null;
+
+    return {
+      key:"vk:"+data.id,
+      title:data.title??"VK Видео Live",
+      url:data.webpage_url??liveUrl,
+      author:slug,
+      thumbnail:data.thumbnail
+    };
   }
 
   private async getTwitchToken():Promise<string>{
@@ -276,6 +321,44 @@ export class StreamAlerts implements PlatformModule {
   }
 }
 
+function buildYouTubeLiveUrl(identifier:string,targetId:string|null):string{
+  const value=identifier.trim();
+  if(targetId)return "https://www.youtube.com/channel/"+encodeURIComponent(targetId)+"/live";
+
+  if(/^https?:\/\//i.test(value)){
+    try{
+      const url=new URL(value);
+      const host=url.hostname.toLowerCase();
+      if(host==="youtu.be"||url.pathname.startsWith("/watch")||url.pathname.startsWith("/live/"))return value;
+      if(host==="youtube.com"||host==="www.youtube.com"||host.endsWith(".youtube.com")){
+        if(url.pathname.startsWith("/@")||url.pathname.startsWith("/channel/")||url.pathname.startsWith("/c/")||url.pathname.startsWith("/user/")){
+          url.pathname=url.pathname.replace(/\/$/,"")+"/live";
+          return url.toString();
+        }
+      }
+    }catch{
+      return value;
+    }
+    return value;
+  }
+
+  if(value.startsWith("@"))return "https://www.youtube.com/"+encodeURIComponent(value)+"/live";
+  if(/^UC[A-Za-z0-9_-]{20,}$/i.test(value))return "https://www.youtube.com/channel/"+encodeURIComponent(value)+"/live";
+  return "https://www.youtube.com/@"+encodeURIComponent(value)+"/live";
+}
+
+function normalizeVkStreamTarget(identifier:string):string{
+  const value=identifier.trim();
+  try{
+    const url=new URL(value);
+    const host=url.hostname.toLowerCase();
+    if(host==="live.vkvideo.ru"||host.endsWith(".vkvideo.ru"))return url.pathname.split("/").filter(Boolean)[0]??"";
+  }catch{
+    // Treat it as a slug.
+  }
+  return value.replace(/^@/,"").replace(/^\//,"").split(/[?#/]/,1)[0]??"";
+}
+
 export function normalizeStreamAlertTarget(platform:StreamAlertPlatform,raw:string):string{
   const value=raw.trim();if(!value)throw new Error("stream_alert_target_required");
   if(platform==="youtube"){
@@ -283,6 +366,7 @@ export function normalizeStreamAlertTarget(platform:StreamAlertPlatform,raw:stri
     if(channelMatch?.[1])return channelMatch[1];
     const handleMatch=value.match(/youtube\.com\/@([A-Za-z0-9._-]+)/i);
     if(handleMatch?.[1])return "@"+handleMatch[1];
+    if(/^UC[A-Za-z0-9_-]{20,}$/i.test(value))return value;
     return value.startsWith("@")?value:"@"+value;
   }
   return value.replace(/^https?:\/\/[^/]+\//i,"").split(/[?#/]/)[0]??value;
