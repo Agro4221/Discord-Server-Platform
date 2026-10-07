@@ -65,6 +65,7 @@ type ApiOptions = {
   streamAlerts?: {
     list: (guildId: string) => Promise<unknown[]>;
     providers: () => unknown;
+    checkNow: (guildId: string, alertId: number) => Promise<unknown>;
     create: (guildId: string, input: {
       platform: StreamAlertPlatform;
       target: string;
