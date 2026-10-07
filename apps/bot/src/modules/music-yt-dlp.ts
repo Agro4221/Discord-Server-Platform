@@ -181,16 +181,28 @@ export class YtDlpMusicEngine implements PlatformModule {
 
   async onInteraction(i:Interaction):Promise<void>{
     if(!i.isButton()||!i.customId.startsWith("dsp:music:")||!i.guild)return;
-    const s=this.sessions.get(i.guild.id);if(!s){await i.reply({content:"Музыка не запущена.",ephemeral:true}).catch(()=>undefined);return;}
+    await i.deferUpdate().catch(()=>undefined);
+    const s=this.sessions.get(i.guild.id);
+    if(!s){await i.followUp({content:"Музыка не запущена.",ephemeral:true}).catch(()=>undefined);return;}
     const member=await i.guild.members.fetch(i.user.id).catch(()=>null), elevated=Boolean(member?.permissions.has("ManageGuild"))||await this.hasDj(i.guild.id,member);
-    if(!canControlMusic(member?.voice.channelId??null,s.voiceChannelId,elevated)){await i.reply({content:"Управлять музыкой можно из того же voice-канала, с DJ-ролью или с Manage Server.",ephemeral:true});return;}
+    if(!canControlMusic(member?.voice.channelId??null,s.voiceChannelId,elevated)){
+      await i.followUp({content:"Управлять музыкой можно из того же voice-канала, с DJ-ролью или с Manage Server.",ephemeral:true}).catch(()=>undefined);
+      return;
+    }
     try{
       const a=i.customId.slice("dsp:music:".length);
-      if(a==="pause")s.paused?await this.resume(s):await this.pause(s);else if(a==="skip")await this.skip(s);
-      else if(a==="stop")await this.stop(s);else if(a==="shuffle"){if(s.queue.length<2)throw new Error("music_queue_too_short");shuffle(s.queue);}
-      else if(a==="volume_down"||a==="volume_up"){s.volume=adjustMusicVolume(s.volume,a==="volume_down"?-10:10);s.resource?.volume?.setVolume(s.volume/100);}else return;
-      await this.persist(s);await this.controller(s);await i.reply({content:"✅ Готово.",ephemeral:true});
-    }catch(error){await i.reply({content:formatError(error),ephemeral:true}).catch(()=>undefined);}
+      if(a==="pause")s.paused?await this.resume(s):await this.pause(s);
+      else if(a==="skip")await this.skip(s);
+      else if(a==="stop")await this.stop(s);
+      else if(a==="shuffle"){if(s.queue.length<2)throw new Error("music_queue_too_short");shuffle(s.queue);}
+      else if(a==="repeat")s.repeatMode=nextMusicRepeatMode(s.repeatMode);
+      else if(a==="volume_down"||a==="volume_up"){s.volume=adjustMusicVolume(s.volume,a==="volume_down"?-10:10);s.resource?.volume?.setVolume(s.volume/100);}
+      else return;
+      await this.persist(s);
+      await this.controller(s);
+    }catch(error){
+      await i.followUp({content:formatError(error),ephemeral:true}).catch(()=>undefined);
+    }
   }
 
   private async createSession(guild:Guild,voiceChannelId:string):Promise<Session>{
@@ -317,7 +329,7 @@ export class YtDlpMusicEngine implements PlatformModule {
   private async controller(s:Session):Promise<void>{
     if(!this.client||!s.textChannelId)return;const channel=this.client.channels.cache.get(s.textChannelId);if(!channel?.isTextBased()||!("send"in channel))return;
     const embed=new EmbedBuilder().setTitle("🎵 Music").setDescription(s.current?`**${s.current.title}**\n${s.current.author}`:"Сейчас ничего не играет.").addFields({name:"Состояние",value:s.paused?"⏸ Пауза":"▶ Играет",inline:true},{name:"Повтор",value:s.repeatMode,inline:true},{name:"Громкость",value:String(s.volume),inline:true}).setTimestamp();
-    const components=buildController(s.paused), existing=s.controllerMessageId?await channel.messages.fetch(s.controllerMessageId).catch(()=>null):null;
+    const components=buildController(s.paused,s.repeatMode), existing=s.controllerMessageId?await channel.messages.fetch(s.controllerMessageId).catch(()=>null):null;
     if(existing){await existing.edit({embeds:[embed],components}).catch(()=>undefined);return;}
     const sent=await channel.send({embeds:[embed],components}).catch(()=>null);if(sent){s.controllerMessageId=sent.id;await this.db.query("UPDATE music_players SET controller_message_id=$1,updated_at=now() WHERE guild_id=$2 AND bot_identity_id=$3",[sent.id,s.guildId,this.config.botIdentityId]).catch(()=>undefined);}
   }
@@ -380,6 +392,7 @@ export function adjustMusicVolume(v:number,d:number):number{const n=Number.isFin
 export function musicResumePosition(p:number,s:number,paused:boolean,durationMs=0,nowMs=Date.now()):number{const base=Number.isFinite(p)&&p>=0?p:0;const snap=Number.isFinite(s)&&s>=0?s:nowMs;const value=paused?base:base+Math.max(0,nowMs-snap);return durationMs>0?Math.min(value,Math.max(0,durationMs-1000)):value;}
 export function canControlMusic(memberVoiceChannelId:string|null,playerVoiceChannelId:string|null,elevated:boolean):boolean{return elevated||Boolean(memberVoiceChannelId&&playerVoiceChannelId&&memberVoiceChannelId===playerVoiceChannelId);}
 export function normalizeMusicRepeatMode(v:string):MusicRepeatMode|null{return v==="off"||v==="track"||v==="queue"?v:null;}
+export function nextMusicRepeatMode(v:MusicRepeatMode):MusicRepeatMode{return v==="off"?"track":v==="track"?"queue":"off";}
 export function shouldAutoplayAfterQueueEnd(a:boolean,r:MusicRepeatMode,n:number):boolean{return a&&r==="off"&&n===0;}
 export function normalizeMusicQueuePosition(v:number,n:number):number|null{if(!Number.isInteger(v)||!Number.isInteger(n)||n<1||v<1||v>n)return null;return v-1;}
 export function normalizeMusicQueueMove(f:number,t:number,n:number):{from:number;to:number}|null{const a=normalizeMusicQueuePosition(f,n),b=normalizeMusicQueuePosition(t,n);return a===null||b===null||a===b?null:{from:a,to:b};}
@@ -388,7 +401,22 @@ export function musicPlayerNodeId(available:boolean):string|null{return availabl
 function extractQueue(input:unknown):MusicTrack[]{if(!input||typeof input!=="object")return[];const raw=Array.isArray((input as any).tracks)?(input as any).tracks:[];return raw.map((x:any)=>coerceTrack(x)).filter((x:any):x is MusicTrack=>Boolean(x)).slice(0,MAX_MUSIC_ENQUEUE_TRACKS);}
 function coerceTrack(x:any):MusicTrack|null{if(!x||typeof x!=="object")return null;if(typeof x.id==="string"&&typeof x.url==="string"&&typeof x.title==="string")return{id:x.id,url:x.url,title:x.title,author:String(x.author??"Unknown artist"),durationMs:Number(x.durationMs??0)};const info=x.info;if(!info||typeof info!=="object"||!info.identifier||!info.title)return null;return{id:String(info.identifier),title:String(info.title),author:String(info.author??"Unknown artist"),durationMs:Number(info.duration??0),url:`https://www.youtube.com/watch?v=${info.identifier}`};}
 function normalizePersistedMusicState(x:unknown){const s=x&&typeof x==="object"?x as any:{};return{track:coerceTrack(s.track),paused:s.paused===true,positionMs:Number.isFinite(Number(s.positionMs))?Math.max(0,Number(s.positionMs)):0,volume:Math.min(200,Math.max(0,Number(s.volume??100))),repeatMode:normalizeMusicRepeatMode(String(s.repeatMode??""))??"off" as MusicRepeatMode,filter:normalizeMusicFilterPreset(String(s.filter??""))??"off" as MusicFilterPreset};}
-function buildController(paused:boolean){return[new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId("dsp:music:pause").setEmoji(paused?"▶️":"⏸️").setStyle(ButtonStyle.Primary),new ButtonBuilder().setCustomId("dsp:music:skip").setEmoji("⏭️").setStyle(ButtonStyle.Secondary),new ButtonBuilder().setCustomId("dsp:music:shuffle").setEmoji("🔀").setStyle(ButtonStyle.Secondary),new ButtonBuilder().setCustomId("dsp:music:stop").setEmoji("⏹️").setStyle(ButtonStyle.Danger)),new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId("dsp:music:volume_down").setLabel("-10").setEmoji("🔉").setStyle(ButtonStyle.Secondary),new ButtonBuilder().setCustomId("dsp:music:volume_up").setLabel("+10").setEmoji("🔊").setStyle(ButtonStyle.Secondary))];}
+function buildController(paused:boolean,repeatMode:MusicRepeatMode){
+  const repeatLabel=repeatMode==="off"?"Off":repeatMode==="track"?"Track":"Queue";
+  return [
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId("dsp:music:pause").setEmoji(paused?"▶️":"⏸️").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("dsp:music:skip").setEmoji("⏭️").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("dsp:music:shuffle").setEmoji("🔀").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("dsp:music:repeat").setLabel(`Повтор: ${repeatLabel}`).setEmoji(repeatMode==="queue"?"🔁":"🔂").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("dsp:music:stop").setEmoji("⏹️").setStyle(ButtonStyle.Danger)
+    ),
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId("dsp:music:volume_down").setLabel("-10").setEmoji("🔉").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("dsp:music:volume_up").setLabel("+10").setEmoji("🔊").setStyle(ButtonStyle.Secondary)
+    )
+  ];
+}
 function shuffle<T>(items:T[]):void{for(let i=items.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[items[i],items[j]]=[items[j]!,items[i]!];}}
 function formatDuration(ms:number):string{const s=Math.max(0,Math.floor(ms/1000));return`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;}
 function formatError(error:unknown):string{const c=error instanceof Error?error.message:"music_failed";const m:Record<string,string>={music_disabled:"Модуль Music выключен.",music_unavailable:"Музыка недоступна: проверь yt-dlp и ffmpeg.",voice_channel_required:"Нужен голосовой канал.",music_voice_assigned_elsewhere:"Voice-канал закреплён за другим bot identity.",music_voice_not_assigned:"Voice-канал не назначен этой bot identity.",music_player_not_started:"Музыка не запущена.",music_player_in_other_voice:"Плеер уже работает в другом voice-канале.",music_query_required:"Укажи трек или URL.",music_track_not_found:"Трек не найден.",music_search_failed:"yt-dlp не смог выполнить поиск.",music_stream_resolve_failed:"Не удалось получить прямой аудиопоток.",music_provider_requires_url:"Для этого источника нужна прямая ссылка: yt-dlp не предоставляет текстовый поиск для этой площадки.",music_spotify_track_only:"Для Spotify сейчас поддерживаются ссылки на отдельные треки; воспроизведение идёт через эквивалентный доступный источник.",music_queue_too_short:"В очереди недостаточно треков.",invalid_repeat_mode:"Некорректный repeat mode.",invalid_seek:"Некорректный seek.",invalid_volume:"Некорректная громкость.",invalid_music_filter:"Некорректный фильтр.",invalid_queue_position:"Некорректная позиция очереди.",invalid_queue_move:"Некорректное перемещение трека."};return m[c.split(":")[0]??c]??c;}
