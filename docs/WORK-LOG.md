@@ -1100,3 +1100,13 @@ Never write credentials, tokens or private user data here.
 - User's `npm test` reached 156 passing tests with one failure in `normalizeYtDlpEntry` because the fallback YouTube ID validator rejected the fixture ID `abc`.
 - Fixed the fallback URL construction to encode any non-empty extractor ID when a source-specific webpage URL is unavailable.
 - Next verification: refresh `apps/bot/src/modules/music-yt-dlp.ts` locally and rerun `npm test`; expected suite is 166 total tests with 9 integration/environment skips and no failures.
+
+
+## 2026-10-07 — Local Music verification green
+- User machine: Node.js 24.21.0, npm 11.19.0.
+- yt-dlp 2026.08.19 is installed and visible in the refreshed PowerShell PATH.
+- FFmpeg is installed and visible; the machine has both the existing C:\\ffmpeg\\bin build and the WinGet yt-dlp FFmpeg dependency.
+- `npm run typecheck`: PASS.
+- `npm test`: 166 total, 157 passed, 0 failed, 9 skipped.
+- The nine skipped tests are environment/database integration cases and did not fail the suite.
+- Local unit/regression verification for the current multi-source Music implementation is therefore green. Remaining verification is live provider playback and Discord runtime behavior.
