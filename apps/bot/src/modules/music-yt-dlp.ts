@@ -368,7 +368,7 @@ export function normalizeYtDlpEntry(e:any,index=0,fallbackUrl?:string):MusicTrac
   const id=String(e.id??e.url??"").trim();if(!id)return null;
   const explicitUrl=String(e.webpage_url??e.original_url??"").trim();
   const entryUrl=/^https?:\/\//i.test(explicitUrl)?explicitUrl:/^https?:\/\//i.test(String(e.url??""))?String(e.url).trim():"";
-  const url=entryUrl||fallbackUrl||(/^[a-zA-Z0-9_-]{4,}$/.test(id)?`https://www.youtube.com/watch?v=${id}`: "");
+  const url=entryUrl||fallbackUrl||`https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
   if(!url)return null;
   return{id,title:String(e.title??`Track ${index+1}`),author:String(e.uploader??e.channel??e.artist??"Unknown artist"),durationMs:Math.max(0,Math.trunc(Number(e.duration??0)*1000)),url};
 }
