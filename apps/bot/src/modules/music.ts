@@ -5,6 +5,7 @@ export {
   normalizeMusicSearchProvider,
   buildMusicSearchTarget,
   normalizeMusicSourceUrl,
+  classifyMusicSearchUrl,
   detectMusicSearchProvider,
   normalizeYtDlpEntry,
   normalizeMusicFilterPreset,
