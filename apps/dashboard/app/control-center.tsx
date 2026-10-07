@@ -570,13 +570,13 @@ export function ControlCenter() {
       } catch (reason) {
         const code = reason instanceof Error ? reason.message : "bootstrap_failed";
         const messages: Record<string, string> = {
-          unauthorized: "Control Center не может авторизоваться в Management API. Проверь MANAGEMENT_API_KEY.",
+          unauthorized: "Центр управления не может авторизоваться в Management API. Проверь MANAGEMENT_API_KEY.",
           catalog_failed: "Management API не отдал каталог модулей платформы.",
           module_schemas_failed: "Management API не отдал каталог настроек модулей.",
           guilds_failed: "Management API не отдал список Discord-серверов.",
           internal_error: "Management API вернул внутреннюю ошибку."
         };
-        setError(messages[code] ?? "Не удалось связать Control Center с Management API: " + code);
+        setError(messages[code] ?? "Не удалось связать Центр управления с Management API: " + code);
       }
     }
 
@@ -677,7 +677,7 @@ export function ControlCenter() {
       const response = await fetch("/api/runtime/shutdown", { method: "POST" });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(String(body.error ?? "shutdown_failed"));
-      setNotice("Бот получил команду на штатное выключение. Control Center остаётся открытым.");
+      setNotice("Бот получил команду на штатное выключение. Центр управления остаётся открытым.");
       setHealth((current) => current ? { ...current, status: "stopping", discord: "down" } : current);
     } catch {
       setError("Не удалось выключить бота.");
@@ -1067,7 +1067,7 @@ function Sidebar(props: {
       <div style={{ ...panel, padding: 11 }}>
         <div style={{ padding: "7px 10px 14px", borderBottom: "1px solid #202632", marginBottom: 9 }}>
           <div style={{ color: "#626e80", fontSize: 9, letterSpacing: 1.6 }}>DISCORD SERVER PLATFORM</div>
-          <div style={{ marginTop: 4, fontSize: 19, fontWeight: 780 }}>Control Center</div>
+          <div style={{ marginTop: 4, fontSize: 19, fontWeight: 780 }}>Центр управления</div>
         </div>
 
         <SidebarButton active={props.view === "overview"} label="Обзор" icon="⌂" onClick={props.onOverview} />
@@ -1191,7 +1191,7 @@ function Overview(props: {
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 18, flexWrap: "wrap" }}>
           <div>
-            <div style={{ color: "#687487", fontSize: 9, letterSpacing: 1.5 }}>SERVER ADMINISTRATION</div>
+            <div style={{ color: "#687487", fontSize: 9, letterSpacing: 1.5 }}>УПРАВЛЕНИЕ СЕРВЕРОМ</div>
             <h1 style={{ margin: "8px 0", fontSize: 35, letterSpacing: -1.2 }}>{props.guild?.name ?? "Discord Server"}</h1>
             <p style={{ margin: 0, color: "#98a3b3", maxWidth: 770, lineHeight: 1.6 }}>
               Единый центр управления функционалом бота. Здесь функции разделены по задачам, а настройки каждого модуля находятся рядом с его операционными инструментами.
@@ -1206,8 +1206,8 @@ function Overview(props: {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 10 }}>
         <StatCard label="Участники" value={formatNumber(props.guild?.memberCount)} hint="выбранный сервер" />
         <StatCard label="Активные модули" value={String(enabled.length)} hint={"из " + props.catalog.length} />
-        <StatCard label="Каналы" value={formatNumber(props.guild?.channelCount)} hint="Discord resources" />
-        <StatCard label="Core" value={ready ? "Ready" : "Degraded"} hint={props.health?.database === "ready" ? "Gateway + PostgreSQL" : "требуется проверка"} />
+        <StatCard label="Каналы" value={formatNumber(props.guild?.channelCount)} hint="ресурсы Discord" />
+        <StatCard label="Core" value={ready ? "Готов" : "Есть проблемы"} hint={props.health?.database === "ready" ? "Gateway + PostgreSQL" : "требуется проверка"} />
       </div>
 
       <section style={{ ...panel, padding: 20 }}>
@@ -1295,7 +1295,7 @@ function Overview(props: {
             <SectionHeader title="Состояние" eyebrow="HEALTH" />
             <HealthRow label="Discord Gateway" value={props.health?.discord ?? "unknown"} />
             <HealthRow label="PostgreSQL" value={props.health?.database ?? "unknown"} />
-            <HealthRow label="Control Center" value={ready ? "ready" : "degraded"} />
+            <HealthRow label="Центр управления" value={ready ? "ready" : "degraded"} />
           </div>
           <div style={{ ...panel, padding: 20 }}>
             <SectionHeader title="Последние действия" eyebrow="AUDIT" />
@@ -1733,7 +1733,7 @@ function ModulePage(props: {
 
       {props.module?.key === "music" && (
         <section style={{ ...panel, padding: 20 }}>
-          <SectionHeader title="Music Control Center" eyebrow="OPERATIONS" />
+          <SectionHeader title="Music Центр управления" eyebrow="OPERATIONS" />
           <MusicPanel
             guildId={props.guildId}
             channels={props.resources.channels.filter((item) => item.type === 2 || item.type === 13)}
