@@ -8,19 +8,19 @@ For a gaming/streaming PC, Docker Desktop is optional. Use the native launcher:
 
     .\start-native.bat
 
-The default native mode starts one Lavalink node and the compiled bot. The Dashboard is off until you add -Dashboard. See docs/NATIVE-SETUP.md for PostgreSQL, Java and Lavalink JAR prerequisites.
+The default native mode starts PostgreSQL, the compiled bot and local yt-dlp + FFmpeg music tooling. The Dashboard is off until you add -Dashboard. See docs/NATIVE-SETUP.md for the local prerequisites.
 
-Use -Lavalink2 only when you explicitly need a second Lavalink node for redundancy.
+There is no separate Lavalink node in the current Music architecture.
 
 ## Windows: one-command local start
 
-Install Node.js 24.17+, PostgreSQL, Java compatible with the selected Lavalink release and a Lavalink JAR. Clone the repository, then run:
+Install Node.js 24.17+, PostgreSQL, yt-dlp and FFmpeg. Clone the repository, then run:
 
     .\start-native.bat
 
-Use `-Dashboard` when you need the local Control Center and `-Lavalink2` only for a two-node redundancy run.
+Use `-Dashboard` when you need the local Control Center.
 
-On the first launch the native launcher creates `.env`, asks only for the Discord bot token and Discord client ID, then generates the Management API key, bot-credential encryption key and Lavalink password. The local Control Center has no end-user login.
+On the first launch the native launcher creates `.env`, asks only for the Discord bot token and Discord client ID, then generates the Management API key and bot-credential encryption key. Missing yt-dlp/FFmpeg are installed through winget when available. The local Control Center has no end-user login.
 
 When `-Dashboard` is requested and the services become healthy, it opens the local Control Center automatically:
 
@@ -38,9 +38,6 @@ After startup, run the read-only native release gate:
 
 Start the Control Center.
 
-    .\start-native.bat -Lavalink2
-
-Start the optional second Lavalink node.
 
     .\start-native.bat -Rebuild
 
@@ -48,11 +45,11 @@ Rebuild native domain/bot output before starting.
 
     .\start-native.bat -Down
 
-Stop the native Bot, Fleet supervisor, Dashboard and Lavalink processes started by the launcher.
+Stop the native Bot, Fleet supervisor and Dashboard processes started by the launcher.
 
 ## What runs locally
 
-Native mode uses the separately installed PostgreSQL service, Java/Lavalink process(es), Node.js Bot process, optional Next.js Control Center and a lightweight PowerShell Fleet supervisor. No Docker Desktop or WSL layer is required.
+Native mode uses PostgreSQL, Node.js, local yt-dlp + FFmpeg tooling, the Bot process, optional Next.js Control Center and a lightweight PowerShell Fleet supervisor. No Docker Desktop or WSL layer is required.
 
 ## First Discord setup
 
@@ -83,14 +80,11 @@ VPS deployment uses the same application architecture. See `scripts/install-vps.
 
 ## Docker optional failover node
 
-The normal Docker start uses one Lavalink node to keep the local resource footprint low:
+The normal Docker start runs PostgreSQL, Bot and Dashboard; Music runs inside the Bot container with yt-dlp + FFmpeg:
 
     .\start-local.bat
 
 For a two-node Docker run:
 
-    .\start-local.bat -Lavalink2
 
-The second node is enabled through the `failover` Compose profile and remains part of the supported Music failover topology.
-
-Run the Docker release gate with `-RequireLavalink2` when the second node is intentionally enabled.
+Run the native release gate after startup to verify Bot health, Fleet state and the yt-dlp/FFmpeg tooling.
