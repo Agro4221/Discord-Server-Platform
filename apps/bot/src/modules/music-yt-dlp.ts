@@ -368,25 +368,45 @@ export class YtDlpMusicEngine implements PlatformModule {
     }catch(error){logger.warn("Music state persistence failed",{guildId:s.guildId,error:String(error)});}
   }
 
-  private async controller(s:Session):Promise<void>{
-    if(!this.client||!s.textChannelId)return;
-    let channel=this.client.channels.cache.get(s.textChannelId);
-    if(!channel)channel=(await this.client.channels.fetch(s.textChannelId).catch(()=>undefined))??undefined;
-    if(!channel?.isTextBased()||!("send"in channel))return;
+  private async controller(s:Session,fallbackTextChannelId?:string):Promise<void>{
+    if(!this.client)return;
+    const targetIds=[s.textChannelId,fallbackTextChannelId].filter((id,index,array):id is string=>Boolean(id)&&array.indexOf(id)===index);
+    if(!targetIds.length)return;
     const repeatText=s.repeatMode==="off"?"выкл.":s.repeatMode==="track"?"трек":"очередь";
-    const embed=new EmbedBuilder().setTitle("🎵 Music").setDescription(s.current?`**${s.current.title}**\n${s.current.author}`:"Сейчас ничего не играет.").addFields({name:"Состояние",value:s.paused?"⏸ Пауза":"▶ Играет",inline:true},{name:"Повтор",value:repeatText,inline:true},{name:"Громкость",value:String(s.volume),inline:true}).setTimestamp();
+    const description=s.current?"**"+s.current.title+"**\n"+s.current.author:"Сейчас ничего не играет.";
+    const embed=new EmbedBuilder().setTitle("🎵 Music").setDescription(description).addFields({name:"Состояние",value:s.paused?"⏸ Пауза":"▶ Играет",inline:true},{name:"Повтор",value:repeatText,inline:true},{name:"Громкость",value:String(s.volume),inline:true}).setTimestamp();
     const components=buildController(s.paused,s.repeatMode);
-    const existing=s.controllerMessageId?await channel.messages.fetch(s.controllerMessageId).catch(error=>{logger.warn("Music controller message fetch failed",{guildId:s.guildId,textChannelId:s.textChannelId,messageId:s.controllerMessageId,error:String(error)});return null;}):null;
-    if(existing){
-      await existing.edit({embeds:[embed],components}).catch(error=>logger.warn("Music controller edit failed",{guildId:s.guildId,textChannelId:s.textChannelId,messageId:s.controllerMessageId,error:String(error)}));
-      return;
-    }
-    try{
-      const sent=await channel.send({embeds:[embed],components});
-      s.controllerMessageId=sent.id;
-      await this.db.query("UPDATE music_players SET controller_message_id=$1,updated_at=now() WHERE guild_id=$2 AND bot_identity_id=$3",[sent.id,s.guildId,this.config.botIdentityId]).catch(error=>logger.warn("Music controller state update failed",{guildId:s.guildId,error:String(error)}));
-    }catch(error){
-      logger.error("Music controller send failed",{guildId:s.guildId,textChannelId:s.textChannelId,error:String(error)});
+    const fallbackContent=s.current?"🎵 **"+s.current.title+"** — "+s.current.author+"\n"+(s.paused?"⏸ Пауза":"▶ Играет")+" · Повтор: "+repeatText+" · Громкость: "+s.volume:"🎵 Music · Сейчас ничего не играет."; 
+    for(const channelId of targetIds){
+      let channel=this.client.channels.cache.get(channelId);
+      if(!channel)channel=(await this.client.channels.fetch(channelId).catch(error=>{logger.warn("Music controller channel fetch failed",{guildId:s.guildId,textChannelId:channelId,error:String(error)});return undefined;}))??undefined;
+      if(!channel?.isTextBased()||!("send"in channel))continue;
+      const existing=s.controllerMessageId?await channel.messages.fetch(s.controllerMessageId).catch(error=>{logger.warn("Music controller message fetch failed",{guildId:s.guildId,textChannelId:channelId,messageId:s.controllerMessageId,error:String(error)});return null;}):null;
+      if(existing){
+        try{
+          await existing.edit({embeds:[embed],components,content:null});
+          return;
+        }catch(error){
+          logger.warn("Music controller embed edit failed",{guildId:s.guildId,textChannelId:channelId,messageId:s.controllerMessageId,error:String(error)});
+          try{await existing.edit({content:fallbackContent,embeds:[],components});return;}catch(fallbackError){logger.warn("Music controller fallback edit failed",{guildId:s.guildId,textChannelId:channelId,messageId:s.controllerMessageId,error:String(fallbackError)});}
+        }
+      }
+      try{
+        const sent=await channel.send({embeds:[embed],components});
+        s.controllerMessageId=sent.id;
+        await this.db.query("UPDATE music_players SET controller_message_id=$1,updated_at=now() WHERE guild_id=$2 AND bot_identity_id=$3",[sent.id,s.guildId,this.config.botIdentityId]).catch(error=>logger.warn("Music controller state update failed",{guildId:s.guildId,error:String(error)}));
+        return;
+      }catch(error){
+        logger.warn("Music controller embed send failed",{guildId:s.guildId,textChannelId:channelId,error:String(error)});
+        try{
+          const sent=await channel.send({content:fallbackContent,components});
+          s.controllerMessageId=sent.id;
+          await this.db.query("UPDATE music_players SET controller_message_id=$1,updated_at=now() WHERE guild_id=$2 AND bot_identity_id=$3",[sent.id,s.guildId,this.config.botIdentityId]).catch(updateError=>logger.warn("Music controller state update failed",{guildId:s.guildId,error:String(updateError)}));
+          return;
+        }catch(fallbackError){
+          logger.error("Music controller fallback send failed",{guildId:s.guildId,textChannelId:channelId,error:String(fallbackError)});
+        }
+      }
     }
   }
   private async announce(channelId:string,text:string){const c=this.client?.channels.cache.get(channelId);if(c?.isTextBased()&&"send"in c)await c.send(text).catch(()=>undefined);}
