@@ -1094,3 +1094,9 @@ Never write credentials, tokens or private user data here.
 - User's `npm test` reached 146 passing tests and one test-file failure caused by `detectMusicSearchProvider` being implemented in `music-yt-dlp.ts` but omitted from the compatibility re-export in `music.ts`.
 - Fixed `apps/bot/src/modules/music.ts` to re-export `detectMusicSearchProvider`.
 - Next verification: refresh this one local file and rerun `npm test`.
+
+
+## 2026-10-07 — Music track normalization edge case
+- User's `npm test` reached 156 passing tests with one failure in `normalizeYtDlpEntry` because the fallback YouTube ID validator rejected the fixture ID `abc`.
+- Fixed the fallback URL construction to encode any non-empty extractor ID when a source-specific webpage URL is unavailable.
+- Next verification: refresh `apps/bot/src/modules/music-yt-dlp.ts` locally and rerun `npm test`; expected suite is 166 total tests with 9 integration/environment skips and no failures.
