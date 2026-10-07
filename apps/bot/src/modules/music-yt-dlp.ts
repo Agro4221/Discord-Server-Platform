@@ -251,12 +251,24 @@ export class YtDlpMusicEngine implements PlatformModule {
 
   private async idle(s:Session):Promise<void>{
     if(s.intentionalStop||s.transitioning||!s.current)return;
-    const previous=s.current;s.intentionalStop=true;s.player.stop(true);this.killFfmpeg(s);s.intentionalStop=false;
-    if(s.repeatMode==="track")s.current=previous;else{if(s.repeatMode==="queue")s.queue.push(previous);s.current=s.queue.shift()??null;s.positionMs=0;}
-    if(!s.current&&s.autoplay){const related=await this.search(`${previous.author} ${previous.title}`,"auto",5).catch(()=>[]);s.current=related.find(t=>t.id!==previous.id)??null;}
-    if(s.current)await this.start(s,0,false);else this.scheduleLeave(s);await this.persist(s);await this.controller(s);
+    const previous=s.current;
+    s.intentionalStop=true;s.player.stop(true);this.killFfmpeg(s);s.intentionalStop=false;
+    if(s.repeatMode==="track"){
+      s.current=previous;
+      try{await this.start(s,0,false);}catch(error){logger.warn("Music repeat track failed",{guildId:s.guildId,trackId:previous.id,error:String(error)});s.current=null;await this.playNext(s);}
+    }else{
+      if(s.repeatMode==="queue")s.queue.push(previous);
+      s.current=null;
+      if(!s.queue.length&&s.autoplay){
+        const related=await this.search(previous.author+" "+previous.title,"auto",5).catch(()=>[]);
+        const next=related.find(t=>t.id!==previous.id)??null;
+        if(next)s.queue.push(next);
+      }
+      await this.playNext(s);
+    }
+    await this.persist(s);
+    await this.controller(s);
   }
-
   private async pause(s:Session):Promise<void>{if(!s.current)throw new Error("music_player_not_started");s.positionMs=this.position(s);s.paused=true;s.player.pause();}
   private async resume(s:Session):Promise<void>{if(!s.current)throw new Error("music_player_not_started");s.paused=false;s.positionChangedAt=Date.now();s.player.unpause();}
   private async skip(s:Session):Promise<void>{if(!s.current)throw new Error("music_player_not_started");if(s.transitioning)return;s.transitioning=true;try{s.intentionalStop=true;s.player.stop(true);this.killFfmpeg(s);s.intentionalStop=false;s.current=s.queue.shift()??null;s.positionMs=0;if(s.current)await this.start(s,0,false);else this.scheduleLeave(s);}finally{s.transitioning=false;}}
