@@ -1140,3 +1140,10 @@ Never write credentials, tokens or private user data here.
 - Controller delivery used only the Discord channel cache and silently swallowed send/edit/fetch errors, making the failure invisible.
 - Controller now falls back to `client.channels.fetch()` when the channel is not cached and logs fetch/edit/send failures.
 - Slash `play` now also assigns the command channel as the controller target when no preferred Music text channel is configured.
+
+## 2026-10-07 — Global Music search `!search` / `!srch`
+- Added prefix commands `!search <query>` and `!srch <query>`.
+- Search aggregates public web-indexed results across YouTube, TikTok, Yandex Music, VK Music, Spotify and SoundCloud.
+- Results are split into separate Discord sections for tracks and playlists/albums/sets.
+- Each result is a clickable URL that can be passed directly to `!play`; playback continues through the local yt-dlp + FFmpeg engine.
+- Because yt-dlp does not provide native text-search for every requested platform, global search uses public web indexing for discovery while yt-dlp remains responsible for direct-source extraction/playback.
