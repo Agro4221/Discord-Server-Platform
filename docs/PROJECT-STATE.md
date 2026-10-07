@@ -14,7 +14,7 @@ development
 `be0d73b41359b4601742f7051a99fddf544c9bc3`
 
 ## Current phase
-Targeted post-RC rework — Temporary Voice naming/bitrate and the Music engine have been migrated to the requested behavior; automated CI and live Windows/Discord validation remain.
+Targeted post-RC rework — Temporary Voice naming/bitrate and the Music engine now use the requested local yt-dlp + FFmpeg architecture; multi-source provider support is restored; automated CI and live Windows/Discord validation remain.
 
 ## Working subsystems
 - Discord Core with typed event bus and module lifecycle.
@@ -36,7 +36,7 @@ Targeted post-RC rework — Temporary Voice naming/bitrate and the Music engine 
 - Security/Anti-Raid and destructive burst detection.
 - Notifications with HTTPS feed validation and SSRF protections.
 - Analytics minute buckets with Dashboard reporting.
-- Music via local yt-dlp + FFmpeg with persistent queue store and bot identity namespace.
+- Music via local yt-dlp + FFmpeg with persistent queue store, per-voice bot identity namespace and multi-source URL support (YouTube, TikTok, Yandex Music, VK, SoundCloud; Spotify track links bridge through metadata to a playable source).
 - Multi-bot identity persistence for separate-process fleet deployment, per-voice Music routing and identity-scoped background workers.
 - Config transfer and compressed local backups with guild-scoped restore/delete controls, including local/remote retention enforcement.
 - Docker Compose / Dockerfiles for local-to-VPS topology.
@@ -44,7 +44,7 @@ Targeted post-RC rework — Temporary Voice naming/bitrate and the Music engine 
 
 ## Remaining verification work
 - Live Discord E2E smoke test on the user's real test server.
-- Live yt-dlp/FFmpeg playback, YouTube edge cases and stream/recovery validation in the real runtime.
+- Live yt-dlp/FFmpeg playback across YouTube, TikTok, Yandex Music, VK and SoundCloud, plus Spotify-track metadata bridging and stream/recovery validation in the real runtime.
 - Multi-bot fleet takeover validation with real secondary identities.
 - Windows native launcher/runtime validation on the actual gaming/streaming PC.
 - VPS clean-host install/upgrade acceptance and secure remote-access/reverse-proxy drill.
