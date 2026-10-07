@@ -106,8 +106,6 @@ try {
 
 $report.processes.primaryBot = Get-PidSnapshot (Join-Path $runtimeRoot "bot.pid")
 $report.processes.fleetSupervisor = Get-PidSnapshot (Join-Path $runtimeRoot "fleet.pid")
-if ($Lavalink2) {
-}
 if ($Dashboard) {
   $report.processes.dashboard = Get-PidSnapshot (Join-Path $runtimeRoot "dashboard.pid")
 }
