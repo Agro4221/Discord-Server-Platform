@@ -1150,3 +1150,8 @@ Never write credentials, tokens or private user data here.
 ## 2026-10-07 — Music controller TypeScript nullability fix
 - Fixed a strict TypeScript error in the controller channel fallback: `channels.fetch()` failures now resolve to `undefined` instead of `null`, matching the inferred channel variable type.
 - This is a compile-time safety fix only; controller runtime behavior is unchanged.
+
+## 2026-10-07 — Music controller channel fetch type fix follow-up
+- Corrected the previous nullability patch: Discord `channels.fetch()` itself can return `null`, so the fetched value is now normalized with `?? undefined` before assignment.
+- This removes the remaining strict TypeScript `Channel | null | undefined` error without changing controller behavior.
+
