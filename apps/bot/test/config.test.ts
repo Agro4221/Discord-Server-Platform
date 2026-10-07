@@ -27,40 +27,39 @@ function baseEnv(): Record<string, string> {
     DISCORD_CLIENT_ID: "123456789012345678",
     MANAGEMENT_API_KEY: "management-key",
     BOT_CREDENTIALS_ENCRYPTION_KEY: "ab".repeat(32),
-    DATABASE_URL: "postgresql://localhost/test",
-    LAVALINK_PASSWORD: "lavalink-password"
+    DATABASE_URL: "postgresql://localhost/test"
   };
 }
 
-test("Lavalink config falls back to the primary node when LAVALINK_NODES is empty", () => {
+test("Music tooling config uses yt-dlp and FFmpeg defaults", () => {
   withEnv({
     ...baseEnv(),
-    LAVALINK_NODES: undefined,
-    LAVALINK_HOST: "127.0.0.1",
-    LAVALINK_PORT: "2333"
+    YTDLP_PATH: undefined,
+    FFMPEG_PATH: undefined,
+    YTDLP_JS_RUNTIME: undefined,
+    YTDLP_COOKIES_FILE: undefined
   }, () => {
     const config = loadConfig();
-    assert.deepEqual(config.lavalinkNodes, [{
-      id: "local",
-      host: "127.0.0.1",
-      port: 2333,
-      password: "lavalink-password"
-    }]);
+    assert.equal(config.ytDlpPath, "yt-dlp");
+    assert.equal(config.ffmpegPath, "ffmpeg");
+    assert.equal(config.ytDlpJsRuntime, "node");
+    assert.equal(config.ytDlpCookiesFile, undefined);
   });
 });
 
-test("Lavalink config accepts an explicit two-node failover definition", () => {
+test("Music tooling config accepts explicit executable paths and cookies", () => {
   withEnv({
     ...baseEnv(),
-    LAVALINK_NODES: JSON.stringify([
-      { id: "local", host: "lavalink", port: 2333, password: "one" },
-      { id: "local-2", host: "lavalink2", port: 2334, password: "two" }
-    ])
+    YTDLP_PATH: "C:\\tools\\yt-dlp.exe",
+    FFMPEG_PATH: "C:\\ffmpeg\\bin\\ffmpeg.exe",
+    YTDLP_JS_RUNTIME: "deno",
+    YTDLP_COOKIES_FILE: "C:\\tools\\cookies.txt"
   }, () => {
     const config = loadConfig();
-    assert.equal(config.lavalinkNodes.length, 2);
-    assert.equal(config.lavalinkNodes[1]?.id, "local-2");
-    assert.equal(config.lavalinkNodes[1]?.port, 2334);
+    assert.equal(config.ytDlpPath, "C:\\tools\\yt-dlp.exe");
+    assert.equal(config.ffmpegPath, "C:\\ffmpeg\\bin\\ffmpeg.exe");
+    assert.equal(config.ytDlpJsRuntime, "deno");
+    assert.equal(config.ytDlpCookiesFile, "C:\\tools\\cookies.txt");
   });
 });
 
