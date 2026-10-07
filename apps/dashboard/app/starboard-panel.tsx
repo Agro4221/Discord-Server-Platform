@@ -62,7 +62,7 @@ export function StarboardPanel({ guildId, channels, onChanged }: { guildId: stri
         </div>
       </section>
       <section style={panel}>
-        <div style={label}>CURRENT CONFIG</div>
+        <div style={label}>ТЕКУЩАЯ КОНФИГУРАЦИЯ</div>
         <div style={{ color: "#9ca6b4", fontSize: 10, marginTop: 7 }}>
           {config.channelId ? "Канал: #" + (channels.find((item) => item.id === config.channelId)?.name ?? config.channelId) : "Канал не настроен"} · порог {config.threshold}
         </div>
