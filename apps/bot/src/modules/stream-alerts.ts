@@ -22,7 +22,8 @@ function renderStreamAlertTemplate(template:string,values:Record<string,string|n
   }).replaceAll("\\n","\n");
 }
 function escapeDiscordText(value:string):string{
-  return value.replace(/[\\*_~|>]/g,"\\type ProcessResult={code:number|null;stdout:string;stderr:string};
+  return value.replace(/[\\*_~|>]/g,"\\$&").replaceAll(String.fromCharCode(96),"\\"+String.fromCharCode(96));
+}
 async function runProcess").replaceAll(String.fromCharCode(96),"\\\"+String.fromCharCode(96));
 }
 async function runProcess(command:string,args:string[],timeoutMs:number):Promise<ProcessResult>{
