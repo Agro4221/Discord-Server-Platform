@@ -1147,3 +1147,6 @@ Never write credentials, tokens or private user data here.
 - Results are split into separate Discord sections for tracks and playlists/albums/sets.
 - Each result is a clickable URL that can be passed directly to `!play`; playback continues through the local yt-dlp + FFmpeg engine.
 - Because yt-dlp does not provide native text-search for every requested platform, global search uses public web indexing for discovery while yt-dlp remains responsible for direct-source extraction/playback.
+## 2026-10-07 — Music controller TypeScript nullability fix
+- Fixed a strict TypeScript error in the controller channel fallback: `channels.fetch()` failures now resolve to `undefined` instead of `null`, matching the inferred channel variable type.
+- This is a compile-time safety fix only; controller runtime behavior is unchanged.
