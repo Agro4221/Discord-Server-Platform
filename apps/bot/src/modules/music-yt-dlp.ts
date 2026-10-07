@@ -260,15 +260,20 @@ export class YtDlpMusicEngine implements PlatformModule {
     if(detected==="spotify"){
       return await this.searchSpotify(q,limit);
     }
-    const target=buildMusicSearchTarget(provider,q,limit);
+    const sourceUrl=isHttpUrl(q)?normalizeMusicSourceUrl(q):q;
+    const target=buildMusicSearchTarget(provider,sourceUrl,limit);
     if(!target){
       throw new Error("music_provider_requires_url");
     }
-    const r=await runProcess(this.config.ytDlpPath,[...this.ytArgs(),"--dump-single-json","--flat-playlist","--skip-download",target],45000);
-    if(r.code!==0){logger.warn("yt-dlp search failed",{provider,query:q.slice(0,200),stderr:r.stderr.slice(-800)});throw new Error("music_search_failed");}
+    let r=await runProcess(this.config.ytDlpPath,[...this.ytArgs(),"--dump-single-json","--flat-playlist","--skip-download",target],45000);
+    if(r.code!==0&&isHttpUrl(target)){
+      logger.warn("yt-dlp flat metadata lookup failed; retrying full source extraction",{provider,query:sourceUrl.slice(0,200),stderr:r.stderr.slice(-800)});
+      r=await runProcess(this.config.ytDlpPath,[...this.ytArgs(),"--dump-single-json","--skip-download",target],60000);
+    }
+    if(r.code!==0){logger.warn("yt-dlp search failed",{provider,query:sourceUrl.slice(0,200),stderr:r.stderr.slice(-800)});throw new Error("music_search_failed");}
     let data:any;try{data=JSON.parse(r.stdout);}catch{throw new Error("music_search_failed");}
     const raw=Array.isArray(data.entries)?data.entries:[data];
-    return raw.map((e:any,n:number)=>normalizeYtDlpEntry(e,n,isHttpUrl(q)?q:undefined)).filter((x:any):x is MusicTrack=>Boolean(x)).slice(0,limit);
+    return raw.map((e:any,n:number)=>normalizeYtDlpEntry(e,n,isHttpUrl(sourceUrl)?sourceUrl:undefined)).filter((x:any):x is MusicTrack=>Boolean(x)).slice(0,limit);
   }
 
   private async searchSpotify(url:string,limit:number):Promise<MusicTrack[]>{
@@ -371,7 +376,7 @@ export function detectMusicSearchProvider(url:string):MusicSearchProvider|null{
     if(host==="spotify.com"||host.endsWith(".spotify.com"))return "spotify";
     if(host==="tiktok.com"||host.endsWith(".tiktok.com"))return "tiktok";
     if(host==="music.yandex.ru"||host==="music.yandex.com"||host.endsWith(".music.yandex.ru")||host.endsWith(".music.yandex.com"))return "yandex_music";
-    if(host==="vk.com"||host.endsWith(".vk.com")||host==="vkvideo.ru"||host.endsWith(".vkvideo.ru"))return "vk_music";
+    if(host==="vk.com"||host.endsWith(".vk.com")||host==="vk.ru"||host.endsWith(".vk.ru")||host==="vkvideo.ru"||host.endsWith(".vkvideo.ru"))return "vk_music";
     if(host==="soundcloud.com"||host.endsWith(".soundcloud.com"))return "soundcloud";
     if(host==="youtube.com"||host.endsWith(".youtube.com")||host==="youtu.be")return "youtube";
   }catch{}
@@ -387,6 +392,14 @@ export function normalizeYtDlpEntry(e:any,index=0,fallbackUrl?:string):MusicTrac
   return{id,title:String(e.title??`Track ${index+1}`),author:String(e.uploader??e.channel??e.artist??"Unknown artist"),durationMs:Math.max(0,Math.trunc(Number(e.duration??0)*1000)),url};
 }
 function isHttpUrl(value:string):boolean{return /^https?:\/\//i.test(value.trim());}
+export function normalizeMusicSourceUrl(value:string):string{
+  if(!isHttpUrl(value))return value.trim();
+  try{
+    const url=new URL(value.trim());
+    if(url.hostname.toLowerCase()==="vk.ru"||url.hostname.toLowerCase().endsWith(".vk.ru"))url.hostname="vk.com";
+    return url.toString();
+  }catch{return value.trim();}
+}
 export function normalizeMusicFilterPreset(v:string):MusicFilterPreset|null{const x=v.trim().toLowerCase();return["off","nightcore","vaporwave","karaoke","rotation","tremolo","vibrato","lowpass"].includes(x)?x as MusicFilterPreset:null;}
 export function buildFfmpegFilter(p:MusicFilterPreset):string|null{if(p==="nightcore")return"asetrate=48000*1.25,aresample=48000,atempo=0.8";if(p==="vaporwave")return"asetrate=48000*0.8,aresample=48000,atempo=1.25";if(p==="karaoke")return"stereotools=mlev=0";if(p==="rotation")return"apulsator=hz=0.08";if(p==="tremolo")return"tremolo=f=5:d=0.5";if(p==="vibrato")return"vibrato=f=5:d=0.5";if(p==="lowpass")return"lowpass=f=12000";return null;}
 export function buildFfmpegArgs(url:string,offsetMs=0,filter:MusicFilterPreset="off"):string[]{const a=["-hide_banner","-loglevel","warning","-nostdin","-reconnect","1","-reconnect_streamed","1","-reconnect_delay_max","5"];if(offsetMs>0)a.push("-ss",String(offsetMs/1000));a.push("-i",url,"-vn");const f=buildFfmpegFilter(filter);if(f)a.push("-af",f);a.push("-f","s16le","-ar","48000","-ac","2","pipe:1");return a;}
