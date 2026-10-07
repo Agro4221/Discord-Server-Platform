@@ -371,7 +371,7 @@ export class YtDlpMusicEngine implements PlatformModule {
   private async controller(s:Session):Promise<void>{
     if(!this.client||!s.textChannelId)return;
     let channel=this.client.channels.cache.get(s.textChannelId);
-    if(!channel)channel=await this.client.channels.fetch(s.textChannelId).catch(()=>undefined);
+    if(!channel)channel=(await this.client.channels.fetch(s.textChannelId).catch(()=>undefined))??undefined;
     if(!channel?.isTextBased()||!("send"in channel))return;
     const repeatText=s.repeatMode==="off"?"выкл.":s.repeatMode==="track"?"трек":"очередь";
     const embed=new EmbedBuilder().setTitle("🎵 Music").setDescription(s.current?`**${s.current.title}**\n${s.current.author}`:"Сейчас ничего не играет.").addFields({name:"Состояние",value:s.paused?"⏸ Пауза":"▶ Играет",inline:true},{name:"Повтор",value:repeatText,inline:true},{name:"Громкость",value:String(s.volume),inline:true}).setTimestamp();
