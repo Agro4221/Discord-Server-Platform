@@ -130,6 +130,7 @@ export class YtDlpMusicEngine implements PlatformModule {
         const provider=normalizeMusicSearchProvider(i.options.getString("provider")??"auto");if(!provider)throw new Error("invalid_music_provider");
         await this.assertOwnership(guild.id,memberVoice);
         const s=existing??await this.createSession(guild,memberVoice);
+        if(i.channelId)s.textChannelId=i.channelId;
         if(!s.textChannelId&&i.channelId)s.textChannelId=i.channelId;
         s.queue.push(...await this.search(query,provider,MAX_MUSIC_ENQUEUE_TRACKS));if(!s.current)await this.playNext(s);
         await this.persist(s);await this.controller(s,i.channelId??undefined);await i.reply({content:"🎵 Добавлено в очередь."});return;
@@ -170,7 +171,7 @@ export class YtDlpMusicEngine implements PlatformModule {
       if(commandName==="play"||commandName==="music"){
         if(!voice)throw new Error("voice_channel_required");const query=args.join(" ").trim();if(!query)throw new Error("music_query_required");
         await this.assertOwnership(message.guild.id,voice);const s=this.sessions.get(message.guild.id)??await this.createSession(message.guild,voice);
-        if(!s.textChannelId&&message.channel.isTextBased())s.textChannelId=message.channel.id;
+        if(message.channel.isTextBased())s.textChannelId=message.channel.id;
         s.queue.push(...await this.search(query,"auto",MAX_MUSIC_ENQUEUE_TRACKS));if(!s.current)await this.playNext(s);await this.persist(s);await this.controller(s,message.channel.isTextBased()?message.channel.id:undefined);await message.reply("🎵 Добавлено в очередь.");return true;
       }
       const s=this.sessions.get(message.guild.id);if(!s){await message.reply("Музыка не запущена.");return true;}
@@ -390,7 +391,7 @@ export class YtDlpMusicEngine implements PlatformModule {
 
   private async controller(s:Session,fallbackTextChannelId?:string):Promise<void>{
     if(!this.client)return;
-    const targetIds=[s.textChannelId,fallbackTextChannelId].filter((id,index,array):id is string=>Boolean(id)&&array.indexOf(id)===index);
+    const targetIds=[fallbackTextChannelId,s.textChannelId].filter((id,index,array):id is string=>Boolean(id)&&array.indexOf(id)===index);
     if(!targetIds.length)return;
     const repeatText=s.repeatMode==="off"?"выкл.":s.repeatMode==="track"?"трек":"очередь";
     const description=s.current?"**"+s.current.title+"**\n"+s.current.author:"Сейчас ничего не играет.";
