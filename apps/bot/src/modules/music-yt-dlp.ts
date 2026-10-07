@@ -132,7 +132,7 @@ export class YtDlpMusicEngine implements PlatformModule {
         const s=existing??await this.createSession(guild,memberVoice);
         if(!s.textChannelId&&i.channelId)s.textChannelId=i.channelId;
         s.queue.push(...await this.search(query,provider,MAX_MUSIC_ENQUEUE_TRACKS));if(!s.current)await this.playNext(s);
-        await this.persist(s);await this.controller(s);await i.reply({content:"🎵 Добавлено в очередь."});return;
+        await this.persist(s);await this.controller(s,i.channelId??undefined);await i.reply({content:"🎵 Добавлено в очередь."});return;
       }
 
       const s=this.sessions.get(guild.id);if(!s){await i.reply({content:"Музыка не запущена.",ephemeral:true});return;}
@@ -170,7 +170,7 @@ export class YtDlpMusicEngine implements PlatformModule {
         if(!voice)throw new Error("voice_channel_required");const query=args.join(" ").trim();if(!query)throw new Error("music_query_required");
         await this.assertOwnership(message.guild.id,voice);const s=this.sessions.get(message.guild.id)??await this.createSession(message.guild,voice);
         if(!s.textChannelId&&message.channel.isTextBased())s.textChannelId=message.channel.id;
-        s.queue.push(...await this.search(query,"auto",MAX_MUSIC_ENQUEUE_TRACKS));if(!s.current)await this.playNext(s);await this.persist(s);await this.controller(s);await message.reply("🎵 Добавлено в очередь.");return true;
+        s.queue.push(...await this.search(query,"auto",MAX_MUSIC_ENQUEUE_TRACKS));if(!s.current)await this.playNext(s);await this.persist(s);await this.controller(s,message.channel.isTextBased()?message.channel.id:undefined);await message.reply("🎵 Добавлено в очередь.");return true;
       }
       const s=this.sessions.get(message.guild.id);if(!s){await message.reply("Музыка не запущена.");return true;}
       const elevated=Boolean(member?.permissions.has("ManageGuild"))||await this.hasDj(message.guild.id,member);
