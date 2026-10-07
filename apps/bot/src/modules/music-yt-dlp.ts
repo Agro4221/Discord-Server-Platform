@@ -132,7 +132,7 @@ export class YtDlpMusicEngine implements PlatformModule {
         const s=existing??await this.createSession(guild,memberVoice);
         if(i.channelId)s.textChannelId=i.channelId;
         s.queue.push(...await this.search(query,provider,MAX_MUSIC_ENQUEUE_TRACKS));if(!s.current)await this.playNext(s);
-        await this.persist(s);await this.controller(s,i.channelId??undefined);await i.reply({content:"🎵 Добавлено в очередь."});return;
+        await this.persist(s);await i.reply({content:"🎵 Добавлено в очередь."});await this.controller(s,i.channelId??undefined);return;
       }
 
       const s=this.sessions.get(guild.id);if(!s){await i.reply({content:"Музыка не запущена.",ephemeral:true});return;}
@@ -171,7 +171,7 @@ export class YtDlpMusicEngine implements PlatformModule {
         if(!voice)throw new Error("voice_channel_required");const query=args.join(" ").trim();if(!query)throw new Error("music_query_required");
         await this.assertOwnership(message.guild.id,voice);const s=this.sessions.get(message.guild.id)??await this.createSession(message.guild,voice);
         if(message.channel.isTextBased())s.textChannelId=message.channel.id;
-        s.queue.push(...await this.search(query,"auto",MAX_MUSIC_ENQUEUE_TRACKS));if(!s.current)await this.playNext(s);await this.persist(s);await this.controller(s,message.channel.isTextBased()?message.channel.id:undefined);await message.reply("🎵 Добавлено в очередь.");return true;
+        s.queue.push(...await this.search(query,"auto",MAX_MUSIC_ENQUEUE_TRACKS));if(!s.current)await this.playNext(s);await this.persist(s);await message.reply("🎵 Добавлено в очередь.");await this.controller(s,message.channel.isTextBased()?message.channel.id:undefined);return true;
       }
       const s=this.sessions.get(message.guild.id);if(!s){await message.reply("Музыка не запущена.");return true;}
       const elevated=Boolean(member?.permissions.has("ManageGuild"))||await this.hasDj(message.guild.id,member);
@@ -252,7 +252,7 @@ export class YtDlpMusicEngine implements PlatformModule {
       s.resource=resource;s.positionMs=Math.max(0,offsetMs);s.positionChangedAt=Date.now();s.paused=paused;
       ffmpeg.stderr.on("data",chunk=>{const msg=String(chunk).trim();if(msg)logger.info("Music ffmpeg",{guildId:s.guildId,message:msg.slice(-400)});});
       ffmpeg.once("exit",(code,signal)=>{if(s.ffmpeg===ffmpeg)s.ffmpeg=null;if((code??0)!==0&&!s.intentionalStop)logger.warn("Music ffmpeg exited unexpectedly",{guildId:s.guildId,code,signal});});
-      s.player.play(resource);if(paused)s.player.pause();await this.persist(s);await this.controller(s);
+      s.player.play(resource);if(paused)s.player.pause();await this.persist(s);
       const st=await this.musicSettings(s.guildId);if(st.announceTrackStart&&s.textChannelId)await this.announce(s.textChannelId,`🎵 Сейчас играет: **${s.current.title}** — ${s.current.author}`);
     }finally{s.transitioning=false;}
   }
@@ -423,20 +423,14 @@ export class YtDlpMusicEngine implements PlatformModule {
     const description=s.current?"**"+s.current.title+"**\n"+s.current.author:"Сейчас ничего не играет.";
     const embed=new EmbedBuilder().setTitle("🎵 Music").setDescription(description).addFields({name:"Состояние",value:s.paused?"⏸ Пауза":"▶ Играет",inline:true},{name:"Повтор",value:repeatText,inline:true},{name:"Громкость",value:String(s.volume),inline:true}).setTimestamp();
     const components=buildController(s.paused,s.repeatMode);
-    const fallbackContent=s.current?"🎵 **"+s.current.title+"** — "+s.current.author+"\n"+(s.paused?"⏸ Пауза":"▶ Играет")+" · Повтор: "+repeatText+" · Громкость: "+s.volume:"🎵 Music · Сейчас ничего не играет."; 
+    const fallbackContent=s.current?"🎵 **"+s.current.title+"** — "+s.current.author+"\n"+(s.paused?"⏸ Пауза":"▶ Играет")+" · Повтор: "+repeatText+" · Громкость: "+s.volume:"🎵 Music · Сейчас ничего не играет.";
     for(const channelId of targetIds){
       let channel=this.client.channels.cache.get(channelId);
       if(!channel)channel=(await this.client.channels.fetch(channelId).catch(error=>{logger.warn("Music controller channel fetch failed",{guildId:s.guildId,textChannelId:channelId,error:String(error)});return undefined;}))??undefined;
       if(!channel?.isTextBased()||!("send"in channel))continue;
-      const existing=s.controllerMessageId?await channel.messages.fetch(s.controllerMessageId).catch(error=>{logger.warn("Music controller message fetch failed",{guildId:s.guildId,textChannelId:channelId,messageId:s.controllerMessageId,error:String(error)});return null;}):null;
-      if(existing){
-        try{
-          await existing.edit({embeds:[embed],components,content:null});
-          return;
-        }catch(error){
-          logger.warn("Music controller embed edit failed",{guildId:s.guildId,textChannelId:channelId,messageId:s.controllerMessageId,error:String(error)});
-          try{await existing.edit({content:fallbackContent,embeds:[],components});return;}catch(fallbackError){logger.warn("Music controller fallback edit failed",{guildId:s.guildId,textChannelId:channelId,messageId:s.controllerMessageId,error:String(fallbackError)});}
-        }
+      if(s.controllerMessageId){
+        const existing=await channel.messages.fetch(s.controllerMessageId).catch(error=>{logger.warn("Music controller message fetch failed",{guildId:s.guildId,textChannelId:channelId,messageId:s.controllerMessageId,error:String(error)});return null;});
+        if(existing)await existing.delete().catch(error=>logger.warn("Music controller old message delete failed",{guildId:s.guildId,textChannelId:channelId,messageId:s.controllerMessageId,error:String(error)}));
       }
       try{
         const sent=await channel.send({embeds:[embed],components});
@@ -450,9 +444,7 @@ export class YtDlpMusicEngine implements PlatformModule {
           s.controllerMessageId=sent.id;
           await this.db.query("UPDATE music_players SET controller_message_id=$1,updated_at=now() WHERE guild_id=$2 AND bot_identity_id=$3",[sent.id,s.guildId,this.config.botIdentityId]).catch(updateError=>logger.warn("Music controller state update failed",{guildId:s.guildId,error:String(updateError)}));
           return;
-        }catch(fallbackError){
-          logger.error("Music controller fallback send failed",{guildId:s.guildId,textChannelId:channelId,error:String(fallbackError)});
-        }
+        }catch(fallbackError){logger.error("Music controller fallback send failed",{guildId:s.guildId,textChannelId:channelId,error:String(fallbackError)});}
       }
     }
   }
