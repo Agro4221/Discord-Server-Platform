@@ -56,7 +56,7 @@ Core / infrastructure:
 - Backup / restore / import / export.
 
 Music / Fleet:
-- Lavalink;
+- yt-dlp + FFmpeg;
 - persistent queue/player recovery;
 - search до 100 треков;
 - repeat/autoplay/shuffle/seek/filters;
@@ -93,14 +93,14 @@ Pre-cleanup CI baseline: **#2398 — success** on `80ee35ae005d356142f47d08da6ab
 - event-index для Automation;
 - сниженная частота не критичных polling workers;
 - bounded AutoMod repeat history;
-- reduced Lavalink JVM defaults;
+- reduced native desktop runtime overhead by removing the JVM/Lavalink layer;
 - regression coverage для новых оптимизаций.
 
 ## Что осталось
 
 Release-gate:
 - live Discord E2E на реальном тестовом сервере;
-- Lavalink restart/resume + multi-node failover;
+- yt-dlp stream resolution + FFmpeg decode, with persisted player/queue resume;
 - multi-bot takeover на реальных identities;
 - native Windows runtime acceptance;
 - VPS clean-host acceptance;
@@ -109,7 +109,7 @@ Release-gate:
 Post-RC functional depth:
 - более глубокий AutoMod/Security;
 - более широкий Automation catalog;
-- Music provider/failover breadth;
+- Music provider breadth, YouTube edge cases and stream/recovery validation;
 - Fleet orchestration depth.
 
 ## Как продолжать
