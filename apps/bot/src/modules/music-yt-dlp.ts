@@ -342,7 +342,7 @@ export class YtDlpMusicEngine implements PlatformModule {
       try{
         const parsed=JSON.parse(r.stdout);
         const entries=Array.isArray(parsed.entries)?parsed.entries:[parsed];
-        return entries.map((entry:any,index:number)=>normalizeYtDlpEntry(entry,index)).filter((track:MusicTrack|null):track is MusicTrack=>Boolean(track)).slice(0,8).map(track=>({provider:item.provider,kind:"track" as const,title:track.title,url:track.url}));
+        return entries.map((entry:any,index:number)=>normalizeYtDlpEntry(entry,index)).filter((track:MusicTrack|null):track is MusicTrack=>Boolean(track)).slice(0,8).map((track:MusicTrack)=>({provider:item.provider,kind:"track" as const,title:track.title,url:track.url}));
       }catch{return[] as MusicSearchHit[];}
     });
     const webJobs=MUSIC_WEB_SEARCH_TARGETS.flatMap(target=>[
