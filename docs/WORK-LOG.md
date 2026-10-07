@@ -1161,3 +1161,7 @@ Never write credentials, tokens or private user data here.
 - The skipped cases are environment-dependent database/integration tests; no test failed.
 - Global Music search classification test passes alongside the existing Music, Temporary Voice, Security, Automation and platform test coverage.
 
+## 2026-10-07 — Music auto-leave timer fix
+- Found that `auto_leave_seconds` was implemented only after queue/track completion, so a newly created Music session with no track never started its idle-leave timer.
+- Found that `!stop` canceled the leave timer, allowing an empty Music session to remain connected indefinitely.
+- Fixed both paths: new Music sessions schedule auto-leave immediately, and `stop` now schedules the configured auto-leave instead of canceling it.
