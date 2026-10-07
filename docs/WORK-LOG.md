@@ -987,3 +987,19 @@ Never write credentials, tokens or private user data here.
 - Live testing showed module toggles and runtime shutdown both failed while GET endpoints remained reachable.
 - Root cause: `assertSameOrigin()` inferred HTTPS whenever `NODE_ENV=production`, but `next start` serves the native Control Center over local HTTP. Protected PUT/POST requests therefore returned `bad_origin`.
 - Origin validation now uses the actual request protocol/host, honoring `X-Forwarded-Proto` when present.
+
+
+## 2026-10-07 — Music/Temporary Voice rework started
+- Continuing from the current development state; no attempt is being made to backfill older unlogged work.
+- Required persistent logging: every substantial implementation, verification result, blocker and architecture decision from this task will be recorded in this file.
+- Requested Temporary Voice behavior:
+  - generated channel names must not add an internal `DSP` prefix;
+  - preserve the member-facing display name;
+  - use the maximum bitrate available to the guild, with the normal non-boosted ceiling of 96 kbps and no artificial boost.
+- Requested Music architecture change:
+  - remove the Lavalink runtime dependency;
+  - use local `yt-dlp` for YouTube discovery/stream resolution and `ffmpeg` for audio decoding;
+  - preserve the existing Discord/dashboard control surface where practical;
+  - keep queue, pause/resume, skip/stop, seek, volume, repeat, autoplay and recovery behavior covered by tests.
+- Initial repository inspection confirmed Temporary Voice already uses `guild.maximumBitrate`; current generated-name helper does not add DSP, but a defensive regression-safe prefix cleanup is still planned.
+- Initial repository inspection confirmed Music is currently implemented around `lavalink-client` and Lavalink node/session state, so the rework is architectural rather than a one-line provider swap.
