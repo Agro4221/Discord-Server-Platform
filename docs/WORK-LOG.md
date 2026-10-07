@@ -1188,3 +1188,9 @@ Never write credentials, tokens or private user data here.
 - Fixed the native YouTube/SoundCloud global-search result mapping by explicitly typing the final `track` parameter as `MusicTrack`.
 - This resolves the strict TypeScript `noImplicitAny` error without changing runtime search behavior.
 - Existing test suite remains green at 167 total, 158 passed, 0 failed, 9 skipped.
+
+## 2026-10-07 — Music controller ordering and playlist search hardening
+- Changed Music controller publishing so the controller is recreated as the newest Music message, keeping the player panel at the bottom of the channel instead of leaving `🎵 Добавлено в очередь.` after it.
+- `start()` no longer publishes the controller before the `!play`/`/play` confirmation; play handlers now send the confirmation first and then publish the controller.
+- Global playlist discovery now tries Google, Bing, DuckDuckGo Lite and DuckDuckGo HTML, while YouTube/SoundCloud keep their native yt-dlp search fallback.
+- Search-result URL decoding now handles common `uddg`, `q` and `url` redirect parameters.
