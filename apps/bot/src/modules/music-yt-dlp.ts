@@ -159,7 +159,8 @@ export class YtDlpMusicEngine implements PlatformModule {
       if(commandName==="play"||commandName==="music"){
         if(!voice)throw new Error("voice_channel_required");const query=args.join(" ").trim();if(!query)throw new Error("music_query_required");
         await this.assertOwnership(message.guild.id,voice);const s=this.sessions.get(message.guild.id)??await this.createSession(message.guild,voice);
-        s.queue.push(...await this.search(query,"auto",MAX_MUSIC_ENQUEUE_TRACKS));if(!s.current)await this.playNext(s);await this.persist(s);await message.reply("🎵 Добавлено в очередь.");return true;
+        if(!s.textChannelId&&message.channel.isTextBased())s.textChannelId=message.channel.id;
+        s.queue.push(...await this.search(query,"auto",MAX_MUSIC_ENQUEUE_TRACKS));if(!s.current)await this.playNext(s);await this.persist(s);await this.controller(s);await message.reply("🎵 Добавлено в очередь.");return true;
       }
       const s=this.sessions.get(message.guild.id);if(!s){await message.reply("Музыка не запущена.");return true;}
       const elevated=Boolean(member?.permissions.has("ManageGuild"))||await this.hasDj(message.guild.id,member);
@@ -175,7 +176,8 @@ export class YtDlpMusicEngine implements PlatformModule {
       else if(commandName==="seek"){const sec=Number(args[0]??"");if(!s.current||!Number.isInteger(sec)||sec<0)throw new Error("invalid_seek");await this.start(s,sec*1000,s.paused);}
       else if(commandName==="volume"){const v=Number(args[0]??"");if(!Number.isInteger(v)||v<0||v>200)throw new Error("invalid_volume");s.volume=v;s.resource?.volume?.setVolume(v/100);}
       else if(commandName==="autoplay"){const v=String(args[0]??"").toLowerCase();if(v!=="on"&&v!=="off")throw new Error("invalid_autoplay");s.autoplay=v==="on";await this.setAutoplay(s.guildId,s.autoplay);}
-      await this.persist(s);await this.controller(s);await message.reply("✅ Готово.");return true;
+      if(!s.textChannelId&&message.channel.isTextBased())s.textChannelId=message.channel.id;
+      await this.persist(s);await this.controller(s);return true;
     }catch(error){await message.reply(formatError(error)).catch(()=>undefined);return true;}
   }
 
