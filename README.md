@@ -27,7 +27,7 @@ Self-hosted Discord server platform for administration, moderation, community fe
 - Security / Anti-Raid and destructive-burst detection.
 - Notifications with HTTPS feed validation and SSRF protections.
 - Analytics with durable minute buckets and dashboard reporting.
-- Music with local yt-dlp + FFmpeg playback, persistent queue state and per-voice routing.
+- Music with local yt-dlp + FFmpeg playback, persistent queue state, per-voice routing and multi-source URL support across YouTube, TikTok, Yandex Music, VK, SoundCloud and Spotify-track bridging.
 - Multi-bot identity persistence, per-voice Music routing and optional atomic guild failover.
 - Custom Commands with prefix/slash configuration, aliases, role actions and Dashboard CRUD.
 - Community Tools with polls, suggestions, sticky messages and fun commands.
@@ -43,7 +43,7 @@ Self-hosted Discord server platform for administration, moderation, community fe
 | AutoMod | ✅ | Rule builder and persisted rule execution implemented; live Discord validation remains |
 | Security | ✅ | Persistent incident lifecycle, quarantine recovery and manual clear implemented; live validation remains |
 | Automation | ✅ | Expanded event catalog and bounded execution guard implemented; live validation remains |
-| Music | ✅ | yt-dlp + FFmpeg engine implemented; live YouTube/Windows playback validation remains |
+| Music | ✅ | yt-dlp + FFmpeg multi-source engine implemented; live provider/Windows playback validation remains |
 | Multi-bot fleet | 🟡 | Live Windows/Docker acceptance; launcher orchestration and DB-backed credentials implemented |
 | E2E / chaos / soak | 🟡 | Full live and long-running validation |
 | VPS deployment | 🟡 | Clean-host installer/reverse-proxy acceptance drill |
