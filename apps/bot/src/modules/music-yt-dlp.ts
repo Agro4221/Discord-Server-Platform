@@ -128,8 +128,9 @@ export class YtDlpMusicEngine implements PlatformModule {
         const provider=normalizeMusicSearchProvider(i.options.getString("provider")??"auto");if(!provider)throw new Error("invalid_music_provider");
         await this.assertOwnership(guild.id,memberVoice);
         const s=existing??await this.createSession(guild,memberVoice);
+        if(!s.textChannelId&&i.channelId)s.textChannelId=i.channelId;
         s.queue.push(...await this.search(query,provider,MAX_MUSIC_ENQUEUE_TRACKS));if(!s.current)await this.playNext(s);
-        await this.persist(s);await i.reply({content:"🎵 Добавлено в очередь."});return;
+        await this.persist(s);await this.controller(s);await i.reply({content:"🎵 Добавлено в очередь."});return;
       }
 
       const s=this.sessions.get(guild.id);if(!s){await i.reply({content:"Музыка не запущена.",ephemeral:true});return;}
@@ -334,13 +335,26 @@ export class YtDlpMusicEngine implements PlatformModule {
   }
 
   private async controller(s:Session):Promise<void>{
-    if(!this.client||!s.textChannelId)return;const channel=this.client.channels.cache.get(s.textChannelId);if(!channel?.isTextBased()||!("send"in channel))return;
-    const repeatText=s.repeatMode==="off"?"выкл.":s.repeatMode==="track"?"трек":"очередь"; const embed=new EmbedBuilder().setTitle("🎵 Music").setDescription(s.current?`**${s.current.title}**\n${s.current.author}`:"Сейчас ничего не играет.").addFields({name:"Состояние",value:s.paused?"⏸ Пауза":"▶ Играет",inline:true},{name:"Повтор",value:repeatText,inline:true},{name:"Громкость",value:String(s.volume),inline:true}).setTimestamp();
-    const components=buildController(s.paused,s.repeatMode), existing=s.controllerMessageId?await channel.messages.fetch(s.controllerMessageId).catch(()=>null):null;
-    if(existing){await existing.edit({embeds:[embed],components}).catch(()=>undefined);return;}
-    const sent=await channel.send({embeds:[embed],components}).catch(()=>null);if(sent){s.controllerMessageId=sent.id;await this.db.query("UPDATE music_players SET controller_message_id=$1,updated_at=now() WHERE guild_id=$2 AND bot_identity_id=$3",[sent.id,s.guildId,this.config.botIdentityId]).catch(()=>undefined);}
+    if(!this.client||!s.textChannelId)return;
+    let channel=this.client.channels.cache.get(s.textChannelId);
+    if(!channel)channel=await this.client.channels.fetch(s.textChannelId).catch(()=>null);
+    if(!channel?.isTextBased()||!("send"in channel))return;
+    const repeatText=s.repeatMode==="off"?"выкл.":s.repeatMode==="track"?"трек":"очередь";
+    const embed=new EmbedBuilder().setTitle("🎵 Music").setDescription(s.current?`**${s.current.title}**\n${s.current.author}`:"Сейчас ничего не играет.").addFields({name:"Состояние",value:s.paused?"⏸ Пауза":"▶ Играет",inline:true},{name:"Повтор",value:repeatText,inline:true},{name:"Громкость",value:String(s.volume),inline:true}).setTimestamp();
+    const components=buildController(s.paused,s.repeatMode);
+    const existing=s.controllerMessageId?await channel.messages.fetch(s.controllerMessageId).catch(error=>{logger.warn("Music controller message fetch failed",{guildId:s.guildId,textChannelId:s.textChannelId,messageId:s.controllerMessageId,error:String(error)});return null;}):null;
+    if(existing){
+      await existing.edit({embeds:[embed],components}).catch(error=>logger.warn("Music controller edit failed",{guildId:s.guildId,textChannelId:s.textChannelId,messageId:s.controllerMessageId,error:String(error)}));
+      return;
+    }
+    try{
+      const sent=await channel.send({embeds:[embed],components});
+      s.controllerMessageId=sent.id;
+      await this.db.query("UPDATE music_players SET controller_message_id=$1,updated_at=now() WHERE guild_id=$2 AND bot_identity_id=$3",[sent.id,s.guildId,this.config.botIdentityId]).catch(error=>logger.warn("Music controller state update failed",{guildId:s.guildId,error:String(error)}));
+    }catch(error){
+      logger.error("Music controller send failed",{guildId:s.guildId,textChannelId:s.textChannelId,error:String(error)});
+    }
   }
-
   private async announce(channelId:string,text:string){const c=this.client?.channels.cache.get(channelId);if(c?.isTextBased()&&"send"in c)await c.send(text).catch(()=>undefined);}
   private async musicSettings(guildId:string){const r=await this.db.query<any>("SELECT preferred_text_channel_id,default_volume,announce_track_start,autoplay,auto_leave_seconds FROM music_settings WHERE guild_id=$1",[guildId]);const row=r.rows[0];return{preferredTextChannelId:row?.preferred_text_channel_id??null,defaultVolume:Math.min(200,Math.max(0,Number(row?.default_volume??100))),announceTrackStart:row?.announce_track_start??true,autoplay:row?.autoplay??false,autoLeaveSeconds:Math.min(86400,Math.max(0,Number(row?.auto_leave_seconds??30)))};}
   private async getAutoplay(guildId:string){return(await this.musicSettings(guildId)).autoplay;}
