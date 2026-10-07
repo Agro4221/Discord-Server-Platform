@@ -69,13 +69,18 @@ type ApiOptions = {
     create: (guildId: string, input: {
       platform: StreamAlertPlatform;
       target: string;
+      displayName: string;
+      template: string;
       channelId: string;
       mentionRoleId?: string | null;
       intervalSeconds: number;
       enabled?: boolean;
     }) => Promise<unknown>;
     update: (guildId: string, alertId: number, input: {
+      platform?: StreamAlertPlatform;
       target?: string;
+      displayName?: string;
+      template?: string;
       channelId?: string;
       mentionRoleId?: string | null;
       intervalSeconds?: number;
@@ -854,6 +859,9 @@ export class ManagementApiServer {
             }
 
             const input: { channelId?: string; url?: string; intervalSeconds?: number; enabled?: boolean } = {};
+            if (input.displayName !== undefined && (!input.displayName || input.displayName.length > 200)) throw new RequestInputError("invalid_stream_alert", 400);
+            if (input.template !== undefined && input.template.length > 1000) throw new RequestInputError("invalid_stream_alert", 400);
+            if (input.target !== undefined && (!input.target || input.target.length > 200)) throw new RequestInputError("invalid_stream_alert", 400);
             if (typeof body.channelId === "string") input.channelId = body.channelId;
             if (typeof body.url === "string") input.url = body.url;
             if (typeof body.intervalSeconds === "number") input.intervalSeconds = body.intervalSeconds;
@@ -921,10 +929,12 @@ export class ManagementApiServer {
             const body = await readJson(req);
             const platform = typeof body.platform === "string" ? body.platform : "";
             const target = typeof body.target === "string" ? body.target.trim() : "";
+            const displayName = typeof body.displayName === "string" ? body.displayName.trim() : target;
+            const template = typeof body.template === "string" ? body.template : "Хей! {channel} запустил стрим на канале. Присоединяйся!\\n{url}";
             const channelId = typeof body.channelId === "string" ? body.channelId : "";
             const mentionRoleId = body.mentionRoleId == null ? null : typeof body.mentionRoleId === "string" ? body.mentionRoleId : "";
-            const intervalSeconds = Number(body.intervalSeconds);
-            if (!["twitch","youtube","vk"].includes(platform) || !target || target.length > 200 || !/^\d{17,20}$/.test(channelId) || (mentionRoleId && !/^\d{17,20}$/.test(mentionRoleId)) || !Number.isFinite(intervalSeconds)) {
+            const intervalSeconds = body.intervalSeconds == null ? 30 : Number(body.intervalSeconds);
+            if (!["twitch","youtube","vk"].includes(platform) || !target || target.length > 200 || !displayName || displayName.length > 200 || template.length > 1000 || !/^\d{17,20}$/.test(channelId) || (mentionRoleId && !/^\d{17,20}$/.test(mentionRoleId)) || !Number.isFinite(intervalSeconds)) {
               throw new RequestInputError("invalid_stream_alert", 400);
             }
             const guild = this.options.client.guilds.cache.get(guildId);
@@ -932,7 +942,7 @@ export class ManagementApiServer {
             if (!channel || channel.type !== 0) throw new RequestInputError("text_channel_required", 400);
             if (mentionRoleId && !guild?.roles.cache.has(mentionRoleId)) throw new RequestInputError("role_not_found", 400);
             const created = await this.options.streamAlerts!.create(guildId, {
-              platform: platform as StreamAlertPlatform, target, channelId, mentionRoleId,
+              platform: platform as StreamAlertPlatform, target, displayName, template, channelId, mentionRoleId,
               intervalSeconds: Math.trunc(intervalSeconds), enabled: body.enabled !== false
             });
             await this.options.auditLog.record({ guildId, source: "dashboard", action: "stream-alert.created", targetType: "stream-alert", targetId: String((created as { id?: number }).id ?? "unknown") });
@@ -964,8 +974,14 @@ export class ManagementApiServer {
               return;
             }
             const body = await readJson(req);
-            const input: { target?: string; channelId?: string; mentionRoleId?: string | null; intervalSeconds?: number; enabled?: boolean } = {};
+            const input: { platform?: StreamAlertPlatform; target?: string; displayName?: string; template?: string; channelId?: string; mentionRoleId?: string | null; intervalSeconds?: number; enabled?: boolean } = {};
+            if (typeof body.platform === "string") {
+              if (!["twitch","youtube","vk"].includes(body.platform)) throw new RequestInputError("invalid_stream_alert", 400);
+              input.platform = body.platform as StreamAlertPlatform;
+            }
             if (typeof body.target === "string") input.target = body.target.trim();
+            if (typeof body.displayName === "string") input.displayName = body.displayName.trim();
+            if (typeof body.template === "string") input.template = body.template;
             if (typeof body.channelId === "string") input.channelId = body.channelId;
             if (body.mentionRoleId === null) input.mentionRoleId = null;
             else if (typeof body.mentionRoleId === "string") input.mentionRoleId = body.mentionRoleId;
