@@ -64,7 +64,7 @@ export class StreamAlerts implements PlatformModule {
   }
 
   providers():{twitch:boolean;youtube:boolean;vk:boolean}{
-    return {twitch:Boolean(this.config.twitchClientId&&this.config.twitchClientSecret),youtube:Boolean(this.config.ytDlpPath),vk:true};
+    return {twitch:Boolean(this.config.ytDlpPath),youtube:Boolean(this.config.ytDlpPath),vk:true};
   }
 
   async list(guildId:string):Promise<StreamAlertRecord[]>{
@@ -163,13 +163,6 @@ export class StreamAlerts implements PlatformModule {
 
   private async pollOne(alert:{id:string;guild_id:string;platform:StreamAlertPlatform;target:string;target_id:string|null;display_name:string;template:string;channel_id:string;mention_role_id:string|null;last_stream_key:string|null;last_online:boolean}):Promise<void>{
     if(!await moduleEnabled(this.db,alert.guild_id,this.name,false))return;
-    if(alert.platform==="twitch"&&(!this.config.twitchClientId||!this.config.twitchClientSecret)){
-      await this.db.query(
-        "UPDATE stream_alerts SET last_error=$1,updated_at=now() WHERE id=$2 AND guild_id=$3",
-        ["twitch_provider_not_configured",alert.id,alert.guild_id]
-      );
-      return;
-    }
     try{
       const live=await this.fetchLive(alert.platform,alert.target,alert.targetId);
       if(live&&(!alert.last_online||live.key!==alert.last_stream_key)){
@@ -192,18 +185,7 @@ export class StreamAlerts implements PlatformModule {
 
   private async fetchLive(platform:StreamAlertPlatform,target:string,targetId:string|null):Promise<LiveInfo|null>{
     if(platform==="twitch"){
-      if(!this.config.twitchClientId||!this.config.twitchClientSecret)throw new Error("twitch_credentials_missing");
-      const userId=targetId??await this.resolveTwitchUserId(target);
-      if(!userId)throw new Error("twitch_channel_not_found");
-      const token=await this.getTwitchToken();
-      const r=await fetch("https://api.twitch.tv/helix/streams?user_id="+encodeURIComponent(userId),{
-        headers:{"Client-Id":this.config.twitchClientId,"Authorization":"Bearer "+token},
-        signal:AbortSignal.timeout(10000)
-      });
-      if(!r.ok)throw new Error("twitch_stream_http_"+r.status);
-      const body=await r.json() as {data?:Array<{id?:string;title?:string;user_name?:string;thumbnail_url?:string}>};
-      const stream=body.data?.[0];
-      return stream?.id?{key:"twitch:"+stream.id,title:stream.title??"Twitch Live",url:"https://twitch.tv/"+target,author:stream.user_name??target,thumbnail:stream.thumbnail_url}:null;
+      return await this.fetchTwitchLiveViaYtDlp(target);
     }
 
     if(platform==="youtube"){
@@ -223,6 +205,39 @@ export class StreamAlerts implements PlatformModule {
     if(!r.ok)throw new Error("twitch_user_http_"+r.status);
     const body=await r.json() as {data?:Array<{id?:string}>};
     return body.data?.[0]?.id??null;
+  }
+
+  private async fetchTwitchLiveViaYtDlp(target:string):Promise<LiveInfo|null>{
+    const login=target.trim().replace(/^@/,"").replace(/^https?:\\/\\/(?:www\\.)?twitch\\.tv\\//i,"").split(/[?#/]/,1)[0]??"";
+    if(!login)throw new Error("twitch_channel_required");
+    const liveUrl="https://www.twitch.tv/"+encodeURIComponent(login);
+    const result=await runProcess(this.config.ytDlpPath,[
+      liveUrl,
+      "--dump-single-json",
+      "--skip-download",
+      "--no-warnings"
+    ],30000);
+
+    if(result.code!==0){
+      if(/not live|offline|no live|does not appear to be live|is not currently live/i.test(result.stderr))return null;
+      throw new Error("twitch_ytdlp_failed:"+result.stderr.slice(0,400));
+    }
+
+    let data:any;
+    try{data=JSON.parse(result.stdout);}
+    catch{throw new Error("twitch_ytdlp_invalid_json");}
+
+    const liveStatus=String(data.live_status??"").toLowerCase();
+    const isLive=data.is_live===true||liveStatus==="is_live"||liveStatus==="live";
+    if(!isLive||!data.id)return null;
+
+    return {
+      key:"twitch:"+data.id,
+      title:data.title??"Twitch Live",
+      url:data.webpage_url??liveUrl,
+      author:String(data.channel??data.uploader??data.uploader_id??login),
+      thumbnail:data.thumbnail,
+    };
   }
 
   private async fetchYouTubeLiveViaYtDlp(target:string,targetId:string|null):Promise<LiveInfo|null>{
