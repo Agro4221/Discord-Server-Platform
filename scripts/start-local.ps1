@@ -262,9 +262,8 @@ if ($Rebuild) {
 }
 
 # Normal starts intentionally avoid an image rebuild so a gaming session does not
-# trigger a Next.js/Node/Java build unless the user explicitly asks for it.
+# trigger a Next.js/Node build unless the user explicitly asks for it.
   & docker compose up -d
-}
 $composeExitCode = $LASTEXITCODE
 if ($composeExitCode -ne 0) {
   Write-Host ""
