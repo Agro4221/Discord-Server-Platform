@@ -183,10 +183,6 @@ export function MusicPanel({
           <select value={provider} onChange={(event) => setProvider(event.target.value as MusicProvider)} style={inputStyle}>
             <option value="auto">Auto</option>
             <option value="youtube">YouTube</option>
-            <option value="youtube_music">YouTube Music</option>
-            <option value="soundcloud">SoundCloud</option>
-            <option value="spotify">Spotify</option>
-            <option value="yandex_music">Яндекс Музыка</option>
           </select>
           <select value={voiceChannelId} onChange={(event) => setVoiceChannelId(event.target.value)} style={inputStyle}>
             <option value="">Voice-канал…</option>
