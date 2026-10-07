@@ -939,6 +939,22 @@ export class ManagementApiServer {
             return;
           }
 
+          if (method === "POST" && streamAlertItemMatch) {
+            const guildId = streamAlertItemMatch[1] ?? "";
+            const alertId = Number(streamAlertItemMatch[2]);
+            if (!guildId || !Number.isSafeInteger(alertId) || !this.options.client.guilds.cache.has(guildId)) {
+              this.json(res, 404, { error: "guild_or_stream_alert_not_found" });
+              return;
+            }
+            const checked = await this.options.streamAlerts!.checkNow(guildId, alertId);
+            if (!checked) {
+              this.json(res, 404, { error: "stream_alert_not_found" });
+              return;
+            }
+            this.json(res, 200, { ok: true, alert: checked });
+            return;
+          }
+
           if (method === "PUT" && streamAlertItemMatch) {
             const guildId = streamAlertItemMatch[1] ?? "";
             const alertId = Number(streamAlertItemMatch[2]);
