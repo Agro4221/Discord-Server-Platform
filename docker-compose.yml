@@ -15,50 +15,6 @@ services:
       retries: 20
     networks: [dsp]
 
-  lavalink:
-    image: ghcr.io/lavalink-devs/lavalink:4.2.2
-    restart: unless-stopped
-    environment:
-      _JAVA_OPTIONS: "-Xms${LAVALINK_JAVA_XMS:-128m} -Xmx${LAVALINK_JAVA_XMX:-512m}"
-      LAVALINK_SERVER_PASSWORD: ${LAVALINK_PASSWORD:-change-me-local}
-      LAVASRC_SPOTIFY_ENABLED: ${LAVASRC_SPOTIFY_ENABLED:-false}
-      LAVASRC_YANDEX_MUSIC_ENABLED: ${LAVASRC_YANDEX_MUSIC_ENABLED:-false}
-      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
-      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
-      YANDEX_MUSIC_ACCESS_TOKEN: ${YANDEX_MUSIC_ACCESS_TOKEN:-}
-    volumes:
-      - ./infrastructure/lavalink/application.yml:/opt/Lavalink/application.yml:ro
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS -H \"Authorization: $(printenv LAVALINK_SERVER_PASSWORD)\" http://127.0.0.1:2333/version >/dev/null"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
-      start_period: 20s
-    networks: [dsp]
-
-  lavalink2:
-    image: ghcr.io/lavalink-devs/lavalink:4.2.2
-    profiles: ["failover"]
-    restart: unless-stopped
-    environment:
-      _JAVA_OPTIONS: "-Xms${LAVALINK_JAVA_XMS:-128m} -Xmx${LAVALINK_JAVA_XMX:-512m}"
-      LAVALINK_SERVER_PASSWORD: ${LAVALINK_PASSWORD:-change-me-local}
-      LAVASRC_SPOTIFY_ENABLED: ${LAVASRC_SPOTIFY_ENABLED:-false}
-      LAVASRC_YANDEX_MUSIC_ENABLED: ${LAVASRC_YANDEX_MUSIC_ENABLED:-false}
-      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
-      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
-      YANDEX_MUSIC_ACCESS_TOKEN: ${YANDEX_MUSIC_ACCESS_TOKEN:-}
-      SERVER_PORT: 2334
-    volumes:
-      - ./infrastructure/lavalink/application.yml:/opt/Lavalink/application.yml:ro
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS -H \"Authorization: $(printenv LAVALINK_SERVER_PASSWORD)\" http://127.0.0.1:2334/version >/dev/null"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
-      start_period: 20s
-    networks: [dsp]
-
   bot:
     build:
       context: .
@@ -68,12 +24,8 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change-me-postgres}@postgres:5432/discord_platform
-      LAVALINK_HOST: lavalink
-      LAVALINK_PORT: 2333
-      LAVALINK_NODES: ${LAVALINK_NODES:-}
       HEALTH_HOST: 0.0.0.0
       MANAGEMENT_API_HOST: 0.0.0.0
-      DSP_CONTAINERIZED: "true"
       MANAGEMENT_API_KEY: ${MANAGEMENT_API_KEY}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3001/health >/dev/null"]
@@ -82,8 +34,6 @@ services:
       retries: 20
     depends_on:
       postgres:
-        condition: service_healthy
-      lavalink:
         condition: service_healthy
     ports:
       - "127.0.0.1:${HEALTH_PORT:-3001}:3001"
