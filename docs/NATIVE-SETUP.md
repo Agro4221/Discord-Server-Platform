@@ -25,7 +25,7 @@ After a successful native startup, the launcher batch terminates its console win
 The legacy `-Dashboard` switch remains accepted for compatibility; Dashboard is enabled by default.
 Registered secondary Bot Identities are supervised natively by the launcher without Docker. Each secondary process uses its own `BOT_IDENTITY_ID`, reads its encrypted Discord token from PostgreSQL and writes its PID/logs under `.native-runtime/`.
 
-For a single-PC gaming setup, yt-dlp + FFmpeg is the normal music path. There is no separate Lavalink service to keep running.
+For a single-PC gaming setup, yt-dlp + FFmpeg is the normal music path. Direct URLs can come from YouTube, TikTok, Yandex Music, VK, SoundCloud and other yt-dlp-supported extractors. Spotify track links are accepted through metadata bridging to an available playable source. There is no separate Lavalink service to keep running.
 
 ## Native first-run bootstrap
 
