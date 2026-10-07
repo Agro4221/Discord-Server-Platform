@@ -73,9 +73,9 @@ Run the non-destructive native preflight after startup:
 
     powershell -ExecutionPolicy Bypass -File .\scripts\release-gate-native.ps1
 
-Add `-Dashboard` when the Control Center is expected to be running. Add `-RequireLavalink2` only for a two-node acceptance run.
+Add `-Dashboard` when the Control Center is expected to be running.
 
-The native gate checks the primary Bot process, Bot health/readiness, Management API authentication, enabled Fleet identities, native secondary-process PID state, Dashboard reachability when requested and the configured Lavalink nodes.
+The native gate checks the primary Bot process, Bot health/readiness, Management API authentication, enabled Fleet identities, native secondary-process PID state, Dashboard reachability when requested, and the required yt-dlp/FFmpeg tooling.
 
 ## Docker mode
 
