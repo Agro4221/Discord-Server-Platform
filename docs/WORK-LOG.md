@@ -1165,3 +1165,9 @@ Never write credentials, tokens or private user data here.
 - Found that `auto_leave_seconds` was implemented only after queue/track completion, so a newly created Music session with no track never started its idle-leave timer.
 - Found that `!stop` canceled the leave timer, allowing an empty Music session to remain connected indefinitely.
 - Fixed both paths: new Music sessions schedule auto-leave immediately, and `stop` now schedules the configured auto-leave instead of canceling it.
+
+## 2026-10-07 — Music controller delivery fallback
+- Strengthened controller publishing after observing successful `!play` replies without a visible Music panel.
+- Controller now retries with a plain Discord message plus buttons when the embed send/edit fails, which covers missing Embed Links permissions and similar embed-only failures.
+- `!play` and `/play` now pass their command text-channel as a fallback target when the configured preferred Music channel cannot be used.
+- Controller channel fetch/send/edit failures remain logged instead of being silently swallowed.
