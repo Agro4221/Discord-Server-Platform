@@ -80,6 +80,8 @@ export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = [
   { name: "seek", label: "Seek", module: "music", prefix: true, slash: true },
   { name: "volume", label: "Volume", module: "music", prefix: true, slash: true },
   { name: "autoplay", label: "Autoplay", module: "music", prefix: true, slash: true },
+  { name: "search", label: "Music global search", module: "music", prefix: true, slash: false },
+  { name: "srch", label: "Music global search alias", module: "music", prefix: true, slash: false },
   { name: "balance", label: "Balance", module: "economy", prefix: true, slash: false },
   { name: "daily", label: "Daily", module: "economy", prefix: true, slash: false },
   { name: "leaderboard", label: "Economy leaderboard", module: "economy", prefix: true, slash: false },
