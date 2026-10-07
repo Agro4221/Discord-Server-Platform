@@ -2,7 +2,6 @@
 param(
   [switch]$Dashboard,
   [switch]$NoDashboard,
-  [switch]$Lavalink2,
   [switch]$Rebuild,
   [switch]$NoOpen,
   [switch]$Down
@@ -327,54 +326,33 @@ function Ensure-Postgres {
   Write-Host "PostgreSQL: ready"
 }
 
-function Ensure-LavalinkJar {
-  $configured = Get-EnvValue "LAVALINK_JAR_PATH"
-  if ([string]::IsNullOrWhiteSpace($configured)) {
-    $configured = ".\infrastructure\lavalink\lavalink.jar"
-    Set-EnvValue "LAVALINK_JAR_PATH" $configured
+function Ensure-MusicTools {
+  $ytDlp = Get-Command "yt-dlp.exe" -ErrorAction SilentlyContinue
+  $ffmpeg = Get-Command "ffmpeg.exe" -ErrorAction SilentlyContinue
+  $winget = Get-Command "winget.exe" -ErrorAction SilentlyContinue
+
+  if (-not $ytDlp -and $winget) {
+    Write-Host "yt-dlp is missing. Installing the current WinGet package..."
+    & $winget install --source winget --id yt-dlp.yt-dlp --exact --silent --accept-package-agreements --accept-source-agreements
+    if ($LASTEXITCODE -ne 0) { throw "Automatic yt-dlp installation failed." }
+    $ytDlp = Get-Command "yt-dlp.exe" -ErrorAction SilentlyContinue
   }
 
-  $resolved = if ([System.IO.Path]::IsPathRooted($configured)) { $configured } else { Join-Path (Get-Location) $configured }
-  if (-not (Test-Path $resolved -PathType Leaf)) {
-    Write-Host "Lavalink JAR is missing. Downloading Lavalink 4.2.2..."
-    $downloadRoot = Join-Path $runtimeRoot "downloads"
-    New-Item -ItemType Directory -Force -Path $downloadRoot | Out-Null
-    $downloaded = Join-Path $downloadRoot "Lavalink-4.2.2.jar"
-    if (-not (Test-Path $downloaded)) {
-      Invoke-WebRequest -Uri "https://github.com/lavalink-devs/Lavalink/releases/download/4.2.2/Lavalink.jar" -OutFile $downloaded -UseBasicParsing
-    }
-    $target = Join-Path (Get-Location) "infrastructure\lavalink\lavalink.jar"
-    Copy-Item $downloaded $target -Force
-    $resolved = $target
+  if (-not $ffmpeg -and $winget) {
+    Write-Host "FFmpeg is missing. Installing the current WinGet package..."
+    & $winget install --source winget --id Gyan.FFmpeg --exact --silent --accept-package-agreements --accept-source-agreements
+    if ($LASTEXITCODE -ne 0) { throw "Automatic FFmpeg installation failed." }
+    $ffmpeg = Get-Command "ffmpeg.exe" -ErrorAction SilentlyContinue
   }
-  return (Resolve-Path $resolved).Path
+
+  if (-not $ytDlp -or -not $ffmpeg) {
+    throw "Music requires yt-dlp and ffmpeg in PATH. Install them and start the launcher again."
+  }
+
+  Write-Host "yt-dlp: $((& $ytDlp.Source --version).Trim())"
+  Write-Host "FFmpeg: $((& $ffmpeg.Source -version | Select-Object -First 1).Trim())"
 }
 
-function Find-Java {
-  $java = Get-Command "java.exe" -ErrorAction SilentlyContinue
-  if ($java) { return $java.Source }
-  $candidates = @(Get-ChildItem "C:\Program Files\Eclipse Adoptium\jdk-21*" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-    Join-Path $_ "bin\java.exe"
-  })
-  foreach ($candidate in $candidates) {
-    if (Test-Path $candidate) { return (Resolve-Path $candidate).Path }
-  }
-  return $null
-}
-
-function Ensure-Java {
-  $javaPath = Find-Java
-  if (-not $javaPath) {
-    $winget = Get-Command "winget.exe" -ErrorAction SilentlyContinue
-    if (-not $winget) { throw "Java 17+ is required for native mode and winget was not found for automatic installation." }
-    Write-Host "Java 21 is missing. Installing Eclipse Temurin 21..."
-    & $winget install --id EclipseAdoptium.Temurin.21.JDK --exact --silent --accept-package-agreements --accept-source-agreements
-    if ($LASTEXITCODE -ne 0) { throw "Automatic Java 21 installation failed." }
-    $javaPath = Find-Java
-  }
-  if (-not $javaPath) { throw "Java 21 was installed but java.exe could not be located. Open a new terminal and retry." }
-  return $javaPath
-}
 
 function Ensure-Secret([string]$Name, [int]$Length) {
   $value = Get-EnvValue $Name
@@ -394,8 +372,6 @@ try {
     Stop-NativeProcess "dashboard"
     Stop-NativeProcess "fleet"
     Stop-NativeProcess "bot"
-    Stop-NativeProcess "lavalink2"
-    Stop-NativeProcess "lavalink"
     & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ".\scripts\reconcile-fleet-native.ps1" -Down
     if ($LASTEXITCODE -ne 0) { throw "Native Bot Fleet cleanup failed with exit code $LASTEXITCODE." }
     Write-Host "Native Discord Server Platform processes stopped."
@@ -423,13 +399,12 @@ try {
 
   Ensure-Secret "MANAGEMENT_API_KEY" 48
   Ensure-Secret "BOT_CREDENTIALS_ENCRYPTION_KEY" 64
-  Ensure-Secret "LAVALINK_PASSWORD" 24
 
   Import-EnvFile
   Ensure-Node
   Ensure-NpmDependencies
 
-  # Build before starting Lavalink/bot so the first-run compiler spike does not
+  # Build before starting the bot so the first-run compiler spike does not
   # happen at the same time as the runtime services. Rebuild automatically when
   # source files are newer than the compiled marker, so a fresh ZIP/update does
   # not accidentally run stale JavaScript.
@@ -465,63 +440,13 @@ try {
 
   Ensure-Postgres
 
-  $java = Ensure-Java
-  $lavalinkJar = Ensure-LavalinkJar
+  Ensure-MusicTools
 
-  $env:DSP_CONTAINERIZED = "false"
   $env:HEALTH_HOST = "127.0.0.1"
   $env:MANAGEMENT_API_HOST = "127.0.0.1"
-  $env:LAVALINK_HOST = "127.0.0.1"
-  $env:LAVALINK_PORT = "2333"
-
-  $password = Get-EnvValue "LAVALINK_PASSWORD"
-  if ([string]::IsNullOrWhiteSpace($password)) { throw "LAVALINK_PASSWORD is required." }
-
-  $nodes = @(
-    @{
-      id = "local"
-      host = "127.0.0.1"
-      port = 2333
-      password = $password
-    }
-  )
-
-  $javaXms = Get-EnvValue "LAVALINK_JAVA_XMS"
-  if ([string]::IsNullOrWhiteSpace($javaXms)) { $javaXms = "128m" }
-  $javaXmx = Get-EnvValue "LAVALINK_JAVA_XMX"
-  if ([string]::IsNullOrWhiteSpace($javaXmx)) { $javaXmx = "512m" }
-
-  $env:LAVALINK_SERVER_PASSWORD = $password
-  $env:SERVER_PORT = "2333"
-  $lavalinkWorkingDirectory = Join-Path (Get-Location) "infrastructure\lavalink"
-  Start-NativeProcess "lavalink" $java @("-Xms$javaXms", "-Xmx$javaXmx", "-jar", $lavalinkJar) $lavalinkWorkingDirectory "lavalink"
-  Write-Host "Lavalink node 1 starting..."
-
-  if (-not (Wait-Tcp "127.0.0.1" 2333 60 1)) {
-    Get-Content (Join-Path $logRoot "lavalink.err.log") -Tail 80 -ErrorAction SilentlyContinue
-    throw "Lavalink node 1 did not open port 2333."
-  }
-
-  if ($Lavalink2) {
-    $env:SERVER_PORT = "2334"
-    $nodes += @{
-      id = "local-2"
-      host = "127.0.0.1"
-      port = 2334
-      password = $password
-    }
-    Start-NativeProcess "lavalink2" $java @("-Xms$javaXms", "-Xmx$javaXmx", "-jar", $lavalinkJar) $lavalinkWorkingDirectory "lavalink2"
-    Write-Host "Lavalink node 2 starting..."
-    if (-not (Wait-Tcp "127.0.0.1" 2334 60 1)) {
-      Get-Content (Join-Path $logRoot "lavalink2.err.log") -Tail 80 -ErrorAction SilentlyContinue
-      throw "Lavalink node 2 did not open port 2334."
-    }
-  } else {
-    Stop-NativeProcess "lavalink2"
-  }
-
-  $nodeJsonItems = @($nodes | ForEach-Object { ConvertTo-Json -InputObject $_ -Compress -Depth 4 }); $env:LAVALINK_NODES = "[" + ($nodeJsonItems -join ",") + "]"
-  $env:SERVER_PORT = "2333"
+  $env:YTDLP_PATH = "yt-dlp"
+  $env:FFMPEG_PATH = "ffmpeg"
+  $env:YTDLP_JS_RUNTIME = "node"
 
   Start-NativeProcess "bot" "npm.cmd" @("run", "start", "-w", "apps/bot") (Get-Location).Path "bot"
 
@@ -571,7 +496,7 @@ try {
   Write-Host ""
   Write-Host "Discord Server Platform is running in native Windows mode."
   Write-Host "Docker Desktop is not required and is not started by this launcher."
-  Write-Host "Lavalink nodes: $($nodes.Count)"
+  Write-Host "Music engine: yt-dlp + FFmpeg"
   Write-Host "Bot health: $healthUrl"
   Write-Host "Logs: $logRoot"
 
