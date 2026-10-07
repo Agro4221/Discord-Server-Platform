@@ -16,6 +16,7 @@ import {
   nextMusicRepeatMode,
   normalizeMusicSearchProvider,
   normalizeMusicSourceUrl,
+  classifyMusicSearchUrl,
   normalizeYtDlpEntry,
   shouldAutoplayAfterQueueEnd,
   MAX_MUSIC_ENQUEUE_TRACKS
@@ -147,4 +148,15 @@ test("Music filter validator accepts only supported FFmpeg filters", () => {
   assert.equal(normalizeMusicFilterPreset("off"), "off");
   assert.equal(normalizeMusicFilterPreset("nightcore"), "nightcore");
   assert.equal(normalizeMusicFilterPreset("bassboost"), null);
+});
+
+
+test("Music global search classifies tracks and playlists across supported providers", () => {
+  assert.deepEqual(classifyMusicSearchUrl("https://www.youtube.com/watch?v=abc"), {provider:"youtube",kind:"track"});
+  assert.deepEqual(classifyMusicSearchUrl("https://www.youtube.com/playlist?list=abc"), {provider:"youtube",kind:"playlist"});
+  assert.deepEqual(classifyMusicSearchUrl("https://music.yandex.ru/album/44055285"), {provider:"yandex_music",kind:"playlist"});
+  assert.deepEqual(classifyMusicSearchUrl("https://open.spotify.com/playlist/abc"), {provider:"spotify",kind:"playlist"});
+  assert.deepEqual(classifyMusicSearchUrl("https://soundcloud.com/artist/sets/ost"), {provider:"soundcloud",kind:"playlist"});
+  assert.deepEqual(classifyMusicSearchUrl("https://www.tiktok.com/@artist/video/123"), {provider:"tiktok",kind:"track"});
+  assert.deepEqual(classifyMusicSearchUrl("https://vk.com/music/playlist/123_456"), {provider:"vk_music",kind:"playlist"});
 });
