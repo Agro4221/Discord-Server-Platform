@@ -14,7 +14,7 @@ development
 `be0d73b41359b4601742f7051a99fddf544c9bc3`
 
 ## Current phase
-Technical implementation freeze — current agreed feature scope is implemented; next phase is verification and live acceptance. Remaining work is tests/real-environment validation, not foundational feature construction.
+Targeted post-RC rework — Temporary Voice naming/bitrate and the Music engine have been migrated to the requested behavior; automated CI and live Windows/Discord validation remain.
 
 ## Working subsystems
 - Discord Core with typed event bus and module lifecycle.
@@ -58,8 +58,12 @@ The current implementation includes the agreed Automation action breadth, expand
 - Cleanup baseline `78a14d4cbb6b15ade0e7111e266eeff970a674e4` contains no removed legacy Dashboard/Vexa files; fresh CI validation is the release gate for this cleanup tree.
 - Source secret hygiene, deployment and observability checks are active.
 - Unit regression tests cover Core, module contracts and key Dashboard/runtime behaviour.
-- Full dependency compilation is delegated to CI because this execution environment has Node.js 22.16.
-- Discord live E2E requires user-owned Discord test credentials and has not been run here.
+- Full dependency compilation is delegated to CI because this execution environment has Node.js 22.16 while the repository targets Node.js 24.17+.
+- Discord live E2E and real yt-dlp/FFmpeg playback require the user's Discord test server and Windows runtime and have not been run here.
+
+- Latest rework code state before the continuity-log documentation commits: `c49dd0841f199d2c127b503c65d12accedecf730`.
+- The current Music architecture is local yt-dlp + FFmpeg; no Lavalink runtime/service/config remains in the active tree.
+- Temporary Voice channel creation is DSP-prefix-free and capped at 96 kbps.
 
 ## Continuity
 Read docs/WORK-LOG.md before continuing work in a new chat.
