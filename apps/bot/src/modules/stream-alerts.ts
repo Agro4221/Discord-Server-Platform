@@ -58,10 +58,10 @@ export class StreamAlerts implements PlatformModule {
   }
 
   async create(guildId:string,input:{platform:StreamAlertPlatform;target:string;channelId:string;mentionRoleId?:string|null;intervalSeconds:number;enabled?:boolean}):Promise<StreamAlertRecord>{
-    const target=normalizeTarget(input.platform,input.target);
+    const target=normalizeStreamAlertTarget(input.platform,input.target);
     const r=await this.db.query<{id:string}>(
       "INSERT INTO stream_alerts(guild_id,platform,target,channel_id,mention_role_id,interval_seconds,enabled) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id",
-      [guildId,input.platform,target,input.channelId,input.mentionRoleId??null,clampInterval(input.intervalSeconds),input.enabled!==false]
+      [guildId,input.platform,target,input.channelId,input.mentionRoleId??null,clampStreamAlertInterval(input.intervalSeconds),input.enabled!==false]
     );
     const id=r.rows[0]?.id;
     if(!id)throw new Error("stream_alert_create_failed");
@@ -77,10 +77,10 @@ export class StreamAlerts implements PlatformModule {
   async update(guildId:string,id:number,patch:{target?:string;channelId?:string;mentionRoleId?:string|null;intervalSeconds?:number;enabled?:boolean}):Promise<boolean>{
     const current=(await this.list(guildId)).find(item=>item.id===id);
     if(!current)return false;
-    const target=patch.target===undefined?current.target:normalizeTarget(current.platform,patch.target);
+    const target=patch.target===undefined?current.target:normalizeStreamAlertTarget(current.platform,patch.target);
     await this.db.query(
       "UPDATE stream_alerts SET target=$1,channel_id=$2,mention_role_id=$3,interval_seconds=$4,enabled=$5,last_error=NULL,updated_at=now() WHERE id=$6 AND guild_id=$7",
-      [target,patch.channelId??current.channelId,patch.mentionRoleId===undefined?current.mentionRoleId:patch.mentionRoleId,clampInterval(patch.intervalSeconds??current.intervalSeconds),patch.enabled??current.enabled,id,guildId]
+      [target,patch.channelId??current.channelId,patch.mentionRoleId===undefined?current.mentionRoleId:patch.mentionRoleId,clampStreamAlertInterval(patch.intervalSeconds??current.intervalSeconds),patch.enabled??current.enabled,id,guildId]
     );
     return true;
   }
@@ -262,7 +262,7 @@ export class StreamAlerts implements PlatformModule {
   }
 }
 
-function normalizeTarget(platform:StreamAlertPlatform,raw:string):string{
+export function normalizeStreamAlertTarget(platform:StreamAlertPlatform,raw:string):string{
   const value=raw.trim();if(!value)throw new Error("stream_alert_target_required");
   if(platform==="youtube"){
     const channelMatch=value.match(/youtube\.com\/channel\/(UC[A-Za-z0-9_-]{20,})/i);
@@ -274,7 +274,7 @@ function normalizeTarget(platform:StreamAlertPlatform,raw:string):string{
   return value.replace(/^https?:\/\/[^/]+\//i,"").split(/[?#/]/)[0]??value;
 }
 
-function clampInterval(value:number):number{
+export function clampStreamAlertInterval(value:number):number{
   if(!Number.isFinite(value))throw new Error("invalid_stream_alert_interval");
   return Math.min(Math.max(Math.trunc(value),15),3600);
 }
