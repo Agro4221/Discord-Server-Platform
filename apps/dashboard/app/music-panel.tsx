@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 type VoiceChannel = { id: string; name: string; type?: number };
 type Track = { title: string; author: string; durationMs: number };
-type MusicProvider = "auto" | "youtube";
+type MusicProvider = "auto" | "youtube" | "tiktok" | "yandex_music" | "vk_music" | "spotify" | "soundcloud";
 type MusicFilter = "off" | "nightcore" | "vaporwave" | "karaoke" | "rotation" | "tremolo" | "vibrato" | "lowpass";
 type MusicState = {
   enabled: boolean;
@@ -145,7 +145,7 @@ export function MusicPanel({
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ color: "#707b8d", fontSize: 11, lineHeight: 1.55 }}>
-        Локальный Music Control Center работает через тот же yt-dlp + FFmpeg engine, что и Discord-команды.
+        Локальный Music Control Center работает через yt-dlp + FFmpeg и принимает прямые ссылки на поддерживаемые источники, включая TikTok, Яндекс Музыку, VK, SoundCloud и Spotify-треки; для текстового поиска доступен Auto/YouTube, а Spotify-трек автоматически разрешается через доступный источник.
       </div>
 
       {error && (
@@ -183,6 +183,11 @@ export function MusicPanel({
           <select value={provider} onChange={(event) => setProvider(event.target.value as MusicProvider)} style={inputStyle}>
             <option value="auto">Auto</option>
             <option value="youtube">YouTube</option>
+            <option value="tiktok">TikTok</option>
+            <option value="yandex_music">Яндекс Музыка</option>
+            <option value="vk_music">VK Музыка</option>
+            <option value="spotify">Spotify</option>
+            <option value="soundcloud">SoundCloud</option>
           </select>
           <select value={voiceChannelId} onChange={(event) => setVoiceChannelId(event.target.value)} style={inputStyle}>
             <option value="">Voice-канал…</option>
