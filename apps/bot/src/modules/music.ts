@@ -13,6 +13,7 @@ export {
   musicResumePosition,
   canControlMusic,
   normalizeMusicRepeatMode,
+  nextMusicRepeatMode,
   shouldAutoplayAfterQueueEnd,
   normalizeMusicQueuePosition,
   normalizeMusicQueueMove,
