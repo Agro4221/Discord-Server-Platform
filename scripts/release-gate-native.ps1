@@ -1,7 +1,6 @@
 [CmdletBinding()]
 param(
   [switch]$Dashboard,
-  [switch]$RequireLavalink2
 )
 
 $ErrorActionPreference = "Stop"
@@ -52,9 +51,6 @@ function Assert-PidAlive([string]$PidFile, [string]$Description) {
 $healthPort = Get-EnvValue "HEALTH_PORT" "3001"
 $managementPort = Get-EnvValue "MANAGEMENT_API_PORT" "3002"
 $dashboardPort = Get-EnvValue "DASHBOARD_PORT" "3000"
-$lavalinkHost = Get-EnvValue "LAVALINK_HOST" "127.0.0.1"
-$lavalinkPort = Get-EnvValue "LAVALINK_PORT" "2333"
-$lavalinkPassword = Get-EnvValue "LAVALINK_PASSWORD" ""
 $managementKey = Get-EnvValue "MANAGEMENT_API_KEY" ""
 
 Write-Host "=== Discord Server Platform native Windows release gate ==="
@@ -118,18 +114,17 @@ if ($Dashboard) {
   }
 }
 
-Assert-Ok (-not [string]::IsNullOrWhiteSpace($lavalinkPassword)) "Lavalink password is configured"
-$lavalinkHeaders = @{ Authorization = $lavalinkPassword }
-$nodePorts = @([int]$lavalinkPort)
-if ($RequireLavalink2) { $nodePorts += 2334 }
-foreach ($nodePort in $nodePorts) {
-  try {
-    $version = Get-Json ("http://" + $lavalinkHost + ":" + $nodePort + "/version") $lavalinkHeaders
-    Assert-Ok ($null -ne $version) ("Lavalink node " + $nodePort + " responds to /version")
-  } catch {
-    throw "NATIVE RELEASE GATE FAILED: Lavalink node " + $nodePort + " is unavailable: " + $_.Exception.Message
-  }
+$ytDlp = Get-Command "yt-dlp.exe" -ErrorAction SilentlyContinue
+$ffmpeg = Get-Command "ffmpeg.exe" -ErrorAction SilentlyContinue
+Assert-Ok ($null -ne $ytDlp) "yt-dlp is installed"
+Assert-Ok ($null -ne $ffmpeg) "FFmpeg is installed"
+if ($ytDlp) {
+  $version = (& $ytDlp.Source --version).Trim()
+  Write-Host "OK: yt-dlp $version"
+}
+if ($ffmpeg) {
+  $version = (& $ffmpeg.Source -version | Select-Object -First 1).Trim()
+  Write-Host "OK: $version"
 }
 
-Write-Host ""
 Write-Host "NATIVE RELEASE GATE PASSED"
