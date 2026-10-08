@@ -208,7 +208,7 @@ export class StreamAlerts implements PlatformModule {
   }
 
   private async fetchTwitchLiveViaYtDlp(target:string):Promise<LiveInfo|null>{
-    const login=target.trim().replace(/^@/,"").replace(/^https?:\\/\\/(?:www\\.)?twitch\\.tv\\//i,"").split(/[?#/]/,1)[0]??"";
+    const login=target.trim().replace(/^@/,"").replace(/^https?:\/\/(?:www\.)?twitch\.tv\//i,"").split(/[?#/]/,1)[0]??"";
     if(!login)throw new Error("twitch_channel_required");
     const liveUrl="https://www.twitch.tv/"+encodeURIComponent(login);
     const result=await runProcess(this.config.ytDlpPath,[
